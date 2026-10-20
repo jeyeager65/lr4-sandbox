@@ -1393,7 +1393,7 @@ body.vr-on .stage { grid-row: 1; }
     const X = (dx - t.x[0]) / IN, Y = (dy - t.y[0]) / IN, Z = dz + meta.tip_above_table;
     for (const m of meshes) {
       const k = m.userData.motion;
-      if (k === "hose") continue;
+      if (k === "hose" || m.userData.held) continue;   // held: the touch plate laid on the stock (G-code playback)
       const b = m.userData.base || { t: [0, 0, 0], s: [1, 1, 1] };
       m.scale.set(b.s[0], b.s[1], b.s[2]);
       m.position.set(b.t[0] + (k === "core" ? dx : 0), b.t[1] + (k === "table" ? 0 : dy), b.t[2] + (k === "core" || k === "beam" ? dz : 0));
@@ -1779,7 +1779,63 @@ body.vr-on .stage { grid-row: 1; }
     done.geometry.setDrawRange(0, 0);
     return { ahead, done };
   }
+  // the modelled Tiny Touch Plate (TouchPlate + its spade + wire stub, stored in the top mount's slot) laid flat on
+  // the stock for the probe: pad centred under the bit, the strip off the stock's front-left corner. Its frame comes
+  // from the mesh: thinnest axis = the plate's normal, longest = the strip, the wider end = the pad. While held,
+  // move() leaves the three meshes alone.
+  const TOUCH_PARTS = ["TouchPlate", "TouchPlate_Spade", "TouchPlate_Wire"];
+  function touchFrame(geo) {                         // geometry coords: { L (pad -> tab), W, N, pad centre }
+    if (geo.userData.touch) return geo.userData.touch;
+    const p = geo.attributes.position.array, n = p.length / 3, c = [0, 0, 0];
+    for (let i = 0; i < n; i++) for (let a = 0; a < 3; a++) c[a] += p[3 * i + a] / n;
+    const C = [[0, 0, 0], [0, 0, 0], [0, 0, 0]];
+    for (let i = 0; i < n; i++) for (let a = 0; a < 3; a++) for (let b = 0; b < 3; b++) C[a][b] += (p[3 * i + a] - c[a]) * (p[3 * i + b] - c[b]);
+    const dot = (u, v) => u[0] * v[0] + u[1] * v[1] + u[2] * v[2], unit = (v) => v.map((x) => x / Math.hypot(...v));
+    const power = (M, v) => { for (let it = 0; it < 80; it++) v = unit(M.map((r) => dot(r, v))); return v; };
+    // the normal from the faces (area-weighted n n^T: the two big faces win - vertices bunch at the pad / tab, so their
+    // spread alone tilts it), then the strip = the vertices' main spread within that plane
+    const A = [[0, 0, 0], [0, 0, 0], [0, 0, 0]], ix = geo.index ? geo.index.array : null, nt = (ix ? ix.length : n) / 3;
+    const vt = (k) => [p[3 * k], p[3 * k + 1], p[3 * k + 2]];
+    for (let t = 0; t < nt; t++) {
+      const [a, b, d] = [0, 1, 2].map((j) => vt(ix ? ix[3 * t + j] : 3 * t + j));
+      const u = [b[0] - a[0], b[1] - a[1], b[2] - a[2]], v = [d[0] - a[0], d[1] - a[1], d[2] - a[2]];
+      const nn = [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]], ar = Math.hypot(...nn);
+      if (ar > 0) for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) A[i][j] += nn[i] * nn[j] / ar;
+    }
+    const N0 = power(A, [0.3, 0.4, 0.9]), Pn = (v) => { const k = dot(v, N0); return v.map((x, a) => x - k * N0[a]); };
+    const C2 = C.map((r) => Pn(r)), C3 = [0, 1, 2].map((a) => Pn(C2.map((r) => r[a])));   // P C P
+    let L = power(C3, unit(Pn([0.6, 0.5, 0.4])));
+    let W = [N0[1] * L[2] - N0[2] * L[1], N0[2] * L[0] - N0[0] * L[2], N0[0] * L[1] - N0[1] * L[0]];   // N x L
+    const loc = (i, ax) => (p[3 * i] - c[0]) * ax[0] + (p[3 * i + 1] - c[1]) * ax[1] + (p[3 * i + 2] - c[2]) * ax[2];
+    const range = (ax, keep) => { let lo = Infinity, hi = -Infinity; for (let i = 0; i < n; i++) if (keep(i)) { const v = loc(i, ax); lo = Math.min(lo, v); hi = Math.max(hi, v); } return [lo, hi]; };
+    let [s0, s1] = range(L, () => true);
+    const wid = (near) => { const r = range(W, near); return r[1] - r[0]; };
+    if (wid((i) => loc(i, L) > s1 - 4) > wid((i) => loc(i, L) < s0 + 4)) { L = L.map((x) => -x); W = W.map((x) => -x); [s0, s1] = [-s1, -s0]; }
+    const N = [L[1] * W[2] - L[2] * W[1], L[2] * W[0] - L[0] * W[2], L[0] * W[1] - L[1] * W[0]];
+    const wr = range(W, (i) => loc(i, L) < s0 + 4), nr = range(N, () => true), pad = 18;   // lr4.TOUCH_PLATE pad
+    const at = [s0 + pad / 2, (wr[0] + wr[1]) / 2, (nr[0] + nr[1]) / 2];
+    const V = (v) => new THREE.Vector3(...v);
+    return (geo.userData.touch = { L: V(L), W: V(W), N: V(N),
+      pad: V(c).addScaledVector(V(L), at[0]).addScaledVector(V(W), at[1]).addScaledVector(V(N), at[2]) });
+  }
+  function jobTouch(on) {
+    const parts = meshes.filter((m) => TOUCH_PARTS.includes(m.userData.name)), plate = parts.find((m) => m.userData.name === "TouchPlate");
+    if (!on || !plate) {                             // back on the core: move() places them again
+      const was = parts.some((m) => m.userData.held);
+      for (const m of parts) { m.userData.held = false; m.quaternion.identity(); }
+      return was;
+    }
+    const f = touchFrame(plate.geometry), pl = JOB.plate, at = JOB.at;
+    const dir = new THREE.Vector3(-1, -1, 0).normalize(), up = new THREE.Vector3(0, 0, 1), side = up.clone().cross(dir);
+    const R = new THREE.Matrix4().makeBasis(dir, side, up).multiply(new THREE.Matrix4().makeBasis(f.L, f.W, f.N).transpose());
+    const q = new THREE.Quaternion().setFromRotationMatrix(R);
+    const target = new THREE.Vector3(at[0] + pl.x, at[1] + pl.y, at[2] + pl.z + Math.max(pl.thick, 0.5) / 2);
+    const pos = target.sub(f.pad.clone().applyMatrix4(R));
+    for (const m of parts) { m.userData.held = true; m.quaternion.copy(q); m.position.copy(pos); m.scale.set(1, 1, 1); }
+    return true;
+  }
   function jobClear() {
+    if (jobTouch(false) && meta) move();
     if (JOB.group) {
       scene.remove(JOB.group);
       JOB.group.traverse((o) => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); });
@@ -1824,11 +1880,7 @@ body.vr-on .stage { grid-row: 1; }
     JOB.ahead = mv.ahead; JOB.done = mv.done;
     JOB.group.add(mv.ahead, mv.done);
     mv.ahead.visible = mv.done.visible = $("job-moves").checked;
-    if (tl.plates.length) {                          // the touch plate (size GUESS, ~1.5 in square), from its attach pause
-      const pl = tl.plates[0], th = Math.max(pl.thick, 0.5);
-      JOB.plate = new THREE.Mesh(new THREE.BoxGeometry(38, 38, th), new THREE.MeshStandardMaterial({ color: 0x9aa0a6, metalness: 0.8, roughness: 0.35 }));
-      JOB.group.add(JOB.plate);
-    }
+    JOB.plate = tl.plates[0] || null;                 // the modelled touch plate comes off the core for it (jobTouch)
     scene.add(JOB.group);
     const tv = meta.travel, b = tl.segs.reduce((r, sg) => [Math.min(r[0], sg.end.x), Math.max(r[1], sg.end.x), Math.min(r[2], sg.end.y),
       Math.max(r[3], sg.end.y)], [Infinity, -Infinity, Infinity, -Infinity]);
@@ -1851,11 +1903,8 @@ body.vr-on .stage { grid-row: 1; }
     if (carve && JOB.sim) JOB.sim.advanceTo(p.index, 15, p.progress);
     jobUpdateMesh(false);
     JOB.done.geometry.setDrawRange(0, 2 * p.index);
-    if (JOB.plate) {
-      const pl = tl.plates[0];
-      JOB.plate.visible = JOB.t >= pl.t0 && (JOB.t < pl.t1 || (JOB.t === pl.t1 && !JOB.playing));   // off once resumed
-      JOB.plate.position.set(at[0] + pl.x, at[1] + pl.y, at[2] + pl.z + JOB.plate.geometry.parameters.depth / 2);
-    }
+    const pl = JOB.plate;                            // on the stock from its attach pause until resumed past the next
+    jobTouch(pl && JOB.t >= pl.t0 && (JOB.t < pl.t1 || (JOB.t === pl.t1 && !JOB.playing)));
     const clamp = (v, r) => Math.min(Math.max(v, r[0]), r[1]);
     // work zero is the cutting area's corner = slider 0; the tip's height above the table = stock + work Z
     move([clamp(p.x + tv.x[0], tv.x), clamp(p.y + tv.y[0], tv.y), at[2] + p.z - tableZ - meta.tip_above_table]);
@@ -1879,7 +1928,7 @@ body.vr-on .stage { grid-row: 1; }
     $("job-resume").textContent = e.kind === "alarm" ? "Carry on anyway" : "Resume (cycle start)";
     $("job-pop").hidden = false;
     $("job-status").textContent = $("job-pop-msg").textContent;   // not the MSG lines after the M0 yet
-    if (JOB.plate) JOB.plate.visible = JOB.t >= JOB.tl.plates[0].t0 && JOB.t <= JOB.tl.plates[0].t1;
+    if (JOB.plate) jobTouch(JOB.t >= JOB.plate.t0 && JOB.t <= JOB.plate.t1);
   }
   function jobTick() {
     const now = performance.now(), dt = Math.min((now - (JOB.last || now)) / 1000, 0.5);   // wall time: the speed holds on
