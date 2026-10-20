@@ -3,6 +3,20 @@
 The version is the configurator page's (`VERSION` in `web/index.html`, shown in its footer). The footer also shows
 the date the model data was built and the Printables file set it was solved for.
 
+## 0.8.0 - 2026-10-20
+- VR mode (PC VR through SteamVR / OpenXR): an "Enter VR" button appears when the browser offers WebXR. A menu on
+  the left controller (inches / mm, size steppers and presets, braces, Peter Plates, part groups, unhide); touch a
+  part (or point + trigger) for its card with Hide part / Hide group; grab the red sphere to move the core, drag
+  the corner diamond to resize the table; hold a grip to drag the machine, both grips to zoom and rotate; snap
+  turn; teleport at 1:1 or a tabletop model on a stand. The desktop window swaps its side panel for a popup card
+  while VR is on. Not yet tried on a headset.
+- "Show N hidden parts" under the part groups (parts hidden from VR).
+- Basic table legs + apron under the MDF (drawn in the page only, for a sense of height): View > Table height sets
+  the top of the MDF (default 34 in).
+- Workshop background (View > Background: Workshop / Plain): concrete floor, block walls with windows, a half-open
+  roll-up door onto a driveway, sky / grass / trees outside, workbench + pegboard, shelf of bins, shop vac, strip lights. Enter your building's size (X, Y, ceiling; blank = auto) to see
+  the gap from the machine to each wall, with a warning under 2 ft / 600 mm. In VR at 1:1 you stand in it.
+
 ## 0.7.0 - 2026-10-20
 - Repo polish: README (the two ways to use it), CHANGELOG, issue template, CI (the no-part-files guard, Python
   compile, calculator tests), a manual GitHub Pages workflow (not enabled yet).

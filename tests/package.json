@@ -1,13 +1,13 @@
 {
   "name": "lr4-sandbox-tests",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "private": true,
   "description": "Tests for the LR4 Sandbox configurator (web/js) and its Python twins",
   "license": "MIT",
   "type": "commonjs",
   "scripts": {
-    "test": "node test_calculator.js",
-    "test:local": "node test_calculator.js && node test_config_model.js && node test_parts_files.js && node test_strut_plate.js"
+    "test": "node test_calculator.js && node test_vr.js",
+    "test:local": "node test_calculator.js && node test_vr.js && node test_config_model.js && node test_parts_files.js && node test_strut_plate.js"
   },
   "dependencies": {
     "polygon-clipping": "^0.15.7"

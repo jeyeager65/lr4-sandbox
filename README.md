@@ -67,12 +67,17 @@ a folder or the STL / DXF files on the page (or use its buttons). They're read i
 SHA-256 (renamed files are fine) and kept in its IndexedDB; nothing is uploaded. The panel lists what's missing,
 with the Printables links, and warns about files that differ from the versions the placements were solved for.
 
-The page reads its data from `web/data/`, which `pipeline/` generates from FreeCAD builds:
+**VR (optional):** with a PC VR headset on SteamVR / OpenXR (PS VR2, Index, Quest Link) and Chrome or Edge, the
+View panel shows "Enter VR" (https or 127.0.0.1 only); the desktop window then shows a small card instead of the
+side panel. Left controller: the menu (tap its grip to hide it). Touch a part - or point at it and pull the
+trigger - for its name and Hide part / Hide group. Trigger also presses menu buttons, grabs the red sphere to move
+the core and drags the corner diamond to resize the table (snaps to 1/2 in, rebuilds when you let go). Hold a grip
+to drag the machine; hold both to zoom and rotate. Thumbstick: left / right turns; at 1:1 push forward to aim a
+teleport and let go to jump; on the tabletop forward / back zooms. Load part files on the desktop first.
 
-```sh
-python pipeline/size_builds.py               # FreeCAD builds at 13 sizes (~55 min)
-python pipeline/fit_config.py                # fit -> web/data/
-```
+**Workshop:** View > Background shows the machine in a workshop. Enter your building's size (X, Y, ceiling) to see
+how much room it takes: the page gives the gap from the machine to each wall and warns when a side is under
+2 ft / 600 mm. The table legs and the room are drawn by the page only (not part of the FreeCAD model).
 
 ## Tests
 
@@ -82,6 +87,7 @@ npm test                                     # what CI runs (no part files neede
 npm run test:local                           # all the node tests below
 node test_config_model.js                    # the configurator's machine vs every FreeCAD size build
 node test_calculator.js                      # the JS and Python calculators agree (needs python)
+node test_vr.js                              # the VR menu layout and helpers
 node test_strut_plate.js                     # JS strut plates vs Vector76's OpenSCAD generator (maintainer only)
 python ../tools/run.py test_strut_plate.py   # Python strut plates vs the same (maintainer only)
 node test_parts_files.js                     # the page's STL / DXF readers vs the reference build (needs parts/)

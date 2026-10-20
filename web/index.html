@@ -81,6 +81,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 .swatches label { display: flex; align-items: center; gap: 8px; cursor: pointer; }
 .swatches input[type=color] { width: 36px; height: 28px; padding: 0; border: 1px solid var(--line); border-radius: 4px; background: none; cursor: pointer; }
 .groups { display: flex; flex-direction: column; gap: 2px; }
+#unhide { margin-top: 8px; }
 .groups label { display: grid; grid-template-columns: 18px 1fr auto; gap: 8px; align-items: center; padding: 4px 0; cursor: pointer; }
 .groups input { accent-color: var(--accent); margin: 0; }
 .groups em { font-style: normal; font-family: var(--font-data); font-size: 12px; color: var(--muted); }
@@ -145,6 +146,8 @@ h1 span { color: var(--accent); }
 .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
 .field { display: grid; gap: 4px; min-width: 0; margin-top: 10px; }
 .pair .field { margin-top: 0; }
+.trio { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 4px; }
+.trio .field { margin-top: 0; }
 .field label { font-size: 12px; color: var(--muted); }
 .unit-input { display: flex; border: 1px solid var(--line); border-radius: 4px; background: var(--bg); }
 .unit-input:focus-within { outline: 2px solid var(--accent); outline-offset: 1px; }
@@ -181,6 +184,23 @@ label.btn:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; 
   .panel { grid-row: 2; border-right: 0; border-top: 1px solid var(--line); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
   h1 { font-size: 24px; }
 }
+/* VR on: no side panel, the stage fills the window, a popup card instead (js/vr.js toggles body.vr-on) */
+body.vr-on { grid-template-columns: 1fr; grid-template-rows: 1fr; }
+body.vr-on .panel, body.vr-on .hint { display: none; }
+body.vr-on .stage { grid-row: 1; }
+.vr-pop {
+  position: absolute; right: 16px; top: 16px; width: min(400px, calc(100% - 32px));
+  background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-left: 4px solid var(--accent);
+  border-radius: 6px; padding: 14px 16px; box-shadow: 0 10px 32px rgb(0 0 0 / 0.28);
+}
+.vr-pop h2 { margin: 0; font-family: var(--font-display); font-size: 20px; letter-spacing: 0.02em; }
+.vr-pop .vr-size { font-family: var(--font-data); color: var(--accent); margin: 2px 0 8px; }
+.vr-pop p { margin: 4px 0; font-size: 13px; color: var(--muted); }
+.vr-pop dl { display: grid; grid-template-columns: auto 1fr; gap: 3px 10px; margin: 8px 0 12px; font-size: 13px; }
+.vr-pop dt { font-weight: 600; color: var(--ink); }
+.vr-pop dd { margin: 0; color: var(--muted); }
+.vr-pop #vr-exit { width: 100%; }
+.vr-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 @media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto; } }
 </style>
 
@@ -239,11 +259,29 @@ label.btn:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; 
       <button id="v-side" type="button">Y-rail side</button>
       <button id="v-back" type="button">Back</button>
       <button id="v-fit" type="button">Fit all</button>
+      <button id="v-vr" type="button" hidden title="PC VR headset (SteamVR / OpenXR)">Enter VR</button>
     </div>
     <div class="variant" id="detail"><span>Detail</span>
       <button type="button" data-v="full" aria-pressed="false">Full</button>
       <button type="button" data-v="lite" aria-pressed="false">Lite</button></div>
     <p class="foot" id="detail-note"></p>
+    <div class="variant" id="scenery"><span>Background</span>
+      <button type="button" data-v="shop" aria-pressed="true">Workshop</button>
+      <button type="button" data-v="plain" aria-pressed="false">Plain</button></div>
+    <div class="field"><label for="table-top">Table height (top of the MDF; legs are drawn only)</label>
+      <div class="unit-input"><input id="table-top" type="number" step="any" min="1"><span class="u">in</span></div></div>
+    <div id="room-box">
+      <div class="trio">
+        <div class="field"><label for="room-w">Building X</label>
+          <div class="unit-input"><input id="room-w" type="number" step="any" min="0" placeholder="–"><span class="ru">ft</span></div></div>
+        <div class="field"><label for="room-d">Building Y</label>
+          <div class="unit-input"><input id="room-d" type="number" step="any" min="0" placeholder="–"><span class="ru">ft</span></div></div>
+        <div class="field"><label for="room-h">Ceiling</label>
+          <div class="unit-input"><input id="room-h" type="number" step="any" min="0" placeholder="–"><span class="ru">ft</span></div></div>
+      </div>
+      <p class="foot" id="room-note"></p>
+      <div id="room-warn"></div>
+    </div>
     <div class="sm">
       <button id="sm-connect" type="button">Connect SpaceMouse</button>
       <span id="sm-status" class="sm-status">Not connected</span>
@@ -265,6 +303,7 @@ label.btn:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; 
   <section aria-labelledby="h-parts">
     <h2 id="h-parts">Parts</h2>
     <div class="groups" id="groups"></div>
+    <button type="button" id="unhide" hidden></button>
     <div class="variant" id="peter-variant" hidden><span>Peter Plates</span>
       <button type="button" data-v="solid" aria-pressed="false">Solid</button>
       <button type="button" data-v="honeycomb" aria-pressed="false">Honeycomb</button>
@@ -336,6 +375,20 @@ label.btn:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; 
   <canvas id="c" aria-label="3D model of the LowRider 4 assembly"></canvas>
   <div class="status" id="status" role="status" aria-live="polite"><div id="status-title">Loading model…</div><div class="bar"><div id="status-bar"></div></div><div class="detail" id="status-detail">&nbsp;</div></div>
   <div class="hint">Drag to orbit · right-drag to pan · scroll to zoom</div>
+  <div class="vr-pop" id="vr-pop" role="dialog" aria-labelledby="vr-pop-h" hidden>
+    <div class="vr-head"><h2 id="vr-pop-h">Viewing in VR</h2>
+      <div class="seg"><button type="button" id="vr-u-in" aria-pressed="true">Inches</button><button type="button" id="vr-u-mm" aria-pressed="false">mm</button></div></div>
+    <div class="vr-size" id="vr-size"></div>
+    <p id="vr-pick">Touch a part, or point at it and pull the trigger, to see what it is.</p>
+    <dl>
+      <dt>Menu</dt><dd>on the left controller; tap its grip to show / hide it</dd>
+      <dt>Touch</dt><dd>a part's card: its name, Hide part, Hide group</dd>
+      <dt>Trigger</dt><dd>press a button, open a part's card, grab the red sphere (moves the core) or the corner diamond (resizes)</dd>
+      <dt>Grip</dt><dd>hold one to drag the machine; hold both to zoom (pull apart / together) and rotate (twist)</dd>
+      <dt>Stick</dt><dd>left / right turns; 1:1: push forward to aim a teleport; tabletop: zoom</dd>
+    </dl>
+    <button type="button" id="vr-exit">Exit VR</button>
+  </div>
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
@@ -346,6 +399,8 @@ label.btn:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; 
 <script src="js/strut_plate.js"></script>
 <script src="js/config_model.js"></script>
 <script src="js/parts_files.js"></script>
+<script src="js/vr.js"></script>
+<script src="js/workshop.js"></script>
 <script>
 (function () {
   const IN = 25.4;
@@ -771,6 +826,50 @@ label.btn:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; 
     }
     return out;
   }
+  // ---- basic table legs - drawn here only (not in the FreeCAD model, cut list or BOM): doubled-2x4 legs inside a 2x4
+  // apron round the MDF's edge, at most LEG_GAP apart; the MDF's top tableTop above the floor (View > Table height,
+  // kept in this browser; default 34 in) ----
+  const LEG = 3.5 * IN, APRON_T = 1.5 * IN, APRON_H = 3.5 * IN, LEG_GAP = 1800, TOP_DEFAULT = 34 * IN;
+  let tableTop = TOP_DEFAULT;
+  try { tableTop = +localStorage.getItem("lr4-table-top") || TOP_DEFAULT; } catch (e) { /* default */ }
+  function boxesGeo(list) {                           // [x0, y0, z0, x1, y1, z1] boxes as one flat-shaded geometry
+    const pos = [], nor = [];
+    for (const [x0, y0, z0, x1, y1, z1] of list) {
+      const g = new THREE.BoxGeometry(x1 - x0, y1 - y0, z1 - z0).toNonIndexed();
+      g.translate((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2);
+      pos.push(...g.attributes.position.array); nor.push(...g.attributes.normal.array);
+      g.dispose();
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+    geo.setAttribute("normal", new THREE.Float32BufferAttribute(nor, 3));
+    return geo;
+  }
+  function legMeshes() {
+    const t = meshes.find((m) => m.userData.name === "TableMDF");
+    if (!t) return [];
+    t.geometry.computeBoundingBox();
+    const b = t.userData.base || { t: [0, 0, 0], s: [1, 1, 1] }, bb = t.geometry.boundingBox;
+    const ends = [bb.min, bb.max].map((p) => [0, 1, 2].map((i) => p.getComponent(i) * b.s[i] + b.t[i]));
+    const lo = [0, 1, 2].map((i) => Math.min(ends[0][i], ends[1][i])), hi = [0, 1, 2].map((i) => Math.max(ends[0][i], ends[1][i]));
+    const minTop = hi[2] - lo[2] + APRON_H + 100;     // legs at least 100 mm below the apron
+    const top = Math.max(tableTop, minTop), floor = hi[2] - top, under = lo[2];
+    const spread = (a, z, n) => Array.from({ length: n }, (_, i) => a + (z - a) * i / (n - 1));
+    const along = (a, z) => spread(a, z, Math.max(2, Math.ceil((z - a) / LEG_GAP) + 1));
+    const x0 = lo[0] + APRON_T, x1 = hi[0] - APRON_T - LEG, y0 = lo[1] + APRON_T, y1 = hi[1] - APRON_T - LEG;
+    const spots = new Set();
+    for (const x of along(x0, x1)) for (const y of [y0, y1]) spots.add(`${x},${y}`);
+    for (const y of along(y0, y1)) for (const x of [x0, x1]) spots.add(`${x},${y}`);
+    const legs = [...spots].map((k) => k.split(",").map(Number)).map(([x, y]) => [x, y, floor, x + LEG, y + LEG, under]);
+    const aprons = [[lo[0], lo[1], under - APRON_H, hi[0], lo[1] + APRON_T, under],
+      [lo[0], hi[1] - APRON_T, under - APRON_H, hi[0], hi[1], under],
+      [lo[0], lo[1] + APRON_T, under - APRON_H, lo[0] + APRON_T, hi[1] - APRON_T, under],
+      [hi[0] - APRON_T, lo[1] + APRON_T, under - APRON_H, hi[0], hi[1] - APRON_T, under]];
+    const ud = (name, label) => ({ name, label, group: "Table", motion: "table", source: "made", color: [0.84, 0.70, 0.50],
+      ownGeo: true, floor: true });
+    return [[boxesGeo(legs), ud("TableLegs", `Table legs (basic: ${legs.length} doubled 2x4s, ${+(top / IN).toFixed(1)} in top - not in the cut list)`)],
+      [boxesGeo(aprons), ud("TableApron", "Table apron (basic: 2x4 on edge - not in the cut list)")]];
+  }
   function clearMachine() {
     select(null);
     for (const m of meshes) {
@@ -811,6 +910,7 @@ label.btn:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; 
       addMesh(geo, material(rec.meta.color, null), Object.assign({}, rec.meta, { name: rec.key, ownGeo: true }));
       tris += geo.attributes.position.count / 3;
     }
+    for (const [geo, ud] of legMeshes()) addMesh(geo, material(ud.color, null), ud);
     meta = { cut_in: [S.cutX / IN, S.cutY / IN], travel: LR4Model.travel(cfg, S), tip_above_table: cfg.tip_above_table,
       hose: LR4Model.hose(cfg, S, inst), table_mm: [S.TW, S.TL], bom: cfg.bom_ref, peter_style: cfg.peter_style, parts: meshes,
       triangles: tris };
@@ -821,7 +921,80 @@ label.btn:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; 
     applyVisibility();
     updateSliders();
     renderBom();
+    updateShop();
   }
+
+  // ---- workshop scenery (js/workshop.js) round the table, sized by the building size (blank = auto); the note
+  // gives the gaps from the machine to each wall. Kept in this browser. ----
+  let scenery = "shop", shop = null, shopVR = true, shopRoom = null;
+  const ROOM = { w: 0, d: 0, h: 0 };                  // mm, 0 = auto
+  const roomU = () => (U.unit === "in" ? 304.8 : 1000);   // ft or m
+  const roomLen = (mm) => {
+    if (U.unit !== "in") return (mm / 1000).toFixed(2) + " m";
+    const i = Math.round(Math.abs(mm) / IN), sign = mm < 0 ? "\u2212" : "";
+    return `${sign}${Math.floor(i / 12)}\u2032 ${i % 12}\u2033`;
+  };
+  function fillRoom() {
+    for (const k of ["w", "d", "h"]) document.getElementById("room-" + k).value = ROOM[k] ? +(ROOM[k] / roomU()).toFixed(2) : "";
+    document.querySelectorAll(".ru").forEach((u) => (u.textContent = U.unit === "in" ? "ft" : "m"));
+  }
+  function setupScenery() {
+    try {
+      scenery = localStorage.getItem("lr4-scenery") || "shop";
+      Object.assign(ROOM, JSON.parse(localStorage.getItem("lr4-room") || "{}"));
+    } catch (e) { /* defaults */ }
+    const box = document.getElementById("scenery");
+    const mark = () => {
+      box.querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.v === scenery)));
+      document.getElementById("room-box").hidden = scenery !== "shop";
+    };
+    box.querySelectorAll("button").forEach((b) => b.addEventListener("click", () => {
+      scenery = b.dataset.v;
+      try { localStorage.setItem("lr4-scenery", scenery); } catch (e) { /* not kept */ }
+      mark(); updateShop();
+    }));
+    for (const k of ["w", "d", "h"]) document.getElementById("room-" + k).addEventListener("change", (e) => {
+      const v = parseFloat(e.target.value);
+      ROOM[k] = isFinite(v) && v > 0 ? v * roomU() : 0;
+      try { localStorage.setItem("lr4-room", JSON.stringify(ROOM)); } catch (err) { /* not kept */ }
+      updateShop();
+    });
+    ["u-in", "u-mm"].forEach((id) => document.getElementById(id).addEventListener("click", () => { fillRoom(); fillTop(); updateShop(); }));
+    const topEl = document.getElementById("table-top");
+    const fillTop = () => (topEl.value = +(U.unit === "in" ? tableTop / IN : tableTop).toFixed(U.unit === "in" ? 2 : 0));
+    topEl.addEventListener("change", () => {
+      const v = parseFloat(topEl.value), mm = v * (U.unit === "in" ? IN : 1);
+      if (!(mm >= 300 && mm <= 1500)) { fillTop(); return; }   // 12 - 59 in
+      tableTop = mm;
+      try { localStorage.setItem("lr4-table-top", String(mm)); } catch (e) { /* not kept */ }
+      rebuild();                                      // new legs, workshop gaps; VR follows the new floor
+    });
+    mark(); fillRoom(); fillTop();
+  }
+  function updateShop() {
+    if (shop) { scene.remove(shop); LR4Shop.dispose(shop); shop = null; }
+    const note = document.getElementById("room-note"), warnEl = document.getElementById("room-warn");
+    const legs = meshes.find((m) => m.userData.name === "TableLegs");
+    if (!legs || scenery !== "shop") { note.textContent = ""; warnEl.innerHTML = ""; shopRoom = null; return; }
+    const tb = new THREE.Box3().setFromObject(legs), mb = new THREE.Box3();
+    for (const m of meshes) if (m.userData.motion !== "hose") { m.updateMatrixWorld(); mb.expandByObject(m); }
+    const floor = tb.min.z, table = { x0: tb.min.x, x1: tb.max.x, y0: tb.min.y, y1: tb.max.y };
+    const machine = { x0: mb.min.x, x1: mb.max.x, y0: mb.min.y, y1: mb.max.y, z1: mb.max.z - floor };
+    const R = LR4Shop.room(table, machine, ROOM), g = R.gaps, auto = !(ROOM.w && ROOM.d && ROOM.h);
+    shopRoom = R;
+    if (shopVR) { shop = LR4Shop.build(THREE, { room: R, table, machine, floor }); scene.add(shop); }
+    note.textContent = `Room ${roomLen(R.x1 - R.x0)} \u00d7 ${roomLen(R.y1 - R.y0)}, ${roomLen(R.h)} ceiling${auto ? " (blank = auto)" : ""}, ` +
+      `machine centered. To the walls: X sides ${roomLen(g.left)} / ${roomLen(g.right)}, front ${roomLen(g.front)}, ` +
+      `back ${roomLen(g.back)}; ${roomLen(g.top)} above it.`;
+    const warn = [], side = { left: "on the \u2212X side", right: "on the +X side", front: "at the front", back: "at the back" };
+    const need = U.unit === "in" ? "2 ft" : "600 mm";
+    for (const [k, txt] of Object.entries(side))
+      if (g[k] < 0) warn.push(`The machine doesn't fit: it's ${roomLen(-g[k])} past the wall ${txt}.`);
+      else if (g[k] < LR4Shop.WALK) warn.push(`Only ${roomLen(g[k])} ${txt} - under ${need} to walk past.`);
+    if (g.top < 0) warn.push(`The ceiling is ${roomLen(-g.top)} below the top of the machine.`);
+    warnEl.innerHTML = warn.map((w) => `<p class="warn">${w}</p>`).join("");
+  }
+
   function fitView(dir) {
     const box = new THREE.Box3();
     for (const m of meshes) if (m.visible && m.userData.motion !== "hose") { m.updateMatrixWorld(); box.expandByObject(m); }
@@ -855,6 +1028,8 @@ label.btn:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; 
     setupVariants();
     setupBom();
     setupAbout();
+    setupScenery();
+    updateShop();
     fitView([1, -1.15, 0.85]);
     await nextFrame();
     statusEl.hidden = true;
@@ -1033,8 +1208,13 @@ label.btn:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; 
   const isLid = (m) => /^Jackpot3_(Lid|Fan)/.test(m.userData.name);
   let lidHidden = false;
   const groupOn = (g) => { const el = document.getElementById("g-" + g); return !el || el.checked; };
+  const hiddenParts = new Set();                     // single parts hidden from VR (by name; kept across sizes)
   function applyVisibility() {
-    for (const m of meshes) m.visible = groupOn(m.userData.group) && variantOK(m) && !(lidHidden && isLid(m));
+    for (const m of meshes) m.visible = groupOn(m.userData.group) && variantOK(m) && !(lidHidden && isLid(m))
+      && !hiddenParts.has(m.userData.name);
+    const un = document.getElementById("unhide");
+    un.hidden = !hiddenParts.size;
+    un.textContent = `Show ${hiddenParts.size} hidden part${hiddenParts.size === 1 ? "" : "s"}`;
     if (selected && !selected.visible) select(null);
   }
   function buildGroups() {                            // once: a row per group; the counts follow the size
@@ -1048,6 +1228,7 @@ label.btn:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; 
     };
     for (const [key, label] of GROUPS) row(key, label, applyVisibility);
     row("jp3lid", "Jackpot3 lid + fan", (e) => { lidHidden = !e.target.checked; applyVisibility(); });
+    document.getElementById("unhide").addEventListener("click", () => { hiddenParts.clear(); applyVisibility(); });
   }
   function updateGroupCounts() {
     const set = (id, list) => {
@@ -1335,7 +1516,7 @@ label.btn:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; 
   }
 
   // ---- version + feedback: the issue link carries the size, data date and the loaded files' checksums ----
-  const VERSION = "0.7.0";
+  const VERSION = "0.8.0";
   function setupAbout() {
     const bits = [`lr4-sandbox ${VERSION}`];
     if (cfg.built) bits.push(`model data built ${cfg.built}`);
@@ -1760,17 +1941,28 @@ label.btn:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; 
     camera.lookAt(controls.target);
   }
 
+  // ---- VR (js/vr.js): the same scene and page state; its menu drives the page's controls ----
+  const vr = LR4VR.setup({ THREE, scene, renderer, camera, controls, meshes: () => meshes, select, background: paintBackground, resize,
+    hidePart: (m) => { hiddenParts.add(m.userData.name); applyVisibility(); },
+    showHidden: () => { hiddenParts.clear(); applyVisibility(); },
+    hiddenCount: () => hiddenParts.size,
+    groupLabel: (k) => (GROUPS.find((g) => g[0] === k) || [0, k])[1],
+    scenery: (on) => { shopVR = on; updateShop(); return !!shop; },
+    room: () => (shop ? shopRoom : null) });   // the workshop at 1:1, not on the tabletop
+  window.LR4VR.page = vr;                             // testing without a headset: page_shot --eval "LR4VR.page.preview('one')"
+
   let lastT = performance.now();
+  const camPos = new THREE.Vector3();
   function tick() {
     const now = performance.now(), dt = Math.min((now - lastT) / 1000, 0.1);
     lastT = now;
-    smApply(dt);
-    controls.update();
+    if (shop) LR4Shop.cutaway(shop, camera.getWorldPosition(camPos));   // hide walls the camera is outside of
+    if (vr.active()) vr.tick(dt);
+    else { smApply(dt); controls.update(); }
     renderer.render(scene, camera);
-    requestAnimationFrame(tick);
   }
   resize();
-  tick();
+  renderer.setAnimationLoop(tick);                    // the headset's frame loop while VR is on
   load().catch((err) => { statusEl.textContent = "Could not load the model: " + err.message; });
 })();
 </script>
