@@ -1780,7 +1780,7 @@ body.vr-on .stage { grid-row: 1; }
     return { ahead, done };
   }
   // the modelled Tiny Touch Plate (TouchPlate + its spade + wire stub, stored in the top mount's slot) laid flat on
-  // the stock for the probe: pad centred under the bit, the strip off the stock's front-left corner. Its frame comes
+  // the stock for the probe: pad centred under the bit, the strip angled front-right off the front edge (user). Its frame comes
   // from the mesh: thinnest axis = the plate's normal, longest = the strip, the wider end = the pad. While held,
   // move() leaves the three meshes alone.
   const TOUCH_PARTS = ["TouchPlate", "TouchPlate_Spade", "TouchPlate_Wire"];
@@ -1826,7 +1826,7 @@ body.vr-on .stage { grid-row: 1; }
       return was;
     }
     const f = touchFrame(plate.geometry), pl = JOB.plate, at = JOB.at;
-    const dir = new THREE.Vector3(-1, -1, 0).normalize(), up = new THREE.Vector3(0, 0, 1), side = up.clone().cross(dir);
+    const dir = new THREE.Vector3(1, -1, 0).normalize(), up = new THREE.Vector3(0, 0, 1), side = up.clone().cross(dir);
     const R = new THREE.Matrix4().makeBasis(dir, side, up).multiply(new THREE.Matrix4().makeBasis(f.L, f.W, f.N).transpose());
     const q = new THREE.Quaternion().setFromRotationMatrix(R);
     const target = new THREE.Vector3(at[0] + pl.x, at[1] + pl.y, at[2] + pl.z + Math.max(pl.thick, 0.5) / 2);
