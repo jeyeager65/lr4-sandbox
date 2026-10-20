@@ -10,7 +10,8 @@
 # up) with the openings filled, so they aren't matched by points. open = that file, piece = its connected component
 # (sorted by ZMax, highest first: 0 = T, 1 = B), A = the build's frame (YZ plate x PETER_IN_YZ, Max mirrored);
 # closed = PeterPlateT / B.stl (flat, as downloaded), fitted onto the open piece by nearest points.
-# Bristles (kind "bent"): bent along the skirt by the build (mesh.bend_strip) - only the file is recorded.
+# Bristles (kind "bent"): bent along the skirt by the build (mesh.bend_strip): the groove path (skirt file frame) and
+# bend_strip's arguments are recorded, A = the skirt's (checked: the strip bent with them lands on the built one).
 import glob
 import itertools
 import sys
@@ -147,8 +148,24 @@ for piece, tag in enumerate(("T", "B")):
         out[nm] = dict(kind="peter", open=file_rec(OPEN, A=A.round(9).tolist(), piece=piece, err=float(d.max())),
                        closed=file_rec(closed, A=Ac.round(9).tolist(), matched=round(frac, 4)))
         unmatched.remove(nm)
+from fclib import mesh as fm                          # noqa: E402  (lr4 put freecad/ on the path)
+sg = lr4.SKIRT_GROOVE
+SKIRT, STRIP = "kobalt/Dust_Skirt_Kobalt.stl", "kobalt/TPU_Bristles_22mm.stl"
+groove = np.asarray(lr4.skirt_groove(Mesh.Mesh(os.path.join(PARTS, SKIRT))), dtype=float)
+glen = float(np.hypot(*np.diff(groove, axis=0).T).sum())
+flat = Mesh.Mesh(os.path.join(PARTS, STRIP))
 for nm in [u for u in unmatched if u.startswith("Bristles_TPU")]:
-    out[nm] = dict(kind="bent", **file_rec("kobalt/TPU_Bristles_22mm.stl"))
+    k = int(nm.rsplit("_", 1)[1]) - 1
+    bend = dict(along=[1, sg["strip_y0"]], height=[0, sg["strip_spine_x"], 1], across=[2, sg["strip_t"] / 2],
+                z0=sg["z_ceiling"], start=0.0 if k == 0 else glen, scale=glen / sg["strips"] / sg["strip_len"],
+                reverse=k == 1)
+    A = np.array(out[SKIRT.split("/")[1][:-4]]["A"])       # build.py: the strips go in with the skirt's placement
+    q = pts_of(fm.bend_strip(flat, groove, **bend)) @ A[:, :3].T + A[:, 3]
+    d, _ = nearest(q, pts_of(doc.getObject(nm).Mesh))
+    if d.max() > 1e-3:
+        raise SystemExit(f"{nm}: bent strip off the built one by {d.max():.4f} mm")
+    out[nm] = dict(kind="bent", **file_rec(STRIP, A=A.round(9).tolist(), path=groove.round(5).tolist(), err=float(d.max()),
+                                           **bend))
     unmatched.remove(nm)
 
 dst = os.path.join(SIZES_DIR, "source_frames.json")

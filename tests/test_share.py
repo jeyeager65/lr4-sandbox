@@ -5,7 +5,8 @@
 # Pass = stl: the file's vertices through A and the reference mesh's are the same set (each within TOL of the other's,
 # grid matched) and the triangle counts agree; peter open: the piece's vertices all lie on the built plate (the build
 # adds fills, so one way only); peter closed: >= 99 % of its vertices on the open piece (B's stepper window differs);
-# dxf: extruded + A + tessellated as build.py / export_web do -> the same vertex set; bent: the file is there.
+# dxf: extruded + A + tessellated as build.py / export_web do -> the same vertex set; bent: the flat strip bent along
+# the recorded path (bend() = fclib mesh.bend_strip in numpy, the page's rule) + A -> the same vertex set.
 import base64
 import gzip
 import hashlib
@@ -79,6 +80,25 @@ def components(tris):
     return sorted(masks, key=lambda mk: -tris[mk][..., 2].max())
 
 
+def bend(tris, s):
+    """fclib mesh.bend_strip on a triangle soup with the share data's arguments (path, along, height, across, z0,
+    start, scale, reverse)."""
+    P = np.array(s["path"], float)
+    seg = np.diff(P, axis=0)
+    S = np.r_[0.0, np.cumsum(np.hypot(seg[:, 0], seg[:, 1]))]
+    tang = seg / np.hypot(seg[:, 0], seg[:, 1])[:, None]
+    tv = np.r_[tang[:1], tang[:-1] + tang[1:], tang[-1:]]
+    tv /= np.linalg.norm(tv, axis=1)[:, None]
+    nv = np.c_[-tv[:, 1], tv[:, 0]]
+    A = tris.reshape(-1, 3)
+    (ai, a0), (hi, h0, hs), (ci, c0) = s["along"], s["height"], s["across"]
+    t = np.clip(s["start"] + (-1 if s["reverse"] else 1) * s["scale"] * (A[:, ai] - a0), 0.0, S[-1])
+    nn = np.c_[np.interp(t, S, nv[:, 0]), np.interp(t, S, nv[:, 1])]
+    nn /= np.linalg.norm(nn, axis=1)[:, None]
+    xy = np.c_[np.interp(t, S, P[:, 0]), np.interp(t, S, P[:, 1])] + nn * (A[:, ci] - c0)[:, None]
+    return np.c_[xy, s["z0"] + hs * (A[:, hi] - h0)].reshape(tris.shape)
+
+
 def ref_meshes(cfg, blob):
     out = {}
     for p in cfg["parts"]:
@@ -96,6 +116,8 @@ def dxf_solid(rel, depth, A):
     doc = App.newDocument("share_dxf_tmp")
     Import.readDXF(os.path.join(PARTS, rel), doc.Name)
     edges = [e for o in doc.Objects if hasattr(o, "Shape") for e in o.Shape.Edges]
+    for e in edges:                                    # V1E's DXFs miss by 3e-7 mm at a few joints: without this
+        e.fixTolerance(1e-4)                           # the ~19 x 22 mm cutout's wire stays open and is dropped
     App.closeDocument(doc.Name)
     wires = sorted((Part.Wire(g) for g in Part.sortEdges(edges)), key=lambda w: -Part.Face(w).Area if w.isClosed() else 0)
     sol = Part.makeFace([w for w in wires if w.isClosed()], "Part::FaceMakerBullseye").extrude(App.Vector(0, 0, depth))
@@ -154,7 +176,9 @@ def main():
             a, b = inside(q, pts), inside(pts, q)
             check(nm, a == 1 and b == 1 and nf == nref, f"{s['file']}: {a:.4f} / {b:.4f} of vertices match, {nf} vs {nref} triangles")
         else:
-            check(nm, True, f"{s['file']} present (bent by the build - not compared)")
+            t = place(bend(read_stl(os.path.join(PARTS, s["file"])), s), s["A"])
+            a, b = inside(t.reshape(-1, 3), pts), inside(pts, t.reshape(-1, 3))
+            check(nm, a == 1 and b == 1 and len(t) == nref, f"{s['file']} bent: {a:.4f} / {b:.4f} of vertices match, {len(t)} vs {nref} triangles")
     print(f"{done - len([f for f in fails if ':' not in f])}/{done} parts pass" + (f"; FAIL: {fails}" if fails else ""))
     sys.stdout.flush()
     if fails:

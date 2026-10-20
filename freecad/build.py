@@ -239,6 +239,8 @@ for side, fn in (("Min", "XZ_Min_DXF_V1.dxf"), ("Max", "XZ_Max_DXF.dxf")):
     import Import
     Import.readDXF(os.path.join(LR4, fn), doc_tmp.Name)
     edges = [e for o in doc_tmp.Objects if hasattr(o, "Shape") for e in o.Shape.Edges]
+    for e in edges:                                    # V1E's DXFs miss by 3e-7 mm at a few joints: without this
+        e.fixTolerance(1e-4)                           # the ~19 x 22 mm cutout's wire stays open and is dropped
     App.closeDocument(doc_tmp.Name)
     wires = sorted((Part.Wire(g) for g in Part.sortEdges(edges)), key=lambda w: -Part.Face(w).Area if w.isClosed() else 0)
     face = Part.makeFace([w for w in wires if w.isClosed()], "Part::FaceMakerBullseye")

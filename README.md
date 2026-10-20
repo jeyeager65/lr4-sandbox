@@ -47,7 +47,13 @@ top of `freecad/build.py` (`CUT_X_IN`, `CUT_Y_IN`). Output goes to `build/` (FCS
 
 ```sh
 python tools/serve.py configurator 48x96     # optional size in inches
+python tools/serve.py configurator --share   # the share data: no V1E geometry, load your own part files
 ```
+
+With the share data the page draws only our hardware until you give it the part files: drop the Printables zips,
+a folder or the STL / DXF files on the page (or use its buttons). They're read in your browser, recognised by
+SHA-256 (renamed files are fine) and kept in its IndexedDB; nothing is uploaded. The panel lists what's missing,
+with the Printables links, and warns about files that differ from the versions the placements were solved for.
 
 The page reads its data from `web/data/`, which `pipeline/` generates from FreeCAD builds:
 
@@ -64,6 +70,8 @@ node test_config_model.js                    # the configurator's machine vs eve
 node test_calculator.js                      # the JS and Python calculators agree (needs python)
 node test_strut_plate.js                     # JS strut plates vs Vector76's OpenSCAD generator (maintainer only)
 python ../tools/run.py test_strut_plate.py   # Python strut plates vs the same (maintainer only)
+node test_parts_files.js                     # the page's STL / DXF readers vs the reference build (needs parts/)
+python ../tools/run.py test_share.py         # the share data's placements vs the reference build (needs parts/)
 ```
 
 ## Layout
@@ -73,7 +81,7 @@ freecad/    the model: build.py, lr4.py (measured placements), hardware.py, bom.
   fclib/    shared FreeCAD helpers (vendored copy)
 web/        the pages: index.html (configurator), viewer.html, js/
 pipeline/   FreeCAD builds -> configurator data
-tests/      node tests, test_strut_plate.py, test_share.py
+tests/      node tests, test_strut_plate.py, test_share.py, test_parts_files.js
 tools/      run.py, serve.py, repo tools (sync_fclib, check_no_parts, check_parts)
 docs/       PLAN.md: settings, measurements and decisions behind the model
 ```

@@ -10,7 +10,8 @@
 #      tests/test_share.py check rebuilds every src part from parts/ and compares it with the private meshes.
 # src kinds: stl {file, sha256, A}; dxf {.., depth: extrusion along the DXF's z, before A}; peter {open: {.., piece:
 # connected component by ZMax, highest first}, closed: {..}} (the "~honeycomb" alternates are dropped - part 6 builds
-# them from the user's DXFs); bent {file, sha256} (the bristles: bent along the skirt by the build, no A).
+# them from the user's DXFs); bent {file, sha256, A, path, along, height, across, z0, start, scale, reverse} (the bristles: mesh.bend_strip's
+# arguments - the page bends the user's flat strip along the groove path, then A).
 import base64
 import gzip
 import json
@@ -41,7 +42,7 @@ def src_of(name, frames):
     f = frames.get(name)
     if f is None:
         return None
-    keep = ("file", "sha256", "A", "depth", "piece")
+    keep = ("file", "sha256", "A", "depth", "piece", "path", "along", "height", "across", "z0", "start", "scale", "reverse")
     if f["kind"] == "peter":
         return dict(kind="peter", **{s: {k: f[s][k] for k in keep if k in f[s]} for s in ("open", "closed")})
     return dict(kind=f["kind"], **{k: f[k] for k in keep if k in f})

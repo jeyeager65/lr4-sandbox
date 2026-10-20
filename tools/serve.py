@@ -1,5 +1,7 @@
 # Serve one of the pages on localhost and open it in the browser (Ctrl+C stops the server):
 #   python tools/serve.py configurator [WxH]   web/ on http://127.0.0.1:8767 (e.g. 48x96 = a 48 x 96 in cutting area)
+#   python tools/serve.py configurator --share [WxH]   the same page on the share data (web/data/share: no V1E
+#                                              geometry - load your own part files, as the public page will)
 #   python tools/serve.py viewer               exports/web on http://127.0.0.1:8765 (full detail; refresh it with
 #                                              freecad/export_web.py)
 # The configurator page is written for the claude.ai artifact host, which adds the document skeleton (charset,
@@ -24,15 +26,17 @@ def wrap_configurator(folder):
 
 
 if __name__ == "__main__":
-    which = sys.argv[1] if len(sys.argv) > 1 else ""
+    share = "--share" in sys.argv
+    args = [a for a in sys.argv[1:] if a != "--share"]
+    which = args[0] if args else ""
     if which not in PAGES:
-        sys.exit("usage: python tools/serve.py configurator [WxH] | viewer")
+        sys.exit("usage: python tools/serve.py configurator [--share] [WxH] | viewer")
     folder, port, page = PAGES[which]
     if which == "configurator":
         wrap_configurator(folder)
     elif not os.path.exists(os.path.join(folder, page)):
         sys.exit(f"{os.path.join(folder, page)} not found - run: python tools/run.py freecad/export_web.py")
-    url = f"http://127.0.0.1:{port}/{page}" + (f"#{sys.argv[2]}" if len(sys.argv) > 2 else "")
+    url = f"http://127.0.0.1:{port}/{page}" + ("?share" if share else "") + (f"#{args[1]}" if len(args) > 1 else "")
     handler = functools.partial(http.server.SimpleHTTPRequestHandler, directory=folder)
     server = http.server.ThreadingHTTPServer(("127.0.0.1", port), handler)
     print(f"serving {folder} at {url} - Ctrl+C to stop", flush=True)

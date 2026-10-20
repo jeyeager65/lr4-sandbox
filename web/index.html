@@ -55,6 +55,7 @@ h2 {
   letter-spacing: 0.12em; color: var(--muted); margin: 0 0 10px;
 }
 section { display: flex; flex-direction: column; }
+[hidden] { display: none !important; }
 .readout { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .readout div { border: 1px solid var(--line); border-radius: 4px; padding: 8px 8px 6px; min-width: 0; }
 .readout b { display: block; font-family: var(--font-display); font-weight: 600; font-size: 11px; letter-spacing: 0.1em; color: var(--muted); }
@@ -153,6 +154,19 @@ h1 span { color: var(--accent); }
 select { width: 100%; border: 1px solid var(--line); border-radius: 4px; background: var(--bg); color: var(--ink);
   font: 13px var(--font-body); padding: 6px; }
 select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.drop { border: 1.5px dashed var(--line); border-radius: 6px; padding: 14px 12px; text-align: center; font-size: 13px; line-height: 1.5; margin-bottom: 8px; }
+.drop small { color: var(--muted); }
+.drop.over { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
+label.btn { display: inline-block; font: inherit; font-size: 13px; background: var(--panel); color: var(--ink); border: 1px solid var(--line);
+  border-radius: 4px; padding: 6px 10px; cursor: pointer; }
+label.btn:hover { border-color: var(--muted); }
+label.btn:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+.files-src { margin: 10px 0 0; font-size: 13px; line-height: 1.45; }
+.files-src b { font-weight: 600; }
+.files-src a { color: var(--ink); text-decoration-color: var(--accent); text-underline-offset: 2px; }
+.files-src em { font-style: normal; font-family: var(--font-data); font-size: 12px; color: var(--muted); }
+.files-src ul { margin: 2px 0 0; padding-left: 18px; color: var(--muted); font-size: 12px; }
+.files-src li.diff { color: var(--warn); }
 .warn { background: var(--warn-bg); color: var(--warn); border-radius: 4px; padding: 6px 8px; font-size: 12px; margin: 8px 0 0; line-height: 1.4; }
 #calc td small { color: var(--muted); font-size: 11px; margin-left: 4px; }
 .plates svg { width: 100%; height: auto; display: block; margin-bottom: 8px; }
@@ -175,6 +189,18 @@ select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
     <h1>LowRider 4 <span>Configurator</span></h1>
     <div class="sub" id="sub">V1E LowRider 4, built to your cutting area. Every printed part is the official STL, placed from its holes.</div>
   </header>
+
+  <section id="files-sec" aria-labelledby="h-files" hidden>
+    <h2 id="h-files">Your part files</h2>
+    <div class="drop" id="drop">Drop the Printables zips, a folder or the STL / DXF files here<br>
+      <small>Read in this browser only - nothing is uploaded. Kept here for next time.</small></div>
+    <div class="buttons">
+      <label class="btn"><input type="file" id="f-files" multiple accept=".zip,.stl,.dxf" hidden>Choose files…</label>
+      <label class="btn"><input type="file" id="f-dir" webkitdirectory hidden>Choose a folder…</label>
+      <button type="button" id="f-forget">Forget files</button>
+    </div>
+    <div id="files-list" role="status"></div>
+  </section>
 
   <section aria-labelledby="h-size">
     <h2 id="h-size">Cutting area</h2>
@@ -296,6 +322,7 @@ select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 <script src="js/calculator.js"></script>
 <script src="js/strut_plate.js"></script>
 <script src="js/config_model.js"></script>
+<script src="js/parts_files.js"></script>
 <script>
 (function () {
   const IN = 25.4;
@@ -534,25 +561,90 @@ select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
   const WING = 11.5, DOGBONE = 3.5, STRUT_T = 6.35;   // build.py: 1" EMT wings, 1/8" bit, 1/4" MDF
   let cfg = null, bin = null, S = null;
   const geoCache = new Map();
+  function dress(geo, fin, hasUV) {                   // metal: smooth-shaded, textured by finish
+    if (!fin) return geo;
+    geo = creaseNormals(geo, 35);
+    if (fin.brushed) plateUV(geo);
+    if (fin.spangle) tubeUV(geo, 70);
+    if (fin.thread && !hasUV) threadUV(geo, 8.0);
+    return geo;
+  }
+  const entry = (geo, fin, hasUV) => ({ geo, fin, hasUV, tris: (geo.index ? geo.index.count : geo.attributes.position.count) / 3 });
+  // null = not drawn (a part from a file the user hasn't loaded, or Peter Plates "none")
   function recGeometry(rec) {
+    if (rec.src) return srcGeometry(rec);
     let e = geoCache.get(rec.key);
     if (e) return e;
     const p = rec.mesh, fin = FINISH[rec.meta.finish];
     const pos = new Float32Array(bin, p.pos[0], p.pos[1] * 3);
     const idx = p.idx[2] === 32 ? new Uint32Array(bin, p.idx[0], p.idx[1]) : new Uint16Array(bin, p.idx[0], p.idx[1]);
-    let geo = new THREE.BufferGeometry();
+    const geo = new THREE.BufferGeometry();
     geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
     geo.setIndex(new THREE.BufferAttribute(idx, 1));
     if (p.uv !== undefined) geo.setAttribute("uv", new THREE.BufferAttribute(new Float32Array(bin, p.uv, p.pos[1] * 2), 2));
-    if (fin) {                                        // metal: smooth-shaded, textured by finish
-      geo = creaseNormals(geo, 35);
-      if (fin.brushed) plateUV(geo);
-      if (fin.spangle) tubeUV(geo, 70);
-      if (fin.thread && p.uv === undefined) threadUV(geo, 8.0);
-    }
-    e = { geo, fin, hasUV: p.uv !== undefined, tris: (geo.index ? geo.index.count : geo.attributes.position.count) / 3 };
+    e = entry(dress(geo, fin, p.uv !== undefined), fin, p.uv !== undefined);
     geoCache.set(rec.key, e);
     return e;
+  }
+
+  // ---- bring your own files (share data: cfg.files + a `src` per V1E part instead of its mesh - pipeline/share_data.py).
+  // The user's files are matched by SHA-256 (js/parts_files.js), kept in IndexedDB, and placed by each part's A. ----
+  const DATA = new URLSearchParams(location.search).has("share") ? "data/share/" : "data/";
+  const userFiles = new Map();                        // manifest path -> {name, sha256, ok, buf}
+  const srcCache = new Map(), soupCache = new Map();
+  let needed = null;                                  // manifest path -> the part names placed from it
+  function soup(rel) {                                // the raw STL triangles (file coordinates), or null
+    if (soupCache.has(rel)) return soupCache.get(rel);
+    const f = userFiles.get(rel);
+    let t = null;
+    if (f) try { t = LR4Files.readSTL(f.buf); } catch (e) { console.warn(rel, e); }
+    soupCache.set(rel, t);
+    return t;
+  }
+  const soupGeo = (pos) => { const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.BufferAttribute(pos, 3)); return g; };
+  function dxfGeo(s) {                                // the DXF's faces extruded `depth` along its z, then A
+    const f = userFiles.get(s.file);
+    if (!f) return null;
+    const { loops } = LR4Files.dxfLoops(new TextDecoder().decode(f.buf));
+    const v2 = (l) => l.slice(0, -1).map(([x, y]) => new THREE.Vector2(x, y));
+    const shapes = LR4Files.nest(loops).map(({ outer, holes }) => {
+      const sh = new THREE.Shape(v2(outer));
+      sh.holes = holes.map((h) => new THREE.Path(v2(h)));
+      return sh;
+    });
+    const geo = new THREE.ExtrudeGeometry(shapes, { depth: Math.abs(s.depth), bevelEnabled: false, curveSegments: 1 });
+    if (s.depth < 0) geo.translate(0, 0, s.depth);
+    geo.deleteAttribute("normal");
+    geo.deleteAttribute("uv");
+    return geo.applyMatrix4(new THREE.Matrix4().set(...s.A.flat(), 0, 0, 0, 1));
+  }
+  function srcGeometry(rec) {
+    const s = rec.src, ck = rec.key + (s.kind === "peter" ? "|" + peterStyle : "");
+    if (srcCache.has(ck)) return srcCache.get(ck);
+    let geo = null;
+    if (s.kind === "stl" || s.kind === "bent") {
+      const t = soup(s.file);
+      if (t) geo = soupGeo(LR4Files.place(s.kind === "bent" ? LR4Files.bend(t, s) : t, s.A));
+    } else if (s.kind === "peter" && peterStyle !== "none") {
+      const r = s[peterStyle] || s.closed;
+      let t = soup(r.file);
+      if (t && r.piece !== undefined) {               // "open": one piece of the both-covers file
+        const ck2 = r.file + "|pieces";
+        if (!soupCache.has(ck2)) soupCache.set(ck2, LR4Files.components(t));
+        t = soupCache.get(ck2)[r.piece];
+      }
+      if (t) geo = soupGeo(LR4Files.place(t, r.A));
+    } else if (s.kind === "dxf") {
+      try { geo = dxfGeo(s); } catch (e) { console.warn(s.file, e); }
+    }
+    const fin = FINISH[rec.meta.finish], e = geo ? entry(dress(geo, fin, false), fin, false) : null;
+    srcCache.set(ck, e);
+    return e;
+  }
+  function dropSrcGeometry() {                        // the user's files changed: rebuild their parts' geometry
+    for (const e of srcCache.values()) if (e) e.geo.dispose();
+    srcCache.clear();
+    soupCache.clear();
   }
   function material(color, fin, hasUV) {
     if (fin) {                                        // metal: reflects the environment
@@ -612,8 +704,11 @@ select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
     let tris = 0;
     const inst = LR4Model.instances(cfg, S);
     for (const o of inst) {
-      const { geo, fin, hasUV, tris: n } = recGeometry(o.rec);
+      const g = recGeometry(o.rec);
+      if (!g) continue;
+      const { geo, fin, hasUV, tris: n } = g;
       const ud = Object.assign({}, o.rec.meta, { name: o.name, base: { t: o.t, s: o.s } });
+      if (o.rec.src) delete ud.variant;              // Peter Plates from files: the style picks the geometry
       if (o.name !== o.rec.meta.name) ud.label = pretty(o.name);
       const mat = material(ud.color, fin, hasUV);
       if (ud.clip) { ud.clip = Object.assign({}, ud.clip, { p: o.clipP }); mat.clippingPlanes = [new THREE.Plane()]; }
@@ -645,18 +740,19 @@ select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 
   async function load() {
     progress("Loading model…", 0, "parts list");
-    const r = await fetch("data/lr4_config.json");
+    const r = await fetch(DATA + "lr4_config.json");
     if (!r.ok) throw new Error("lr4_config.json " + r.status);
     cfg = await r.json();
     const total = cfg.geometry_chars || 0;
     let got = 0;
-    const raw = await fetchBytes("data/lr4_config_geometry.txt", (n) => { got += n;
+    const raw = await fetchBytes(DATA + "lr4_config_geometry.txt", (n) => { got += n;
       progress("Downloading geometry…", total ? got / total : null, total ? `${MB(got)} of ${MB(total)}` : MB(got)); });
     progress("Unpacking…", 1, "gzip");
     await nextFrame();
     const str = atob(new TextDecoder().decode(raw).trim()), u = new Uint8Array(str.length);
     for (let i = 0; i < str.length; i++) u[i] = str.charCodeAt(i);
     bin = await new Response(new Blob([u]).stream().pipeThrough(new DecompressionStream("gzip"))).arrayBuffer();
+    if (cfg.files) await setupFiles();
     progress("Building the machine…", 1, `${cfg.parts.length} parts`);
     await nextFrame();
     buildGroups();
@@ -668,6 +764,9 @@ select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
     fitView([1, -1.15, 0.85]);
     await nextFrame();
     statusEl.hidden = true;
+    const dev = cfg.files && new URLSearchParams(location.search).get("parts");   // testing: fetch the files from a folder URL
+    if (dev) await addFiles([...needed.keys()].map((p) => ({ name: p,
+      read: () => fetch(dev + p).then((q) => q.ok ? q.arrayBuffer() : Promise.reject(new Error(p + " " + q.status))) })));
   }
 
   // ---- Peter Plates: solid (stepper openings filled) or open honeycomb in a solid border - one shown at a time ----
@@ -677,6 +776,7 @@ select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
     : !m.userData.variant || m.userData.variant === peterStyle;
   function setupVariants() {
     const box = document.getElementById("peter-variant");
+    if (cfg.files) return setupFileVariants(box);
     const have = new Set(meshes.map((m) => m.userData.variant).filter(Boolean));
     if (have.size < 2) return;
     have.add("none");
@@ -693,6 +793,145 @@ select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
     box.hidden = false;
     mark();
     applyVisibility();
+  }
+
+  // from the user's files: Open (PeterPlates_w_locations, stepper locations open - what the build places), Closed
+  // (PeterPlateT / B as downloaded) or None; the style picks each plate's geometry, so a change rebuilds
+  function setupFileVariants(box) {
+    const STYLES = [["open", "Open"], ["closed", "Closed"], ["none", "None"]];
+    box.querySelectorAll("button").forEach((b) => b.remove());
+    for (const [v, label] of STYLES) {
+      const b = document.createElement("button");
+      b.type = "button"; b.dataset.v = v; b.textContent = label;
+      box.appendChild(b);
+    }
+    let saved = null;
+    try { saved = localStorage.getItem("peter-style-files"); } catch (e) { /* defaults */ }
+    peterStyle = STYLES.some(([v]) => v === saved) ? saved : "closed";
+    const mark = () => box.querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.v === peterStyle)));
+    box.querySelectorAll("button").forEach((b) => b.addEventListener("click", () => {
+      if (peterStyle === b.dataset.v) return;
+      peterStyle = b.dataset.v;
+      try { localStorage.setItem("peter-style-files", peterStyle); } catch (e) { /* not kept */ }
+      mark();
+      rebuild();
+    }));
+    box.hidden = false;
+    mark();
+    rebuild();
+  }
+
+  // ---- the file panel: drop / pick zips, folders or files; what's loaded, missing or a different version ----
+  let JSZipLib = null;
+  function loadJSZip() {
+    if (JSZipLib) return JSZipLib;
+    return JSZipLib = new Promise((res, rej) => {
+      const s = document.createElement("script");
+      s.src = "https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js";
+      s.onload = () => res(window.JSZip);
+      s.onerror = () => { JSZipLib = null; rej(new Error("could not load the zip reader")); };
+      document.head.appendChild(s);
+    });
+  }
+  async function setupFiles() {
+    needed = new Map();
+    for (const p of cfg.parts) {
+      if (!p.src) continue;
+      for (const r of p.src.kind === "peter" ? [p.src.open, p.src.closed] : [p.src])
+        (needed.get(r.file) || needed.set(r.file, []).get(r.file)).push(p.meta.name);
+    }
+    progress("Loading your part files…", null, "kept in this browser");
+    try {
+      for (const f of await LR4Files.store.all()) if (needed.has(f.path)) userFiles.set(f.path, f);
+    } catch (e) { console.warn("IndexedDB", e); }
+    document.getElementById("files-sec").hidden = false;
+    const drop = document.getElementById("drop");
+    const fromList = (list) => [...list].map((f) => ({ name: f.webkitRelativePath || f.name, read: () => f.arrayBuffer() }));
+    for (const id of ["f-files", "f-dir"]) document.getElementById(id).addEventListener("change", (e) => {
+      addFiles(fromList(e.target.files));
+      e.target.value = "";
+    });
+    window.addEventListener("dragover", (e) => { e.preventDefault(); drop.classList.add("over"); });
+    window.addEventListener("dragleave", (e) => { if (!e.relatedTarget) drop.classList.remove("over"); });
+    window.addEventListener("drop", async (e) => {
+      e.preventDefault();
+      drop.classList.remove("over");
+      const entries = [...e.dataTransfer.items].map((it) => it.webkitGetAsEntry && it.webkitGetAsEntry()).filter(Boolean);
+      addFiles(entries.length ? await fromEntries(entries) : fromList(e.dataTransfer.files));
+    });
+    document.getElementById("f-forget").addEventListener("click", async () => {
+      try { await LR4Files.store.clear(); } catch (e) { /* nothing kept */ }
+      userFiles.clear();
+      dropSrcGeometry();
+      rebuild();
+      renderFiles();
+    });
+    renderFiles();
+  }
+  async function fromEntries(entries) {               // dropped folders: walk them (readEntries returns batches)
+    const out = [];
+    const walk = async (en) => {
+      if (en.isFile) {
+        if (LR4Files.wanted(en.name)) out.push({ name: en.fullPath, read: () => new Promise((res, rej) => en.file((f) => f.arrayBuffer().then(res, rej), rej)) });
+        return;
+      }
+      const rd = en.createReader();
+      for (;;) {
+        const batch = await new Promise((res, rej) => rd.readEntries(res, rej));
+        if (!batch.length) break;
+        for (const c of batch) await walk(c);
+      }
+    };
+    for (const en of entries) await walk(en);
+    return out;
+  }
+  async function addFiles(items) {
+    items = items.filter((it) => LR4Files.wanted(it.name));
+    if (!items.length) return;
+    statusEl.hidden = false;
+    let n = 0;
+    try {
+      const zip = items.some((it) => /\.zip$/i.test(it.name)) ? await loadJSZip() : null;
+      const match = LR4Files.matcher(cfg.files.files, needed.keys());
+      const got = await LR4Files.identify(items, match, zip, (name) => progress("Reading your files…", null, `${++n}: ${name.split("/").pop()}`));
+      const keep = got.filter((g) => !(userFiles.get(g.path) && userFiles.get(g.path).ok && !g.ok));   // never trade a match for a near miss
+      for (const g of keep) userFiles.set(g.path, g);
+      try { await LR4Files.store.put(keep); } catch (e) { console.warn("IndexedDB", e); }
+      progress("Building the machine…", 1, `${keep.length} file(s) used`);
+      await nextFrame();
+      dropSrcGeometry();
+      rebuild();
+    } catch (e) {
+      console.error(e);
+      document.getElementById("files-list").insertAdjacentHTML("afterbegin", `<p class="warn">Could not read the files: ${e.message}</p>`);
+    }
+    statusEl.hidden = true;
+    renderFiles();
+  }
+  function renderFiles() {
+    const host = document.getElementById("files-list"), F = cfg.files;
+    const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+    let have = 0, diff = 0, html = "";
+    const bySrc = {};
+    for (const p of needed.keys()) (bySrc[F.files[p].source] = bySrc[F.files[p].source] || []).push(p);
+    for (const [src, paths] of Object.entries(bySrc)) {
+      const S = F.sources[src], items = [];
+      let n = 0;
+      for (const p of paths.sort()) {
+        const f = userFiles.get(p), short = p.split("/").pop();
+        if (f) { n++; have++; }
+        if (!f) items.push(`<li>${esc(short)}</li>`);
+        else if (!f.ok) { diff++; items.push(`<li class="diff">${esc(short)} - a different version${f.name.toLowerCase() !== short.toLowerCase() ? ` (${esc(f.name)})` : ""}</li>`); }
+      }
+      const list = n || items.length <= 5;          // none of a source yet: just the link, not every name
+      html += `<div class="files-src"><b><a href="${esc(S.url)}" target="_blank" rel="noopener">${esc(S.title)}</a></b> <em>${n} of ${paths.length}</em>`
+        + (items.length && list ? `<ul>${items.join("")}</ul>` : "") + "</div>";
+    }
+    const total = needed.size;
+    const head = have === total && !diff ? `<p class="sub">All ${total} files loaded.</p>`
+      : `<p class="sub">${have} of ${total} files loaded${have < total ? " - the missing parts are left out of the model. Download them from Printables (the links below) and drop them here" : ""}.</p>`;
+    const warn = diff ? `<p class="warn">${diff} file(s) differ from the ones this page was solved for (as of ${esc(F.tested)}) - placed anyway, check they fit.</p>` : "";
+    host.innerHTML = head + warn + html;
   }
 
   // the Jackpot3 lid, its fan and their screws can be hidden on their own to see inside the box
