@@ -1929,14 +1929,17 @@ body.vr-on .stage { grid-row: 1; }
     controls.target.lerpVectors(camTween.t0, camTween.t1, e);
     if (k >= 1) camTween = null;
   }
+  const PROBE_VIEW = 150, PROBE_UP = 45, PROBE_ELEV = 12;   // close-up: view height mm (user: good), centre over the plate mm, deg
   function jobCloseUp(pl) {
     if (pl && !JOB.camSaved && JOB.playing && $("job-closeup").checked && !vr.active()) {
       JOB.camSaved = { p: (camTween ? camTween.p1 : camera.position).clone(), t: (camTween ? camTween.t1 : controls.target).clone() };
       const def = JOB.tl.tools.get(pl.tool), d = def && def.diameter > 0 ? def.diameter : 6;
       const len = def && def.overallLength > 0 ? def.overallLength : d * 6, size = Math.max(30, d * 4);
-      const at = JOB.at, tgt = new THREE.Vector3(at[0] + pl.x, at[1] + pl.y, at[2] + pl.z + len * 0.35);
-      const tilt = 65 * Math.PI / 180, dir = new THREE.Vector3(0, -Math.sin(tilt), Math.cos(tilt));
-      const dist = Math.max(size * 0.8, len * 0.7) / 2 / Math.tan(camera.fov * Math.PI / 360);
+      // low (PROBE_ELEV over the stock, from the front, a little right) to see the bit under the shoe's lip; centred PROBE_UP over
+      // the plate so the bit + plate sit in the lower part of the view, below the pause popup
+      const at = JOB.at, tgt = new THREE.Vector3(at[0] + pl.x, at[1] + pl.y, at[2] + pl.z + PROBE_UP);
+      const el = PROBE_ELEV * Math.PI / 180, dir = new THREE.Vector3(0.482 * Math.cos(el), -0.876 * Math.cos(el), Math.sin(el));   // azimuth: user's pick
+      const dist = Math.max(PROBE_VIEW, size * 4, len * 3.5) / 2 / Math.tan(camera.fov * Math.PI / 360);   // frame height
       camEase(tgt.clone().addScaledVector(dir, dist), tgt);
     } else if (!pl && JOB.camSaved) {
       camEase(JOB.camSaved.p, JOB.camSaved.t);
