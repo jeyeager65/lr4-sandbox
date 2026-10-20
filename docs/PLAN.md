@@ -30,10 +30,12 @@ script is history only.
 - The FreeCAD scripts below are in `freecad/` (run from the repo: `python tools/run.py freecad/build.py`); output goes to
   the repo's `build/` and `exports/`.
 - `build.py` - parameters + assembly; writes `build/LowRider4.FCStd`, `build/bom.md`,
-  `build/strut_plates.dxf/.svg` (the generator's own output, like the web page's download), and the viewer
+  `exports/strut_plates_<strut>mm.dxf/.svg` (the same files as the web page's download), and the viewer
   side files `build/fasteners.json`, `threads.json`, `belts.json`, `hose.json`, `bom.json`, `peter_alt/`.
-- `lr4.py` - V1E calculator port, strut plate generator runner, and every measured placement
-  constant (with how it was found).
+- `lr4.py` - every measured placement constant (with how it was found).
+- `calculator.py` - the size calculator (our code, matches V1E's; twin of `web/js/calculator.js`).
+- `strut_plate.py` - Vector76's strut plate generator ported to Python (twin of `web/js/strut_plate.js`;
+  golden-tested against his SCAD, no OpenSCAD needed to build).
 - `hardware.py` - every fastener, placed and checked with fclib `fasteners` (docs photo per joint).
 - `check.py` - interference checks between mating parts (155 pairs, run by headless builds; ~11 s with
   `overlap_fast` + the pair cache `build/check_cache.json`).
@@ -44,8 +46,8 @@ script is history only.
 - `CONFIGURATOR.md` - plan for a separate LR4 web configurator (later).
 - `export_web.py` - browser viewer data (`exports/web/`); viewer page `web/viewer.html` (copied to `exports/web/LowRider4.html`),
   published at https://claude.ai/artifact/EcXkEtxoxZj4HNnJduZzha (private). Rerun after a build, then republish.
-- `vendor/` - `lr4_strut_plate_3d.scad` (Vector76's generator, as served by his page) and
-  `v1e_lr4_calculator.js` (V1E's calculator, the source of `lr4.calculator`).
+- `vendor/` (git-ignored, local only) - `lr4_strut_plate_3d.scad` (Vector76's generator, as served by his page)
+  and `v1e_lr4_calculator.js` (V1E's calculator): only the tests read them (golden cases).
 - `parts/` - downloaded files: `lr4/` (Printables 1034840, V1E LowRider 4, 29.5 mm EMT
   variants), `kobalt/` (1034828, Kobalt tool mount + dust shoe), `jackpot3/` (1434650,
   Jackpot3 box; `Jackpot3_Lid.step` gives the lid's screw and fan holes), `peter/` (1044487, Peter
@@ -95,7 +97,7 @@ plates, front_wing_size 11.5 (1" EMT). Plates 830 x 90.5 (front) and 830 x 78.5 
 | # | Decision | Alternatives considered |
 |---|---|---|
 | 1 | Script-built assembly; printed parts are the official STLs placed by measured mating features | remodel parts as solids (huge effort, less faithful); GUI assembly by hand |
-| 2 | Run the generator's actual SCAD with OpenSCAD (installed) rather than re-implementing it | Python port (no OpenSCAD needed, but could drift from the web tool) |
+| 2 | Python port of the generator (`strut_plate.py`, 2026-10-20), golden-tested against the SCAD run by OpenSCAD (58 cases) | run the SCAD with OpenSCAD in every build (until 2026-10-20: needs OpenSCAD and the SCAD, which isn't ours to ship) |
 | 3 | Calculator's mm mode (strut 830); the inch mode would round up to 32.75" = 831.85 mm | inch mode |
 | 4 | 1" EMT (29.5) parts: Brace_29p5, Y_Clip_29p5, wings 11.5 | 30/32 mm tubes |
 | 5 | Kobalt tool mount (user's router) | Makita/DeWalt mounts |

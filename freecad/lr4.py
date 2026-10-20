@@ -1,4 +1,4 @@
-# LowRider 4 geometry: the V1E size calculator, the Vector76 strut plate generator, and where
+# LowRider 4 geometry: the size calculator and strut plates (calculator.py, strut_plate.py), and where
 # every downloaded STL goes. Imported by build.py and cam.py. All lengths in mm.
 #
 # How the placements were found (2026-10-17, from the STL/DXF files themselves - V1E publishes
@@ -15,7 +15,7 @@
 
 import math
 import os
-import subprocess
+import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)                       # the repo (this script is in freecad/)
@@ -25,117 +25,24 @@ JP3_BOARD_DIR = os.path.join(PRIVATE, "jackpot3_board")    # user's EasyEDA OBJ 
 SIZES_DIR = os.path.join(PRIVATE, "sizes")                  # configurator size builds (configurator/size_builds.py)
 IN = 25.4
 
-# ---- V1E LowRider 4 calculator (docs.v1e.com/lowrider/calculator, vendor/v1e_lr4_calculator.js)
-OFFSETS = dict(xrail_core=169, yrail_minus_work=255, ytable_minus_work=313, xbelt_extra=180,
-               ybelt_extra=200, xtable_extra=110, xrail_cushion=3)
+if HERE not in sys.path:
+    sys.path.insert(0, HERE)
 
 
-def calculator(x_work, y_work, xz_plate=6.5):
-    """Port of calculate() in V1E's calculator.js (metric display mode): mm in, mm out."""
-    o = OFFSETS
-    strut = math.ceil(x_work + o["xrail_core"])
-    yrail = y_work + o["yrail_minus_work"]
-    out = dict(strut=strut, xrails=strut - o["xrail_cushion"], yrail=yrail,
-               xbelt=strut + o["xbelt_extra"], ybelt=yrail + o["ybelt_extra"],
-               xtable=strut + 2 * xz_plate + o["xtable_extra"], ytable=y_work + o["ytable_minus_work"])
-    out["belt_total"] = out["xbelt"] + 2 * out["ybelt"]
-    return out
+# ---- size calculator (calculator.py, matches V1E's) and strut plates (strut_plate.py, Vector76's generator) -----
+from calculator import OFFSETS, calculator, calculator_inches  # noqa: E402,F401  (lr4.calculator etc. as before)
+import strut_plate  # noqa: E402
+from strut_plate import BOTTOM_Y, braces  # noqa: E402,F401
 
 
-def calculator_inches(x_work_in, y_work_in, xz_plate_in):
-    """The calculator's inch display mode (rounds UP to 1/8")."""
-    up = lambda v: math.ceil(v / IN * 8) / 8
-    near = lambda v: round(v / IN * 8) / 8
-    c = calculator(x_work_in * IN, y_work_in * IN, xz_plate_in * IN)
-    strut_in = up(c["strut"])
-    return dict(strut=strut_in, xrails=strut_in - up(OFFSETS["xrail_cushion"]), yrail=up(c["yrail"]),
-                xbelt=up(c["xbelt"]), ybelt=up(c["ybelt"]), belt_total=up(c["belt_total"]),
-                xtable=up(c["xtable"]), ytable=up(c["ytable"]))
-
-
-# ---- Vector76 strut plate generator (vendor/lr4_strut_plate_3d.scad, run by OpenSCAD) --------
-OPENSCAD = r"C:\Program Files\OpenSCAD\openscad.com"
-SCAD = os.path.join(ROOT, "vendor", "lr4_strut_plate_3d.scad")
-BOTTOM_Y = -95.0                 # the SCAD draws the bottom plate at ty(-95)
-
-
-def run_generator(out_base, strut_length, wing=11.5, dogbones=3.5, num_braces=0):
-    """OpenSCAD -> <out_base>.dxf and .svg (both plates, mm, as the web page makes them).
-    Returns the generator's echo lines."""
-    args = ["-D", f"strut_length={strut_length}", "-D", f"num_braces={num_braces}",
-            "-D", f"dogbones={dogbones}", "-D", "front_plate=true", "-D", "bottom_plate=true",
-            "-D", f"front_wing_size={wing}", "-D", "render_2d=true"]
-    echoes = []
-    for ext in ("dxf", "svg"):
-        r = subprocess.run([OPENSCAD, "-o", f"{out_base}.{ext}"] + args + [SCAD], capture_output=True, text=True)
-        if r.returncode != 0:
-            raise RuntimeError(f"OpenSCAD failed: {r.stderr[-2000:]}")
-        echoes = [l for l in r.stderr.splitlines() if l.startswith("ECHO")]
-    return echoes
-
-
-def braces(strut_length, num_braces=0):
-    """Brace count and pitch exactly as the SCAD computes them (hole centres at 9 + i*pitch)."""
-    n = num_braces or math.floor((strut_length - 18) / (165 + 18)) + 1
-    return n, (strut_length - 18) / (n - 1)
-
-
-def read_dxf_loops(path):
-    """OpenSCAD 2D DXF (LINE entities only) -> closed loops [[(x, y), ...]]."""
-    lines = open(path, encoding="utf-8").read().splitlines()
-    pairs = list(zip(lines[0::2], lines[1::2]))
-    segs, cur = [], None
-    for code, val in pairs:
-        code, val = code.strip(), val.strip()
-        if code == "0":
-            if cur and len(cur) == 4:
-                segs.append(((cur["10"], cur["20"]), (cur["11"], cur["21"])))
-            cur = {} if val == "LINE" else None
-        elif cur is not None and code in ("10", "20", "11", "21"):
-            cur[code] = float(val)
-    key = lambda p: (round(p[0], 5), round(p[1], 5))
-    nxt = {}
-    for a, b in segs:
-        nxt.setdefault(key(a), []).append(b)
-    loops, used = [], set()
-    for a, b in segs:
-        if (key(a), key(b)) in used:
-            continue
-        loop, p = [a], b
-        used.add((key(a), key(b)))
-        while key(p) != key(loop[0]):
-            loop.append(p)
-            q = next(q for q in nxt[key(p)] if (key(p), key(q)) not in used)
-            used.add((key(p), key(q)))
-            p = q
-        loops.append(loop)
-    return loops
-
-
-def plate_faces(dxf_path, hole_d=5.3):
-    """The two plates as flat Part faces in SCAD coordinates: {"front": face, "bottom": face}.
-    The bottom plate is moved back to y = 0..67.5 (the SCAD draws it at y - 95). Bolt holes
-    (36-gon in the DXF) become true circles of hole_d."""
-    import FreeCAD as App
-    import Part
-    loops = read_dxf_loops(dxf_path)
-    out = {}
-    for name, (y0, y1) in (("front", (-30, 120)), ("bottom", (-130, -10))):
-        mine = [l for l in loops if y0 < sum(p[1] for p in l) / len(l) < y1]
-        mine.sort(key=lambda l: -_area(l))
-        shift = -BOTTOM_Y if name == "bottom" else 0.0
-        outer = Part.makePolygon([App.Vector(x, y + shift, 0) for x, y in mine[0] + [mine[0][0]]])
-        holes = []
-        for l in mine[1:]:
-            cx = sum(p[0] for p in l) / len(l)
-            cy = sum(p[1] for p in l) / len(l) + shift
-            holes.append(Part.Wire(Part.makeCircle(hole_d / 2, App.Vector(cx, cy, 0))))
-        out[name] = Part.makeFace([Part.Wire(outer)] + holes, "Part::FaceMakerBullseye")
-    return out
-
-
-def _area(l):
-    return abs(sum(l[i][0] * l[i - 1][1] - l[i - 1][0] * l[i][1] for i in range(len(l)))) / 2
+def plate_faces(strut_length, wing=11.5, dogbones=3.5, num_braces=0, hole_d=5.3, out_base=None):
+    """The two plates as flat Part faces in generator coordinates, both at y = 0..67.5: {"front": face,
+    "bottom": face}. Bolt holes are true circles of hole_d. out_base: also write <out_base>.dxf / .svg (both
+    plates laid out as the generator draws them - the same files as the web page's download)."""
+    pl = strut_plate.plates(strut_length, wing, dogbones, num_braces)
+    if out_base:
+        strut_plate.write(out_base, pl)
+    return {k: strut_plate.face(v, hole_d) for k, v in pl.items()}
 
 
 # ---- measured geometry (mm, print coordinates of the STLs/DXFs in parts/) -------------------

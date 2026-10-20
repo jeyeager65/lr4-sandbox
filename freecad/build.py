@@ -1,7 +1,7 @@
 # LowRider4 - V1 Engineering LowRider 4 CNC sized for a 26 x 50 in cutting area, on a flat
 # MDF sheet table. Script-built assembly (the script owns the model):
-#   - sizes from V1E's LR4 calculator (ported in lr4.py)
-#   - strut plates from Vector76's strut plate generator (OpenSCAD, vendor/), the real cut shapes
+#   - sizes from the LR4 calculator (calculator.py, matches V1E's)
+#   - strut plates from Vector76's strut plate generator (ported in strut_plate.py), the real cut shapes
 #   - every printed part is the V1E STL from Printables (parts/), placed by measured mating
 #     features (lr4.py explains each), plus the Kobalt tool mount and the Jackpot3 box
 #   - hardware (rails, steppers, MGN12, belts, bearings, switches, router) as simple solids
@@ -10,8 +10,8 @@
 #   headless:  python tools/run.py freecad/build.py   (or tools\fcrun.ps1 freecad\build.py; also runs the checks)
 #   in the GUI (MCP execute_code / Python console):
 #     p = r"D:/GitHub/lr4-sandbox/freecad/build.py"; exec(open(p, encoding="utf-8").read(), {"__file__": p, "__name__": "__main__"})
-# Writes build/LowRider4.FCStd, build/bom.md, build/strut_plates.(dxf|svg) and
-# exports/strut_plates.(dxf|svg). STEP: export_step.py. Strut plate G-code: cam.py.
+# Writes build/LowRider4.FCStd, build/bom.md and exports/strut_plates_<strut>mm.(dxf|svg).
+# STEP: export_step.py. Strut plate G-code: cam.py.
 # Axes: X along the beam (YZ_Min side at the left), Y depth (front = 0), Z up (floor of the
 # MDF sheet at 0). Units: mm inside; the cutting area and table are given in inches.
 
@@ -346,15 +346,9 @@ for nm, (dx, dy) in (("X_Rail_Lower", lr4.RAIL_A), ("X_Rail_Upper", lr4.RAIL_B))
     m.add(nm, hw.tube(29.5, EMT_WALL, (X_s0 + 1.5, y, z), (X_s0 + strut - 1.5, y, z)), group="Beam",
           colour=hw.STEEL)
 
-# strut plates from the generator
-gen_base = os.path.join(ROOT, "build", "strut_plates")
-os.makedirs(os.path.dirname(gen_base), exist_ok=True)
-echo = lr4.run_generator(gen_base, strut, WING, DOGBONE)
-plates = lr4.plate_faces(gen_base + ".dxf")
-import shutil
+# strut plates from the generator (strut_plate.py); DXF + SVG as the web page's download (mm)
 os.makedirs(os.path.join(ROOT, "exports"), exist_ok=True)
-for ext in ("dxf", "svg"):                           # as the web generator's download (mm)
-    shutil.copy(f"{gen_base}.{ext}", os.path.join(ROOT, "exports", f"strut_plates_{strut}mm.{ext}"))
+plates = lr4.plate_faces(strut, WING, DOGBONE, out_base=os.path.join(ROOT, "exports", f"strut_plates_{strut}mm"))
 (p0y, p0z), (dby, dbz) = lr4.FRONT_FACE
 oy, oz = D(lr4.BRACE_TO_D[0] - p0y, p0z + lr4.BRACE_TO_D[1])
 dY, dZ = -dby, dbz                                   # up the face, in machine (Y, Z)
@@ -877,7 +871,7 @@ bb = m.bound_box()
 print(path)
 print(f"calculator (mm): {calc}")
 print(f"calculator (in): {calc_in}")
-print(f"strut generator: {strut} mm, {n_braces} braces, pitch {pitch:.2f} mm; " + " | ".join(e.split('ECHO: ')[-1] for e in echo))
+print(f"strut generator: {strut} mm, {n_braces} braces, pitch {pitch:.2f} mm, {pitch - 18:.2f} mm between braces")
 print(f"table {TW / IN:g} x {TL / IN:g} in MDF, footprint {xtable} x {ytable} mm at ({FX0:.1f}, {FY0:.1f})")
 print(f"machine {core.size_text(bb)}; tool at X {tool_x:.1f} Y {tool_y:.1f}, bit tip {tip_z - T:.1f} mm above the table "
       f"(Z_POS {Z_POS}); Y rail clips {n_clips}")

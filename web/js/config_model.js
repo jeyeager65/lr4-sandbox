@@ -9,16 +9,16 @@
 (function (root) {
   "use strict";
   const IN = 25.4, XZ = 6.5;
+  const Calc = typeof module !== "undefined" && module.exports ? require("./calculator.js") : root.LR4Calc;
   // build.py HOSE_ORDER (holder file per brace, counted from the Max end) -> fit_config.py HOSE_TYPE keys
   const HOSE_KEY = { Hose_Holder_Hook: "Hook", hose_holder_shorty: "Shorty", Hose_Hook_70: "Hook70" };
   const HOSE_NAME = { Hook: "Hose_Holder_Hook", Shorty: "Hose_Holder_Shorty", Hook70: "Hose_Hook_70" };
 
   function size(cutX, cutY, braces) {
-    const strut = Math.ceil(cutX + 169);
-    const auto = Math.floor((strut - 18) / 183) + 1;
+    const { strut, xtable, ytable } = Calc.calc(cutX, cutY, XZ);
+    const auto = Math.floor((strut - 18) / 183) + 1;       // the strut plate generator's brace count
     const n = braces || auto;
     const pitch = (strut - 18) / (n - 1);
-    const xtable = strut + 2 * XZ + 110, ytable = cutY + 313;
     const TW = Math.ceil(xtable / IN + 2 - 1e-9) * IN, TL = Math.ceil(ytable / IN + 2 - 1e-9) * IN;
     return { cutX, cutY, strut, n, auto, pitch, TW, TL, xtable, ytable, f: [1, TW, TL, strut, pitch, cutY, cutX] };
   }
@@ -144,17 +144,12 @@
   // ---- BOM at this size: the reference build's BOM (bom.py) with the size-dependent parts redone - calculator and
   // stock rows from the calculator, printed part counts from the parts drawn (names), hardware counts from
   // fit_config.py's per-row fits (a + b braces + c Y clips, exact across the size builds) ----
-  const OFF = { xrail_core: 169, yrail_minus_work: 255, ytable_minus_work: 313, xbelt_extra: 180, ybelt_extra: 200,
-    xtable_extra: 110, xrail_cushion: 3 };          // V1E calculator (vendor/v1e_lr4_calculator.js), mm
   const EMT_STICK = 3048, KERF = 3, WING = 11.5;
-  const up8 = (v) => Math.ceil(v * 8 - 1e-9) / 8;
   function bom(cfg, S, names) {
     const secs = JSON.parse(JSON.stringify(cfg.bom_ref || []));
     const n = S.n, nc = names.filter((nm) => /^Y_Clip_\d+$/.test(nm)).length;
-    const strut = S.strut, xbelt = strut + OFF.xbelt_extra, xtable = strut + 2 * XZ + OFF.xtable_extra;
-    const yrail = S.cutY + OFF.yrail_minus_work, ybelt = yrail + OFF.ybelt_extra, ytable = S.cutY + OFF.ytable_minus_work;
-    const xrails = strut - OFF.xrail_cushion, inch = (mm) => up8(mm / IN), num = (v) => +v.toFixed(1);
-    const strutIn = inch(strut);
+    const c = Calc.calc(S.cutX, S.cutY, XZ), ci = Calc.inches(c), num = (v) => +v.toFixed(1);
+    const { strut, xbelt, xtable, yrail, ybelt, ytable, xrails } = c, strutIn = ci.strut;
     const count = (re) => names.filter((nm) => re.test(nm)).length;
     const sec = (t) => secs.find((q) => q.title.startsWith(t));
     const byName = (q, col, name) => q && q.rows.find((r) => r[col] === name);
@@ -164,10 +159,10 @@
       q.note = `Usable cutting area ${+(S.cutX / IN).toFixed(3)} x ${+(S.cutY / IN).toFixed(3)} in (${S.cutX.toFixed(1)} x ` +
         `${S.cutY.toFixed(1)} mm), 1" EMT (29.5 mm), XZ plates 6.5 mm. This build uses the mm values (the inch mode ` +
         `rounds the strut up to ${(strutIn * IN).toFixed(2)} mm).`;
-      const rows = { 'X rails (1" EMT)': [xrails, strutIn - inch(OFF.xrail_cushion)], 'Y rail (1" EMT)': [num(yrail), inch(yrail)],
-        "Belt along X": [xbelt, inch(xbelt)], "Belt along Y": [num(ybelt), inch(ybelt)],
-        "Belt total (GT2 10 mm)": [num(xbelt + 2 * ybelt), inch(xbelt + 2 * ybelt)], "Strut length": [strut, strutIn],
-        "Table footprint (min)": [`${xtable.toFixed(1)} x ${ytable.toFixed(1)}`, `${inch(xtable)} x ${inch(ytable)}`] };
+      const rows = { 'X rails (1" EMT)': [xrails, ci.xrails], 'Y rail (1" EMT)': [num(yrail), ci.yrail],
+        "Belt along X": [xbelt, ci.xbelt], "Belt along Y": [num(ybelt), ci.ybelt],
+        "Belt total (GT2 10 mm)": [num(c.belt_total), ci.belt_total], "Strut length": [strut, strutIn],
+        "Table footprint (min)": [`${xtable.toFixed(1)} x ${ytable.toFixed(1)}`, `${ci.xtable} x ${ci.ytable}`] };
       for (const [k, [mm, i]] of Object.entries(rows)) { const r = byName(q, 0, k); set(r, 1, mm); set(r, 2, i); }
     }
     q = sec("Buy / cut: stock");

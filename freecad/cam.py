@@ -57,10 +57,7 @@ ROUTER = "kobalt"
 
 core.set_units("mm")
 strut = lr4.calculator(B["CUT_X_IN"] * 25.4, B["CUT_Y_IN"] * 25.4, B["XZ_PLATE"])["strut"]
-os.makedirs(os.path.join(ROOT, "build"), exist_ok=True)
-gen = os.path.join(ROOT, "build", "strut_plates")
-lr4.run_generator(gen, strut, B["WING"], B["DOGBONE"])
-faces = lr4.plate_faces(gen + ".dxf")
+faces = lr4.plate_faces(strut, B["WING"], B["DOGBONE"])
 
 # lay the plates along Y (length) side by side in X; SCAD (x, y) -> stock (X, Y) = (y, x) turned
 solids, x = {}, MARGIN

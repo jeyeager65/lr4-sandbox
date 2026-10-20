@@ -1,6 +1,6 @@
-// LR4 strut plates - a JS port of Vector76's generator (vendor/lr4_strut_plate_3d.scad).
+// LR4 strut plates - a JS port of Vector76's generator (his SCAD, not shipped; twin of freecad/strut_plate.py).
 // Same shapes, same polygon circles ($fn 36 holes, 30 dogbones) so the outlines match the
-// SCAD's DXF vertex for vertex (configurator/test_strut_plate.js checks it against OpenSCAD).
+// SCAD's DXF vertex for vertex (tests/test_strut_plate.js checks it against OpenSCAD).
 // Needs a polygon boolean lib: polygon-clipping (global `polygonClipping` in the page, require() in node).
 (function (root) {
   "use strict";

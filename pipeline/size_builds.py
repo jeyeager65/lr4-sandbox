@@ -1,7 +1,7 @@
 # Configurator phase 2: build the LR4 at several cut areas, each in its own throwaway copy of the project, so
 # fit_config.py can work out how every part moves with size. The real build/ and exports/ are never touched.
 #   python pipeline/size_builds.py [tag ...]      (plain Python; runs FreeCAD headless per size, ~4 min each)
-# Copies: private/sizes/<tag>/ (freecad/ incl. fclib + vendor + build/cache; parts/ is read from the real project by
+# Copies: private/sizes/<tag>/ (freecad/ incl. fclib + build/cache; parts/ is read from the real project by
 # patched paths - no junctions, so deleting private/sizes can't reach the originals). Each copy runs build.py with
 # LR4_CHECK=0, then export_web.py, which leaves exports/web/lr4_local.json + geo/*.bin per size.
 import os
@@ -53,7 +53,6 @@ def make_copy(tag, cx, cy):
     os.makedirs(os.path.join(dst, "build"))
     shutil.copytree(os.path.join(PROJ, "freecad"), os.path.join(dst, "freecad"),
                     ignore=shutil.ignore_patterns("__pycache__"))
-    shutil.copytree(os.path.join(PROJ, "vendor"), os.path.join(dst, "vendor"))
     shutil.copytree(os.path.join(PROJ, "build", "cache"), os.path.join(dst, "build", "cache"))
     os.makedirs(os.path.join(dst, "exports", "web"))
     os.makedirs(os.path.join(dst, "web"))

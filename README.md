@@ -61,7 +61,9 @@ python pipeline/fit_config.py                # fit -> web/data/
 ```sh
 cd tests && npm install                      # once
 node test_config_model.js                    # the configurator's machine vs every FreeCAD size build
-node test_strut_plate.js                     # strut plates vs the OpenSCAD generator (needs OpenSCAD)
+node test_calculator.js                      # the JS and Python calculators agree (needs python)
+node test_strut_plate.js                     # JS strut plates vs Vector76's OpenSCAD generator (maintainer only)
+python ../tools/run.py test_strut_plate.py   # Python strut plates vs the same (maintainer only)
 ```
 
 ## Layout

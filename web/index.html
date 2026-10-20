@@ -293,6 +293,7 @@ select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/controls/OrbitControls.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/environments/RoomEnvironment.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/polygon-clipping@0.15.7/dist/polygon-clipping.umd.min.js"></script>
+<script src="js/calculator.js"></script>
 <script src="js/strut_plate.js"></script>
 <script src="js/config_model.js"></script>
 <script>
@@ -811,12 +812,9 @@ select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
   }
 
   // ---- size inputs, V1E calculator, cut list, strut plate drawing + downloads ----
-  const OFF = { xrail_core: 169, yrail_minus_work: 255, ytable_minus_work: 313, xbelt_extra: 180, ybelt_extra: 200,
-    xtable_extra: 110, xrail_cushion: 3 };          // V1E calculator (vendor/v1e_lr4_calculator.js), mm
   const EMT_STICK = 3048, KERF = 3, XZ = 6.5;
   const U = { unit: "in", cutX: 26 * IN, cutY: 50 * IN, braces: 0 };
   const $ = (id) => document.getElementById(id);
-  const up8 = (v) => Math.ceil(v * 8 - 1e-9) / 8;
   const disp = (mm) => U.unit === "in" ? mm / IN : mm;
   function frac(v) {                                  // 32.625 -> 32 5/8
     const w = Math.floor(v + 1e-9), e = Math.round((v - w) * 8);
@@ -834,13 +832,10 @@ select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
     }
     return bins.length;
   }
-  function calcNumbers() {
-    const strut = S.strut, xbelt = strut + OFF.xbelt_extra, xtable = strut + 2 * XZ + OFF.xtable_extra;
-    const yrail = S.cutY + OFF.yrail_minus_work, ybelt = yrail + OFF.ybelt_extra, ytable = S.cutY + OFF.ytable_minus_work;
-    const strutD = up8(disp(strut));
-    return { strut, xrails: strut - OFF.xrail_cushion, yrail, xbelt, ybelt, xtable, ytable, belt: xbelt + 2 * ybelt,
-      d: { strut: strutD, xrails: strutD - up8(disp(OFF.xrail_cushion)), yrail: up8(disp(yrail)), xbelt: up8(disp(xbelt)),
-        ybelt: up8(disp(ybelt)), belt: up8(disp(xbelt + 2 * ybelt)), xtable: up8(disp(xtable)), ytable: up8(disp(ytable)) } };
+  function calcNumbers() {                           // calculator.js: mm, plus the display (inches: up to 1/8")
+    const c = LR4Calc.calc(S.cutX, S.cutY, XZ), i = LR4Calc.inches(c);
+    const d = U.unit === "in" ? i : Object.fromEntries(Object.entries(c).map(([k, v]) => [k, LR4Calc.up8(v)]));  // V1E's mm display
+    return { ...c, belt: c.belt_total, d: { ...d, belt: d.belt_total } };
   }
   function updateCalc() {
     const c = calcNumbers();

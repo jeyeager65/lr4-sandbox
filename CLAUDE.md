@@ -24,7 +24,8 @@ across many FreeCAD builds. See README.md for the layout. FreeCAD 1.1, Python 3,
   V1E's; users download their own.
 - **Commit or push only when the maintainer asks.** Nothing goes to GitHub until V1E has approved the public version.
 - **Keep JS and Python rules in step.** The page mirrors several Python rules (`lr4.hose_route` / `cord_route` /
-  `jp3_shift`, the brace and calculator maths in `web/js/config_model.js`). Change both and run both tests.
+  `jp3_shift` in `web/js/config_model.js`; `calculator.py` / `calculator.js`; `strut_plate.py` / `strut_plate.js`).
+  Change both and run the tests.
 - Units: mm inside; the cutting area and table are in inches. Axes: X along the beam, Y along the table (front 0),
   Z up.
 
