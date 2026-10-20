@@ -1,7 +1,7 @@
 # Publishes the configurator to GitHub Pages (jeyeager65.github.io/lr4-sandbox). Manual only, and not enabled:
 # it needs Pages turned on in the repo settings (Source: GitHub Actions) and the share data committed - web/data/share/
 # is git-ignored until V1E OKs shipping the placements (.gitignore has the line to uncomment).
-# The site is web/index.html (wrapped as a full page, as tools/serve.py does) + web/js/ with the share data as its data/ (so no ?share is needed): no V1E geometry,
+# The site is web/index.html + web/js/ with the share data as its data/ (so no ?share is needed): no V1E geometry,
 # visitors load their own part files.
 name: Pages
 
@@ -33,9 +33,8 @@ jobs:
 
       - name: Assemble the site
         run: |
-          python -c "import sys; sys.path.insert(0, 'tools'); import serve; serve.wrap_configurator('web')"
           mkdir -p _site/data
-          cp web/index_local.html _site/index.html
+          cp web/index.html _site/index.html
           cp -r web/js _site/
           cp -r web/data/share/. _site/data/
 

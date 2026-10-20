@@ -14,7 +14,7 @@ const ROOT = path.join(__dirname, ".."), PARTS = path.join(ROOT, "parts"), DATA 
 const TOL = 0.002, DXF_TOL = 0.02;
 const cfg = JSON.parse(fs.readFileSync(path.join(DATA, "lr4_config.json"), "utf8"));
 const share = JSON.parse(fs.readFileSync(path.join(DATA, "share", "lr4_config.json"), "utf8"));
-const blob = zlib.gunzipSync(Buffer.from(fs.readFileSync(path.join(DATA, "lr4_config_geometry.txt"), "utf8").trim(), "base64"));
+const blob = zlib.gunzipSync(fs.readFileSync(path.join(DATA, "lr4_config_geometry.bin.gz")));
 const ab = blob.buffer.slice(blob.byteOffset, blob.byteOffset + blob.byteLength);
 const ref = {};
 for (const p of cfg.parts) if (p.mesh) {

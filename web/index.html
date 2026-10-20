@@ -1,5 +1,9 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>LowRider 4 Configurator</title>
-<meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=Barlow:wght@400;500&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <style>
@@ -221,6 +225,8 @@ body.vr-on .stage { grid-row: 1; }
 .vr-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 @media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto; } }
 </style>
+</head>
+<body>
 
 <aside class="panel">
   <header>
@@ -382,7 +388,6 @@ body.vr-on .stage { grid-row: 1; }
     <div class="buttons">
       <button type="button" id="dl-dxf">Download DXF</button>
       <button type="button" id="dl-svg">Download SVG</button>
-      <button type="button" id="copy-dxf">Copy DXF text</button>
       <button type="button" id="dl-nc">Download G-code</button>
     </div>
     <div id="dl-status" role="status"></div>
@@ -1098,15 +1103,13 @@ body.vr-on .stage { grid-row: 1; }
     const r = await fetch(DATA + "lr4_config.json");
     if (!r.ok) throw new Error("lr4_config.json " + r.status);
     cfg = await r.json();
-    const total = cfg.geometry_chars || 0;
+    const total = cfg.geometry_bytes || 0;             // gzip of the meshes (fit_config.py / share_data.py)
     let got = 0;
-    const raw = await fetchBytes(DATA + "lr4_config_geometry.txt", (n) => { got += n;
+    const raw = await fetchBytes(DATA + "lr4_config_geometry.bin.gz", (n) => { got += n;
       progress("Downloading geometry…", total ? got / total : null, total ? `${MB(got)} of ${MB(total)}` : MB(got)); });
     progress("Unpacking…", 1, "gzip");
     await nextFrame();
-    const str = atob(new TextDecoder().decode(raw).trim()), u = new Uint8Array(str.length);
-    for (let i = 0; i < str.length; i++) u[i] = str.charCodeAt(i);
-    bin = await new Response(new Blob([u]).stream().pipeThrough(new DecompressionStream("gzip"))).arrayBuffer();
+    bin = await new Response(new Blob([raw]).stream().pipeThrough(new DecompressionStream("gzip"))).arrayBuffer();
     if (cfg.files) await setupFiles();
     progress("Building the machine…", 1, `${cfg.parts.length} parts`);
     await nextFrame();
@@ -1575,35 +1578,13 @@ body.vr-on .stage { grid-row: 1; }
     applySize(true);
   }
 
-  // downloads: the artifact's downloads capability (DXF isn't an allowed type, so it goes in a zip)
-  const crcT = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
-  const crc32 = (b) => { let c = 0xFFFFFFFF; for (const x of b) c = crcT[(c ^ x) & 255] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; };
-  function zip1(name, text) {                         // one-file ZIP, stored
-    const data = new TextEncoder().encode(text), nm = new TextEncoder().encode(name), crc = crc32(data), n = data.length;
-    const lh = new DataView(new ArrayBuffer(30)), ch = new DataView(new ArrayBuffer(46)), eh = new DataView(new ArrayBuffer(22));
-    lh.setUint32(0, 0x04034b50, true); lh.setUint16(4, 20, true); lh.setUint16(12, 0x21, true);
-    lh.setUint32(14, crc, true); lh.setUint32(18, n, true); lh.setUint32(22, n, true); lh.setUint16(26, nm.length, true);
-    ch.setUint32(0, 0x02014b50, true); ch.setUint16(4, 20, true); ch.setUint16(6, 20, true); ch.setUint16(14, 0x21, true);
-    ch.setUint32(16, crc, true); ch.setUint32(20, n, true); ch.setUint32(24, n, true); ch.setUint16(28, nm.length, true);
-    eh.setUint32(0, 0x06054b50, true); eh.setUint16(8, 1, true); eh.setUint16(10, 1, true);
-    eh.setUint32(12, 46 + nm.length, true); eh.setUint32(16, 30 + nm.length + n, true);
-    return new Blob([lh, nm, data, ch, nm, eh]);
-  }
-  let dl = null;
-  (async () => { try { dl = window.claude ? await window.claude.use("downloads") : null; } catch (e) { dl = null; } })();
+  // downloads: a plain browser download
   const dlStatus = (t, id = "dl-status") => { $(id).textContent = t; };
-  async function save(filename, data, id = "dl-status", copy = "Copy DXF text") {
-    const st = (t) => dlStatus(t, id);
-    if (dl) {
-      try { await dl.save({ filename, data }); st(`Saved ${filename}`); }
-      catch (e) { st(e && e.code === "declined" ? "Download cancelled." : `Download not available here (${(e && e.code) || "error"}). Use ${copy}.`); }
-      return;
-    }
-    if (window.claude) { st(`Downloads are not available in this view. Use ${copy}.`); return; }
-    const a = document.createElement("a");             // a local copy / plain web page
+  function save(filename, data, id = "dl-status") {
+    const a = document.createElement("a");
     a.href = URL.createObjectURL(data instanceof Blob ? data : new Blob([data]));
     a.download = filename; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-    st(`Saved ${filename}`);
+    dlStatus(`Saved ${filename}`, id);
   }
 
   // ---- FluidNC config.yaml: V1E's JP3_LR file (pinned commit, fetched on demand - not shipped) or the user's own,
@@ -1622,7 +1603,7 @@ body.vr-on .stage { grid-row: 1; }
   const yamlFail = (e) => dlStatus(yamlBase ? `Not patched: ${e.message}`
     : `Couldn't read V1E's config.yaml from GitHub here (${e.message}). Download it from the link below and use "Use my own config.yaml".`, "yaml-status");
   $("dl-yaml").addEventListener("click", async () => {
-    try { save("config.yaml", (await yamlText()).text, "yaml-status", "Copy text"); } catch (e) { yamlFail(e); }
+    try { save("config.yaml", (await yamlText()).text, "yaml-status"); } catch (e) { yamlFail(e); }
   });
   $("copy-yaml").addEventListener("click", async () => {
     let r;
@@ -1667,13 +1648,8 @@ body.vr-on .stage { grid-row: 1; }
   const laidOut = () => StrutPlate.plates(polygonClipping, S.strut,
     { nbraces: S.n === S.auto ? 0 : S.n, wing: WING, dogbones: DOGBONE });   // bottom at y -95, as the SCAD
   $("dl-dxf").addEventListener("click", () => { const q = laidOut();
-    save(baseName() + "_dxf.zip", zip1(baseName() + ".dxf", StrutPlate.toDXF([q.front, q.bottom]))); });
+    save(baseName() + ".dxf", StrutPlate.toDXF([q.front, q.bottom])); });
   $("dl-svg").addEventListener("click", () => { const q = laidOut(); save(baseName() + ".svg", StrutPlate.toSVG([q.front, q.bottom])); });
-  $("copy-dxf").addEventListener("click", async () => {
-    const q = laidOut(), t = StrutPlate.toDXF([q.front, q.bottom]);
-    try { await navigator.clipboard.writeText(t); dlStatus("DXF copied. Paste it into a .dxf file."); }
-    catch (e) { dlStatus("Copy blocked here. Use Download DXF."); }
-  });
 
   // ---- strut plate G-code (strut_cam.js, twin of freecad/cam.py; defaults = cam.py). Settings kept per browser. ----
   const CAM_FIELDS = { "cam-t": "t", "cam-step": "step", "cam-plate": "plate", "cam-feed": "feed", "cam-plunge": "plunge",
@@ -1722,7 +1698,7 @@ body.vr-on .stage { grid-row: 1; }
     camNote();
   });
   $("dl-nc").addEventListener("click", () => {
-    try { const j = camJob(); save(`${baseName()}_T1_eighth.gcode`, j.gcode, "dl-status", "a local copy of the page"); }
+    try { const j = camJob(); save(`${baseName()}_T1_eighth.gcode`, j.gcode); }
     catch (e) { dlStatus(`G-code: ${e.message}`); }
   });
 
@@ -2648,3 +2624,5 @@ body.vr-on .stage { grid-row: 1; }
   load().catch((err) => { statusEl.textContent = "Could not load the model: " + err.message; });
 })();
 </script>
+</body>
+</html>

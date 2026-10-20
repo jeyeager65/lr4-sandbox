@@ -5,14 +5,14 @@
 // into ffmpeg (H.264 MP4).
 //   python tools/serve.py configurator        (serves the local page on 127.0.0.1:8767)
 //   node tools/record_demo.js <file.nc> [out.mp4] [--size 2560x1440] [--fps 30] [--job 75] [--pause 2] [--orbit 10]
-//        [--url http://127.0.0.1:8767/index_local.html] [--swiftshader]
+//        [--url http://127.0.0.1:8767/index.html] [--swiftshader]
 // --job: seconds of video for the job's moves (sets the playback speed; pauses and probes come on top).
 // Needs Chrome (CHROME env or the usual path), ffmpeg on PATH, Node 22+. Uses the page's window.LR4Demo handle.
 "use strict";
 const { spawn } = require("child_process"), fs = require("fs"), os = require("os"), path = require("path");
 
 const args = process.argv.slice(2), opt = { size: [2560, 1440], fps: 30, job: 75, pause: 2, orbit: 10,
-  url: "http://127.0.0.1:8767/index_local.html", gpu: true };
+  url: "http://127.0.0.1:8767/index.html", gpu: true };
 const pos = [];
 for (let i = 0; i < args.length; i++) {
   const a = args[i];

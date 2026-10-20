@@ -4,15 +4,14 @@
 # so the page places the user's own copy exactly where the mesh was. Our meshes (hardware, strut plates, table, bolts)
 # stay. Plain Python (numpy).
 #   python pipeline/share_data.py
-# in : web/data/lr4_config.json + lr4_config_geometry.txt (fit_config.py), private/sizes/source_frames.json
+# in : web/data/lr4_config.json + lr4_config_geometry.bin.gz (fit_config.py), private/sizes/source_frames.json
 #      (source_frames.py), parts/manifest.json
-# out: web/data/share/lr4_config.json + lr4_config_geometry.txt (same layout as the private data) - the
+# out: web/data/share/lr4_config.json + lr4_config_geometry.bin.gz (same layout as the private data) - the
 #      tests/test_share.py check rebuilds every src part from parts/ and compares it with the private meshes.
 # src kinds: stl {file, sha256, A}; dxf {.., depth: extrusion along the DXF's z, before A}; peter {open: {.., piece:
 # connected component by ZMax, highest first}, closed: {..}} (the "~honeycomb" alternates are dropped - part 6 builds
 # them from the user's DXFs); bent {file, sha256, A, path, along, height, across, z0, start, scale, reverse} (the bristles: mesh.bend_strip's
 # arguments - the page bends the user's flat strip along the groove path, then A).
-import base64
 import gzip
 import json
 import os
@@ -29,7 +28,7 @@ MANIFEST = os.path.join(PROJ, "parts", "manifest.json")
 
 
 def load_geometry(path):
-    return gzip.decompress(base64.b64decode(open(path).read()))
+    return gzip.decompress(open(path, "rb").read())
 
 
 def mesh_span(m):
@@ -51,7 +50,7 @@ def src_of(name, frames):
 
 def main():
     cfg = json.load(open(os.path.join(DATA, "lr4_config.json")))
-    blob = load_geometry(os.path.join(DATA, "lr4_config_geometry.txt"))
+    blob = load_geometry(os.path.join(DATA, "lr4_config_geometry.bin.gz"))
     frames = json.load(open(FRAMES))
     frames_t = json.load(open(FRAMES_TEMP)) if os.path.exists(FRAMES_TEMP) else {}
     man = json.load(open(MANIFEST))
@@ -80,17 +79,17 @@ def main():
                 q["uv"] = m["uv"] + off
             rec["mesh"] = q
         parts.append(rec)
-    txt = base64.b64encode(gzip.compress(bytes(out_blob), 9)).decode("ascii")
-    share = dict(cfg, parts=parts, geometry_chars=len(txt),
+    gz = gzip.compress(bytes(out_blob), 9)
+    share = dict(cfg, parts=parts, geometry_bytes=len(gz),
                  triangles=sum(p["mesh"]["idx"][1] // 3 for p in parts if "mesh" in p),
                  files=dict(tested=man["tested"], sources=man["sources"],
                             files={k: {f: v[f] for f in ("source", "use", "sha256")} for k, v in man["files"].items()}))
     os.makedirs(OUT, exist_ok=True)
-    open(os.path.join(OUT, "lr4_config_geometry.txt"), "w").write(txt)
+    open(os.path.join(OUT, "lr4_config_geometry.bin.gz"), "wb").write(gz)
     json.dump(share, open(os.path.join(OUT, "lr4_config.json"), "w"), separators=(",", ":"))
     print(f"SHARE {len(parts)} parts: {sum(by_kind.values())} from files {by_kind}, "
           f"{sum('mesh' in p for p in parts)} meshes kept; dropped {len(dropped)} ({', '.join(dropped)}); "
-          f"geometry {len(txt) / 1e6:.2f} MB (private {cfg['geometry_chars'] / 1e6:.2f} MB)")
+          f"geometry {len(gz) / 1e6:.2f} MB (private {cfg['geometry_bytes'] / 1e6:.2f} MB)")
 
 
 if __name__ == "__main__":

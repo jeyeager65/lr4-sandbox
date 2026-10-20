@@ -7,7 +7,6 @@
 # adds fills, so one way only); peter closed: >= 99 % of its vertices on the open piece (B's stepper window differs);
 # dxf: extruded + A + tessellated as build.py / export_web do -> the same vertex set; bent: the flat strip bent along
 # the recorded path (bend() = fclib mesh.bend_strip in numpy, the page's rule) + A -> the same vertex set.
-import base64
 import gzip
 import hashlib
 import json
@@ -128,7 +127,7 @@ def dxf_solid(rel, depth, A):
 
 def main():
     cfg = json.load(open(os.path.join(DATA, "lr4_config.json")))
-    ref = ref_meshes(cfg, gzip.decompress(base64.b64decode(open(os.path.join(DATA, "lr4_config_geometry.txt")).read())))
+    ref = ref_meshes(cfg, gzip.decompress(open(os.path.join(DATA, "lr4_config_geometry.bin.gz"), "rb").read()))
     share = json.load(open(os.path.join(DATA, "share", "lr4_config.json")))
     fails, done = [], 0
     printed = {p["meta"]["name"] for p in cfg["parts"] if p["meta"].get("source") == "printed" and "mesh" in p}

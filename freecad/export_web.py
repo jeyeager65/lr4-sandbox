@@ -1,10 +1,8 @@
 # LowRider4 - export the built assembly for the browser viewer (exports/web/), headless:
 #   python tools/run.py freecad/export_web.py
-# Writes, for the published artifact, lr4_geometry.txt (base64 of gzip of: per part float32 positions [+ uv] +
-# uint16/uint32 triangle indices) and lr4.json (names, groups, colours, motion, travel limits); and for the LOCAL
-# viewer (LowRider4_local.html, no 16 MB cap) geo/<part>.bin (the same per-part bytes, one file each) + lr4_local.json.
-# STL meshes go in at full resolution, solids tessellated. LOCAL_ONLY parts (the Jackpot3 board: ~730k triangles)
-# are left out of the published file.
+# Writes, for the viewer (LowRider4_local.html, served by tools/serve.py viewer), geo/<part>.bin (per part float32
+# positions [+ uv] + uint16/uint32 triangle indices) + lr4_local.json (names, groups, colours, motion, travel limits).
+# STL meshes go in at full resolution, solids tessellated.
 
 import json
 import os
@@ -24,7 +22,6 @@ DECIMATE_ABOVE = None      # decimate meshes with more facets than this (None = 
 TESSELLATE = 0.05          # mm deviation for solids
 STEPPER_BITS = ("_Face", "_Shaft", "_Screws", "_Lead_Red", "_Lead_Green", "_Lead_Blue", "_Lead_Black")
 TESSELLATE_FASTENERS = 0.12   # bolts/screws/nuts (names with '__'): Phillips heads are many small faces
-LOCAL_ONLY = ("Jackpot3_Board_", "Jackpot3_PCB", "Jackpot3_Silk")   # local viewer only (too big for the artifact)
 
 # what moves with what: lr4.motion (shared with hosecheck.py)
 
@@ -270,8 +267,6 @@ meta["bom"] = load("bom.json")                  # build/bom.json (bom.py): the p
 hose_json = os.path.join(ROOT, "build", "hose.json")   # route anchors from build.py (lr4.hose_route, mirrored
 if os.path.exists(hose_json):                          # by hoseRoute in the page)
     meta["hose"] = json.load(open(hose_json))
-import base64                                     # noqa: E402 - artifacts serve text, not .bin
-import gzip                                       # noqa: E402
 import shutil                                     # noqa: E402
 
 
@@ -289,20 +284,7 @@ def rebased(pt, shift, **kw):
 
 
 ntris = lambda ps: sum(pt["idx"][1] // 3 for pt in ps)
-# published: one blob without the LOCAL_ONLY parts
-pub, pub_parts = bytearray(), []
-for pt in parts:
-    if pt["name"].startswith(LOCAL_ONLY):
-        continue
-    a, b = span(pt)
-    pub_parts.append(rebased(pt, a - len(pub)))
-    pub += blob[a:b]
-gz = gzip.compress(bytes(pub), 9)
-txt = base64.b64encode(gz).decode("ascii")
-open(os.path.join(out_dir, "lr4_geometry.txt"), "w").write(txt)
-json.dump(dict(meta, parts=pub_parts, triangles=ntris(pub_parts), geometry_chars=len(txt)),
-          open(os.path.join(out_dir, "lr4.json"), "w"), indent=0)
-# local: every part in its own geo/<name>.bin, offsets relative to its file
+# every part in its own geo/<name>.bin, offsets relative to its file
 geo_dir = os.path.join(out_dir, "geo")
 shutil.rmtree(geo_dir, ignore_errors=True)
 os.makedirs(geo_dir)
@@ -313,15 +295,7 @@ for pt in parts:
     open(os.path.join(out_dir, fn), "wb").write(blob[a:b])
     loc_parts.append(rebased(pt, a, file=fn, bytes=b - a))
 json.dump(dict(meta, parts=loc_parts, triangles=ntris(loc_parts)), open(os.path.join(out_dir, "lr4_local.json"), "w"), indent=0)
-# the page source is web/viewer.html; it's copied in as LowRider4.html (what the artifact publishes) and wrapped as
-# the local page: the published page + window.LR4_LOCAL (served by tools/serve.py viewer; the claude.ai artifact
-# sandbox may block WebHID, so the SpaceMouse works only here)
-page = open(os.path.join(ROOT, "web", "viewer.html"), encoding="utf-8").read()
-open(os.path.join(out_dir, "LowRider4.html"), "w", encoding="utf-8").write(page)
-open(os.path.join(out_dir, "LowRider4_local.html"), "w", encoding="utf-8").write(
-    "<!doctype html>\n<html lang='en'><head><meta charset='utf-8'>"
-    "<meta name='viewport' content='width=device-width,initial-scale=1'><script>window.LR4_LOCAL = true;</script>"
-    "</head><body>\n" + page + "\n</body></html>\n")
-print(f"published: {len(pub_parts)} parts, {ntris(pub_parts)} triangles, {len(txt) / 1e6:.2f} MB as text (limit 16); "
-      f"local: {len(loc_parts)} parts, {ntris(loc_parts)} triangles, {len(blob) / 1e6:.1f} MB in geo/ -> {out_dir}")
+# the page: web/viewer.html, copied next to its data (served by tools/serve.py viewer)
+shutil.copyfile(os.path.join(ROOT, "web", "viewer.html"), os.path.join(out_dir, "LowRider4_local.html"))
+print(f"{len(loc_parts)} parts, {ntris(loc_parts)} triangles, {len(blob) / 1e6:.1f} MB in geo/ -> {out_dir}")
 print(f"[time] variants + write: {time.time() - t_out:.1f} s")

@@ -44,8 +44,8 @@ script is history only.
 - `private/export_step.py` - whole assembly to `exports/LowRider4.step` (meshes decimated as far as FreeCAD's
   decimator goes; 859 MB, 208 parts, 2026-10-19 - smaller needs pyfqmr, ask before installing).
 - `CONFIGURATOR.md` - plan for a separate LR4 web configurator (later).
-- `export_web.py` - browser viewer data (`exports/web/`); viewer page `web/viewer.html` (copied to `exports/web/LowRider4.html`),
-  published at https://claude.ai/artifact/EcXkEtxoxZj4HNnJduZzha (private). Rerun after a build, then republish.
+- `export_web.py` - browser viewer data (`exports/web/`: geo/*.bin + lr4_local.json); viewer page `web/viewer.html`
+  (copied to `exports/web/LowRider4_local.html`; `python tools/serve.py viewer`). Rerun after a build.
 - `vendor/` (git-ignored, local only) - `lr4_strut_plate_3d.scad` (Vector76's generator, as served by his page)
   and `v1e_lr4_calculator.js` (V1E's calculator): only the tests read them (golden cases).
 - `parts/` - downloaded files: `lr4/` (Printables 1034840, V1E LowRider 4, 29.5 mm EMT

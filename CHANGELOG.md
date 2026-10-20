@@ -4,6 +4,11 @@ The version is the configurator page's (`VERSION` in `web/index.html`, shown in 
 the date the model data was built and the Printables file set it was solved for.
 
 ## 0.11.0 - 2026-10-20
+- Page data: the geometry is `lr4_config_geometry.bin.gz` (plain gzip, fetched as bytes) instead of base64 text -
+  a quarter smaller (share data 2.86 MB) and no decode step.
+- No more claude.ai artifact workarounds: index.html and viewer.html are complete pages (no wrapping by serve.py, the
+  Pages workflow or export_web); DXF downloads as .dxf (was zipped), no "Copy DXF text"; downloads are plain browser downloads; the viewer
+  loads only its per-part .bin files (export_web no longer writes lr4_geometry.txt / lr4.json / LowRider4.html).
 - tools/record_demo.js: records a demo video (QHD by default) - a turn round the workshop and the LR4, then a G-code
   file running (M0s resumed after 2 s, probe close-ups), the gantry parked at the end to show the result. Drives the
   page through `window.LR4Demo`, one frame at a time, so the video plays at true speed.

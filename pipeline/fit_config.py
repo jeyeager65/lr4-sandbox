@@ -1,7 +1,7 @@
 # Configurator phase 2: from the size builds (size_builds.py -> private/sizes/<tag>/), work out how every part
 # moves with the machine's size, check it against every build, and write the page's data:
 #   python pipeline/fit_config.py        (plain Python + numpy; no FreeCAD)
-# -> web/data/lr4_config.json (parts, rules, fitted coefficients) + lr4_config_geometry.txt (gzip+base64
+# -> web/data/lr4_config.json (parts, rules, fitted coefficients) + lr4_config_geometry.bin.gz (gzip
 #    of each mesh once, at the reference size), and a report of anything that doesn't fit.
 #
 # Size features (all computable in the page from the cut area): f = [1, TW, TL, strut, pitch, cutY]
@@ -18,7 +18,6 @@
 #   next, so families shift by the brace offsets (lr4.brace_offsets) rather than idx * pitch. A part placed the same
 #   by both is one rec; otherwise one per variant, tagged "struts": "mdf" / "temp". cfg.temp has the temp hose / BOM /
 #   travel fits.
-import base64
 import gzip
 import json
 import math
@@ -471,8 +470,7 @@ def main():
 
     os.makedirs(OUT, exist_ok=True)
     gz = gzip.compress(bytes(blob), 9)
-    txt = base64.b64encode(gz).decode("ascii")
-    open(os.path.join(OUT, "lr4_config_geometry.txt"), "w").write(txt)
+    open(os.path.join(OUT, "lr4_config_geometry.bin.gz"), "wb").write(gz)
     cfg = dict(features=FEATURES, ref=dict(tag=REF, cut_in=list(SIZES[REF]), f=infos[REF]["f"].tolist()),
                verified=dict(sizes={t: SIZES[t] for t in tags},
                              strut=[min(i["strut"] for i in infos.values()), max(i["strut"] for i in infos.values())],
@@ -486,7 +484,7 @@ def main():
                temp=temp,
                built=max(time.strftime("%Y-%m-%d", time.localtime(os.path.getmtime(os.path.join(
                    SIZES_DIR, t, "LowRider4", "exports", "web", "lr4_local.json")))) for t in tags),   # newest size build
-               geometry_chars=len(txt),
+               geometry_bytes=len(gz),
                triangles=sum(p["mesh"]["idx"][1] // 3 for p in out_parts if "mesh" in p and p.get("struts") != "temp"))
     json.dump(cfg, open(os.path.join(OUT, "lr4_config.json"), "w"), separators=(",", ":"))
     json.dump({t: SIZES[t] for t in built}, open(os.path.join(OUT, "sizes.json"), "w"))   # test_config_model.js

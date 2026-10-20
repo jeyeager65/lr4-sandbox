@@ -5,7 +5,6 @@ __pycache__/
 *.pyc
 *.FCBak
 tests/node_modules/
-web/index_local.html
 # page data made from the V1E meshes (pipeline/fit_config.py)
 web/data/*
 # the share data (no V1E geometry; the Pages site needs it) - uncomment once V1E OKs shipping the placements,
