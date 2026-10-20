@@ -21,6 +21,7 @@ import math
 import os
 import re
 import sys
+import time
 
 import numpy as np
 
@@ -375,6 +376,8 @@ def main():
                tip_above_table=ref_meta["tip_above_table"], peter_style=ref_meta.get("peter_style"),
                bom_ref=ref_meta.get("bom"), bom_fit=bom_fit, n_ref=infos[REF]["n"], nclips_ref=nclips[REF],
                hose_order=HOSE_ORDER, jp3=dict(shift=JP3_SHIFT_X, a=JP3_A, min_pitch=round(lr4.JP3_MIN_PITCH, 3), hose=sorted(map(list, JP3_HOSE))),
+               built=max(time.strftime("%Y-%m-%d", time.localtime(os.path.getmtime(os.path.join(
+                   SIZES_DIR, t, "LowRider4", "exports", "web", "lr4_local.json")))) for t in tags),   # newest size build
                geometry_chars=len(txt),
                triangles=sum(p["mesh"]["idx"][1] // 3 for p in out_parts if "mesh" in p))
     json.dump(cfg, open(os.path.join(OUT, "lr4_config.json"), "w"), separators=(",", ":"))

@@ -97,5 +97,21 @@ for (const [tag, [cx, cy]] of Object.entries(sizes)) {
     (extra.length ? `\n     extra: ${extra.slice(0, 12).join(", ")}${extra.length > 12 ? " ..." : ""}` : "") +
     (bad.length ? `\n     off: ${bad.slice(0, 12).join("; ")}` : ""));
 }
-console.log(fails ? `${fails} size(s) failed` : "all sizes match");
+// config.yaml: only axes x / y max_travel_mm change (laid out like V1E's JP3_LR file: nested keys, comments, a
+// commented-out axis, a max_travel_mm outside axes)
+{
+  const yaml = ["board: Jackpot3", "axes:", "  shared_stepper_disable_pin: NO_PIN", "  x:", "    steps_per_mm: 50.000",
+    "    max_travel_mm: 1220", "    homing:", "      cycle: 2", "    #X", "    motor0:", "      pulloff_mm: 4.000", "  y:",
+    "    max_travel_mm: 2440 # 8 ft", "  z:", "    max_travel_mm: 150.000", "#  c:", "#    max_travel_mm: 300.000",
+    "other:", "  max_travel_mm: 5"].join("\n");
+  const S = M.size(24.5 * M.IN, 45 * M.IN), r = M.fluidncConfig(yaml, cfg, S, "note");
+  const out = r.text.split("\n"), body = out.slice(2), diff = yaml.split("\n").map((l, i) => l === body[i] ? null : [l, body[i]]).filter(Boolean);
+  const ok = out.length === yaml.split("\n").length + 2 && diff.length === 2 && body[5] === "    max_travel_mm: 622.3"
+    && body[12] === "    max_travel_mm: 1143.0" && out[1] === "# note";
+  let bad = false;
+  try { M.fluidncConfig("axes:\n  z:\n    max_travel_mm: 150\n", cfg, S); } catch (e) { bad = true; }
+  if (!ok || !bad) fails++;
+  console.log(`${ok && bad ? "ok  " : "FAIL"} config.yaml: ${diff.length} lines changed (${diff.map((d) => d[1].trim()).join(", ")}), no-x/y file ${bad ? "refused" : "accepted"}`);
+}
+console.log(fails ? `${fails} check(s) failed` : "all sizes match, config.yaml ok");
 process.exit(fails ? 1 : 0);

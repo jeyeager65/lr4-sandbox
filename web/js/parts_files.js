@@ -250,6 +250,144 @@
     return faces.map(({ outer, holes }) => ({ outer, holes }));
   }
 
+  // ---- lite mode: vertex clustering on a `cell` mm grid (each cell's vertices -> their mean; triangles that collapse
+  // are dropped). pos = a soup (idx null) or indexed positions; -> {pos, idx} indexed. Keeps the winding. ----
+  function decimate(pos, idx, cell) {
+    const id = new Map(), sum = [], tri = [];
+    const nv = pos.length / 3, map = new Int32Array(nv);
+    for (let v = 0; v < nv; v++) {
+      const k = `${Math.floor(pos[v * 3] / cell)},${Math.floor(pos[v * 3 + 1] / cell)},${Math.floor(pos[v * 3 + 2] / cell)}`;
+      let c = id.get(k);
+      if (c === undefined) { c = sum.length / 4; id.set(k, c); sum.push(0, 0, 0, 0); }
+      sum[c * 4] += pos[v * 3]; sum[c * 4 + 1] += pos[v * 3 + 1]; sum[c * 4 + 2] += pos[v * 3 + 2]; sum[c * 4 + 3]++;
+      map[v] = c;
+    }
+    const nt = idx ? idx.length / 3 : nv / 3, seen = new Set();
+    for (let t = 0; t < nt; t++) {
+      const a = map[idx ? idx[t * 3] : t * 3], b = map[idx ? idx[t * 3 + 1] : t * 3 + 1], c = map[idx ? idx[t * 3 + 2] : t * 3 + 2];
+      if (a === b || b === c || a === c) continue;
+      const k = a < b && a < c ? `${a},${b},${c}` : b < c ? `${b},${c},${a}` : `${c},${a},${b}`;
+      if (seen.has(k)) continue;                      // (the same triangle twice after the collapse)
+      seen.add(k);
+      tri.push(a, b, c);
+    }
+    const out = new Float32Array(sum.length / 4 * 3);
+    for (let c = 0; c < sum.length / 4; c++) for (let k = 0; k < 3; k++) out[c * 3 + k] = sum[c * 4 + k] / sum[c * 4 + 3];
+    return { pos: out, idx: new Uint32Array(tri) };
+  }
+
+  // ---- Peter Plates honeycomb: the closed cover (PeterPlateT / B.stl, flat as printed) sectioned across its thin
+  // axis -> outline + holes; open hex cells (lr4.peter_variants: 5 mm across flats, 0.8 walls) wherever a whole cell
+  // fits inside a solid `border`, clear of a `ring` round each screw hole. A flat look-alike of the private build's
+  // (which clips cells to the border and keeps the drafted edges / counterbores). peterplateb_dxf.dxf is broken
+  // (open chains, 56 of the 80.8 mm), so the outline comes from the STL for both plates. ----
+  function section(pos, axis, h) {                    // loops in the plane pos[axis] = h, in the other two axes
+    const [a, b] = [[1, 2], [2, 0], [0, 1]][axis];
+    const segs = [];
+    for (let o = 0; o < pos.length; o += 9) {
+      const pts = [];
+      for (let k = 0; k < 3; k++) {
+        let p = o + 3 * k, q = o + 3 * ((k + 1) % 3);
+        if (pos[p + axis] > pos[q + axis] || (pos[p + axis] === pos[q + axis] && p > q)) [p, q] = [q, p];  // same
+        const dp = pos[p + axis] - h, dq = pos[q + axis] - h;                       // edge -> same point both ways
+        if ((dp < 0) !== (dq < 0)) {
+          const t = dp / (dp - dq);
+          pts.push([pos[p + a] + t * (pos[q + a] - pos[p + a]), pos[p + b] + t * (pos[q + b] - pos[p + b])]);
+        }
+      }
+      if (pts.length === 2) segs.push(pts);
+    }
+    const key = (p) => `${Math.round(p[0] * 1e4)},${Math.round(p[1] * 1e4)}`;
+    const at = new Map();
+    segs.forEach((s, i) => s.forEach((p) => { const k = key(p); (at.get(k) || at.set(k, []).get(k)).push(i); }));
+    const used = new Uint8Array(segs.length), loops = [];
+    for (let i = 0; i < segs.length; i++) {
+      if (used[i]) continue;
+      used[i] = 1;
+      const l = [segs[i][0], segs[i][1]];
+      for (;;) {
+        const end = l[l.length - 1], j = (at.get(key(end)) || []).find((n) => !used[n]);
+        if (j === undefined) break;
+        used[j] = 1;
+        l.push(key(segs[j][0]) === key(end) ? segs[j][1] : segs[j][0]);
+      }
+      if (l.length > 3 && key(l[0]) === key(l[l.length - 1])) { l[l.length - 1] = l[0]; loops.push(l); }
+    }
+    return loops;
+  }
+  function segDist(p, a, b) {
+    const dx = b[0] - a[0], dy = b[1] - a[1], L = dx * dx + dy * dy;
+    const t = L ? Math.max(0, Math.min(1, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / L)) : 0;
+    return Math.hypot(p[0] - a[0] - t * dx, p[1] - a[1] - t * dy);
+  }
+  const loopDist = (p, l) => { let d = Infinity; for (let i = 0; i + 1 < l.length; i++) d = Math.min(d, segDist(p, l[i], l[i + 1])); return d; };
+  function inset(l, d) {                              // closed CCW loop moved d inwards (mitred, capped at 2 d)
+    const n = l.length - 1, out = [];
+    const nrm = (p, q) => { const dx = q[0] - p[0], dy = q[1] - p[1], L = Math.hypot(dx, dy) || 1; return [-dy / L, dx / L]; };
+    for (let i = 0; i < n; i++) {
+      const a = nrm(l[(i + n - 1) % n], l[i]), b = nrm(l[i], l[i + 1]);
+      const k = Math.min(2, 1 / Math.max(0.5, (1 + a[0] * b[0] + a[1] * b[1]) / 2) ** 0.5) * d;
+      const m = [a[0] + b[0], a[1] + b[1]], L = Math.hypot(...m) || 1;
+      out.push([l[i][0] + k * m[0] / L, l[i][1] + k * m[1] / L]);
+    }
+    out.push(out[0]);
+    return out;
+  }
+  function clipConvex(subj, win) {                    // Sutherland-Hodgman: subj (any closed loop) inside convex CCW win
+    let out = subj.slice(0, -1);
+    for (let i = 0; i + 1 < win.length && out.length; i++) {
+      const a = win[i], b = win[i + 1], side = (p) => (b[0] - a[0]) * (p[1] - a[1]) - (b[1] - a[1]) * (p[0] - a[0]);
+      const inp = out;
+      out = [];
+      for (let k = 0; k < inp.length; k++) {
+        const p = inp[k], q = inp[(k + 1) % inp.length], sp = side(p), sq = side(q);
+        if (sp >= 0) out.push(p);
+        if ((sp >= 0) !== (sq >= 0)) { const t = sp / (sp - sq); out.push([p[0] + t * (q[0] - p[0]), p[1] + t * (q[1] - p[1])]); }
+      }
+    }
+    if (out.length < 3) return null;
+    out.push(out[0]);
+    return out;
+  }
+  // -> {axis, lo, hi, faces: [{outer, holes}]} with points in the two other axes ([y, z] / [z, x] / [x, y])
+  function honeycomb(pos, { cell = 5.0, wall = 0.8, border = 4.0, ring = 3.8, screw = 20 } = {}) {
+    const lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity];
+    for (let i = 0; i < pos.length; i++) { lo[i % 3] = Math.min(lo[i % 3], pos[i]); hi[i % 3] = Math.max(hi[i % 3], pos[i]); }
+    const axis = [0, 1, 2].reduce((m, k) => (hi[k] - lo[k] < hi[m] - lo[m] ? k : m), 0), th = hi[axis] - lo[axis];
+    let best = null;                                  // the section with the biggest outline (the face plate)
+    for (const fr of [0.13, 0.25, 0.37, 0.5, 0.63]) {
+      const faces = nest(section(pos, axis, lo[axis] + fr * th + 1e-4));
+      const f = faces.length && faces.reduce((m, x) => (Math.abs(area(x.outer)) > Math.abs(area(m.outer)) ? x : m));
+      if (f && (!best || Math.abs(area(f.outer)) > Math.abs(area(best.outer)) + 1)) best = f;
+    }
+    if (!best) return null;
+    const small = best.holes.filter((h) => Math.abs(area(h)) < screw), big = best.holes.filter((h) => Math.abs(area(h)) >= screw);
+    const centre = (l) => { let x = 0, y = 0; for (let i = 0; i + 1 < l.length; i++) { x += l[i][0]; y += l[i][1]; } return [x / (l.length - 1), y / (l.length - 1)]; };
+    const screws = small.map(centre);
+    const xs = best.outer.map((p) => p[0]), ys = best.outer.map((p) => p[1]);
+    const [x0, x1, y0, y1] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
+    const pitch = cell + wall, r = cell / Math.sqrt(3), cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
+    const rows = Math.ceil((y1 - y0) / 2 / (pitch * Math.sqrt(3) / 2)) + 1, cols = Math.ceil((x1 - x0) / 2 / pitch) + 1;
+    const outer = area(best.outer) > 0 ? best.outer : best.outer.slice().reverse(), inner = inset(outer, border);
+    const cells = [];
+    for (let j = -rows; j <= rows; j++)
+      for (let i = -cols; i <= cols; i++) {
+        const u = cx + (i + (j & 1 ? 0.5 : 0)) * pitch, v = cy + j * pitch * Math.sqrt(3) / 2;
+        let hex = [];                                 // CCW
+        for (let k = 0; k <= 6; k++) hex.push([u + r * Math.cos(Math.PI / 6 + k * Math.PI / 3), v + r * Math.sin(Math.PI / 6 + k * Math.PI / 3)]);
+        if (screws.some((s) => insidePt(s, hex) || loopDist(s, hex) < ring)) continue;
+        const test = hex.slice(0, 6).concat(hex.slice(0, 6).map((p, k) => [(p[0] + hex[k + 1][0]) / 2, (p[1] + hex[k + 1][1]) / 2]));
+        if (big.some((h) => test.some((p) => insidePt(p, h) || loopDist(p, h) < border))) continue;
+        if (!test.every((p) => insidePt(p, inner))) {   // an edge cell: cut to the border's inside edge
+          if (!test.some((p) => insidePt(p, outer) && loopDist(p, outer) > border * 0.5)) continue;
+          hex = clipConvex(inner, hex);
+          if (!hex || Math.abs(area(hex)) < 2 || hex.some((p) => !insidePt(p, outer) || loopDist(p, outer) < border * 0.9)) continue;
+        }
+        cells.push(area(hex) > 0 ? hex : hex.reverse());
+      }
+    return { axis, lo: lo[axis], hi: hi[axis], cells: cells.length, faces: [{ outer: best.outer, holes: best.holes.concat(cells) }] };
+  }
+
   // ---- files: SHA-256, zips, matching to the manifest, IndexedDB ----
   const hex = (b) => [...new Uint8Array(b)].map((x) => x.toString(16).padStart(2, "0")).join("");
   async function sha256(buf) { return hex(await globalThis.crypto.subtle.digest("SHA-256", buf)); }
@@ -311,7 +449,7 @@
     clear: () => tx("readwrite", (st) => st.clear()),
   };
 
-  const api = { readSTL, place, components, bend, flipWinding, dxfLoops, nest, area, sha256, matcher, identify, wanted, store };
+  const api = { readSTL, place, components, bend, flipWinding, dxfLoops, nest, area, section, honeycomb, decimate, sha256, matcher, identify, wanted, store };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.LR4Files = api;
 })(typeof self !== "undefined" ? self : this);

@@ -163,7 +163,7 @@ label.btn:hover { border-color: var(--muted); }
 label.btn:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
 .files-src { margin: 10px 0 0; font-size: 13px; line-height: 1.45; }
 .files-src b { font-weight: 600; }
-.files-src a { color: var(--ink); text-decoration-color: var(--accent); text-underline-offset: 2px; }
+.files-src a, .foot a { color: var(--ink); text-decoration-color: var(--accent); text-underline-offset: 2px; }
 .files-src em { font-style: normal; font-family: var(--font-data); font-size: 12px; color: var(--muted); }
 .files-src ul { margin: 2px 0 0; padding-left: 18px; color: var(--muted); font-size: 12px; }
 .files-src li.diff { color: var(--warn); }
@@ -240,6 +240,10 @@ label.btn:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; 
       <button id="v-back" type="button">Back</button>
       <button id="v-fit" type="button">Fit all</button>
     </div>
+    <div class="variant" id="detail"><span>Detail</span>
+      <button type="button" data-v="full" aria-pressed="false">Full</button>
+      <button type="button" data-v="lite" aria-pressed="false">Lite</button></div>
+    <p class="foot" id="detail-note"></p>
     <div class="sm">
       <button id="sm-connect" type="button">Connect SpaceMouse</button>
       <span id="sm-status" class="sm-status">Not connected</span>
@@ -294,6 +298,25 @@ label.btn:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; 
     <p class="foot">Vector76's strut plate generator, ported to the browser and checked against the original OpenSCAD output
     at 58 sizes. 1/4" MDF, 1/8" bit (3.5 mm dogbones), 1" EMT wings (11.5 mm). The DXF comes zipped (closed polylines, mm).</p>
   </section>
+
+  <section aria-labelledby="h-fluidnc">
+    <h2 id="h-fluidnc">FluidNC config</h2>
+    <div class="buttons">
+      <button type="button" id="dl-yaml">Download config.yaml</button>
+      <label class="btn"><input type="file" id="f-yaml" accept=".yaml,.yml" hidden>Use my own config.yaml…</label>
+      <button type="button" id="copy-yaml">Copy text</button>
+    </div>
+    <div id="yaml-status" role="status"></div>
+    <p class="foot" id="yaml-note">V1 Engineering's Jackpot3 LowRider config (<a href="https://github.com/V1EngineeringInc/FluidNC_Configs/blob/3bb36506b0fcd2b0caca7c108ec150ccbb0c055c/LowRider%20CNC/Jackpot3/JP3_LR/config.yaml"
+    target="_blank" rel="noopener">FluidNC_Configs, JP3_LR</a>, AGPL-3.0, read from GitHub when you click) with the X and Y
+    max_travel_mm set to this cutting area: <b id="yaml-xy"></b>. Everything else is V1E's (Z travel, homing, pins, motor
+    currents). Or bring your own config.yaml and only its two travel lines change. Check it against your machine before use.</p>
+  </section>
+
+  <p class="foot" id="about"><span id="version"></span><br>
+    <a id="fb-issue" href="https://github.com/jeyeager65/lr4-sandbox/issues/new" target="_blank" rel="noopener">Report a problem</a>
+    (a GitHub issue with your size and file checksums filled in) ·
+    <a href="https://forum.v1e.com/" target="_blank" rel="noopener">Discuss on the V1E forum</a></p>
 
   <p class="foot">The machine is rebuilt from the measured FreeCAD model: every part's position was fitted across 13
   FreeCAD builds from 15 x 30 in to 48 x 96 in (3 to 8 braces) and checked part by part against each, and against
@@ -570,6 +593,49 @@ label.btn:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; 
     return geo;
   }
   const entry = (geo, fin, hasUV) => ({ geo, fin, hasUV, tris: (geo.index ? geo.index.count : geo.attributes.position.count) / 3 });
+  // ---- Lite mode (phones, software / weak GPUs): every mesh clustered on a 1 mm grid in the browser (about a fifth of
+  // the triangles: LR4Files.decimate) and a pixel ratio of 1. Auto unless the viewer picked Full / Lite. ----
+  const LITE_CELL = 1.0;
+  let lite = false;
+  function autoLite() {
+    const gl = renderer.getContext(), dbg = gl.getExtension("WEBGL_debug_renderer_info");
+    const gpu = dbg ? String(gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL)) : "";
+    const phone = matchMedia("(pointer: coarse)").matches && Math.min(screen.width, screen.height) < 820;
+    return phone || /swiftshader|llvmpipe|softpipe|software/i.test(gpu) || (navigator.deviceMemory || 8) <= 2;
+  }
+  function liteGeo(pos, idx) {
+    const r = LR4Files.decimate(pos, idx, LITE_CELL), g = new THREE.BufferGeometry();
+    g.setAttribute("position", new THREE.BufferAttribute(r.pos, 3));
+    g.setIndex(new THREE.BufferAttribute(r.idx, 1));
+    return g;
+  }
+  function setupDetail() {                            // once, before the first build
+    const box = document.getElementById("detail");
+    let saved = null;
+    try { saved = localStorage.getItem("detail"); } catch (e) { /* auto */ }
+    const auto = autoLite();
+    lite = saved ? saved === "lite" : auto;
+    const mark = () => {
+      box.querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String((b.dataset.v === "lite") === lite)));
+      document.getElementById("detail-note").textContent = (saved ? "" : "Picked for this device. ")
+        + (lite ? "Lite: simplified meshes (about a fifth of the triangles)." : "Full: every triangle of every file.");
+      renderer.setPixelRatio(lite ? 1 : Math.min(window.devicePixelRatio || 1, 2));
+      resize();
+    };
+    box.querySelectorAll("button").forEach((b) => b.addEventListener("click", () => {
+      if ((b.dataset.v === "lite") === lite) return;
+      lite = b.dataset.v === "lite";
+      saved = b.dataset.v;
+      try { localStorage.setItem("detail", saved); } catch (e) { /* not kept */ }
+      for (const e of geoCache.values()) e.geo.dispose();
+      geoCache.clear();
+      dropSrcGeometry();
+      mark();
+      rebuild();
+    }));
+    mark();
+  }
+
   // null = not drawn (a part from a file the user hasn't loaded, or Peter Plates "none")
   function recGeometry(rec) {
     if (rec.src) return srcGeometry(rec);
@@ -578,6 +644,11 @@ label.btn:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; 
     const p = rec.mesh, fin = FINISH[rec.meta.finish];
     const pos = new Float32Array(bin, p.pos[0], p.pos[1] * 3);
     const idx = p.idx[2] === 32 ? new Uint32Array(bin, p.idx[0], p.idx[1]) : new Uint16Array(bin, p.idx[0], p.idx[1]);
+    if (lite) {                                       // clustered: the shipped UVs no longer fit, dress() makes its own
+      e = entry(dress(liteGeo(pos, idx), fin, false), fin, false);
+      geoCache.set(rec.key, e);
+      return e;
+    }
     const geo = new THREE.BufferGeometry();
     geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
     geo.setIndex(new THREE.BufferAttribute(idx, 1));
@@ -601,7 +672,10 @@ label.btn:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; 
     soupCache.set(rel, t);
     return t;
   }
-  const soupGeo = (pos) => { const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.BufferAttribute(pos, 3)); return g; };
+  const soupGeo = (pos) => {
+    if (lite) return liteGeo(pos, null);
+    const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.BufferAttribute(pos, 3)); return g;
+  };
   function dxfGeo(s) {                                // the DXF's faces extruded `depth` along its z, then A
     const f = userFiles.get(s.file);
     if (!f) return null;
@@ -618,6 +692,21 @@ label.btn:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; 
     geo.deleteAttribute("uv");
     return geo.applyMatrix4(new THREE.Matrix4().set(...s.A.flat(), 0, 0, 0, 1));
   }
+  function honeyGeo(t) {                              // the closed cover as a flat honeycomb slab, file coordinates
+    const h = LR4Files.honeycomb(t);
+    const v2 = (l) => l.slice(0, -1).map(([x, y]) => new THREE.Vector2(x, y));
+    const shapes = h.faces.map(({ outer, holes }) => {
+      const sh = new THREE.Shape(v2(outer));
+      sh.holes = holes.map((l) => new THREE.Path(v2(l)));
+      return sh;
+    });
+    const g = new THREE.ExtrudeGeometry(shapes, { depth: h.hi - h.lo, bevelEnabled: false, curveSegments: 1 });
+    const p = g.attributes.position.array, out = new Float32Array(p.length);
+    const [a, b] = [[1, 2], [2, 0], [0, 1]][h.axis];  // section points are [a, b]; the slab runs along h.axis
+    for (let i = 0; i < p.length; i += 3) { out[i + a] = p[i]; out[i + b] = p[i + 1]; out[i + h.axis] = p[i + 2] + h.lo; }
+    g.dispose();
+    return out;
+  }
   function srcGeometry(rec) {
     const s = rec.src, ck = rec.key + (s.kind === "peter" ? "|" + peterStyle : "");
     if (srcCache.has(ck)) return srcCache.get(ck);
@@ -625,6 +714,9 @@ label.btn:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; 
     if (s.kind === "stl" || s.kind === "bent") {
       const t = soup(s.file);
       if (t) geo = soupGeo(LR4Files.place(s.kind === "bent" ? LR4Files.bend(t, s) : t, s.A));
+    } else if (s.kind === "peter" && peterStyle === "honeycomb") {
+      const t = soup(s.closed.file);
+      if (t) try { geo = soupGeo(LR4Files.place(honeyGeo(t), s.closed.A)); } catch (e) { console.warn(s.closed.file, e); }
     } else if (s.kind === "peter" && peterStyle !== "none") {
       const r = s[peterStyle] || s.closed;
       let t = soup(r.file);
@@ -757,10 +849,12 @@ label.btn:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; 
     await nextFrame();
     buildGroups();
     setupColours();
+    setupDetail();
     setupSliders();
     setupSize();
     setupVariants();
     setupBom();
+    setupAbout();
     fitView([1, -1.15, 0.85]);
     await nextFrame();
     statusEl.hidden = true;
@@ -796,9 +890,10 @@ label.btn:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; 
   }
 
   // from the user's files: Open (PeterPlates_w_locations, stepper locations open - what the build places), Closed
-  // (PeterPlateT / B as downloaded) or None; the style picks each plate's geometry, so a change rebuilds
+  // (PeterPlateT / B as downloaded), Honeycomb (made here from the Closed files - LR4Files.honeycomb) or None; the
+  // style picks each plate's geometry, so a change rebuilds
   function setupFileVariants(box) {
-    const STYLES = [["open", "Open"], ["closed", "Closed"], ["none", "None"]];
+    const STYLES = [["open", "Open"], ["closed", "Closed"], ["honeycomb", "Honeycomb"], ["none", "None"]];
     box.querySelectorAll("button").forEach((b) => b.remove());
     for (const [v, label] of STYLES) {
       const b = document.createElement("button");
@@ -1137,6 +1232,7 @@ label.btn:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; 
       updateCalc();
       rebuild();
       drawPlates();
+      updateYaml();
     };
     if (now) go(); else pending = setTimeout(go, 250);
   }
@@ -1185,18 +1281,77 @@ label.btn:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; 
   }
   let dl = null;
   (async () => { try { dl = window.claude ? await window.claude.use("downloads") : null; } catch (e) { dl = null; } })();
-  const dlStatus = (t) => { $("dl-status").textContent = t; };
-  async function save(filename, data) {
+  const dlStatus = (t, id = "dl-status") => { $(id).textContent = t; };
+  async function save(filename, data, id = "dl-status", copy = "Copy DXF text") {
+    const st = (t) => dlStatus(t, id);
     if (dl) {
-      try { await dl.save({ filename, data }); dlStatus(`Saved ${filename}`); }
-      catch (e) { dlStatus(e && e.code === "declined" ? "Download cancelled." : `Download not available here (${(e && e.code) || "error"}). Use Copy DXF text.`); }
+      try { await dl.save({ filename, data }); st(`Saved ${filename}`); }
+      catch (e) { st(e && e.code === "declined" ? "Download cancelled." : `Download not available here (${(e && e.code) || "error"}). Use ${copy}.`); }
       return;
     }
-    if (window.claude) { dlStatus("Downloads are not available in this view. Use Copy DXF text."); return; }
+    if (window.claude) { st(`Downloads are not available in this view. Use ${copy}.`); return; }
     const a = document.createElement("a");             // a local copy / plain web page
     a.href = URL.createObjectURL(data instanceof Blob ? data : new Blob([data]));
     a.download = filename; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-    dlStatus(`Saved ${filename}`);
+    st(`Saved ${filename}`);
+  }
+
+  // ---- FluidNC config.yaml: V1E's JP3_LR file (pinned commit, fetched on demand - not shipped) or the user's own,
+  // with X / Y max_travel_mm set for this size (LR4Model.fluidncConfig) ----
+  const V1E_COMMIT = "3bb36506b0fcd2b0caca7c108ec150ccbb0c055c";
+  const V1E_YAML = `https://raw.githubusercontent.com/V1EngineeringInc/FluidNC_Configs/${V1E_COMMIT}/LowRider%20CNC/Jackpot3/JP3_LR/config.yaml`;
+  let yamlBase = null;                                // {text, note}
+  async function yamlText() {
+    if (!yamlBase) {
+      const r = await fetch(V1E_YAML);
+      if (!r.ok) throw new Error(`GitHub ${r.status}`);
+      yamlBase = { text: await r.text(), note: `From V1 Engineering's FluidNC_Configs (AGPL-3.0), LowRider CNC/Jackpot3/JP3_LR/config.yaml at ${V1E_COMMIT.slice(0, 7)}: https://github.com/V1EngineeringInc/FluidNC_Configs` };
+    }
+    return LR4Model.fluidncConfig(yamlBase.text, cfg, S, yamlBase.note);
+  }
+  const yamlFail = (e) => dlStatus(yamlBase ? `Not patched: ${e.message}`
+    : `Couldn't read V1E's config.yaml from GitHub here (${e.message}). Download it from the link below and use "Use my own config.yaml".`, "yaml-status");
+  $("dl-yaml").addEventListener("click", async () => {
+    try { save("config.yaml", (await yamlText()).text, "yaml-status", "Copy text"); } catch (e) { yamlFail(e); }
+  });
+  $("copy-yaml").addEventListener("click", async () => {
+    let r;
+    try { r = await yamlText(); } catch (e) { yamlFail(e); return; }
+    try { await navigator.clipboard.writeText(r.text); dlStatus("config.yaml copied.", "yaml-status"); }
+    catch (e) { dlStatus("Copy blocked here. Use Download config.yaml.", "yaml-status"); }
+  });
+  $("f-yaml").addEventListener("change", async (ev) => {
+    const f = ev.target.files[0];
+    ev.target.value = "";
+    if (!f) return;
+    const prev = yamlBase;
+    yamlBase = { text: await f.text(), note: `From your ${f.name}.` };
+    try { const r = await yamlText(); dlStatus(`Using your ${f.name} (x ${r.x[0]}, y ${r.y[0]} -> this size). Download or copy it.`, "yaml-status"); }
+    catch (e) { yamlBase = prev; dlStatus(`${f.name}: ${e.message}`, "yaml-status"); }
+  });
+  function updateYaml() {
+    const t = LR4Model.travel(cfg, S);
+    $("yaml-xy").textContent = `X ${(t.x[1] - t.x[0]).toFixed(1)} mm, Y ${(t.y[1] - t.y[0]).toFixed(1)} mm`;
+  }
+
+  // ---- version + feedback: the issue link carries the size, data date and the loaded files' checksums ----
+  const VERSION = "0.6.0";
+  function setupAbout() {
+    const bits = [`lr4-sandbox ${VERSION}`];
+    if (cfg.built) bits.push(`model data built ${cfg.built}`);
+    if (cfg.files) bits.push(`tested with the Printables files as of ${cfg.files.tested}`);
+    $("version").textContent = bits.join(" · ");
+    $("fb-issue").addEventListener("click", (ev) => {
+      const files = [...userFiles.entries()].map(([p, f]) => `- ${p}: ${f.ok ? "match" : "DIFFERENT"} ${f.sha256.slice(0, 12)}${f.name.toLowerCase().endsWith(p.split("/").pop().toLowerCase()) ? "" : ` (${f.name})`}`);
+      const body = [`**What happened:**\n\n\n**Expected:**\n\n`, "---",
+        `- Page: ${VERSION}, data ${cfg.built || "?"}${cfg.files ? `, files as of ${cfg.files.tested}` : " (private data)"}`,
+        `- Size: ${(S.cutX / IN).toFixed(2)} x ${(S.cutY / IN).toFixed(2)} in, ${S.n} braces (strut ${S.strut.toFixed(1)} mm)`,
+        `- Peter Plates: ${peterStyle}; detail: ${lite ? "lite" : "full"}`,
+        `- Browser: ${navigator.userAgent}`,
+        ...(cfg.files ? [`- Files loaded: ${userFiles.size} of ${needed ? needed.size : "?"}`, ...files] : [])].join("\n");
+      ev.currentTarget.href = "https://github.com/jeyeager65/lr4-sandbox/issues/new?" + new URLSearchParams({
+        title: `[${(S.cutX / IN).toFixed(1)}x${(S.cutY / IN).toFixed(1)}] `, body: body.slice(0, 4500) });   // GitHub drops URLs over ~8 KB
+    });
   }
   const baseName = () => `LR4_strut_plates_${S.strut}mm_${S.n}br`;
   const laidOut = () => StrutPlate.plates(polygonClipping, S.strut,

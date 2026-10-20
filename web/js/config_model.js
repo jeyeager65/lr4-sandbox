@@ -218,7 +218,33 @@
     return secs;
   }
 
-  const api = { size, instances, hose, travel, plateFrame, bom, jp3Fits, IN };
+  // FluidNC config.yaml (V1E's FluidNC_Configs "LowRider CNC/Jackpot3/JP3_LR", or the user's own) with axes x / y
+  // max_travel_mm set to this travel (= the cutting area; V1E's 4 x 8 file has 1220 x 2440). Line edits only, so
+  // comments and layout stay; a header comment says what changed. -> {text, x: [old, new], y: [old, new]}
+  function fluidncConfig(text, cfg, S, note) {
+    const t = travel(cfg, S), want = { x: t.x[1] - t.x[0], y: t.y[1] - t.y[0] }, got = {};
+    let inAxes = false, axis = null, axisIndent = -1;
+    const lines = text.split(/\r?\n/).map((ln) => {
+      const m = /^(\s*)([^\s#][^:]*):\s*(.*?)\s*(#.*)?$/.exec(ln);
+      if (!m) return ln;
+      const ind = m[1].length, key = m[2].trim();
+      if (ind === 0) { inAxes = key === "axes"; axis = null; return ln; }
+      if (!inAxes) return ln;
+      if (axis === null || ind <= axisIndent) { axis = /^[xyzabc]$/.test(key) && !m[3] ? key : null; axisIndent = ind; return ln; }
+      if (key === "max_travel_mm" && want[axis] !== undefined && ind === axisIndent + 2) {
+        got[axis] = [m[3], want[axis].toFixed(1)];
+        return `${m[1]}max_travel_mm: ${want[axis].toFixed(1)}`;
+      }
+      return ln;
+    });
+    if (!got.x || !got.y) throw new Error("no axes x / y max_travel_mm found - is this a FluidNC config.yaml?");
+    const head = [`# lr4-sandbox: max_travel_mm set for a ${(S.cutX / IN).toFixed(2)} x ${(S.cutY / IN).toFixed(2)} in cutting area`
+      + ` (x ${got.x[0]} -> ${got.x[1]}, y ${got.y[0]} -> ${got.y[1]}); everything else unchanged.`];
+    if (note) head.push(`# ${note}`);
+    return { text: head.concat(lines).join("\n"), x: got.x, y: got.y };
+  }
+
+  const api = { size, instances, hose, travel, plateFrame, bom, jp3Fits, fluidncConfig, IN };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.LR4Model = api;
 })(typeof self !== "undefined" ? self : this);

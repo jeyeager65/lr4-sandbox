@@ -4,6 +4,7 @@
 // stl / bent: the same vertex set both ways (grid match, TOL) + the same triangle count; peter open: the piece's
 // vertices all on the built plate (the build fills openings), closed: >= 99 % on the open piece; dxf: every reference
 // vertex within DXF_TOL of an outline and inside the slab (back through A), the same face / hole count, area x depth = the mesh's volume.
+// Peter honeycomb: cells inside the border, clear of the holes, not overlapping; lite (decimate): volume kept, fewer triangles.
 // Also: every needed file is recognised by its SHA-256, and a renamed copy still is.
 "use strict";
 const fs = require("fs"), path = require("path"), zlib = require("zlib");
@@ -107,6 +108,34 @@ function segDist(p, loops) {
       check(nm, !open && worst < DXF_TOL && offz < 1e-3 && dv < 0.002,
         `${s.file}: ${faces.length} face(s), ${faces.reduce((a, f) => a + f.holes.length, 0)} holes, ${open} open chains, z outside the slab by ${Math.max(0, offz).toExponential(1)}; reference vertices within ${worst.toFixed(4)} mm of the outline; volume off by ${(100 * dv).toFixed(3)} %`);
     } else check(nm, false, `unknown kind ${s.kind}`);
+  }
+
+  // honeycomb (Peter "Honeycomb" style): every cell inside the cover, >= 0.9 border from its edge, clear of the screw
+  // rings, no two cells overlapping; the slab as thick as the cover
+  for (const file of ["peter/PeterPlateT.stl", "peter/PeterPlateB.stl"]) {
+    const t = soup(file), h = F.honeycomb(t), f = h.faces[0];
+    const own = f.holes.slice(0, f.holes.length - h.cells);   // the cover's holes: screws (< 20 mm^2) get a ring
+    const screws = own.filter((l) => Math.abs(F.area(l)) < 20), big = own.filter((l) => Math.abs(F.area(l)) >= 20);
+    const cells = f.holes.slice(f.holes.length - h.cells);
+    const ctr = (l) => [l.slice(0, -1).reduce((a, p) => a + p[0], 0) / (l.length - 1), l.slice(0, -1).reduce((a, p) => a + p[1], 0) / (l.length - 1)];
+    let edge = Infinity, ring = Infinity, overlap = 0;
+    for (const c of cells) for (const p of c) edge = Math.min(edge, segDist([p[0], p[1], 0], [f.outer, ...big]));
+    for (const s of screws) { const q = ctr(s); for (const c of cells) ring = Math.min(ring, segDist([q[0], q[1], 0], [c])); }
+    const cs = cells.map(ctr);
+    for (let i = 0; i < cs.length; i++) for (let j = i + 1; j < cs.length; j++) if (Math.hypot(cs[i][0] - cs[j][0], cs[i][1] - cs[j][1]) < 2.5) overlap++;
+    check(file + " honeycomb", h.cells > 250 && edge >= 3.6 && ring >= 3.8 - 1e-6 && !overlap && own.length >= 5,
+      `${h.cells} cells, ${screws.length} screw + ${big.length} bigger holes, slab ${(h.hi - h.lo).toFixed(2)} mm; cells >= ${edge.toFixed(2)} mm from an edge, >= ${ring.toFixed(2)} from a screw centre, ${overlap} overlapping`);
+  }
+  // lite mode: clustering keeps the winding (signed volume within 3 %) and cuts the triangles
+  for (const file of ["lr4/Core.stl", "kobalt/Dust_Shoe_Kobalt.stl"]) {
+    const t = soup(file), d = F.decimate(t, null, 1.0);
+    const sv = (pos, idx) => { let v = 0; const n = idx ? idx.length / 3 : pos.length / 9;
+      for (let k = 0; k < n; k++) { const [a, b, c] = [0, 1, 2].map((j) => (idx ? idx[k * 3 + j] : k * 3 + j) * 3);
+        v += (pos[a] * (pos[b + 1] * pos[c + 2] - pos[b + 2] * pos[c + 1]) - pos[a + 1] * (pos[b] * pos[c + 2] - pos[b + 2] * pos[c])
+          + pos[a + 2] * (pos[b] * pos[c + 1] - pos[b + 1] * pos[c])) / 6; } return v; };
+    const v0 = sv(t, null), v1 = sv(d.pos, d.idx), dv = Math.abs(v1 - v0) / Math.abs(v0);
+    check(file + " lite", v1 * v0 > 0 && dv < 0.03 && d.idx.length / 3 < 0.6 * t.length / 9,
+      `${t.length / 9} -> ${d.idx.length / 3} triangles, volume off by ${(100 * dv).toFixed(2)} %`);
   }
   console.log(`${done - fails.length}/${done} pass` + (fails.length ? `; FAIL: ${fails.join(", ")}` : ""));
   if (fails.length) process.exit(1);

@@ -82,7 +82,7 @@ freecad/    the model: build.py, lr4.py (measured placements), hardware.py, bom.
 web/        the pages: index.html (configurator), viewer.html, js/
 pipeline/   FreeCAD builds -> configurator data
 tests/      node tests, test_strut_plate.py, test_share.py, test_parts_files.js
-tools/      run.py, serve.py, repo tools (sync_fclib, check_no_parts, check_parts)
+tools/      run.py, serve.py, repo tools (sync_fclib, check_no_parts, check_parts, page_shot = headless screenshots)
 docs/       PLAN.md: settings, measurements and decisions behind the model
 ```
 
