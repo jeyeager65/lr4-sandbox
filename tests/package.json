@@ -6,8 +6,8 @@
   "license": "MIT",
   "type": "commonjs",
   "scripts": {
-    "test": "node test_calculator.js && node test_vr.js && node test_strut_cam.js && node test_strut_play.js",
-    "test:local": "node test_calculator.js && node test_vr.js && node test_config_model.js && node test_parts_files.js && node test_strut_plate.js && node test_strut_cam.js && node test_strut_play.js"
+    "test": "node test_calculator.js && node test_vr.js && node test_strut_cam.js && node test_gcode_play.js",
+    "test:local": "node test_calculator.js && node test_vr.js && node test_config_model.js && node test_parts_files.js && node test_strut_plate.js && node test_strut_cam.js && node test_gcode_play.js"
   },
   "dependencies": {
     "polygon-clipping": "^0.15.7"

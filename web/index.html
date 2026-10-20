@@ -103,6 +103,15 @@ canvas { display: block; width: 100%; height: 100%; touch-action: none; }
 .status .bar { height: 6px; margin: 9px 0 7px; border-radius: 3px; background: var(--line); overflow: hidden; }
 .status .bar > div { height: 100%; width: 0; background: var(--accent); }
 .status .detail { font-size: 12px; }
+.job-pop {
+  position: absolute; left: 50%; top: 16px; transform: translateX(-50%); max-width: min(440px, calc(100% - 32px));
+  background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-left: 4px solid var(--accent);
+  border-radius: 4px; padding: 10px 14px 12px; box-shadow: 0 6px 24px rgb(0 0 0 / 0.18); font-size: 14px;
+}
+.job-pop[hidden] { display: none; }
+.job-pop b { font-family: var(--font-display); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.job-pop p { margin: 4px 0 10px; font-size: 15px; line-height: 1.4; }
+label.check { display: flex; align-items: center; gap: 6px; font-size: 13px; margin-top: 8px; }
 .hint {
   position: absolute; right: max(12px, env(safe-area-inset-right, 0px)); bottom: 10px;
   font-size: 12px; color: var(--muted); background: color-mix(in srgb, var(--panel) 80%, transparent);
@@ -246,8 +255,8 @@ body.vr-on .stage { grid-row: 1; }
   <section aria-labelledby="h-pos">
     <h2 id="h-pos">Tool position</h2>
     <div class="readout">
-      <div><b>X</b><span id="rx">13.00</span> <small>in</small></div>
-      <div><b>Y</b><span id="ry">17.50</span> <small>in</small></div>
+      <div><b>X</b><span id="rx">13.00</span> <small id="ux">in</small></div>
+      <div><b>Y</b><span id="ry">17.50</span> <small id="uy">in</small></div>
       <div><b>Tip</b><span id="rz">42</span> <small>mm</small></div>
     </div>
     <div class="slider"><label for="sx">X</label><input id="sx" type="range" step="0.1"><output id="ox" for="sx"></output></div>
@@ -256,9 +265,10 @@ body.vr-on .stage { grid-row: 1; }
   </section>
 
   <section aria-labelledby="h-job">
-    <h2 id="h-job">Cut the strut plates</h2>
+    <h2 id="h-job">Run G-code</h2>
     <p class="foot" id="job-off">V1E's build order: the machine runs on the printed temporary struts first and cuts its own MDF
-      strut plates. Switch Parts &gt; Strut plates to <b>Temporary</b> to play that job here.</p>
+      strut plates. Switch Parts &gt; Strut plates to <b>Temporary</b> to run that job here, or play a G-code file.</p>
+    <p class="foot" id="job-src"></p>
     <div id="job-on" hidden>
       <div class="buttons">
         <button type="button" id="job-play">Play</button>
@@ -268,8 +278,18 @@ body.vr-on .stage { grid-row: 1; }
           <option value="100">100×</option><option value="300">300×</option></select>
       </div>
       <div class="slider"><label for="job-t" title="Job time">⏱</label><input id="job-t" type="range" min="0" max="1000" step="1" value="0"><output id="job-o" for="job-t"></output></div>
+      <div class="readout" aria-label="Work position, mm">
+        <div><b>Work X</b><span id="wx">0.0</span> <small>mm</small></div>
+        <div><b>Work Y</b><span id="wy">0.0</span> <small>mm</small></div>
+        <div><b>Work Z</b><span id="wz">0.0</span> <small>mm</small></div>
+      </div>
+      <label class="check"><input type="checkbox" id="job-moves" checked> Show the moves</label>
       <p class="foot" id="job-status" role="status"></p>
-      <div class="buttons"><button type="button" id="job-install" hidden>Install the plates (Permanent)</button></div>
+    </div>
+    <div class="buttons">
+      <label class="btn">Play a G-code file…<input type="file" id="job-file" accept=".gcode,.nc,.ngc,.tap,.gc,.txt" hidden></label>
+      <button type="button" id="job-back" hidden>Back to the strut plate job</button>
+      <button type="button" id="job-install" hidden>Install the plates (Permanent)</button>
     </div>
   </section>
 
@@ -428,6 +448,7 @@ body.vr-on .stage { grid-row: 1; }
   <canvas id="c" aria-label="3D model of the LowRider 4 assembly"></canvas>
   <div class="status" id="status" role="status" aria-live="polite"><div id="status-title">Loading model…</div><div class="bar"><div id="status-bar"></div></div><div class="detail" id="status-detail">&nbsp;</div></div>
   <div class="hint">Drag to orbit · right-drag to pan · scroll to zoom</div>
+  <div class="job-pop" id="job-pop" role="alertdialog" aria-labelledby="job-pop-h" hidden><b id="job-pop-h">Paused (M0)</b><p id="job-pop-msg"></p><div class="buttons"><button type="button" id="job-resume">Resume (cycle start)</button></div></div>
   <div class="vr-pop" id="vr-pop" role="dialog" aria-labelledby="vr-pop-h" hidden>
     <div class="vr-head"><h2 id="vr-pop-h">Viewing in VR</h2>
       <div class="seg"><button type="button" id="vr-u-in" aria-pressed="true">Inches</button><button type="button" id="vr-u-mm" aria-pressed="false">mm</button></div></div>
@@ -451,8 +472,11 @@ body.vr-on .stage { grid-row: 1; }
 <script src="js/calculator.js"></script>
 <script src="js/strut_plate.js"></script>
 <script src="js/strut_cam.js"></script>
-<script src="js/strut_play.js"></script>
-<script src="js/stock_sim.js"></script>
+<script src="js/lib/cnc-gcode-tools/gcode-expander.js"></script>
+<script src="js/lib/cnc-gcode-tools/stock-sim.js"></script>
+<script src="js/lib/cnc-gcode-tools/parser.js"></script>
+<script src="js/lib/cnc-gcode-tools/animator.js"></script>
+<script src="js/gcode_play.js"></script>
 <script src="js/config_model.js"></script>
 <script src="js/parts_files.js"></script>
 <script src="js/vr.js"></script>
@@ -460,9 +484,10 @@ body.vr-on .stage { grid-row: 1; }
 <script>
 (function () {
   const IN = 25.4;
+  const DUST_PARTS = /^(Dust_Shoe|Dust_Skirt|Bristles_TPU)/;   // moved from Core into the Hose group
   const GROUPS = [
     ["Table", "Table + Y rail"], ["YZ_Min", "YZ Min side"], ["YZ_Max", "YZ Max side"], ["Beam", "Beam"],
-    ["Core", "Core + router"], ["Hose", "Vacuum hose"], ["Belts", "Belts"], ["Electronics", "Electronics + switches"],
+    ["Core", "Core + router"], ["Hose", "Vacuum hose + dust shoe"], ["Belts", "Belts"], ["Electronics", "Electronics + switches"],
     ["Hardware", "Bolts + nuts"]];
   const SOURCE = {
     printed: "V1E printed part (STL from Printables)",
@@ -955,6 +980,7 @@ body.vr-on .stage { grid-row: 1; }
       if (!g) continue;
       const { geo, fin, hasUV, tris: n } = g;
       const ud = Object.assign({}, o.rec.meta, { name: o.name, base: { t: o.t, s: o.s } });
+      if (DUST_PARTS.test(o.name)) ud.group = "Hose";   // the dust shoe shows / hides with the hose (user 2026-10-20)
       if (o.rec.src) delete ud.variant;              // Peter Plates from files: the style picks the geometry
       if (o.name !== o.rec.meta.name) ud.label = pretty(o.name);
       const mat = material(ud.color, fin, hasUV);
@@ -1379,11 +1405,13 @@ body.vr-on .stage { grid-row: 1; }
       }
     }
     if (hoseMesh) updateHose(dx, dy, dz);
-    document.getElementById("rx").textContent = X.toFixed(2);
-    document.getElementById("ry").textContent = Y.toFixed(2);
+    const mm = !!pose, u = (v) => (mm ? v * IN : v);  // G-code playback: mm (machine position from the corner)
+    document.getElementById("ux").textContent = document.getElementById("uy").textContent = mm ? "mm" : "in";
+    document.getElementById("rx").textContent = u(X).toFixed(mm ? 1 : 2);
+    document.getElementById("ry").textContent = u(Y).toFixed(mm ? 1 : 2);
     document.getElementById("rz").textContent = Z.toFixed(pose ? 1 : 0);
-    document.getElementById("ox").textContent = `${X.toFixed(1)} / ${+Number(sx.max).toFixed(1)}`;
-    document.getElementById("oy").textContent = `${Y.toFixed(1)} / ${+Number(sy.max).toFixed(1)}`;
+    document.getElementById("ox").textContent = `${u(X).toFixed(mm ? 0 : 1)} / ${+u(Number(sx.max)).toFixed(mm ? 0 : 1)}`;
+    document.getElementById("oy").textContent = `${u(Y).toFixed(mm ? 0 : 1)} / ${+u(Number(sy.max)).toFixed(mm ? 0 : 1)}`;
     document.getElementById("oz").textContent = `${Z.toFixed(pose ? 1 : 0)} mm`;
   }
 
@@ -1672,14 +1700,24 @@ body.vr-on .stage { grid-row: 1; }
     catch (e) { dlStatus(`G-code: ${e.message}`); }
   });
 
-  // ---- strut plate job playback (simulator stage 1; js/strut_play.js + js/stock_sim.js = cnc-gcode-tools'
-  // StockSimulator). Temporary struts only: the G-code above plays on the machine, the stock sits at the cutting
-  // area's front-left corner (= the job's zero) and is carved as the bit goes; the sliders take over when touched. ----
-  const JOB = { j: null, tl: null, sim: null, mesh: null, t: 0, playing: false, key: "" };
+  // ---- Run G-code (simulator stage 1; js/gcode_play.js over js/lib/cnc-gcode-tools): the strut plate G-code above
+  // (Temporary struts) or a file the user picks, parsed from its TEXT and played on the machine, all in mm whatever
+  // G20 / G21 say. The bit follows it at FluidNC-like speeds (V1E's JP3_LR rates, or the user's config.yaml), the
+  // moves are drawn, M0 pauses pop up their MSG, G38.2 stops on the stock (touch plate shown), the stock from the
+  // (Stock:) header is carved as it goes. Work zero = the cutting area's front-left corner, stock top. Touching the
+  // position sliders pauses it. ----
+  const JOB = { tl: null, sim: null, group: null, done: null, plate: null, at: null, t: 0, k: 0, playing: false,
+    key: "", seq: 0, src: null, file: null, pageJob: null, last: 0 };
   const MDF_RGB = [0.66, 0.52, 0.36];
+  const MOVE_RGB = { rapid: [0.95, 0.55, 0.1], cut: [0.15, 0.45, 0.95], probe: [0.1, 0.75, 0.3] };
+  function jobRates() {                              // the user's own config.yaml if they brought one, else V1E's
+    try { if (yamlBase && /^From your/.test(yamlBase.note)) return GcodePlay.motion(parseFluidNCConfig(yamlBase.text).values); }
+    catch (e) { /* V1E's */ }
+    return GcodePlay.V1E;
+  }
   function jobStockMesh(sim, at) {                   // the heightmap as one grid (top) + its four side walls
     const { nx, ny, vx, vy, dx, dy, stock: s } = sim;
-    const pos = new Float32Array(vx * vy * 3), col = new Float32Array(vx * vy * 3);
+    const pos = new Float32Array(vx * vy * 3);
     for (let j = 0, k = 0; j < vy; j++) for (let i = 0; i < vx; i++, k++) {
       pos[3 * k] = at[0] + s.xmin + i * dx; pos[3 * k + 1] = at[1] + s.ymin + j * dy;
     }
@@ -1691,12 +1729,11 @@ body.vr-on .stage { grid-row: 1; }
     const geo = new THREE.BufferGeometry();
     geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
     geo.setAttribute("normal", new THREE.BufferAttribute(new Float32Array(vx * vy * 3), 3));
-    geo.setAttribute("color", new THREE.BufferAttribute(col, 3));
+    geo.setAttribute("color", new THREE.BufferAttribute(new Float32Array(vx * vy * 3), 3));
     geo.setIndex(new THREE.BufferAttribute(idx, 1));
     // polygon offset: where the bit cut through, the stock's floor lies on the table top and the table shows
-    const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9, metalness: 0,
-      polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 });
-    const top = new THREE.Mesh(geo, mat);
+    const top = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9, metalness: 0,
+      polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 }));
     const x0 = at[0] + s.xmin, x1 = at[0] + s.xmax, y0 = at[1] + s.ymin, y1 = at[1] + s.ymax, z0 = at[2] + s.zmin, z1 = at[2] + s.zmax;
     const w = [[x0, y0, x1, y0], [x1, y0, x1, y1], [x1, y1, x0, y1], [x0, y1, x0, y0]].flatMap(([a, b, c, d]) =>
       [a, b, z0, c, d, z0, c, d, z1, a, b, z0, c, d, z1, a, b, z1]);
@@ -1708,9 +1745,9 @@ body.vr-on .stage { grid-row: 1; }
     return top;
   }
   function jobUpdateMesh(all) {                      // copy the carved rows into the grid: heights, normals, shading
-    const sim = JOB.sim, mesh = JOB.mesh;
+    const sim = JOB.sim, mesh = JOB.stock;
     if (!sim || !mesh || (!all && !sim.isDirty)) return;
-    const { vx, vy, dx, dy, heights: h, stock: s } = sim, z0 = mesh.userData.z, span = s.zmax - s.zmin;
+    const { vx, vy, dx, dy, heights: h, stock: s } = sim, z0 = mesh.userData.z, span = s.zmax - s.zmin || 1;
     const j0 = all ? 0 : Math.max(0, sim.dirtyMin - 1), j1 = all ? vy - 1 : Math.min(vy - 1, sim.dirtyMax + 1);
     const i0 = all ? 0 : Math.max(0, sim.dirtyMinI - 1), i1 = all ? vx - 1 : Math.min(vx - 1, sim.dirtyMaxI + 1);
     const g = mesh.geometry, P = g.attributes.position, N = g.attributes.normal, C = g.attributes.color;
@@ -1728,78 +1765,158 @@ body.vr-on .stage { grid-row: 1; }
     for (const a of [P, N, C]) { a.updateRange = { offset: j0 * vx * 3, count: (j1 - j0 + 1) * vx * 3 }; a.needsUpdate = true; }
     sim.clearDirty();
   }
-  function jobClear() {
-    if (JOB.mesh) {
-      scene.remove(JOB.mesh);
-      JOB.mesh.traverse((o) => { if (o.geometry) { o.geometry.dispose(); o.material.dispose(); } });
-    }
-    Object.assign(JOB, { j: null, tl: null, sim: null, mesh: null, t: 0, playing: false, key: "" });
+  function jobMoves(tl, at) {                        // every move as a line: faint ahead, solid once done (drawRange)
+    const n = tl.segs.length, pos = new Float32Array(n * 6), col = new Float32Array(n * 6);
+    tl.segs.forEach((sg, i) => {
+      const { start: a, end: b } = sg, c = MOVE_RGB[sg.type] || MOVE_RGB.cut;
+      pos.set([at[0] + a.x, at[1] + a.y, at[2] + a.z, at[0] + b.x, at[1] + b.y, at[2] + b.z], 6 * i);
+      col.set([...c, ...c], 6 * i);
+    });
+    const P = new THREE.BufferAttribute(pos, 3), C = new THREE.BufferAttribute(col, 3);
+    const geo = () => { const g = new THREE.BufferGeometry(); g.setAttribute("position", P); g.setAttribute("color", C); return g; };
+    const ahead = new THREE.LineSegments(geo(), new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.28, depthWrite: false }));
+    const done = new THREE.LineSegments(geo(), new THREE.LineBasicMaterial({ vertexColors: true }));
+    done.geometry.setDrawRange(0, 0);
+    return { ahead, done };
   }
-  function jobSetup(j) {                             // after a size / settings change (camNote): a fresh job, uncut stock
-    const on = U.struts === "temp" && !!j && !!meta;
-    $("job-on").hidden = !on; $("job-off").hidden = on;
-    const key = on ? `${S.cutX},${S.cutY},${S.n},${tableTop},${lite},${j.gcode.length},${j.minutes}` : "";
-    if (key && key === JOB.key) return;
-    jobClear();
+  function jobClear() {
+    if (JOB.group) {
+      scene.remove(JOB.group);
+      JOB.group.traverse((o) => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); });
+    }
+    Object.assign(JOB, { tl: null, sim: null, group: null, done: null, ahead: null, stock: null, plate: null, t: 0, k: 0, key: "" });
     jobPlaying(false);
-    if (!on) return;
+    $("job-pop").hidden = true;
+  }
+  // after a size / settings change (camNote): the strut plate job (Temporary struts) unless a file is playing
+  function jobSetup(j) {
+    JOB.pageJob = j || null;
+    const page = U.struts === "temp" && j ? { kind: "page", name: "The strut plate G-code above", text: j.gcode } : null;
+    const src = JOB.file || page;
+    $("job-off").hidden = !!src;
+    $("job-back").hidden = !(JOB.file && page);
+    if (!src || !meta) { jobClear(); $("job-on").hidden = true; $("job-src").textContent = ""; return; }
+    const key = `${src.kind}|${src.name}|${src.text.length}|${src.text.slice(-200)}|${S.cutX},${S.cutY},${S.n},${lite},${tableTop}`;
+    if (key === JOB.key) return;
+    jobLoad(src, key);
+  }
+  async function jobLoad(src, key) {
+    const seq = ++JOB.seq;
+    $("job-src").textContent = `${src.name}: reading…`;
+    let tl;
+    try { tl = await GcodePlay.load(src.text, jobRates()); }
+    catch (e) { if (seq === JOB.seq) { jobClear(); $("job-on").hidden = true; $("job-src").textContent = `${src.name}: ${e.message}`; } return; }
+    if (seq !== JOB.seq) return;                     // a newer one started meanwhile
+    jobClear();
     const t = meshes.find((m) => m.userData.name === "TableMDF");
-    if (!t) return;
+    if (!t || !tl.segs.length) { $("job-on").hidden = true; $("job-src").textContent = `${src.name}: no moves.`; return; }
     const bb = new THREE.Box3().setFromObject(t), cx = (bb.min.x + bb.max.x) / 2, cy = (bb.min.y + bb.max.y) / 2;
-    const at = [cx - S.cutX / 2, cy - S.cutY / 2, bb.max.z + j.opts.t];   // the job's zero: stock top, front-left
-    JOB.j = j; JOB.tl = StrutPlay.timeline(j); JOB.key = key;
-    JOB.sim = new StockSimulator(j.stock, new Map([[1, { shape: "flat", diameter: j.opts.bit }]]), { maxCells: lite ? 1.2e5 : 4e5 });
-    JOB.sim.setSegments(JOB.tl.segs);
-    JOB.mesh = jobStockMesh(JOB.sim, at);
-    scene.add(JOB.mesh);
-    jobUpdateMesh(true);
-    const tv = meta.travel;
-    JOB.fits = j.stock.xmax <= tv.x[1] - tv.x[0] && j.stock.ymax <= tv.y[1] - tv.y[0];
+    const at = [cx - S.cutX / 2, cy - S.cutY / 2, bb.max.z - (tl.stock ? tl.stock.zmin : 0)];   // work zero, world mm
+    Object.assign(JOB, { tl, at, src, key, group: new THREE.Group() });
+    if (tl.stock && tl.tools.size) {
+      JOB.sim = new StockSimulator(tl.stock, tl.tools, { maxCells: lite ? 1.2e5 : 4e5 });
+      JOB.sim.setSegments(tl.segs);
+      JOB.stock = jobStockMesh(JOB.sim, at);
+      JOB.group.add(JOB.stock);
+      jobUpdateMesh(true);
+    }
+    const mv = jobMoves(tl, at);
+    JOB.ahead = mv.ahead; JOB.done = mv.done;
+    JOB.group.add(mv.ahead, mv.done);
+    mv.ahead.visible = mv.done.visible = $("job-moves").checked;
+    if (tl.plates.length) {                          // the touch plate (size GUESS, ~1.5 in square), from its attach pause
+      const pl = tl.plates[0], th = Math.max(pl.thick, 0.5);
+      JOB.plate = new THREE.Mesh(new THREE.BoxGeometry(38, 38, th), new THREE.MeshStandardMaterial({ color: 0x9aa0a6, metalness: 0.8, roughness: 0.35 }));
+      JOB.group.add(JOB.plate);
+    }
+    scene.add(JOB.group);
+    const tv = meta.travel, b = tl.segs.reduce((r, sg) => [Math.min(r[0], sg.end.x), Math.max(r[1], sg.end.x), Math.min(r[2], sg.end.y),
+      Math.max(r[3], sg.end.y)], [Infinity, -Infinity, Infinity, -Infinity]);
+    JOB.fits = b[0] >= -0.01 && b[2] >= -0.01 && b[1] <= tv.x[1] - tv.x[0] + 0.01 && b[3] <= tv.y[1] - tv.y[0] + 0.01;
+    const units = { mm: "mm (G21)", in: "inches (G20), shown in mm", mixed: "G20 + G21, shown in mm" }[tl.units];
+    $("job-src").textContent = `${src.name}: ${tl.lines} lines, ${tl.segs.length} moves, ${units}; ~${clock(tl.total)} at ` +
+      `${jobRates() === GcodePlay.V1E ? "V1E's JP3_LR" : "your config.yaml's"} speeds. ` +
+      (tl.stock ? "" : "No (Stock:) header, so nothing is carved. ") +
+      (JOB.fits ? "" : "Some moves are outside this machine's travel: the bit stops at its limits.");
+    $("job-on").hidden = false;
     jobSeek(0, false);
   }
-  const clock = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
-  function jobSeek(s, carve = true) {                // the machine to the job at time s; the stock carved up to it
+  const clock = (s) => (s >= 3600 ? `${Math.floor(s / 3600)}:${String(Math.floor(s / 60) % 60).padStart(2, "0")}` : `${Math.floor(s / 60)}`) +
+    `:${String(Math.floor(s % 60)).padStart(2, "0")}`;
+  function jobSeek(s, carve = true) {                // the machine to time s; the stock carved up to it
     const tl = JOB.tl;
     if (!tl) return;
     JOB.t = Math.min(Math.max(s, 0), tl.total);
-    const p = StrutPlay.at(tl, JOB.t), tv = meta.travel, o = JOB.j.opts;
-    if (carve) JOB.sim.advanceTo(p.index, 15, p.progress);
+    const p = GcodePlay.at(tl, JOB.t), tv = meta.travel, at = JOB.at, tableZ = at[2] + (tl.stock ? tl.stock.zmin : 0);
+    if (carve && JOB.sim) JOB.sim.advanceTo(p.index, 15, p.progress);
     jobUpdateMesh(false);
+    JOB.done.geometry.setDrawRange(0, 2 * p.index);
+    if (JOB.plate) {
+      const pl = tl.plates[0];
+      JOB.plate.visible = JOB.t >= pl.t0 && (JOB.t < pl.t1 || (JOB.t === pl.t1 && !JOB.playing));   // off once resumed
+      JOB.plate.position.set(at[0] + pl.x, at[1] + pl.y, at[2] + pl.z + JOB.plate.geometry.parameters.depth / 2);
+    }
     const clamp = (v, r) => Math.min(Math.max(v, r[0]), r[1]);
-    move([clamp(p.x + tv.x[0], tv.x), clamp(p.y + tv.y[0], tv.y), o.t + p.z - meta.tip_above_table]);
+    // work zero is the cutting area's corner = slider 0; the tip's height above the table = stock + work Z
+    move([clamp(p.x + tv.x[0], tv.x), clamp(p.y + tv.y[0], tv.y), at[2] + p.z - tableZ - meta.tip_above_table]);
+    $("wx").textContent = p.x.toFixed(1); $("wy").textContent = p.y.toFixed(1); $("wz").textContent = p.z.toFixed(2);
     $("job-t").value = Math.round(JOB.t / tl.total * 1000);
     $("job-o").textContent = clock(JOB.t);
-    const op = p.op >= 0 ? tl.ops[p.op] : null, done = JOB.t >= tl.total;
-    $("job-status").textContent = (done ? "Done: both plates cut, held by their tabs. " :
-      op ? `${p.op + 1}/${tl.ops.length} ${op.name}. ` : "") +
-      `${clock(tl.total)} in all (${JOB.j.depths.length} passes); stock ${JOB.j.stock.xmax.toFixed(0)} × ${JOB.j.stock.ymax.toFixed(0)} mm at the ` +
-      `cutting area's front-left corner.` + (JOB.fits ? "" : " The stock is bigger than this machine's travel: the bit stops at its limits.");
-    $("job-install").hidden = !done;
+    const m = GcodePlay.message(tl, JOB.t), done = JOB.t >= tl.total;
+    $("job-status").textContent = `${done ? "Done. " : ""}${m ? m.text : ""}`;
+    $("job-install").hidden = !(done && JOB.src.kind === "page");
     if (done) jobPlaying(false);
   }
   function jobPlaying(on) {
-    JOB.playing = on && !!JOB.tl;
+    JOB.playing = on && !!JOB.tl && JOB.t < JOB.tl.total;
     $("job-play").textContent = JOB.playing ? "Pause" : "Play";
+    if (JOB.playing) $("job-pop").hidden = true;
+  }
+  function jobStop(e) {                              // M0 (or a failed probe): hold, with its message
+    jobPlaying(false);
+    $("job-pop-h").textContent = e.kind === "alarm" ? "Alarm" : `Paused (M0) - line ${e.lineNum}`;
+    $("job-pop-msg").textContent = e.kind === "alarm" ? e.text : GcodePlay.pauseText(JOB.tl, e);
+    $("job-resume").textContent = e.kind === "alarm" ? "Carry on anyway" : "Resume (cycle start)";
+    $("job-pop").hidden = false;
+    $("job-status").textContent = $("job-pop-msg").textContent;   // not the MSG lines after the M0 yet
+    if (JOB.plate) JOB.plate.visible = JOB.t >= JOB.tl.plates[0].t0 && JOB.t <= JOB.tl.plates[0].t1;
   }
   function jobTick() {
     const now = performance.now(), dt = Math.min((now - (JOB.last || now)) / 1000, 0.5);   // wall time: the speed holds on
     JOB.last = now;                                                                       // a slow GPU (tick's dt is capped)
-    if (!JOB.playing) {                              // catch up after a scrub (carving is spread over frames)
-      if (JOB.sim && JOB.tl) {
-        const p = StrutPlay.at(JOB.tl, JOB.t);
-        if (JOB.sim.carvedIndex < p.index) { JOB.sim.advanceTo(p.index, 15, p.progress); jobUpdateMesh(false); }
-      }
-      return;
+    if (!JOB.tl) return;
+    if (JOB.playing) {
+      const r = GcodePlay.step(JOB.tl, JOB.t, dt, +$("job-speed").value, JOB.k);
+      JOB.k = r.k;
+      jobSeek(r.t);
+      if (r.stop) jobStop(r.stop);
+    } else if (JOB.sim) {                            // catch up after a scrub (carving is spread over frames)
+      const p = GcodePlay.at(JOB.tl, JOB.t);
+      if (JOB.sim.carvedIndex < p.index) { JOB.sim.advanceTo(p.index, 15, p.progress); jobUpdateMesh(false); }
     }
-    jobSeek(JOB.t + dt * +$("job-speed").value);
   }
   $("job-play").addEventListener("click", () => {
     if (!JOB.tl) return;
-    if (!JOB.playing && JOB.t >= JOB.tl.total) jobSeek(0);
+    if (!JOB.playing && JOB.t >= JOB.tl.total) { jobSeek(0); JOB.k = 0; }
     jobPlaying(!JOB.playing);
   });
-  $("job-reset").addEventListener("click", () => { jobPlaying(false); jobSeek(0); });
-  $("job-t").addEventListener("input", (e) => { if (JOB.tl) jobSeek(e.target.value / 1000 * JOB.tl.total); });
+  $("job-resume").addEventListener("click", () => jobPlaying(true));
+  $("job-reset").addEventListener("click", () => { jobPlaying(false); $("job-pop").hidden = true; jobSeek(0); JOB.k = 0; });
+  $("job-t").addEventListener("input", (e) => {
+    if (!JOB.tl) return;
+    $("job-pop").hidden = true;
+    jobSeek(e.target.value / 1000 * JOB.tl.total);
+    JOB.k = GcodePlay.pending(JOB.tl, JOB.t);
+  });
+  $("job-moves").addEventListener("change", (e) => { if (JOB.ahead) JOB.ahead.visible = JOB.done.visible = e.target.checked; });
+  $("job-file").addEventListener("change", async (e) => {
+    const f = e.target.files[0];
+    e.target.value = "";
+    if (!f) return;
+    JOB.file = { kind: "file", name: f.name, text: await f.text() };
+    jobSetup(JOB.pageJob);
+  });
+  $("job-back").addEventListener("click", () => { JOB.file = null; jobSetup(JOB.pageJob); });
   $("job-install").addEventListener("click", () => {
     const b = document.querySelector('#strut-variant button[data-v="mdf"]');
     if (b) b.click();

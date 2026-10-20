@@ -89,7 +89,7 @@ node test_config_model.js                    # the configurator's machine vs eve
 node test_calculator.js                      # the JS and Python calculators agree (needs python)
 node test_vr.js                              # the VR menu layout and helpers
 node test_strut_cam.js                       # the page's strut plate G-code; vs freecad/cam.py if its goldens exist
-node test_strut_play.js                      # job playback + stock carving: holes / outlines through, tabs left
+node test_gcode_play.js                      # G-code playback: pauses, probe, G20/G21, carving frees the plates
 node test_strut_plate.js                     # JS strut plates vs Vector76's OpenSCAD generator (maintainer only)
 python ../tools/run.py test_strut_plate.py   # Python strut plates vs the same (maintainer only)
 node test_parts_files.js                     # the page's STL / DXF readers vs the reference build (needs parts/)
@@ -127,8 +127,8 @@ stops STL, STEP, DXF and FCStd files from being committed.
   sizing matches V1E's LowRider 4 calculator.
 - **[Vector76](https://github.com/vector76)** wrote the [LR4 strut plate generator](https://vector76.github.io/Web_OpenSCAD_Customizer/strut_plate.html)
   (OpenSCAD) that the strut plate code follows.
-- The stock carving in the job playback is `StockSimulator` from
-  [cnc-gcode-tools](https://github.com/jeyeager65/cnc-gcode-tools) (MIT), copied as `web/js/stock_sim.js`.
+- "Run G-code" parses, times and carves with [cnc-gcode-tools](https://github.com/jeyeager65/cnc-gcode-tools) (MIT):
+  its parser, expander, animator and stock simulator, copied unmodified into `web/js/lib/cnc-gcode-tools/`.
 
 ### Built with Claude
 

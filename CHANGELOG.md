@@ -4,11 +4,16 @@ The version is the configurator page's (`VERSION` in `web/index.html`, shown in 
 the date the model data was built and the Printables file set it was solved for.
 
 ## 0.11.0 - 2026-10-20
-- Cut the strut plates (playback): with Temporary struts, "Cut the strut plates" plays the G-code above on the
-  machine - the bit follows the job and a 1/4" MDF sheet at the cutting area's front-left corner is carved as it
-  goes (cnc-gcode-tools' stock simulator). Play / pause, 1-300x, a time slider to scrub; touching the position
-  sliders pauses it. At the end, "Install the plates" switches to Permanent. tests/test_strut_play.js checks that
-  the full job frees both plates (holes and outlines through, tabs left, faces untouched, no rapids in the stock).
+- Run G-code: with Temporary struts, the strut plate G-code above plays on the machine - the file's own text,
+  parsed by cnc-gcode-tools (#<variables>, arcs, messages). The bit follows it at V1E's JP3_LR speeds (or your
+  config.yaml's) with acceleration; each M0 pauses with its message ("Attach Probe", ...) until you press Resume;
+  G38.2 stops on the stock with the touch plate shown; the 1/4" MDF at the cutting area's front-left corner is
+  carved as it goes. The moves are drawn (faint ahead, solid once done; rapids orange, cuts blue, probes green).
+  Work position and tool position read in mm while it runs. Play / pause, 1-300x, a time slider to scrub; touching
+  the position sliders pauses it. "Play a G-code file..." runs your own file the same way (G20 inches and G20 / G21
+  switches play in mm; carving needs its (Stock:) / (ToolDef:) header). At the end, "Install the plates" switches to
+  Permanent. tests/test_gcode_play.js checks the pauses, probe, units and that the whole file frees both plates.
+- The dust shoe, skirt and bristles now show / hide with the vacuum hose (group "Vacuum hose + dust shoe").
 
 ## 0.10.0 - 2026-10-20
 - Strut plate G-code: "Download G-code" under the strut plates makes the FluidNC job for this size in the browser
