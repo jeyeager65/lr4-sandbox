@@ -68,6 +68,8 @@ def joints(names):
           ]                                    # Jackpot3 lid -> box: from the lid STEP in extra_specs
     j += [(p, n, (5.0,), 10, n, "beam4/beam5/B4: strut plate screws, nylocks on the braces")
           for p in ("StrutPlate_Front", "StrutPlate_Bottom") for n in names if n.startswith("Brace_")]
+    j += [(p, n, (5.0,), 10, n, "beam4/beam5/B4: temp strut screws, nylocks on the braces")   # build.py STRUTS = "temp"
+          for p in names if p.startswith("Temp_Strut_") for n in names if n.startswith("Brace_")]
     return [t for t in j if t[0] in names and t[1] in names]
 
 
@@ -449,7 +451,7 @@ def add(m, colour=hw.STEEL, extra=None, out=None, cache=None):
         now = time.time()
         print(f"[time]   hardware {what}: {now - t[0]:.1f} s", flush=True)
         t[0] = now
-    hole_joint_specs(plan, {})
+    hole_joint_specs(plan, dict((extra or {}).get("holes", {})))   # holes given by build.py (tilted meshes)
     lap(f"hole joints (find_holes {FIND_HOLES_S[0]:.1f} s)")
     rail_specs(plan)
     bearing_specs(plan)

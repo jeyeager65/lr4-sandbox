@@ -14,6 +14,10 @@
 #   stretch - rails, belt runs, table (and anything else that changes shape): bbox min / max per axis = C . f,
 #             the page maps the reference mesh onto it per axis
 #   plate   - strut plates: drawn by the page from the JS generator; their frame's translation = C . f
+# Temp struts (build.py STRUTS = "temp", the <tag>_temp builds when they exist): the end braces sit 180 mm from the
+#   next, so families shift by the brace offsets (lr4.brace_offsets) rather than idx * pitch. A part placed the same
+#   by both is one rec; otherwise one per variant, tagged "struts": "mdf" / "temp". cfg.temp has the temp hose / BOM /
+#   travel fits.
 import base64
 import gzip
 import json
@@ -37,6 +41,7 @@ import lr4                                          # noqa: E402  (plain Python:
 IN = 25.4
 XZ_PLATE = 6.5
 REF = "ref"
+TEMP = "_temp"          # size_builds.py --temp: the STRUTS = "temp" builds in private/sizes/<tag>_temp
 FEATURES = ["1", "TW", "TL", "strut", "pitch", "cutY", "cutX"]   # cutX: belt run reach (travel)
 TOL_RIGID = 0.02        # mm: same shape (bbox size; see same_shape)
 TOL_FIT = 0.05          # mm: fitted position vs the build
@@ -74,7 +79,8 @@ def size_info(cx, cy):
     TW = math.ceil(xtable / IN + 2) * IN
     TL = math.ceil(ytable / IN + 2) * IN
     return dict(strut=strut, n=n, pitch=pitch, TW=TW, TL=TL, cutY=cy * IN, cutX=cx * IN,
-                f=np.array([1.0, TW, TL, strut, pitch, cy * IN, cx * IN]))
+                f=np.array([1.0, TW, TL, strut, pitch, cy * IN, cx * IN]), bx=lr4.brace_offsets(strut, n),
+                bx_temp=lr4.brace_offsets(strut, n, True) if n >= 4 else None)
 
 
 def load(tag):
@@ -167,6 +173,10 @@ def key_of(name, parts, info):
         if k == nc:
             return "Y_Clip_last" + m.group(2), None, None
         return None, None, None                     # in between: the page spaces them
+    m = re.match(r"^Temp_Strut_.*Brace_(\d+)", name)
+    if m:                                           # temp strut screws: only on the two braces at each end
+        last = int(m.group(1)) == info["n"] - 1     # Brace_{n-1} (the Max strut's inner brace) -> "Brace_last"
+        return (name[:m.start(1) - 6] + "Brace_last" + name[m.end(1):] if last else name), None, None
     m = re.search(r"Brace_(\d+)", name)
     if m:
         return name[:m.start()] + "Brace_#" + name[m.end():], int(m.group(1)) - 1, None
@@ -184,108 +194,96 @@ def lstsq(F, Y):
     return C, np.abs(F @ C - Y).max() if len(Y) else 0.0
 
 
-def main():
-    built = [t for t in SIZES if os.path.exists(os.path.join(SIZES_DIR, t, "LowRider4", "exports", "web", "lr4_local.json"))]
-    # LR4_HOLDOUT=tag,tag: left out of the fit (still summarised for the test) - an out-of-sample check
-    hold = set(os.environ.get("LR4_HOLDOUT", "").split(",")) - {""}
-    tags = [t for t in built if t not in hold]
-    print("sizes:", tags, "held out:", sorted(hold & set(built)))
-    infos = {t: size_info(*SIZES[t]) for t in built}
-    F_all = np.array([infos[t]["f"] for t in tags])
-    print("feature matrix rank", np.linalg.matrix_rank(F_all), "of", F_all.shape[1])
-    data = {}
-    metas = {}
-    for t in built:
-        meta_t, parts = load(t)
+def offset(info, idx, temp=False):
+    """Brace idx's X offset from brace 0 (lr4.brace_offsets; = config_model.js braceOffset): idx < 0 counts back
+    from Brace_Max (the hose holders)."""
+    bx = info["bx_temp" if temp else "bx"]
+    return bx[idx] if idx >= 0 else bx[info["n"] - 1 + idx] - bx[info["n"] - 1]
+
+
+def bay0(info, temp=False):
+    bx = info["bx_temp" if temp else "bx"]
+    return bx[1] - bx[0]
+
+
+def collect(tags, suffix, infos, hold):
+    """Load the size builds <tag><suffix>: (fitted tags, metas, data[key][tag] = [(idx, j, name, part)])."""
+    data, metas, fitted = {}, {}, []
+    for t in tags:
+        meta_t, parts = load(t + suffix)
         json.dump({nm: dict(c=p["c"].tolist(), lo=p["lo"].tolist(), hi=p["hi"].tolist(), n=len(p["pos"]))
-                   for nm, p in parts.items()}, open(os.path.join(SIZES_DIR, t, "summary.json"), "w"))
+                   for nm, p in parts.items()}, open(os.path.join(SIZES_DIR, t + suffix, "summary.json"), "w"))
         if t in hold:
             continue
+        fitted.append(t)
         metas[t] = meta_t
         for name, p in parts.items():
             key, idx, j = key_of(name, parts, infos[t])
             if key is None:
                 continue
             data.setdefault(key, {}).setdefault(t, []).append((idx, j, name, p))
-        print(f"  {t}: {len(parts)} parts, strut {infos[t]['strut']}, {infos[t]['n']} braces")
-    ref_meta, ref_parts = metas[REF], load(REF)[1]
+        print(f"  {t + suffix}: {len(parts)} parts, strut {infos[t]['strut']}, {infos[t]['n']} braces")
+    return fitted, metas, data
 
-    out_parts, blob, report = [], bytearray(), []
-    mesh_of = {}                                     # key -> (ref sample used as the mesh)
 
-    def add_mesh(p):
-        """The part's bytes (positions [+ uv] + indices), as export_web laid them out; offsets rebased."""
-        mt = p["meta"]
-        a = mt["pos"][0]
-        off = len(blob)
-        blob.extend(p["buf"][a:])
-        if len(blob) % 4:
-            blob.extend(b"\0" * (4 - len(blob) % 4))
-        q = dict(pos=[mt["pos"][0] - a + off, mt["pos"][1]], idx=[mt["idx"][0] - a + off] + mt["idx"][1:])
-        if "uv" in mt:
-            q["uv"] = mt["uv"] - a + off
-        return q
-
-    for key, by in sorted(data.items()):
-        samples = [(t, idx, j, name, p) for t in tags for (idx, j, name, p) in by.get(t, [])]
-        # the reference sample (mesh): the ref build's lowest index member, else any size's
-        ref_s = sorted([s for s in samples if s[0] == REF], key=lambda s: (s[1] or 0) if (s[1] or 0) >= 0 else -s[1])
-        base = ref_s[0] if ref_s else samples[0]
-        bp = base[4]
-        if key.startswith("StrutPlate_") and "__" not in key:
-            kind = "plate"
-        else:
-            same = all(same_shape(s[4], bp) for s in samples)
-            kind = "rigid" if same else "stretch"
-        fam = key.startswith("Hose:") or any((s[1] or 0) != 0 for s in samples)   # Brace_1-only parts aren't one
-        F = np.array([infos[s[0]]["f"] for s in samples])
-        jp3 = key.startswith("Jackpot3")
-        shift = np.array([[(s[1] or 0) * infos[s[0]]["pitch"] + (jp3_extra(infos[s[0]]["pitch"]) if jp3 else 0), 0, 0]
-                          for s in samples])
-        meta = dict(bp["meta"])
-        for k_ in ("pos", "idx", "uv", "file", "bytes"):
-            meta.pop(k_, None)
-        rec = dict(key=key if fam else key.replace("Brace_#", "Brace_1"), kind=kind, meta=meta)
-        rec["lo_ref"], rec["hi_ref"] = bp["lo"].round(5).tolist(), bp["hi"].round(5).tolist()
-        if jp3:
-            rec["jp3"] = True
-        if fam:
-            rec["family"] = "brace" if not key.startswith("Hose:") else "hose"
-        if kind in ("rigid", "plate"):
-            Y = np.array([s[4]["c"] for s in samples]) - shift if kind == "rigid" else \
-                np.array([s[4]["lo"] for s in samples]) - shift
-            C, err = lstsq(F, Y)
-            rec["C"] = C.T.round(6).tolist()          # 3 x 6
-            rec["c_ref"] = (bp["c"] if kind == "rigid" else bp["lo"]).round(5).tolist()
-            if kind == "rigid":
-                rec["base_idx"] = base[1] or 0
-        else:
-            Y = np.hstack([np.array([s[4]["lo"] for s in samples]), np.array([s[4]["hi"] for s in samples])]) \
-                - np.hstack([shift, shift])
-            C, err = lstsq(F, Y)
-            rec["C"] = C.T.round(6).tolist()          # 6 x 6: lo xyz, hi xyz
-            rec["lo_ref"], rec["hi_ref"] = bp["lo"].round(5).tolist(), bp["hi"].round(5).tolist()
-        if "clip" in meta:                             # belt run: its clip point moves with size too
+def fit_key(key, samples, infos, temp=False, C_given=None, given=None):
+    """Fit one key over its samples [(tag, idx, j, name, part)] -> (rec without mesh, base sample, error). C_given:
+    only measure how well those coefficients place these samples (the shared / per-variant decision); given = the
+    rec they come from (its kind, and its clip point fit)."""
+    base = sorted([s for s in samples if s[0] == REF], key=lambda s: (s[1] or 0) if (s[1] or 0) >= 0 else -s[1])
+    base = base[0] if base else samples[0]
+    bp = base[4]
+    if given is not None:
+        kind = given["kind"]
+    elif key.startswith("StrutPlate_") and "__" not in key:
+        kind = "plate"
+    else:
+        kind = "rigid" if all(same_shape(s[4], bp) for s in samples) else "stretch"
+    fam = key.startswith("Hose:") or any((s[1] or 0) != 0 for s in samples)   # Brace_1-only parts aren't one
+    F = np.array([infos[s[0]]["f"] for s in samples])
+    jp3 = key.startswith("Jackpot3")
+    shift = np.array([[offset(infos[s[0]], s[1] or 0, temp) + (jp3_extra(bay0(infos[s[0]], temp)) if jp3 else 0), 0, 0]
+                      for s in samples])
+    if kind in ("rigid", "plate"):
+        Y = np.array([s[4]["c" if kind == "rigid" else "lo"] for s in samples]) - shift
+    else:
+        Y = np.hstack([np.array([s[4]["lo"] for s in samples]), np.array([s[4]["hi"] for s in samples])]) \
+            - np.hstack([shift, shift])
+    if C_given is not None:
+        err = float(np.abs(F @ np.array(C_given).T - Y).max())
+        if given is not None and "clipC" in given:
             P = np.array([s[4]["meta"]["clip"]["p"] for s in samples])
-            Cp, errp = lstsq(F, P)
-            rec["clipC"] = Cp.T.round(6).tolist()
-            err = max(err, errp)
-        rec["err"] = round(float(err), 4)
-        rec["sizes"] = len(set(s[0] for s in samples))
-        if key.startswith("Hose:"):
-            rec["hose_j"] = sorted(set(s[2] for s in samples))
-        if len(F) < 6 or np.linalg.matrix_rank(F) < 6:
-            report.append(f"UNDERDETERMINED {key}: {len(F)} samples, rank {np.linalg.matrix_rank(F)}")
-        if err > TOL_FIT:
-            report.append(f"FIT {kind} {key}: max error {err:.3f} mm over {rec['sizes']} sizes")
-        if kind != "plate" and key != "Y_Clip_last":       # the last clip is drawn with the first's mesh
-            rec["mesh"] = add_mesh(bp)
-        out_parts.append(rec)
+            err = max(err, float(np.abs(F @ np.array(given["clipC"]).T - P).max()))
+        return None, base, err
+    meta = dict(bp["meta"])
+    for k_ in ("pos", "idx", "uv", "file", "bytes"):
+        meta.pop(k_, None)
+    rec = dict(key=key if fam else key.replace("Brace_#", "Brace_1"), kind=kind, meta=meta)
+    rec["lo_ref"], rec["hi_ref"] = bp["lo"].round(5).tolist(), bp["hi"].round(5).tolist()
+    if jp3:
+        rec["jp3"] = True
+    if fam:
+        rec["family"] = "brace" if not key.startswith("Hose:") else "hose"
+    C, err = lstsq(F, Y)
+    rec["C"] = C.T.round(6).tolist()                  # rigid / plate 3 x f; stretch 6 x f: lo xyz, hi xyz
+    if kind in ("rigid", "plate"):
+        rec["c_ref"] = (bp["c"] if kind == "rigid" else bp["lo"]).round(5).tolist()
+        if kind == "rigid":
+            rec["base_idx"] = base[1] or 0
+    if "clip" in meta:                                 # belt run: its clip point moves with size too
+        P = np.array([s[4]["meta"]["clip"]["p"] for s in samples])
+        Cp, errp = lstsq(F, P)
+        rec["clipC"] = Cp.T.round(6).tolist()
+        err = max(err, errp)
+    rec["err"] = round(float(err), 4)
+    rec["sizes"] = len(set(s[0] for s in samples))
+    if key.startswith("Hose:"):
+        rec["hose_j"] = sorted(set(s[2] for s in samples))
+    return rec, base, err
 
-    # Y clips: count rule from build.py, n = ceil((c1 - c0) / 300) + 1 between the first and last
-    # hose anchors: every numeric leaf fitted
-    hose_fit, hose_ref = {}, None
 
+def hose_fits(tags, metas, infos, F_all, report, temp=False, label="hose"):
+    """Every numeric leaf of the hose anchors fitted (except the ones build.py picks from parts)."""
     def leaves(v, path=()):
         if isinstance(v, bool) or v is None or isinstance(v, str):
             return
@@ -298,29 +296,33 @@ def main():
             for k, x in v.items():
                 yield from leaves(x, path + (k,))
     hv = {t: dict(leaves(metas[t]["hose"])) for t in tags}
-    hose_ref = metas[REF]["hose"]
+    fit = {}
     for path in hv[REF]:
         if path in HOSE_RULES:                         # picked from parts by build.py: config_model.hose redoes it
             continue
-        Y = np.array([hv[t][path] - (jp3_extra(infos[t]["pitch"]) if path in JP3_HOSE else 0) for t in tags])
+        Y = np.array([hv[t][path] - (jp3_extra(bay0(infos[t], temp)) if path in JP3_HOSE else 0) for t in tags])
         if np.ptp(Y) < 1e-6:
             continue
         C, err = lstsq(F_all, Y)
-        hose_fit[json.dumps(path)] = C.round(6).tolist()
+        fit[json.dumps(path)] = C.round(6).tolist()
         if err > TOL_FIT:
-            report.append(f"FIT hose {path}: max error {err:.3f}")
+            report.append(f"FIT {label} {path}: max error {err:.3f}")
+    return fit
 
-    # BOM: the two hardware tables' counts follow the brace and Y clip counts - fitted per row as a + b n + c nc
-    # (rows matched by item + joint with the numbers taken out: the first brace named in a joint varies)
-    boms = {t: json.load(open(os.path.join(SIZES_DIR, t, "LowRider4", "build", "bom.json"))) for t in tags}
-    nclips = {t: sum(1 for q in json.load(open(os.path.join(SIZES_DIR, t, "summary.json"))) if re.match(r"^Y_Clip_\d+$", q))
-              for t in tags}
+
+def bom_fits(tags, suffix, infos, report):
+    """The two hardware tables' counts follow the brace and Y clip counts - fitted per row as a + b n + c nc
+    (rows matched by item + joint with the numbers taken out: the first brace named in a joint varies)."""
+    boms = {t: json.load(open(os.path.join(SIZES_DIR, t + suffix, "LowRider4", "build", "bom.json"))) for t in tags}
+    nclips = {t: sum(1 for q in json.load(open(os.path.join(SIZES_DIR, t + suffix, "summary.json")))
+                     if re.match(r"^Y_Clip_\d+$", q)) for t in tags}
     # only builds whose fastener check is clean: a flagged joint changes the counts (a nut with no seat isn't counted)
     flagged = {t: [r[2] for r in next(q for q in boms[t] if q["title"] == "Hardware: where every fastener goes")["rows"]
                    if str(r[6]).startswith("CHECK")] for t in tags}
     for t, f in flagged.items():
         if f:
-            report.append(f"FLAGGED build {t} (pitch {infos[t]['pitch']:.1f} mm, left out of the BOM fit): {'; '.join(f)}")
+            report.append(f"FLAGGED build {t + suffix} (pitch {infos[t]['pitch']:.1f} mm, left out of the BOM fit): "
+                          f"{'; '.join(f)}")
     btags = [t for t in tags if not flagged[t]]
     bom_fit = {}
     for title, cols in (("Hardware: V1E kit vs this build", (1, 2)), ("Hardware: where every fastener goes", (0,))):
@@ -338,7 +340,7 @@ def main():
         for k in rows_by[REF]:
             have = [t for t in btags if k in rows_by[t]]
             if len(have) < len(btags):
-                report.append(f"BOM row not in every build ({len(have)}/{len(btags)}): {title}: {k}")
+                report.append(f"BOM{suffix} row not in every build ({len(have)}/{len(btags)}): {title}: {k}")
             Gh = np.array([[1.0, infos[t]["n"], nclips[t]] for t in have])
             fits[k] = {}
             for c in cols:
@@ -346,13 +348,15 @@ def main():
                 C, err = lstsq(Gh, Y)
                 fits[k][c] = C.round(6).tolist()
                 if err > 1e-6:
-                    report.append(f"BOM count not linear in braces / clips: {title}: {k} col {c} (err {err:.3f})")
+                    report.append(f"BOM{suffix} count not linear in braces / clips: {title}: {k} col {c} (err {err:.3f})")
         extra = {k for t in btags for k in rows_by[t]} - set(rows_by[REF])
         for k in sorted(extra):
-            report.append(f"BOM row missing from the reference build: {title}: {k}")
+            report.append(f"BOM{suffix} row missing from the reference build: {title}: {k}")
         bom_fit[title] = fits
+    return bom_fit, nclips[REF]
 
-    # travel / parked pose: from the build's own numbers at each size
+
+def travel_fits(tags, metas, F_all, report, label="travel"):
     tv = {}
     for k in ("x", "y", "z"):
         for i in (0, 1):
@@ -360,7 +364,110 @@ def main():
             C, err = lstsq(F_all, Y)
             tv[f"{k}{i}"] = C.round(6).tolist()
             if err > TOL_FIT:
-                report.append(f"FIT travel {k}{i}: {err:.3f}")
+                report.append(f"FIT {label} {k}{i}: {err:.3f}")
+    return tv
+
+
+def main():
+    built = [t for t in SIZES if os.path.exists(os.path.join(SIZES_DIR, t, "LowRider4", "exports", "web", "lr4_local.json"))]
+    built_t = [t for t in built if os.path.exists(os.path.join(SIZES_DIR, t + TEMP, "LowRider4", "exports", "web",
+                                                               "lr4_local.json"))]
+    # LR4_HOLDOUT=tag,tag: left out of the fit (still summarised for the test) - an out-of-sample check
+    hold = set(os.environ.get("LR4_HOLDOUT", "").split(",")) - {""}
+    print("sizes:", [t for t in built if t not in hold], "held out:", sorted(hold & set(built)),
+          "temp struts:", [t for t in built_t if t not in hold])
+    infos = {t: size_info(*SIZES[t]) for t in built}
+    tags, metas, data = collect(built, "", infos, hold)
+    tags_t, metas_t, data_t = collect(built_t, TEMP, infos, hold) if REF in built_t else ([], {}, {})
+    F_all = np.array([infos[t]["f"] for t in tags])
+    print("feature matrix rank", np.linalg.matrix_rank(F_all), "of", F_all.shape[1])
+    ref_meta = metas[REF]
+
+    out_parts, blob, report = [], bytearray(), []
+
+    def add_mesh(p):
+        """The part's bytes (positions [+ uv] + indices), as export_web laid them out; offsets rebased."""
+        mt = p["meta"]
+        a = mt["pos"][0]
+        off = len(blob)
+        blob.extend(p["buf"][a:])
+        if len(blob) % 4:
+            blob.extend(b"\0" * (4 - len(blob) % 4))
+        q = dict(pos=[mt["pos"][0] - a + off, mt["pos"][1]], idx=[mt["idx"][0] - a + off] + mt["idx"][1:])
+        if "uv" in mt:
+            q["uv"] = mt["uv"] - a + off
+        return q
+
+    def check(rec, key, samples):
+        F = np.array([infos[s[0]]["f"] for s in samples])
+        if len(F) < 6 or np.linalg.matrix_rank(F) < 6:
+            report.append(f"UNDERDETERMINED {key}{' (temp)' if rec.get('struts') == 'temp' else ''}: {len(F)} samples, "
+                          f"rank {np.linalg.matrix_rank(F)}")
+        if rec["err"] > TOL_FIT:
+            report.append(f"FIT {rec['kind']} {key}{' (temp)' if rec.get('struts') == 'temp' else ''}: max error "
+                          f"{rec['err']:.3f} mm over {rec['sizes']} sizes")
+
+    # MDF plates and temp struts (STRUTS = "temp" builds, <tag>_temp): a key placed the same way by both is one part;
+    # otherwise one rec per variant ("struts": "mdf" / "temp"; the page draws the set for its toggle). A temp rec of
+    # the same shape reuses the MDF rec's mesh (its refs are that mesh's).
+    n_shared = n_split = 0
+    for key in sorted(set(data) | set(data_t)):
+        sm = [(t, idx, j, name, p) for t in tags for (idx, j, name, p) in data.get(key, {}).get(t, [])]
+        st = [(t, idx, j, name, p) for t in tags_t for (idx, j, name, p) in data_t.get(key, {}).get(t, [])]
+        rec_m = base_m = rec_t = base_t = None
+        if sm:
+            rec_m, base_m, _ = fit_key(key, sm, infos)
+        if st:
+            rec_t, base_t, _ = fit_key(key, st, infos, temp=True)
+        if rec_m and rec_t:
+            # one rec if the MDF one (its kind: a stretch rec also covers a rigid one) places the temp builds too
+            same = rec_m.get("family") == rec_t.get("family") and same_shape(base_m[4], base_t[4]) and \
+                (rec_m["kind"] == rec_t["kind"] or rec_m["kind"] == "stretch")
+            err = fit_key(key, st, infos, temp=True, C_given=rec_m["C"], given=rec_m)[2] if same and \
+                rec_m["kind"] != "plate" else math.inf
+            if err <= TOL_FIT or (err <= max(rec_m["err"], rec_t["err"]) + 1e-6):
+                rec_m["err"] = round(max(rec_m["err"], err), 4)
+                rec_t = None
+                n_shared += 1
+            else:
+                rec_m["struts"], rec_t["struts"] = "mdf", "temp"
+                n_split += 1
+                if same:                                 # same mesh: refer to the MDF one
+                    for k_ in ("lo_ref", "hi_ref", "c_ref", "meta"):
+                        if k_ in rec_m:
+                            rec_t[k_] = rec_m[k_]
+                    rec_t["mesh_of"] = key
+        elif rec_m and tags_t:
+            rec_m["struts"] = "mdf"
+        elif rec_t:
+            rec_t["struts"] = "temp"
+        for rec, base, samples in ((rec_m, base_m, sm), (rec_t, base_t, st)):
+            if rec is None:
+                continue
+            check(rec, key, samples)
+            if rec.get("mesh_of"):
+                rec["mesh"] = rec_m["mesh"]
+                del rec["mesh_of"]
+            elif rec["kind"] != "plate" and key != "Y_Clip_last":   # the last clip is drawn with the first's mesh
+                rec["mesh"] = add_mesh(base[4])
+                if rec.get("struts") == "temp":
+                    rec["from_temp"] = True                     # share_data.py: its source frame is the temp build's
+            out_parts.append(rec)
+    if tags_t:
+        print(f"temp struts: {n_shared} parts shared, {n_split} placed differently, "
+              f"{sum(1 for p in out_parts if p.get('struts') == 'temp')} temp-only recs in all")
+
+    hose_fit = hose_fits(tags, metas, infos, F_all, report)
+    bom_fit, nclips_ref = bom_fits(tags, "", infos, report)
+    tv = travel_fits(tags, metas, F_all, report)
+    temp = None
+    if tags_t:
+        F_t = np.array([infos[t]["f"] for t in tags_t])
+        bom_t, nclips_t = bom_fits(tags_t, TEMP, infos, report)
+        temp = dict(hose=metas_t[REF]["hose"], hose_fit=hose_fits(tags_t, metas_t, infos, F_t, report, True, "hose (temp)"),
+                    bom_ref=metas_t[REF].get("bom"), bom_fit=bom_t, nclips_ref=nclips_t,
+                    travel_fit=travel_fits(tags_t, metas_t, F_t, report, "travel (temp)"),
+                    pitch=lr4.TEMP_STRUT_PITCH, min_braces=4, sizes=tags_t)
 
     os.makedirs(OUT, exist_ok=True)
     gz = gzip.compress(bytes(blob), 9)
@@ -370,18 +477,20 @@ def main():
                verified=dict(sizes={t: SIZES[t] for t in tags},
                              strut=[min(i["strut"] for i in infos.values()), max(i["strut"] for i in infos.values())],
                              braces=[min(i["n"] for i in infos.values()), max(i["n"] for i in infos.values())]),
-               parts=out_parts, hose=hose_ref,
+               parts=out_parts, hose=metas[REF]["hose"],
                plate_frames=json.load(open(os.path.join(SIZES_DIR, "plate_frames.json"))),   # plate_frames.py, ref
                hose_fit=hose_fit, travel_fit=tv,
                tip_above_table=ref_meta["tip_above_table"], peter_style=ref_meta.get("peter_style"),
-               bom_ref=ref_meta.get("bom"), bom_fit=bom_fit, n_ref=infos[REF]["n"], nclips_ref=nclips[REF],
+               bom_ref=ref_meta.get("bom"), bom_fit=bom_fit, n_ref=infos[REF]["n"], nclips_ref=nclips_ref,
                hose_order=HOSE_ORDER, jp3=dict(shift=JP3_SHIFT_X, a=JP3_A, min_pitch=round(lr4.JP3_MIN_PITCH, 3), hose=sorted(map(list, JP3_HOSE))),
+               temp=temp,
                built=max(time.strftime("%Y-%m-%d", time.localtime(os.path.getmtime(os.path.join(
                    SIZES_DIR, t, "LowRider4", "exports", "web", "lr4_local.json")))) for t in tags),   # newest size build
                geometry_chars=len(txt),
-               triangles=sum(p["mesh"]["idx"][1] // 3 for p in out_parts if "mesh" in p))
+               triangles=sum(p["mesh"]["idx"][1] // 3 for p in out_parts if "mesh" in p and p.get("struts") != "temp"))
     json.dump(cfg, open(os.path.join(OUT, "lr4_config.json"), "w"), separators=(",", ":"))
     json.dump({t: SIZES[t] for t in built}, open(os.path.join(OUT, "sizes.json"), "w"))   # test_config_model.js
+    json.dump([t for t in built_t], open(os.path.join(OUT, "sizes_temp.json"), "w"))
     kinds = {}
     for p in out_parts:
         kinds[p["kind"]] = kinds.get(p["kind"], 0) + 1

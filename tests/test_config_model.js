@@ -2,7 +2,8 @@
 //   python pipeline/fit_config.py && node tests/test_config_model.js
 // For every size build (private/sizes/<tag>/summary.json, written by fit_config.py) the page's model
 // (config_model.js + web/data/lr4_config.json) must produce exactly the build's parts, each within TOL:
-// rigid parts by centroid, stretched parts by bounding box. Also checks the hose anchors and travel.
+// rigid parts by centroid, stretched parts by bounding box. Also checks the hose anchors and travel. The temp strut
+// builds (private/sizes/<tag>_temp, web/data/sizes_temp.json) are checked the same way with S.struts = "temp".
 "use strict";
 const fs = require("fs"), path = require("path");
 const M = require("../web/js/config_model.js");
@@ -11,14 +12,17 @@ const SIZES = path.join(__dirname, "..", "private", "sizes");
 const TOL = 0.05;
 const TOL_BELT = 0.15;      // stretched belt runs: their bbox ends move with where the teeth fall
 const sizes = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "web", "data", "sizes.json"), "utf8"));
+const tempFile = path.join(__dirname, "..", "web", "data", "sizes_temp.json");
+const runs = Object.entries(sizes).map(([tag, c]) => [tag, c, "mdf"]).concat(
+  (fs.existsSync(tempFile) && cfg.temp ? JSON.parse(fs.readFileSync(tempFile, "utf8")) : []).map((t) => [t + "_temp", sizes[t], "temp"]));
 
 let fails = 0, compared = 0;
-for (const [tag, [cx, cy]] of Object.entries(sizes)) {
+for (const [tag, [cx, cy], struts] of runs) {
   const f = path.join(SIZES, tag, "summary.json");
   if (!fs.existsSync(f)) { console.log(`skip ${tag}: no build`); continue; }
   const act = JSON.parse(fs.readFileSync(f, "utf8"));
   compared++;
-  const S = M.size(cx * M.IN, cy * M.IN);
+  const S = M.size(cx * M.IN, cy * M.IN, 0, struts);
   const inst = M.instances(cfg, S), got = new Map(inst.map((o) => [o.name, o]));
   const want = Object.keys(act).filter((n) => !/^StrutPlate_(Front|Bottom)$/.test(n));
   const missing = want.filter((n) => !got.has(n)), extra = [...got.keys()].filter((n) => !(n in act));
@@ -38,7 +42,7 @@ for (const [tag, [cx, cy]] of Object.entries(sizes)) {
     if (d > worst) { worst = d; worstName = n; }
     if (d > (r.kind === "stretch" && /^Belt_/.test(n) ? TOL_BELT : TOL)) bad.push(`${n} ${d.toFixed(3)}`);
   }
-  for (const w of ["StrutPlate_Front", "StrutPlate_Bottom"]) {     // plate frames: bbox corner
+  for (const w of struts === "temp" ? [] : ["StrutPlate_Front", "StrutPlate_Bottom"]) {     // plate frames: bbox corner
     const m = M.plateFrame(cfg, w, S), fr = cfg.plate_frames[w];
     const rec = cfg.parts.find((p) => p.key === w);
     const d = Math.max(Math.abs(m[3] - fr.m[3] - (act[w].lo[0] - rec.c_ref[0])),

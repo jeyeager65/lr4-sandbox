@@ -58,6 +58,9 @@ X_POS, Y_POS, Z_POS = 0.5, 0.35, 0.3     # Z_POS 0 = carriages at the bottom of 
 JP3_SHIFT_X = -17.0   # ...and this far toward the Min end so the narrow hose holder on brace 2 clears the lid;
                       # less when the bay is short (lr4.jp3_shift: the lid clears the XZ_Min -> Brace_1 bolt ends)
 PSU_BAY = 1           # bay (0 = Min end) where the power brick lies on the bottom strut plate
+STRUTS = "mdf"        # "mdf" = the CNC-cut strut plates; "temp" = V1E's 4 printed Temp_Strut_v1 (what the machine
+                      # runs on until it cuts its plates): the end braces move to 180 mm from the next (needs 4+ braces),
+                      # the PSU lies on the Max-end bottom temp strut (GUESS). Size builds patch this line.
 HARDWARE = True        # bolts, screws and nuts from the parts' holes (hardware.py, ~1-2 min)
 THREADS = True         # model screw / leadscrew threads (revolved rings) and GT2 belt teeth - FCStd + STEP
 PETER_PLATES = ("Min", "Max")   # Peter Plates covers (Printables 1044487) on these YZ plates; () = none (user 2026-10-19)
@@ -82,6 +85,8 @@ calc = lr4.calculator(CUT_X, CUT_Y, XZ_PLATE)
 calc_in = lr4.calculator_inches(CUT_X_IN, CUT_Y_IN, XZ_PLATE / IN)
 strut = calc["strut"]
 n_braces, pitch = lr4.braces(strut)
+TEMP = STRUTS == "temp"
+brace_off = lr4.brace_offsets(strut, n_braces, TEMP)   # brace i at X_s0 + brace_off[i] (even pitch; temp: 180 mm end bays)
 xtable, ytable = calc["xtable"], calc["ytable"]
 if TABLE_IN:
     TW, TL = TABLE_IN[0] * IN, TABLE_IN[1] * IN
@@ -140,7 +145,7 @@ ROWS_HOLDER = ((0, 1, 0), (-1, 0, 0), (0, 0, 1))   # belt holders: print z up, p
 
 
 def brace_x(i):
-    return X_s0 + i * pitch                        # brace i occupies X brace_x(i) .. + 18
+    return X_s0 + brace_off[i]                            # brace i occupies X brace_x(i) .. + 18
 
 
 # ---- colours ------------------------------------------------------------------------------
@@ -362,10 +367,22 @@ bottom = plates["bottom"].extrude(V(0, 0, STRUT_T))
 bottom_y0 = Ym + lr4.BRACE_TO_D[0] - (lr4.BOTTOM_SEAT[1] + 67.5)      # plate edge at bx 155.75
 bottom_z0 = Zm + lr4.BOTTOM_SEAT[0] + lr4.BRACE_TO_D[1]
 bottom.Placement = App.Placement(V(X_s0, bottom_y0, bottom_z0), App.Rotation())
-m.add("StrutPlate_Front", front, group="Beam", colour=MDF,
-      cut=wood.sheet(t=STRUT_T / IN, note="1/4in MDF - CNC cut, see exports/cam"))
-m.add("StrutPlate_Bottom", bottom, group="Beam", colour=MDF,
-      cut=wood.sheet(t=STRUT_T / IN, note="1/4in MDF - CNC cut, see exports/cam"))
+if not TEMP:
+    m.add("StrutPlate_Front", front, group="Beam", colour=MDF,
+          cut=wood.sheet(t=STRUT_T / IN, note="1/4in MDF - CNC cut, see exports/cam"))
+    m.add("StrutPlate_Bottom", bottom, group="Beam", colour=MDF,
+          cut=wood.sheet(t=STRUT_T / IN, note="1/4in MDF - CNC cut, see exports/cam"))
+else:                                            # the 4 temp struts in the plates' own 2D frames (lr4.TEMP_STRUT_FRAMES)
+    for which, plate in (("front", front), ("bottom", bottom)):
+        for end in ("Min", "Max"):
+            pl_ts = plate.Placement.multiply(F(*lr4.temp_strut_frame(which, end, strut)))
+            stl(f"Temp_Strut_{which.title()}_{end}", "Temp_Strut_v1", pl_ts, "Beam", PRINT_ACCENT)
+            # its 4 holes from the STL frame: the front ones lean with the face, where find_holes (axis-aligned
+            # sections) can't see them
+            hw_extra.setdefault("holes", {})[f"Temp_Strut_{which.title()}_{end}"] = [
+                dict(p0=pl_ts.multVec(V(x, y, 0)), p1=pl_ts.multVec(V(x, y, lr4.TEMP_STRUT_T)), d=5.3)
+                for x, y in lr4.TEMP_STRUT_HOLES]
+plate_t = lr4.TEMP_STRUT_T if TEMP else STRUT_T  # what the box / PSU lie on
 
 # X belt tensioner on the Max end, X belt along the front of the front strut plate
 xb_y, xb_z = D(*lr4.XBELT_D)
@@ -596,14 +613,15 @@ stage("Y axis on the table")
 # The box and lid are two channel profiles extruded along print z; the profile runs along Y,
 # the open ends face the braces. Its flat base lies on the bottom strut plate with just the lip
 # hanging over the plate's back edge (lr4.JP3_BASE_PY / JP3_LIP_X; user, 2026-10-18).
-bay_x = brace_x(0) + lr4.BRACE_T + (pitch - lr4.BRACE_T) / 2
-jp3_dx = lr4.jp3_shift(pitch, JP3_SHIFT_X)
+bay0 = brace_off[1] - brace_off[0]                            # = pitch (temp struts: 180)
+bay_x = brace_x(0) + lr4.BRACE_T + (bay0 - lr4.BRACE_T) / 2
+jp3_dx = lr4.jp3_shift(bay0, JP3_SHIFT_X)
 if jp3_dx != JP3_SHIFT_X:
-    print(f"Jackpot3 box: shift {jp3_dx:.1f} mm (not {JP3_SHIFT_X}) - the bay is short ({pitch:.1f} mm pitch), "
+    print(f"Jackpot3 box: shift {jp3_dx:.1f} mm (not {JP3_SHIFT_X}) - the bay is short ({bay0:.1f} mm pitch), "
           "the lid has to clear the XZ_Plate_Min -> Brace_1 bolt ends")
 pl_box = F(((0, 0, -1), (-1, 0, 0), (0, 1, 0)), (bay_x + 61.2 + jp3_dx,      # turned 180 deg about Z
                                                 bottom.BoundBox.YMax + lr4.JP3_LIP_X + 0.2,   # (user, 2026-10-17)
-                                                bottom_z0 + STRUT_T - lr4.JP3_BASE_PY))
+                                                bottom_z0 + plate_t - lr4.JP3_BASE_PY))
 stl("Jackpot3_Box", "Jackpot3_Box", pl_box, "Electronics", PRINT_MAIN, folder=JP3)
 stage("electronics: box")
 pl_lid = pl_box.multiply(F(*lr4.JP3_LID))
@@ -697,8 +715,9 @@ if JP3_FAN:
           f"{[(round(x, 1), round(y, 1)) for x, y in loc]}, outlet (world) {side}")
 stage("electronics: fan")
 psu = core.box(0, 150, 0, 60, 0, 32)            # 24 V power brick - GUESS size; lies flat on the bottom
-psu.translate(V(brace_x(PSU_BAY) + (pitch + lr4.BRACE_T - 150) / 2,   # strut plate, centred in its bay
-                bottom_y0 + (78.5 - 60) / 2, bottom_z0 + STRUT_T))     # (user, 2026-10-17)
+psu_bay = n_braces - 2 if TEMP else PSU_BAY       # temp: on the Max-end bottom temp strut (GUESS)
+psu.translate(V(brace_x(psu_bay) + (brace_off[psu_bay + 1] - brace_off[psu_bay] + lr4.BRACE_T - 150) / 2,   # centred in its bay
+                bottom_y0 + (78.5 - 60) / 2, bottom_z0 + plate_t))     # (user, 2026-10-17)
 m.add("PSU_24V", psu, group="Electronics", colour=hw.BLACK)
 
 # endstops: Z on the Z stops, Y on the front wheels, X on the core - each on its own two M2.5 holes in the

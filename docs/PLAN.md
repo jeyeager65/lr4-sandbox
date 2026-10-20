@@ -85,6 +85,7 @@ plates, front_wing_size 11.5 (1" EMT). Plates 830 x 90.5 (front) and 830 x 78.5 
 | Router | Kobalt 1.25 HP trim router (Makita RT0701C clone): `hw.trim_router`, grip 65.8 (owners' figure), ER11 nut | motor length, grip/head heights, head 82 x 64, bit stick-out, colours GUESS - MEASURE (override in `lr4.ROUTER`) |
 | 1/8" bit | 1-flute upcut, 12 mm flutes, 38 mm long | GUESS - MEASURE |
 | Power supply | 150 x 60 x 32 mm brick | GUESS |
+| Bottom temp strut orientation | both ends the same way round, bed face down, small d 3.5 hole at the back edge | GUESS from beam5 (`lr4.TEMP_STRUT_FRAMES`); front ones from the notches (B4/B5) |
 | Z stepper shaft | 24 mm from the face (`Z_SHAFT`) | GUESS - V1E says 20 mm+; MEASURE (sets the coupler / leadscrew height) |
 | Endstop lever | Omron SS-3GL13PT, tip 2.1 above the body, 10 mm past its end | GUESS from the user's photo |
 | Vacuum hose | Fulton 2-1/2" x 20 ft clear PVC, steel wire (user's) - 73 mm OD | OD GUESS - MEASURE (`lr4.HOSE['od']`) |
@@ -110,6 +111,7 @@ plates, front_wing_size 11.5 (1" EMT). Plates 830 x 90.5 (front) and 830 x 78.5 
 | 12 | Endstops = Omron SS-3GL13PT; orientation picked by what trips them (`lr4.SWITCH_HOME`) | eyeballed generic switches (~5 mm off their holes) |
 | 13 | Jackpot3 lid fan: 5015 on the OUTSIDE, exhausting (dusty shop - don't blow in), outlet toward the Min end (user, 2026-10-19) | inside the lid (board and wiring in the way); blowing in |
 | 14 | Peter Plates on both YZ plates (Max mirrored), stepper cut-outs filled (user); "solid" in the model, "honeycomb" kept as the viewer alternative | designer's covers with stepper openings |
+| 15 | Temp struts as a build option (`STRUTS = "temp"`): V1E's 4 Temp_Strut_v1 (front + bottom at each end) in the plates' own 2D frames (`lr4.TEMP_STRUT_FRAMES`); the end braces move to 180 mm from the next, the rest evenly between (V1E beam3), needs 4+ braces; PSU on the Max-end bottom temp strut, Jackpot3 box on the Min-end one. The configurator shows it as the Strut plates Temporary / Permanent toggle (2026-10-20) | keep the MDF brace pitch (temp strut screws would miss the inner braces) |
 
 ## How the parts were placed (V1E publishes no assembly CAD)
 

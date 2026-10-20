@@ -187,7 +187,7 @@
   },
   "lr4/Temp_Strut_v1.stl": {
    "source": "lr4",
-   "use": "later",
+   "use": "build",
    "bytes": 378484,
    "sha256": [
     "af6b3a98bc59764c0ec24ed8eaf737acb2220dd56fe48a66366fc7ee5802ec8e"

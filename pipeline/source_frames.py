@@ -2,6 +2,8 @@
 # came from, and the transform from that file's own coordinates to the machine. The public page doesn't ship that
 # geometry - each user loads the files they downloaded, and the page places them with these transforms.
 #   python tools/run.py pipeline/source_frames.py   (LR4_FCSTD=<build> to read another build)
+#   LR4_TEMP=1: the temp strut build (private/sizes/ref_temp) -> source_frames_temp.json (share_data.py uses it for
+#   the parts only that build has: the Temp_Strut_*)
 # -> private/sizes/source_frames.json: {part: {file, sha256, bytes, facets, kind: stl|dxf, A: 3x4 (file -> machine)}}
 # STL parts: matched by point count, then an affine fit of the file's points (FreeCAD load order) onto the placed
 # part (mirrored parts are just a negative determinant); accepted when it reproduces every point to 1e-3 mm.
@@ -29,7 +31,9 @@ sys.path.insert(0, os.path.join(PROJ, "freecad"))
 import lr4                                            # noqa: E402
 PARTS = os.path.join(PROJ, "parts")
 SIZES_DIR = os.path.join(PROJ, "private", "sizes")    # = lr4.SIZES_DIR
-path = os.environ.get("LR4_FCSTD") or os.path.join(SIZES_DIR, "ref", "LowRider4", "build", "LowRider4.FCStd")
+TEMP = os.environ.get("LR4_TEMP") == "1"
+path = os.environ.get("LR4_FCSTD") or os.path.join(SIZES_DIR, "ref_temp" if TEMP else "ref", "LowRider4", "build",
+                                                   "LowRider4.FCStd")
 doc = App.openDocument(path)
 
 
@@ -168,6 +172,6 @@ for nm in [u for u in unmatched if u.startswith("Bristles_TPU")]:
                                            **bend))
     unmatched.remove(nm)
 
-dst = os.path.join(SIZES_DIR, "source_frames.json")
+dst = os.path.join(SIZES_DIR, "source_frames_temp.json" if TEMP else "source_frames.json")
 json.dump(out, open(dst, "w"), indent=1)
 print(f"SOURCES {len(out)} parts from files; not from a file: {', '.join(unmatched)}")

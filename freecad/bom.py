@@ -147,13 +147,15 @@ def data(g):
                         [2, "Belt along Y", "GT2 10 mm", f"{calc['ybelt']:.0f} mm",
                          f"modelled path {max(g.get('belt_len', {0: 0}).values()):.0f} mm lock to tension block"]]))
     counts = Counter(g["printed"])
-    counts["Temp_Strut_v1"] += 4
+    temp = counts["Temp_Strut_v1"] > 0                   # STRUTS = "temp": they're in the model (4)
+    if not temp:
+        counts["Temp_Strut_v1"] += 4
     rows = []
     for f, q in sorted(counts.items(), key=lambda kv: (kv[0] in SOURCE, kv[0].lower())):
         note = INFILL.get(f, "30%")
         src = SOURCE.get(f, "V1E LowRider 4 (Printables 1034840)")
         if f == "Temp_Strut_v1":
-            src += " - temporary, until the machine cuts its MDF strut plates (not in the model)"
+            src += " - temporary, until the machine cuts its MDF strut plates" + ("" if temp else " (not in the model)")
         rows.append([q, f, note, src])
     S.append(dict(title="Printed parts", note="PLA, 3 walls, no supports, default orientation (V1E); the Kobalt mount 2 walls. "
                   "Files in parts/.", columns=["Qty", "File", "Infill", "Source / notes"], rows=rows))
@@ -173,7 +175,10 @@ def data(g):
                   f"into). {bad} row(s) to check. V1E step = the photo name in docs.v1e.com/lowrider.",
                   columns=["Qty", "Item", "Joint", "Head", "Nut / thread", "V1E step", "Check"], rows=hw_rows))
     S.append(dict(title="Model notes", note="", columns=["Note"], rows=[
-        [f"Braces: {n_braces} at {g['pitch']:.2f} mm pitch (generator default); Y clips: {g['n_clips']} (<= 300 mm apart)."],
+        [(f"Braces: {n_braces}, end bays {g['brace_off'][1]:g} mm (temp struts), the rest "       # = config_model.js bom()
+          f"{g['brace_off'][2] - g['brace_off'][1]:.2f} mm" if g.get("TEMP") else
+          f"Braces: {n_braces} at {g['pitch']:.2f} mm pitch") +
+         f" (generator default); Y clips: {g['n_clips']} (<= 300 mm apart)."],
         ["Threads are modelled on every screw, bolt and leadscrew (revolved V / trapezoid rings, not a true helix); GT2 belt "
          "teeth face the pulleys."],
         ["Approximate: router body (GUESS dims), power supply, Jackpot3 lid, the X belt end loop screws, the hose route."],

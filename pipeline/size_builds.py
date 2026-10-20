@@ -1,6 +1,8 @@
 # Configurator phase 2: build the LR4 at several cut areas, each in its own throwaway copy of the project, so
 # fit_config.py can work out how every part moves with size. The real build/ and exports/ are never touched.
 #   python pipeline/size_builds.py [tag ...]      (plain Python; runs FreeCAD headless per size, ~4 min each)
+#   python pipeline/size_builds.py --temp [tag ...]   the temp strut variant (build.py STRUTS = "temp") into
+#                                                 private/sizes/<tag>_temp/; sizes with < 4 braces are skipped
 # Copies: private/sizes/<tag>/ (freecad/ incl. fclib + build/cache; parts/ is read from the real project by
 # patched paths - no junctions, so deleting private/sizes can't reach the originals). Each copy runs build.py with
 # LR4_CHECK=0, then export_web.py, which leaves exports/web/lr4_local.json + geo/*.bin per size.
@@ -46,8 +48,17 @@ def patch(path, subs):
     open(path, "w", encoding="utf-8").write(s)
 
 
-def make_copy(tag, cx, cy):
-    dst = os.path.join(OUT, tag, "LowRider4")       # basename must stay LowRider4 (document name)
+TEMP_SUFFIX = "_temp"
+
+
+def braces(cx):
+    """Brace count at this cut X (fit_config.size_info / strut_plate.braces)."""
+    import math
+    return math.floor((math.ceil(cx * 25.4 + 169) - 18) / 183) + 1
+
+
+def make_copy(tag, cx, cy, temp=False):
+    dst = os.path.join(OUT, tag + (TEMP_SUFFIX if temp else ""), "LowRider4")       # basename must stay LowRider4 (document name)
     if os.path.isdir(dst):
         shutil.rmtree(dst)
     os.makedirs(os.path.join(dst, "build"))
@@ -61,7 +72,8 @@ def make_copy(tag, cx, cy):
     patch(os.path.join(dst, "freecad", "lr4.py"), [(r'^PARTS = .*$', f'PARTS = r"{parts}"')])
     patch(os.path.join(dst, "freecad", "build.py"), [(r'^CUT_X_IN = [0-9.]+', f"CUT_X_IN = {cx}"),
                                           (r'^CUT_Y_IN = [0-9.]+', f"CUT_Y_IN = {cy}"),
-                                          (r'^JP3_BOARD = True', "JP3_BOARD = False")])
+                                          (r'^JP3_BOARD = True', "JP3_BOARD = False")]
+          + ([(r'^STRUTS = "mdf"', 'STRUTS = "temp"')] if temp else []))
     return dst
 
 
@@ -74,12 +86,16 @@ def run(dst, script, log):
 
 
 if __name__ == "__main__":
-    tags = sys.argv[1:] or list(SIZES)
+    temp = "--temp" in sys.argv
+    tags = [a for a in sys.argv[1:] if a != "--temp"] or list(SIZES)
     for tag in tags:
         cx, cy = SIZES[tag]
+        if temp and braces(cx) < 4:
+            print(f"{tag}: {braces(cx)} braces - no temp strut build (needs 4)", flush=True)
+            continue
         t0 = time.time()
-        dst = make_copy(tag, cx, cy)
-        log = os.path.join(OUT, tag, "log.txt")
+        dst = make_copy(tag, cx, cy, temp)
+        log = os.path.join(OUT, tag + (TEMP_SUFFIX if temp else ""), "log.txt")
         ok = run(dst, "freecad/build.py", log) == 0 and run(dst, "freecad/export_web.py", log) == 0
         ok = ok and os.path.exists(os.path.join(dst, "exports", "web", "lr4_local.json"))
         print(f"{tag} {cx} x {cy} in: {'ok' if ok else 'FAILED - see ' + log} ({time.time() - t0:.0f} s)", flush=True)

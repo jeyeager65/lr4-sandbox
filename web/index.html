@@ -304,6 +304,9 @@ body.vr-on .stage { grid-row: 1; }
     <h2 id="h-parts">Parts</h2>
     <div class="groups" id="groups"></div>
     <button type="button" id="unhide" hidden></button>
+    <div class="variant" id="strut-variant" hidden><span>Strut plates</span>
+      <button type="button" data-v="mdf" aria-pressed="true">Permanent (MDF)</button>
+      <button type="button" data-v="temp" aria-pressed="false">Temporary (printed)</button></div>
     <div class="variant" id="peter-variant" hidden><span>Peter Plates</span>
       <button type="button" data-v="solid" aria-pressed="false">Solid</button>
       <button type="button" data-v="honeycomb" aria-pressed="false">Honeycomb</button>
@@ -906,7 +909,7 @@ body.vr-on .stage { grid-row: 1; }
       addMesh(geo, mat, ud);
       tris += n;
     }
-    for (const { rec, geo } of plateMeshes()) {
+    for (const { rec, geo } of S.struts === "temp" ? [] : plateMeshes()) {   // temp struts: no MDF plates yet
       addMesh(geo, material(rec.meta.color, null), Object.assign({}, rec.meta, { name: rec.key, ownGeo: true }));
       tris += geo.attributes.position.count / 3;
     }
@@ -1328,7 +1331,7 @@ body.vr-on .stage { grid-row: 1; }
 
   // ---- size inputs, V1E calculator, cut list, strut plate drawing + downloads ----
   const EMT_STICK = 3048, KERF = 3, XZ = 6.5;
-  const U = { unit: "in", cutX: 26 * IN, cutY: 50 * IN, braces: 0 };
+  const U = { unit: "in", cutX: 26 * IN, cutY: 50 * IN, braces: 0, struts: "mdf" };
   const $ = (id) => document.getElementById(id);
   const disp = (mm) => U.unit === "in" ? mm / IN : mm;
   function frac(v) {                                  // 32.625 -> 32 5/8
@@ -1399,8 +1402,10 @@ body.vr-on .stage { grid-row: 1; }
         `${v.braces[0]}–${v.braces[1]} braces): parts are placed by extrapolation.`);
     if (S.cutX > 1600 || S.cutY > 3000) warn.push("Big machine: V1E suggests staying within about 4 × 8 ft of cutting area.");
     if (S.pitch - 18 < 60) warn.push(`Brace gaps are only ${(S.pitch - 18).toFixed(0)} mm. Use fewer braces.`);
+    if (S.tempBlocked)
+      warn.push(`Temporary struts need 4 or more braces (this size has ${S.n}), so the MDF plates are shown.`);
     if (!LR4Model.jp3Fits(cfg, S))
-      warn.push(`The Jackpot3 box doesn't fit between braces 1 and 2 at ${S.pitch.toFixed(1)} mm pitch ` +
+      warn.push(`The Jackpot3 box doesn't fit between braces 1 and 2 at ${S.bay0.toFixed(1)} mm pitch ` +
         `(needs ${cfg.jp3.min_pitch.toFixed(1)} mm), so it's hidden. Use fewer braces or mount it elsewhere.`);
     $("warnings").innerHTML = warn.map((w) => `<p class="warn">${w}</p>`).join("");
   }
@@ -1408,7 +1413,7 @@ body.vr-on .stage { grid-row: 1; }
   function applySize(now) {
     clearTimeout(pending);
     const go = () => {
-      S = LR4Model.size(U.cutX, U.cutY, U.braces);
+      S = LR4Model.size(U.cutX, U.cutY, U.braces, U.struts);
       updateText();
       updateCalc();
       rebuild();
@@ -1440,6 +1445,17 @@ body.vr-on .stage { grid-row: 1; }
       U[k] = mm; U.braces = 0; keep(); applySize();
     });
     $("braces").addEventListener("change", (e) => { U.braces = parseInt(e.target.value, 10); keep(); applySize(true); });
+    // Strut plates: Permanent (the MDF plates the machine cuts) or Temporary (V1E's 4 printed Temp_Strut_v1 it runs
+    // on until then: the end braces sit 180 mm from the next) - fit_config.py cfg.temp, config_model.js S.struts
+    const sv = $("strut-variant");
+    sv.hidden = !cfg.temp;
+    if (!cfg.temp) U.struts = "mdf";
+    const markStruts = () => sv.querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.v === U.struts)));
+    sv.querySelectorAll("button").forEach((b) => b.addEventListener("click", () => {
+      if (U.struts === b.dataset.v) return;
+      U.struts = b.dataset.v; keep(); markStruts(); applySize(true);
+    }));
+    markStruts();
     $("u-in").addEventListener("click", () => { U.unit = "in"; keep(); fillInputs(); updateCalc(); });
     $("u-mm").addEventListener("click", () => { U.unit = "mm"; keep(); fillInputs(); updateCalc(); });
     fillInputs();
@@ -1516,7 +1532,7 @@ body.vr-on .stage { grid-row: 1; }
   }
 
   // ---- version + feedback: the issue link carries the size, data date and the loaded files' checksums ----
-  const VERSION = "0.8.0";
+  const VERSION = "0.9.0";
   function setupAbout() {
     const bits = [`lr4-sandbox ${VERSION}`];
     if (cfg.built) bits.push(`model data built ${cfg.built}`);

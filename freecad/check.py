@@ -91,6 +91,11 @@ PAIRS = [
     ("Vac_Hose", "Hose_Holder_Shorty_1"), ("Vac_Hose", "Hose_Hook_70_1"), ("Vac_Hose", "Hose_Holder_Shorty_2"),
     ("Vac_Hose", "Brace_1"), ("Vac_Hose", "Brace_2"), ("Vac_Hose", "Jackpot3_Lid"), ("Vac_Hose", "YZ_Plate_Min"),
     ("Vac_Hose", "TableMDF"), ("Vac_Hose", "Hose_Holder_Hook_1"), ("Vac_Hose", "Brace_3"), ("Vac_Hose", "Brace_4"),
+    # temp struts (build.py STRUTS = "temp"), instead of the strut plates
+    *[(f"Temp_Strut_{w}_{e}", b) for w in ("Front", "Bottom") for e in ("Min", "Max")
+      for b in ("Brace_1", "Brace_2", "Brace_3", "Brace_4", "Brace_5", "Brace_6", "Brace_7", "Brace_Max", "X_Rail_Upper",
+                "X_Rail_Lower", "X_Belt", "Belt_X_Min", "Belt_X_Max", "Core", "Jackpot3_Box", "Jackpot3_Lid", "PSU_24V",
+                "XZ_Plate_Min", "XZ_Plate_Max", "Cable_Sleeve", "Router_Cord_Run", "Vac_Hose")],
     # Tiny Touch Plate in the top mount's slot (2026-10-19)
     *[(a, b) for a in ("TouchPlate", "TouchPlate_Spade", "TouchPlate_Clip", "TouchPlate_Wire", "TouchPlate_Clip_Wire",
                        "TouchPlate_Magnet")

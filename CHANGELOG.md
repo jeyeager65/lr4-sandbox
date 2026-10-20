@@ -3,6 +3,12 @@
 The version is the configurator page's (`VERSION` in `web/index.html`, shown in its footer). The footer also shows
 the date the model data was built and the Printables file set it was solved for.
 
+## 0.9.0 - 2026-10-20
+- Temporary struts: Parts > "Strut plates: Permanent (MDF) / Temporary (printed)" shows the machine as it first
+  runs, on V1E's 4 printed Temp_Strut_v1 (front + bottom at each end, end braces 180 mm from the next) before it
+  cuts its own MDF strut plates. Needs 4+ braces. The FreeCAD build has it as `STRUTS = "temp"`. Bring-your-own-files
+  mode places your Temp_Strut_v1.stl too.
+
 ## 0.8.0 - 2026-10-20
 - VR mode (PC VR through SteamVR / OpenXR): an "Enter VR" button appears when the browser offers WebXR. A menu on
   the left controller (inches / mm, size steppers and presets, braces, Peter Plates, part groups, unhide); touch a

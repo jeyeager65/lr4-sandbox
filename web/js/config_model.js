@@ -1,6 +1,7 @@
 // LR4 configurator: the machine at any size from lr4_config.json (fit_config.py). Pure functions, shared by the
 // page and test_config_model.js (which checks them against every size build, part by part).
-//   size(cutXmm, cutYmm, braces?)  -> the size features f = [1, TW, TL, strut, pitch, cutY] (+ n, ...)
+//   size(cutXmm, cutYmm, braces?, struts?) -> the size features f = [1, TW, TL, strut, pitch, cutY] (+ n, bx, ...)
+//                                     struts "temp": V1E's temp struts (S.struts falls back to "mdf" under 4 braces)
 //   instances(cfg, S)              -> every part to draw: {rec, name, t: [x,y,z], s: [sx,sy,sz], clipP?}
 //                                     world = s * ref_vertex + t (per axis); rigid parts have s = [1,1,1]
 //   hose(cfg, S)                   -> the hose / cord anchors (lr4.json "hose") at this size
@@ -14,14 +15,31 @@
   const HOSE_KEY = { Hose_Holder_Hook: "Hook", hose_holder_shorty: "Shorty", Hose_Hook_70: "Hook70" };
   const HOSE_NAME = { Hook: "Hose_Holder_Hook", Shorty: "Hose_Holder_Shorty", Hook70: "Hose_Hook_70" };
 
-  function size(cutX, cutY, braces) {
+  // brace i's X offset from brace 0 (lr4.brace_offsets): the generator's even pitch, or with temp struts the two end
+  // bays TEMP_PITCH and the rest evenly between (V1E: "position the end braces to fit the temp struts")
+  const TEMP_PITCH = 180, TEMP_MIN_BRACES = 4;
+  function braceOffsets(strut, n, temp) {
+    const span = strut - 18;
+    if (!temp) return Array.from({ length: n }, (_, i) => span * i / (n - 1));
+    const a = TEMP_PITCH, b = span - TEMP_PITCH;
+    return [0, ...Array.from({ length: n - 2 }, (_, i) => a + (b - a) * i / (n - 3)), span];
+  }
+  function size(cutX, cutY, braces, struts) {
     const { strut, xtable, ytable } = Calc.calc(cutX, cutY, XZ);
     const auto = Math.floor((strut - 18) / 183) + 1;       // the strut plate generator's brace count
     const n = braces || auto;
     const pitch = (strut - 18) / (n - 1);
     const TW = Math.ceil(xtable / IN + 2 - 1e-9) * IN, TL = Math.ceil(ytable / IN + 2 - 1e-9) * IN;
-    return { cutX, cutY, strut, n, auto, pitch, TW, TL, xtable, ytable, f: [1, TW, TL, strut, pitch, cutY, cutX] };
+    const want = struts === "temp", temp = want && n >= TEMP_MIN_BRACES;
+    const bx = braceOffsets(strut, n, temp);
+    return { cutX, cutY, strut, n, auto, pitch, TW, TL, xtable, ytable, f: [1, TW, TL, strut, pitch, cutY, cutX],
+      struts: temp ? "temp" : "mdf", tempBlocked: want && !temp, bx, bay0: bx[1] - bx[0] };
   }
+  // brace idx's offset; idx < 0 counts back from Brace_Max (the hose holders)
+  const braceOffset = (S, idx) => (idx >= 0 ? S.bx[idx] : S.bx[S.n - 1 + idx] - S.bx[S.n - 1]);
+  // the fits for this strut variant (fit_config.py cfg.temp: hose, BOM, travel)
+  const fits = (cfg, S) => (S.struts === "temp" && cfg.temp ? cfg.temp : cfg);
+  const shown = (rec, S) => !rec.struts || rec.struts === S.struts;
   const dot = (row, f) => row.reduce((a, c, i) => a + c * f[i], 0);
   const lin = (C, f) => C.map((row) => dot(row, f));
   const add = (a, b, k = 1) => a.map((v, i) => v + k * b[i]);
@@ -40,12 +58,12 @@
   // Jackpot3 box: extra X past build.py's JP3_SHIFT_X when the bay is short (lr4.jp3_shift, a clamp; fit_config.py
   // took it out before fitting)
   let JP3 = null;
-  const jp3Extra = (S) => (JP3 ? Math.max(0, JP3.a - S.pitch / 2 - JP3.shift) : 0);
+  const jp3Extra = (S) => (JP3 ? Math.max(0, JP3.a - S.bay0 / 2 - JP3.shift) : 0);
   // ...and whether it fits in the bay at all (lr4.JP3_MIN_PITCH; only a manual brace count can go under it)
-  const jp3Fits = (cfg, S) => !(cfg.jp3 && cfg.jp3.min_pitch) || S.pitch >= cfg.jp3.min_pitch;
-  // position of a rec at this size, its family index shifted along X by idx * pitch
+  const jp3Fits = (cfg, S) => !(cfg.jp3 && cfg.jp3.min_pitch) || S.bay0 >= cfg.jp3.min_pitch;
+  // position of a rec at this size, its family index shifted along X by the brace's offset
   function place(rec, S, idx) {
-    const sh = [idx * S.pitch + (rec.jp3 ? jp3Extra(S) : 0), 0, 0];
+    const sh = [braceOffset(S, idx) + (rec.jp3 ? jp3Extra(S) : 0), 0, 0];
     if (rec.kind === "rigid") return rigid(rec, add(lin(rec.C, S.f), sh));
     const v = lin(rec.C, S.f);
     return stretch(rec, add(v.slice(0, 3), sh), add(v.slice(3), sh));
@@ -60,12 +78,12 @@
     const push = (rec, name, p, idx = 0) => {
       if (rec.jp3 && !jp3) return;
       const o = Object.assign({ rec, name }, p);
-      if (rec.clipC) o.clipP = add(lin(rec.clipC, S.f), [idx * S.pitch, 0, 0]);
+      if (rec.clipC) o.clipP = add(lin(rec.clipC, S.f), [braceOffset(S, idx), 0, 0]);
       out.push(o);
     };
     for (const rec of cfg.parts) {
       const k = rec.key;
-      if (rec.kind === "plate" || k.startsWith("Y_Clip_last")) continue;
+      if (rec.kind === "plate" || k.startsWith("Y_Clip_last") || !shown(rec, S)) continue;
       if (k.startsWith("Y_Clip_first")) {               // clips: first + last fitted, the rest evenly between
         const suf = k.slice("Y_Clip_first".length), last = byKey["Y_Clip_last" + suf];
         const c0 = lin(rec.C, S.f), c1 = lin(last.C, S.f);
@@ -89,7 +107,7 @@
         }
         continue;
       }
-      push(rec, k, place(rec, S, 0));
+      push(rec, k.replace("Brace_last", `Brace_${S.n - 1}`), place(rec, S, 0));   // temp strut screws (fit_config key_of)
     }
     return out;
   }
@@ -102,8 +120,8 @@
   // hose anchors: fitted, except the ones build.py picks from parts (fit_config.py HOSE_RULES), redone here from
   // the instances exactly as build.py does
   function hose(cfg, S, inst) {
-    const h = JSON.parse(JSON.stringify(cfg.hose));
-    for (const [path, C] of Object.entries(cfg.hose_fit)) {
+    const h = JSON.parse(JSON.stringify(fits(cfg, S).hose));
+    for (const [path, C] of Object.entries(fits(cfg, S).hose_fit)) {
       const ks = JSON.parse(path);
       let o = h;
       for (const q of ks.slice(0, -1)) o = o[q];
@@ -129,7 +147,7 @@
   }
 
   function travel(cfg, S) {
-    const v = (k) => dot(cfg.travel_fit[k], S.f);
+    const v = (k) => dot(fits(cfg, S).travel_fit[k], S.f);
     return { x: [v("x0"), v("x1")], y: [v("y0"), v("y1")], z: [v("z0"), v("z1")] };
   }
 
@@ -146,7 +164,7 @@
   // fit_config.py's per-row fits (a + b braces + c Y clips, exact across the size builds) ----
   const EMT_STICK = 3048, KERF = 3, WING = 11.5;
   function bom(cfg, S, names) {
-    const secs = JSON.parse(JSON.stringify(cfg.bom_ref || []));
+    const secs = JSON.parse(JSON.stringify(fits(cfg, S).bom_ref || []));
     const n = S.n, nc = names.filter((nm) => /^Y_Clip_\d+$/.test(nm)).length;
     const c = Calc.calc(S.cutX, S.cutY, XZ), ci = Calc.inches(c), num = (v) => +v.toFixed(1);
     const { strut, xbelt, xtable, yrail, ybelt, ytable, xrails } = c, strutIn = ci.strut;
@@ -195,13 +213,13 @@
     for (const [title, keyf] of [["Hardware: V1E kit vs this build", (r) => r[3]],
       ["Hardware: where every fastener goes", (r) => [r[1], r[2].replace("Brace Max", "Brace 0").replace(/\d+/g, "#"), r[5]]]]) {
       q = sec(title);
-      const fits = (cfg.bom_fit || {})[title];
-      if (!q || !fits) continue;
+      const fit_ = (fits(cfg, S).bom_fit || {})[title];
+      if (!q || !fit_) continue;
       const seen = {};                                // repeated keys numbered in order, as fit_config.py does
       for (const r of q.rows) {
         const k = JSON.stringify(keyf(r));
         seen[k] = (seen[k] ?? -1) + 1;
-        const f = fits[`${k}|${seen[k]}`];
+        const f = fit_[`${k}|${seen[k]}`];
         if (f) for (const [col, C] of Object.entries(f)) r[col] = fit(C);
       }
       q.rows = q.rows.filter((r) => title.startsWith("Hardware: V1E") || r[0] > 0);
@@ -212,7 +230,9 @@
     if (q && q.note) q.note = q.note.replace(/^\d+ fasteners/, `${q.rows.reduce((a, r) => a + (Number(r[0]) || 0), 0)} fasteners`);
     q = sec("Model notes");
     if (q) q.rows = q.rows.map((r) => [String(r[0])
-      .replace(/^Braces: .*$/, `Braces: ${n} at ${S.pitch.toFixed(2)} mm pitch (${S.n === S.auto ? "generator default" : "chosen"}); ` +
+      .replace(/^Braces: .*$/, (S.struts === "temp" ? `Braces: ${n}, end bays ${TEMP_PITCH} mm (temp struts), the rest ` +
+        `${(S.bx[2] - S.bx[1]).toFixed(2)} mm` : `Braces: ${n} at ${S.pitch.toFixed(2)} mm pitch`) +
+        ` (${S.n === S.auto ? "generator default" : "chosen"}); ` +
         `Y clips: ${nc} (<= 300 mm apart).`)
       .replace(/Vacuum hose: [\d.]+ m modelled/, "Vacuum hose: modelled")]);
     return secs;
@@ -244,7 +264,7 @@
     return { text: head.concat(lines).join("\n"), x: got.x, y: got.y };
   }
 
-  const api = { size, instances, hose, travel, plateFrame, bom, jp3Fits, fluidncConfig, IN };
+  const api = { size, instances, hose, travel, plateFrame, bom, jp3Fits, fluidncConfig, braceOffsets, IN };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.LR4Model = api;
 })(typeof self !== "undefined" ? self : this);

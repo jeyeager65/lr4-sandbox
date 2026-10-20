@@ -45,6 +45,47 @@ def plate_faces(strut_length, wing=11.5, dogbones=3.5, num_braces=0, hole_d=5.3,
     return {k: strut_plate.face(v, hole_d) for k, v in pl.items()}
 
 
+# ---- temporary struts (V1E Temp_Strut_v1, Printables 1034840): the machine runs on 4 of these - front + bottom at
+# each end - until it has cut its own MDF strut plates (V1E docs "Beam Assembly", photos beam3-5, B4, B5).
+# Flat 67.5 x 192.3 x 4 mm; holes d 5.3 at STL x 124.5 / 180.5, y 62.5 / 242.5 = the generator's holes (5.75 in from
+# each edge) on two braces 180 mm apart. STL ends: a small notch at y 56 (the front plate's screw-head notch, Min
+# end) and a 40 x 32 cutout at y 249 (X belt tensioner, Max end); a d 3.5 hole mid-length near x 186.
+TEMP_STRUT_PITCH = 180.0         # brace centre to centre under a temp strut
+TEMP_STRUT_T = 4.0
+TEMP_STRUT_HOLES = ((124.5, 62.5), (180.5, 62.5), (124.5, 242.5), (180.5, 242.5))   # STL (x, y), d 5.3, through
+# STL -> generator 2D (u along the plate, v across, n = thickness): rows, offset (u0 = the end brace's hole line
+# at u = 9; Max end: + strut - 18). Front Min: small notch at the Min end, matching the MDF plate's (v 29-39 vs
+# 30.5-42.5). Front Max: the same way round, so the big cutout is at the Max end over the X belt tensioner (MDF
+# notch v 10.9-30 -> cutout 11.3-51.3).
+# Bottom: GUESS - both ends the same way round (beam5: the small hole on the same edge at both ends), turned so
+# the textured (bed) face is underneath; the hole then lies at the back edge (v 58.8).
+TEMP_STRUT_FRAMES = {
+    ("front", "Min"): (((0, 1, 0), (1, 0, 0), (0, 0, -1)), (-53.5, -118.75, 4.0)),
+    ("front", "Max"): (((0, 1, 0), (1, 0, 0), (0, 0, -1)), (-233.5, -118.75, 4.0)),   # + strut - 18 (= Min, moved)
+    ("bottom", "Min"): (((0, -1, 0), (1, 0, 0), (0, 0, 1)), (251.5, -118.75, 0.0)),
+    ("bottom", "Max"): (((0, -1, 0), (1, 0, 0), (0, 0, 1)), (71.5, -118.75, 0.0)),    # + strut - 18
+}
+
+
+def brace_offsets(strut, n, temp=False):
+    """Brace i's X offset from brace 0 (its Min face), i = 0..n-1. MDF plates: the generator's even pitch. Temp
+    struts (V1E beam3: "position the end braces to fit the temp struts, equally space your remaining braces"): the
+    two end bays TEMP_STRUT_PITCH, the rest evenly between. Needs 4+ braces."""
+    span = strut - 18.0
+    if not temp:
+        return [span * i / (n - 1) for i in range(n)]
+    if n < 4:
+        raise ValueError(f"temp struts need 4+ braces (this size has {n})")
+    a, b = TEMP_STRUT_PITCH, span - TEMP_STRUT_PITCH
+    return [0.0] + [a + (b - a) * i / (n - 3) for i in range(n - 2)] + [span]
+
+
+def temp_strut_frame(which, end, strut):
+    """(rows, offset) mapping Temp_Strut_v1.stl into the generator's 2D frame of the `which` plate."""
+    rows, (u, v, w) = TEMP_STRUT_FRAMES[(which, end)]
+    return rows, (u + (strut - 18.0 if end == "Max" else 0.0), v, w)
+
+
 # ---- measured geometry (mm, print coordinates of the STLs/DXFs in parts/) -------------------
 RAIL_A = (62.17, 58.57)          # lower X rail centre in D (= brace clamp at print (198.78, 92.70))
 RAIL_B = (75.78, 171.27)         # upper X rail centre in D (brace clamp (185.17, 205.40)); 113.5 apart
@@ -551,7 +592,7 @@ def switch_frame(host, hint_pl, home=None, scene=None, name="", tip=None):
 
 # ---- what moves with what (the web viewer and the hose checks) ---------------------------------------------
 # "table" never moves, "gantry" moves in Y (YZ plates and what's on them), "beam" in Y + Z, "core" in X + Y + Z
-MOTION_BEAM = ("XZ_Plate", "Z_Stub", "Z_Nut", "Z_BrassNut", "MGN12H", "Brace", "X_Rail", "StrutPlate",
+MOTION_BEAM = ("XZ_Plate", "Z_Stub", "Z_Nut", "Z_BrassNut", "MGN12H", "Brace", "X_Rail", "StrutPlate", "Temp_Strut",
                "X_Belt", "Belt_X", "Hose_", "Jackpot3", "PSU", "Vac_Hose")
 MOTION_CORE = ("Core", "Tool_Mount", "Dust_", "Router", "Bristles", "X_Stepper", "X_Pulley", "X_Idler",
                "Bearing_Core", "Endstop_X", "TouchPlate")

@@ -24,6 +24,7 @@ PROJ = os.path.dirname(HERE)
 DATA = os.path.join(PROJ, "web", "data")
 OUT = os.path.join(DATA, "share")
 FRAMES = os.path.join(PROJ, "private", "sizes", "source_frames.json")
+FRAMES_TEMP = os.path.join(PROJ, "private", "sizes", "source_frames_temp.json")   # source_frames.py LR4_TEMP=1
 MANIFEST = os.path.join(PROJ, "parts", "manifest.json")
 
 
@@ -52,6 +53,7 @@ def main():
     cfg = json.load(open(os.path.join(DATA, "lr4_config.json")))
     blob = load_geometry(os.path.join(DATA, "lr4_config_geometry.txt"))
     frames = json.load(open(FRAMES))
+    frames_t = json.load(open(FRAMES_TEMP)) if os.path.exists(FRAMES_TEMP) else {}
     man = json.load(open(MANIFEST))
     out_blob, parts, dropped, by_kind = bytearray(), [], [], {}
     for rec in cfg["parts"]:
@@ -60,7 +62,8 @@ def main():
             dropped.append(name)
             continue
         rec = dict(rec)
-        src = src_of(name, frames) if "mesh" in rec else None    # Y_Clip_last: drawn with Y_Clip_first's
+        src = src_of(name, frames_t if rec.get("from_temp") else frames) if "mesh" in rec else None   # Y_Clip_last:
+                                                                                                        # Y_Clip_first's mesh
         if src:
             rec.pop("mesh", None)
             rec["src"] = src
