@@ -6,7 +6,14 @@
 # STL parts: matched by point count, then an affine fit of the file's points (FreeCAD load order) onto the placed
 # part (mirrored parts are just a negative determinant); accepted when it reproduces every point to 1e-3 mm.
 # XZ plates: the DXF extruded by build.py; A = the solid's placement, depth = its extrusion.
+# Peter Plates (kind "peter"): the build makes them from PeterPlates_w_locations.stl (both covers in one file, stood
+# up) with the openings filled, so they aren't matched by points. open = that file, piece = its connected component
+# (sorted by ZMax, highest first: 0 = T, 1 = B), A = the build's frame (YZ plate x PETER_IN_YZ, Max mirrored);
+# closed = PeterPlateT / B.stl (flat, as downloaded), fitted onto the open piece by nearest points.
+# Bristles (kind "bent"): bent along the skirt by the build (mesh.bend_strip) - only the file is recorded.
 import glob
+import itertools
+import sys
 import hashlib
 import json
 import os
@@ -17,6 +24,8 @@ import numpy as np
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 PROJ = os.path.dirname(HERE)
+sys.path.insert(0, os.path.join(PROJ, "freecad"))
+import lr4                                            # noqa: E402
 PARTS = os.path.join(PROJ, "parts")
 SIZES_DIR = os.path.join(PROJ, "private", "sizes")    # = lr4.SIZES_DIR
 path = os.environ.get("LR4_FCSTD") or os.path.join(SIZES_DIR, "ref", "LowRider4", "build", "LowRider4.FCStd")
@@ -65,6 +74,83 @@ for side, fn, depth in (("Min", "lr4/XZ_Min_DXF_V1.dxf", 6.5), ("Max", "lr4/XZ_M
                                       [M.A31, M.A32, M.A33, M.A34]],
                                    bbox=[s.BoundBox.XMin, s.BoundBox.YMin, s.BoundBox.ZMin,
                                          s.BoundBox.XMax, s.BoundBox.YMax, s.BoundBox.ZMax])
+
+
+def rows(M):
+    return np.array([[M.A11, M.A12, M.A13, M.A14], [M.A21, M.A22, M.A23, M.A24], [M.A31, M.A32, M.A33, M.A34]])
+
+
+def nearest(a, b):
+    """For each point of a: distance to and index of the nearest point of b (chunked brute force)."""
+    d, j = np.empty(len(a)), np.empty(len(a), dtype=int)
+    for i in range(0, len(a), 500):
+        D = np.linalg.norm(a[i:i + 500, None, :] - b[None, :, :], axis=2)
+        j[i:i + 500] = D.argmin(axis=1)
+        d[i:i + 500] = D[np.arange(len(D)), j[i:i + 500]]
+    return d, j
+
+
+def fit_onto(src, dst, tol=1e-3):
+    """Rigid (or mirrored) 3x4 taking src's points onto dst's: the best of the 48 axis-aligned orientations by bbox
+    centre, refined by least squares on the points that coincide. Returns (A, fraction matched, max error)."""
+    cs, cd = (src.min(0) + src.max(0)) / 2, (dst.min(0) + dst.max(0)) / 2
+    best = None
+    for perm in itertools.permutations(range(3)):
+        for sg in itertools.product((1, -1), repeat=3):
+            R = np.zeros((3, 3))
+            R[range(3), perm] = sg
+            q = (src - cs) @ R.T + cd
+            if not np.allclose(q.max(0) - q.min(0), dst.max(0) - dst.min(0), atol=1.0):
+                continue
+            d, j = nearest(q, dst)
+            f = (d < 0.05).mean()
+            if best is None or f > best[0]:
+                best = (f, R, j, d)
+    f, R, j, d = best
+    ok = d < 0.05
+    Q = np.hstack([src[ok], np.ones((ok.sum(), 1))])
+    A, *_ = np.linalg.lstsq(Q, dst[j[ok]], rcond=None)
+    q = np.hstack([src, np.ones((len(src), 1))]) @ A
+    d, _ = nearest(q, dst)
+    return A.T, float((d < tol).mean()), float(d[d < tol].max())
+
+
+def file_rec(fn, **kw):
+    p = os.path.join(PARTS, fn)
+    return dict(file=fn, sha256=sha(p), bytes=os.path.getsize(p), facets=Mesh.Mesh(p).CountFacets, **kw)
+
+
+pts_of = lambda m: np.array([[v.x, v.y, v.z] for v in m.Topology[0]])
+OPEN = "peter/PeterPlates_w_locations.stl"
+comps = sorted(Mesh.Mesh(os.path.join(PARTS, OPEN)).getSeparateComponents(), key=lambda c: -c.BoundBox.ZMax)
+mirror = App.Matrix(1, 0, 0, 0, 0, -1, 0, 300.0, 0, 0, 1, 0, 0, 0, 0, 1)    # build.py: Max side, print y -> 300 - y
+in_yz = App.Matrix(*lr4.PETER_IN_YZ, 0, 0, 0, 1)
+for piece, tag in enumerate(("T", "B")):
+    closed = f"peter/PeterPlate{tag}.stl"
+    Fc, frac, err = fit_onto(pts_of(Mesh.Mesh(os.path.join(PARTS, closed))), pts_of(comps[piece]))
+    print(f"PETER {tag}: closed -> open piece, {frac:.1%} of points within 1e-3 mm (worst {err:.1e})")
+    for side in ("Min", "Max"):
+        nm = f"PeterPlate_{tag}_{side}"
+        o = doc.getObject(nm)
+        if o is None:
+            continue
+        M = o.Placement.toMatrix()
+        if side == "Max":
+            M = M.multiply(mirror)
+        A = rows(M.multiply(in_yz))
+        q = pts_of(comps[piece]) @ A[:, :3].T + A[:, 3]
+        d, _ = nearest(q, pts_of(o.Mesh))
+        if d.max() > 1e-3:
+            raise SystemExit(f"{nm}: open piece off the built plate by {d.max():.4f} mm")
+        Ac = A[:, :3] @ Fc[:, :3]
+        Ac = np.hstack([Ac, (A[:, :3] @ Fc[:, 3] + A[:, 3])[:, None]])
+        out[nm] = dict(kind="peter", open=file_rec(OPEN, A=A.round(9).tolist(), piece=piece, err=float(d.max())),
+                       closed=file_rec(closed, A=Ac.round(9).tolist(), matched=round(frac, 4)))
+        unmatched.remove(nm)
+for nm in [u for u in unmatched if u.startswith("Bristles_TPU")]:
+    out[nm] = dict(kind="bent", **file_rec("kobalt/TPU_Bristles_22mm.stl"))
+    unmatched.remove(nm)
+
 dst = os.path.join(SIZES_DIR, "source_frames.json")
 json.dump(out, open(dst, "w"), indent=1)
 print(f"SOURCES {len(out)} parts from files; not from a file: {', '.join(unmatched)}")

@@ -26,8 +26,8 @@ them yourself from Printables, and the model and configurator place your copies:
 | `jackpot3/` | [Jackpot3 box](https://www.printables.com/model/1434650) |
 | `peter/` | [Peter Plates](https://www.printables.com/model/1044487) (V1 Engineering) |
 
-A parts manifest with the exact file names and checksums the model was solved against is coming. Until then, the
-FreeCAD scripts expect the folder layout above.
+`parts/manifest.json` lists every file with the SHA-256 it was tested with. `python tools/check_parts.py` says
+which are missing or differ (a different version is still used, with a warning).
 
 ## Running the FreeCAD model
 
@@ -73,12 +73,12 @@ freecad/    the model: build.py, lr4.py (measured placements), hardware.py, bom.
   fclib/    shared FreeCAD helpers (vendored copy)
 web/        the pages: index.html (configurator), viewer.html, js/
 pipeline/   FreeCAD builds -> configurator data
-tests/      node tests
-tools/      run.py, serve.py, repo tools (sync_fclib, check_no_parts)
+tests/      node tests, test_strut_plate.py, test_share.py
+tools/      run.py, serve.py, repo tools (sync_fclib, check_no_parts, check_parts)
 docs/       PLAN.md: settings, measurements and decisions behind the model
 ```
 
-`parts/`, `build/`, `exports/` and `web/data/` are git-ignored. A pre-commit check (`tools/check_no_parts.py`)
+`parts/` (except its manifest), `build/`, `exports/` and `web/data/` are git-ignored. A pre-commit check (`tools/check_no_parts.py`)
 stops STL, STEP, DXF and FCStd files from being committed.
 
 ## Credits

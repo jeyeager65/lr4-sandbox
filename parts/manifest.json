@@ -1,0 +1,405 @@
+{
+ "about": "Third-party files this repo uses (not committed: download them yourself). Checked by tools/check_parts.py. use: build = read by freecad/build.py and placed by the page; page = only the page's Peter 'closed' style; reference = measured once for lr4.py constants, not read; later = not used yet. sha256: every version known to work (newest last); date: when that set was tested.",
+ "tested": "2026-10-20",
+ "sources": {
+  "lr4": {
+   "title": "LowRider 4",
+   "by": "V1 Engineering",
+   "url": "https://www.printables.com/model/1034840"
+  },
+  "kobalt": {
+   "title": "Kobalt tool mount + dust shoe",
+   "by": "V1 Engineering",
+   "url": "https://www.printables.com/model/1034828"
+  },
+  "jackpot3": {
+   "title": "Jackpot3 box",
+   "url": "https://www.printables.com/model/1434650"
+  },
+  "peter": {
+   "title": "Peter Plates",
+   "by": "V1 Engineering",
+   "url": "https://www.printables.com/model/1044487"
+  }
+ },
+ "files": {
+  "jackpot3/Jackpot3_Box.step": {
+   "source": "jackpot3",
+   "use": "reference",
+   "bytes": 532073,
+   "sha256": [
+    "2df1eda7e6ff5310699e7565114ffce2213de07f482209620878b26d812e318f"
+   ],
+   "date": "2026-10-17"
+  },
+  "jackpot3/Jackpot3_Box.stl": {
+   "source": "jackpot3",
+   "use": "build",
+   "bytes": 3907984,
+   "sha256": [
+    "2059058b795e2e8bca6bbe57edf73e73af37198ddd5e2439a166e999de6006f2"
+   ],
+   "date": "2026-10-17"
+  },
+  "jackpot3/Jackpot3_Lid.step": {
+   "source": "jackpot3",
+   "use": "reference",
+   "bytes": 219942,
+   "sha256": [
+    "64f5778964b687530faa959a2042897a61c6891a32ba84eb990de2863f400398"
+   ],
+   "date": "2026-10-17"
+  },
+  "jackpot3/Jackpot3_Lid.stl": {
+   "source": "jackpot3",
+   "use": "build",
+   "bytes": 634084,
+   "sha256": [
+    "93d44b47e52069aec1d6718a471ccc60c15b419676ed322f788763e0344fceef"
+   ],
+   "date": "2026-10-17"
+  },
+  "kobalt/Dust_Shoe_Kobalt.stl": {
+   "source": "kobalt",
+   "use": "build",
+   "bytes": 3185784,
+   "sha256": [
+    "ceb530afcec8f45de0e4aa8394f993b7e383e25e5e4daa9bcca36db478a6d5fe"
+   ],
+   "date": "2026-10-17"
+  },
+  "kobalt/Dust_Skirt_Kobalt.stl": {
+   "source": "kobalt",
+   "use": "build",
+   "bytes": 321384,
+   "sha256": [
+    "ab82fc76a5463243b239719aeae3d24af3fe152fb54d649b1cff3729963fb8a2"
+   ],
+   "date": "2026-10-17"
+  },
+  "kobalt/TPU_Bristles_22mm.stl": {
+   "source": "kobalt",
+   "use": "build",
+   "bytes": 1125484,
+   "sha256": [
+    "d9c886eeda8be07088cfee7c2940605a9349579abbe55d628d7a0934ca8f1e4f"
+   ],
+   "date": "2026-10-17"
+  },
+  "kobalt/Tool_Mount_B_Kobalt.stl": {
+   "source": "kobalt",
+   "use": "build",
+   "bytes": 419484,
+   "sha256": [
+    "eb65dd97350e271478dac3cc1ac395ce1e3904fc69529b8722696e9dd6b66739"
+   ],
+   "date": "2026-10-17"
+  },
+  "kobalt/Tool_Mount_T_Kobalt.stl": {
+   "source": "kobalt",
+   "use": "build",
+   "bytes": 446284,
+   "sha256": [
+    "bc57f73cbad1ce3c0796cdac3b8e10a1c85d4ecd4e2fc54fe1ad2b6251ead5db"
+   ],
+   "date": "2026-10-17"
+  },
+  "lr4/BackWheel_Max.stl": {
+   "source": "lr4",
+   "use": "build",
+   "bytes": 1030384,
+   "sha256": [
+    "2c02b569de5401cd1a8563f5035f31b86b66ff05fcdf101541f849a9f0b54936"
+   ],
+   "date": "2026-10-17"
+  },
+  "lr4/BackWheel_Min.stl": {
+   "source": "lr4",
+   "use": "build",
+   "bytes": 699584,
+   "sha256": [
+    "8b7fa178497e065943fb2cb86a4518923a5d97a3f2e3477ad0acb1b627ab73be"
+   ],
+   "date": "2026-10-17"
+  },
+  "lr4/Brace_29p5.stl": {
+   "source": "lr4",
+   "use": "build",
+   "bytes": 1245884,
+   "sha256": [
+    "cefb02a4fee83ca70e6e213a62d87d1adc962569d1d9d33ced3fcea647367266"
+   ],
+   "date": "2026-10-17"
+  },
+  "lr4/Brace_Max_29p5.stl": {
+   "source": "lr4",
+   "use": "build",
+   "bytes": 1393684,
+   "sha256": [
+    "fa54a1aabbf56f04aed4785f5760d1a5b093d4dccf519f18e614b5bd1776256e"
+   ],
+   "date": "2026-10-17"
+  },
+  "lr4/Core.stl": {
+   "source": "lr4",
+   "use": "build",
+   "bytes": 12196184,
+   "sha256": [
+    "4948ad881888ec2492c4a1a9e63a358bcea5d3baed331aed5169d5186a546e74"
+   ],
+   "date": "2026-10-17"
+  },
+  "lr4/FrontWheel_Max.stl": {
+   "source": "lr4",
+   "use": "build",
+   "bytes": 801584,
+   "sha256": [
+    "8fa0ab858505ff8a0717d45e869cc90ed8894507accc7d0604b2d6083cad4351"
+   ],
+   "date": "2026-10-17"
+  },
+  "lr4/FrontWheel_Min.stl": {
+   "source": "lr4",
+   "use": "build",
+   "bytes": 451884,
+   "sha256": [
+    "9c5b66c62cba572823f22c7a827a9be9296b2126b00359b9818bd3e9b5a6f7f3"
+   ],
+   "date": "2026-10-17"
+  },
+  "lr4/Hose_Holder_Hook.stl": {
+   "source": "lr4",
+   "use": "build",
+   "bytes": 1613984,
+   "sha256": [
+    "bf222e7da4bfed4e43f03551b167a0299bd9b0d2f64fda87b5ae2d6cfd90f547"
+   ],
+   "date": "2026-10-17"
+  },
+  "lr4/Hose_Hook_70.stl": {
+   "source": "lr4",
+   "use": "build",
+   "bytes": 206284,
+   "sha256": [
+    "226d0cafeaa294e471265b970a157d7d720bf79c21373a3b72381d009d718d5e"
+   ],
+   "date": "2026-10-17"
+  },
+  "lr4/Temp_Strut_v1.stl": {
+   "source": "lr4",
+   "use": "later",
+   "bytes": 378484,
+   "sha256": [
+    "af6b3a98bc59764c0ec24ed8eaf737acb2220dd56fe48a66366fc7ee5802ec8e"
+   ],
+   "date": "2026-10-17"
+  },
+  "lr4/XZ_Max_DXF.dxf": {
+   "source": "lr4",
+   "use": "build",
+   "bytes": 70042,
+   "sha256": [
+    "eb578df13493fbc22d9cb7c7282d1923dfbf66d930dae34f64b9f64b8ba9ec0b"
+   ],
+   "date": "2026-10-17"
+  },
+  "lr4/XZ_Min_DXF_V1.dxf": {
+   "source": "lr4",
+   "use": "build",
+   "bytes": 80418,
+   "sha256": [
+    "40d79ce961ee643d473062bd0b8a668266c3f8e1b674e9842c9775c001418be3"
+   ],
+   "date": "2026-10-17"
+  },
+  "lr4/X_Belt.stl": {
+   "source": "lr4",
+   "use": "build",
+   "bytes": 62484,
+   "sha256": [
+    "03ab99881c4a801f132116846835a714c464754ac9a6dcb2c69e2c19cce6cda0"
+   ],
+   "date": "2026-10-17"
+  },
+  "lr4/YZ_Plate_Max_V1.stl": {
+   "source": "lr4",
+   "use": "build",
+   "bytes": 5437484,
+   "sha256": [
+    "f4fe948f158db83512757ddde356506ea3cbae9800ad7cb72c8ce79fb6703da6"
+   ],
+   "date": "2026-10-17"
+  },
+  "lr4/YZ_Plate_Min_V1.stl": {
+   "source": "lr4",
+   "use": "build",
+   "bytes": 5433684,
+   "sha256": [
+    "c15e45a491283e4367ce2fa56a595577b5c0117a919b1cf7cf164346cbd24a52"
+   ],
+   "date": "2026-10-17"
+  },
+  "lr4/Y_Belt_MaxB.stl": {
+   "source": "lr4",
+   "use": "build",
+   "bytes": 385284,
+   "sha256": [
+    "367043b3d0c21bb9ad4772813631938752050dc3e342b6305725bb1249d6d050"
+   ],
+   "date": "2026-10-17"
+  },
+  "lr4/Y_Belt_MaxF.stl": {
+   "source": "lr4",
+   "use": "build",
+   "bytes": 404584,
+   "sha256": [
+    "e57750993d7acdff07785728f1712630988f5ef5848c238f7b0d380b54682d38"
+   ],
+   "date": "2026-10-17"
+  },
+  "lr4/Y_Belt_Max_Lock.stl": {
+   "source": "lr4",
+   "use": "build",
+   "bytes": 47884,
+   "sha256": [
+    "2da0ade78df55ba366bcbb7e098f8868090ff2321a7dff499d8e79b829529b64"
+   ],
+   "date": "2026-10-17"
+  },
+  "lr4/Y_Belt_Max_Tension.stl": {
+   "source": "lr4",
+   "use": "build",
+   "bytes": 99184,
+   "sha256": [
+    "566fda551951b516332cee9b4e020307619326d36e149cbdb5ea931d972033a6"
+   ],
+   "date": "2026-10-17"
+  },
+  "lr4/Y_Belt_MinB.stl": {
+   "source": "lr4",
+   "use": "build",
+   "bytes": 199784,
+   "sha256": [
+    "0a17a7f619a878b263200f61241a9d646d10ca683bf556e9113caea1cff5bc45"
+   ],
+   "date": "2026-10-17"
+  },
+  "lr4/Y_Belt_MinF.stl": {
+   "source": "lr4",
+   "use": "build",
+   "bytes": 229784,
+   "sha256": [
+    "837c18546c2cfe4cc74cdd21c8baafed25cb9c6ee4f8fd66d5f1f3322fd39bc9"
+   ],
+   "date": "2026-10-17"
+  },
+  "lr4/Y_Belt_Min_Lock.stl": {
+   "source": "lr4",
+   "use": "build",
+   "bytes": 48284,
+   "sha256": [
+    "9ad97a427777d352b55969b5cb8164cb1105204bcd13006f21e6cdeec35ef148"
+   ],
+   "date": "2026-10-17"
+  },
+  "lr4/Y_Belt_Min_Tension.stl": {
+   "source": "lr4",
+   "use": "build",
+   "bytes": 99184,
+   "sha256": [
+    "3ee075a160f1efd3f540475e4b3567ceedfc8d5d47c765e4c6d6b864b57f399c"
+   ],
+   "date": "2026-10-17"
+  },
+  "lr4/Y_Clip_29p5.stl": {
+   "source": "lr4",
+   "use": "build",
+   "bytes": 526384,
+   "sha256": [
+    "a6df4098c01201ba60bf07bce2c4c71bd4367535148b13249a5a51e69e876b14"
+   ],
+   "date": "2026-10-17"
+  },
+  "lr4/ZStop_Max.stl": {
+   "source": "lr4",
+   "use": "build",
+   "bytes": 187984,
+   "sha256": [
+    "a14cdc2df9c14a4cda110ee8437385d2b862ff05c57e1f6bb685932401420a01"
+   ],
+   "date": "2026-10-17"
+  },
+  "lr4/ZStop_Min.stl": {
+   "source": "lr4",
+   "use": "build",
+   "bytes": 187984,
+   "sha256": [
+    "93554e86f16a59b3a512ceb225de9b1cc6e2c831f4abc2ac154efd47e3db8068"
+   ],
+   "date": "2026-10-17"
+  },
+  "lr4/Z_Nut.stl": {
+   "source": "lr4",
+   "use": "build",
+   "bytes": 237884,
+   "sha256": [
+    "c6af1e33d1bfaad9cf326c8a4ae0795f31339c6965a7a95271ac50c220f4ced6"
+   ],
+   "date": "2026-10-17"
+  },
+  "lr4/Z_Stub_Max.stl": {
+   "source": "lr4",
+   "use": "build",
+   "bytes": 331484,
+   "sha256": [
+    "622152d30ff46a4955e100e48fa942865d0927e05bb0466b89a0590ad2f56a65"
+   ],
+   "date": "2026-10-17"
+  },
+  "lr4/Z_Stub_Min.stl": {
+   "source": "lr4",
+   "use": "build",
+   "bytes": 379484,
+   "sha256": [
+    "977c90db241a07ac27561f6dc45ffff7f8a035df68af68d647cac8785b01cdb5"
+   ],
+   "date": "2026-10-17"
+  },
+  "lr4/hose_holder_shorty.stl": {
+   "source": "lr4",
+   "use": "build",
+   "bytes": 1591884,
+   "sha256": [
+    "9c1299872ec8036cf53ccb36449a2df9fce51fdb29f10c1b88d8a2b6fd8c8116"
+   ],
+   "date": "2026-10-17"
+  },
+  "peter/PeterPlateB.stl": {
+   "source": "peter",
+   "use": "page",
+   "bytes": 385484,
+   "sha256": [
+    "c3b29c897e31e415108a163f32715e9668ab9ce69fd12c0dd24772362253a721"
+   ],
+   "date": "2026-10-19"
+  },
+  "peter/PeterPlateT.stl": {
+   "source": "peter",
+   "use": "page",
+   "bytes": 336684,
+   "sha256": [
+    "5be8b13256c31c119bbb08b2367fa90a384cf7c583b60caa315861c85e9b151e"
+   ],
+   "date": "2026-10-19"
+  },
+  "peter/PeterPlates_w_locations.stl": {
+   "source": "peter",
+   "use": "build",
+   "bytes": 727184,
+   "sha256": [
+    "3e3188290ac60cd7fd283292b5eafce08c16eebdc9ddd9f9dff14fdd8c9998e2"
+   ],
+   "date": "2026-10-19"
+  }
+ }
+}

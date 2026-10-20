@@ -10,7 +10,8 @@ web/index_local.html
 web/data/
 
 # Third-party files: users download their own (parts/ = V1E / Printables STLs, DXFs, STEPs)
-parts/
+parts/*
+!parts/manifest.json
 # V1E calculator JS + Vector76's SCAD - not ours to redistribute
 vendor/
 # OpenSCAD golden outputs (local-only tests)
