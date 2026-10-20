@@ -891,8 +891,10 @@ body.vr-on .stage { grid-row: 1; }
   }
   const pretty = (n) => n.replace(/_/g, " ").replace("29p5", "29.5").replace(" V1", "").replace("Kobalt", "(Kobalt)").trim();
   let platePolys = null;
-  function plateMeshes() {
+  function updatePlatePolys() {                     // every size, Temporary struts too (the drawing + downloads use it)
     platePolys = StrutPlate.plates(polygonClipping, S.strut, { nbraces: S.n === S.auto ? 0 : S.n, wing: WING, dogbones: DOGBONE, layout: false });
+  }
+  function plateMeshes() {
     const out = [];
     for (const [key, mp] of [["StrutPlate_Front", platePolys.front], ["StrutPlate_Bottom", platePolys.bottom]]) {
       const rec = cfg.parts.find((q) => q.key === key);
@@ -973,6 +975,7 @@ body.vr-on .stage { grid-row: 1; }
   }
   function rebuild() {
     clearMachine();
+    updatePlatePolys();
     let tris = 0;
     const inst = LR4Model.instances(cfg, S);
     for (const o of inst) {
