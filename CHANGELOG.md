@@ -16,7 +16,8 @@ the date the model data was built and the Printables file set it was solved for.
   the position sliders pauses it. "Play a G-code file..." runs your own file the same way (G20 inches and G20 / G21
   switches play in mm; carving needs its (Stock:) / (ToolDef:) header). At the end, "Install the plates" switches to
   Permanent. tests/test_gcode_play.js checks the pauses, probe, units and that the whole file frees both plates.
-- The dust shoe, skirt and bristles now show / hide with the vacuum hose (group "Vacuum hose + dust shoe").
+- Parts: "Dust shoe + bristles" is its own toggle (shoe, skirt, bristles), so the bit can be seen with the hose on;
+  hiding the vacuum hose hides the shoe too.
 
 ## 0.10.0 - 2026-10-20
 - Strut plate G-code: "Download G-code" under the strut plates makes the FluidNC job for this size in the browser

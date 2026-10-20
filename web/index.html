@@ -486,10 +486,10 @@ body.vr-on .stage { grid-row: 1; }
 <script>
 (function () {
   const IN = 25.4;
-  const DUST_PARTS = /^(Dust_Shoe|Dust_Skirt|Bristles_TPU)/;   // moved from Core into the Hose group
+  const DUST_PARTS = /^(Dust_Shoe|Dust_Skirt|Bristles_TPU)/;   // moved from Core into their own group (Shoe)
   const GROUPS = [
     ["Table", "Table + Y rail"], ["YZ_Min", "YZ Min side"], ["YZ_Max", "YZ Max side"], ["Beam", "Beam"],
-    ["Core", "Core + router"], ["Hose", "Vacuum hose + dust shoe"], ["Belts", "Belts"], ["Electronics", "Electronics + switches"],
+    ["Core", "Core + router"], ["Hose", "Vacuum hose"], ["Shoe", "Dust shoe + bristles"], ["Belts", "Belts"], ["Electronics", "Electronics + switches"],
     ["Hardware", "Bolts + nuts"]];
   const SOURCE = {
     printed: "V1E printed part (STL from Printables)",
@@ -985,7 +985,7 @@ body.vr-on .stage { grid-row: 1; }
       if (!g) continue;
       const { geo, fin, hasUV, tris: n } = g;
       const ud = Object.assign({}, o.rec.meta, { name: o.name, base: { t: o.t, s: o.s } });
-      if (DUST_PARTS.test(o.name)) ud.group = "Hose";   // the dust shoe shows / hides with the hose (user 2026-10-20)
+      if (DUST_PARTS.test(o.name)) ud.group = "Shoe";   // own toggle, so the bit shows with the hose on (user 2026-10-20)
       if (o.rec.src) delete ud.variant;              // Peter Plates from files: the style picks the geometry
       if (o.name !== o.rec.meta.name) ud.label = pretty(o.name);
       const mat = material(ud.color, fin, hasUV);
@@ -1294,7 +1294,7 @@ body.vr-on .stage { grid-row: 1; }
   // the Jackpot3 lid, its fan and their screws can be hidden on their own to see inside the box
   const isLid = (m) => /^Jackpot3_(Lid|Fan)/.test(m.userData.name);
   let lidHidden = false;
-  const groupOn = (g) => { const el = document.getElementById("g-" + g); return !el || el.checked; };
+  const groupOn = (g) => { const el = document.getElementById("g-" + g); return (!el || el.checked) && (g !== "Shoe" || groupOn("Hose")); };   // no hose, no shoe
   const hiddenParts = new Set();                     // single parts hidden from VR (by name; kept across sizes)
   // G-code playback: probing = the touch plate is out, so the shoe's bottom (skirt + bristles) is off, as you would
   // take it off (user); jobBit = the file's own bit (from its ToolDef) is drawn instead of the model's Router_Bit
