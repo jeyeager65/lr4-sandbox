@@ -1744,6 +1744,44 @@ body.vr-on .stage { grid-row: 1; }
     catch (e) { /* V1E's */ }
     return GcodePlay.V1E;
   }
+  function jobStockMaterial(top, bottom, through, skirt) {   // cnc-gcode-tools' stock shader (theme colours as there)
+    const dark = matchMedia("(prefers-color-scheme: dark)").matches;
+    const m = new THREE.ShaderMaterial({
+      side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1,
+      uniforms: { uLight: { value: new THREE.Vector3(0, 0, 1) }, uView: { value: new THREE.Vector3(0, 0, 1) },
+        uStockColor: { value: new THREE.Vector3(...(dark ? [0.80, 0.68, 0.50] : [0.87, 0.75, 0.56])) },
+        uCutColor: { value: new THREE.Vector3(...(dark ? [0.70, 0.55, 0.38] : [0.76, 0.60, 0.42])) },
+        uTop: { value: top }, uBottom: { value: bottom }, uThroughZ: { value: through + (top - bottom) * 1e-5 },
+        uSkirt: { value: skirt ? 1 : 0 } },
+      vertexShader: `uniform float uThroughZ; varying vec3 vPos; varying vec3 vNormal; varying float vThrough;
+        void main() {
+          vPos = (modelMatrix * vec4(position, 1.0)).xyz; vNormal = mat3(modelMatrix) * normal;
+          vThrough = position.z <= uThroughZ ? 1.0 : 0.0;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }`,
+      fragmentShader: `varying vec3 vPos; varying vec3 vNormal; varying float vThrough;
+        uniform vec3 uLight; uniform vec3 uView; uniform vec3 uStockColor; uniform vec3 uCutColor;
+        uniform float uTop; uniform float uBottom; uniform float uSkirt;
+        void main() {
+          if (vThrough > 0.999) discard;
+          vec3 n = normalize(vNormal);
+          if (dot(n, uView) < 0.0) n = -n;
+          float depth = clamp((uTop - vPos.z) / max(uTop - uBottom, 1e-6), 0.0, 1.0);
+          vec3 base = depth < 1e-4 || uSkirt > 0.5 ? uStockColor : mix(uCutColor, uCutColor * 0.55, depth);
+          float diffuse = max(dot(n, uLight), 0.0);
+          float sky = 0.5 + 0.5 * n.z;
+          gl_FragColor = vec4(base * (0.22 + 0.18 * sky + 0.62 * diffuse), 1.0);
+        }` });
+    m.userData.camLit = true;
+    return m;
+  }
+  function camLight(mats) {                          // stock-sim draw(): light = back + 0.6 up - 0.3 right of the camera
+    return (r, sc, cam) => {
+      const e = cam.matrixWorld.elements, l = new THREE.Vector3(e[8] + e[4] * 0.6 - e[0] * 0.3, e[9] + e[5] * 0.6 - e[1] * 0.3,
+        e[10] + e[6] * 0.6 - e[2] * 0.3).normalize();
+      for (const m of mats) { m.uniforms.uLight.value.copy(l); m.uniforms.uView.value.set(e[8], e[9], e[10]).normalize(); }
+    };
+  }
   function jobStockMesh(sim, at) {                   // the heightmap as one grid (top) + its four side walls
     const { nx, ny, vx, vy, dx, dy, stock: s } = sim;
     const pos = new Float32Array(vx * vy * 3);
@@ -1758,19 +1796,21 @@ body.vr-on .stage { grid-row: 1; }
     const geo = new THREE.BufferGeometry();
     geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
     geo.setAttribute("normal", new THREE.BufferAttribute(new Float32Array(vx * vy * 3), 3));
-    geo.setAttribute("color", new THREE.BufferAttribute(new Float32Array(vx * vy * 3), 3));
     geo.setIndex(new THREE.BufferAttribute(idx, 1));
-    // polygon offset: where the bit cut through, the stock's floor lies on the table top and the table shows
-    const top = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9, metalness: 0,
-      polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 }));
+    // shaded as cnc-gcode-tools shades its stock (StockMeshRenderer): cut surfaces in their own colour, darker with
+    // depth, lit from beside the camera; cut-through triangles dropped so the table shows; pushed back (polygon offset)
+    // so the moves on its surface stay visible
+    const top = new THREE.Mesh(geo, jobStockMaterial(at[2] + s.zmax, at[2] + s.zmin, sim.bottom + at[2], false));
     const x0 = at[0] + s.xmin, x1 = at[0] + s.xmax, y0 = at[1] + s.ymin, y1 = at[1] + s.ymax, z0 = at[2] + s.zmin, z1 = at[2] + s.zmax;
     const w = [[x0, y0, x1, y0], [x1, y0, x1, y1], [x1, y1, x0, y1], [x0, y1, x0, y0]].flatMap(([a, b, c, d]) =>
       [a, b, z0, c, d, z0, c, d, z1, a, b, z0, c, d, z1, a, b, z1]);
     const wg = new THREE.BufferGeometry();
     wg.setAttribute("position", new THREE.Float32BufferAttribute(w, 3));
     wg.computeVertexNormals();
-    top.add(new THREE.Mesh(wg, new THREE.MeshStandardMaterial({ color: new THREE.Color(...MDF_RGB).multiplyScalar(0.8), roughness: 0.9 })));
+    top.add(new THREE.Mesh(wg, jobStockMaterial(z1, z0, -Infinity, true)));
     top.userData.z = at[2];
+    top.onBeforeRender = camLight([top.material]);
+    top.children[0].onBeforeRender = camLight([top.children[0].material]);
     return top;
   }
   function jobUpdateMesh(all) {                      // copy the carved rows into the grid: heights, normals, shading
@@ -1779,8 +1819,8 @@ body.vr-on .stage { grid-row: 1; }
     const { vx, vy, dx, dy, heights: h, stock: s } = sim, z0 = mesh.userData.z, span = s.zmax - s.zmin || 1;
     const j0 = all ? 0 : Math.max(0, sim.dirtyMin - 1), j1 = all ? vy - 1 : Math.min(vy - 1, sim.dirtyMax + 1);
     const i0 = all ? 0 : Math.max(0, sim.dirtyMinI - 1), i1 = all ? vx - 1 : Math.min(vx - 1, sim.dirtyMaxI + 1);
-    const g = mesh.geometry, P = g.attributes.position, N = g.attributes.normal, C = g.attributes.color;
-    const p = P.array, n = N.array, c = C.array;
+    const g = mesh.geometry, P = g.attributes.position, N = g.attributes.normal;
+    const p = P.array, n = N.array;
     for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
       const k = j * vx + i, z = h[k];
       p[3 * k + 2] = z0 + z;
@@ -1788,10 +1828,8 @@ body.vr-on .stage { grid-row: 1; }
       const gy = (h[Math.min(vy - 1, j + 1) * vx + i] - h[Math.max(0, j - 1) * vx + i]) / (2 * dy);
       const l = Math.hypot(gx, gy, 1);
       n[3 * k] = -gx / l; n[3 * k + 1] = -gy / l; n[3 * k + 2] = 1 / l;
-      const f = 0.72 + 0.28 * (z - s.zmin) / span;    // deeper = darker, so the passes read
-      c[3 * k] = MDF_RGB[0] * f; c[3 * k + 1] = MDF_RGB[1] * f; c[3 * k + 2] = MDF_RGB[2] * f;
     }
-    for (const a of [P, N, C]) { a.updateRange = { offset: j0 * vx * 3, count: (j1 - j0 + 1) * vx * 3 }; a.needsUpdate = true; }
+    for (const a of [P, N]) { a.updateRange = { offset: j0 * vx * 3, count: (j1 - j0 + 1) * vx * 3 }; a.needsUpdate = true; }
     sim.clearDirty();
   }
   function jobMoves(tl, at) {                        // every move as a line: faint ahead, solid once done (drawRange)

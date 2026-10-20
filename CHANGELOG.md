@@ -12,7 +12,8 @@ the date the model data was built and the Printables file set it was solved for.
   draws and shades it (tool colours, 45 deg helix) and turns clockwise with the collet nut while the job runs; the
   M0 popup opens mid-view and can be dragged; "Close-up while probing" (on by default, as cnc-gcode-tools) eases the
   view to the touch plate when a probe starts and back to your view once the plate is put away; the 1/4" MDF at the cutting area's front-left corner is
-  carved as it goes. The moves are drawn as cnc-gcode-tools draws them (cuts in their tool's colour, the same as its bit; rapids grey;
+  carved as it goes, shaded as cnc-gcode-tools shades its stock (cuts in their own colour, darker with depth, lit
+  from beside the camera, cut-through left open). The moves are drawn as cnc-gcode-tools draws them (cuts in their tool's colour, the same as its bit; rapids grey;
   probes red; the move in progress up to the bit), faint ahead, solid once done.
   Work position and tool position read in mm while it runs. Play / pause, 1-300x (10x first; moves hidden until "Show the moves"), a time slider to scrub; touching
   the position sliders pauses it. "Play a G-code file..." runs your own file the same way (G20 inches and G20 / G21
