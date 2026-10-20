@@ -104,11 +104,13 @@ canvas { display: block; width: 100%; height: 100%; touch-action: none; }
 .status .bar > div { height: 100%; width: 0; background: var(--accent); }
 .status .detail { font-size: 12px; }
 .job-pop {
-  position: absolute; left: 50%; top: 16px; transform: translateX(-50%); max-width: min(440px, calc(100% - 32px));
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); max-width: min(440px, calc(100% - 32px));
+  cursor: move; touch-action: none; user-select: none;
   background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-left: 4px solid var(--accent);
   border-radius: 4px; padding: 10px 14px 12px; box-shadow: 0 6px 24px rgb(0 0 0 / 0.18); font-size: 14px;
 }
 .job-pop[hidden] { display: none; }
+.job-pop button { cursor: pointer; }
 .job-pop b { font-family: var(--font-display); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
 .job-pop p { margin: 4px 0 10px; font-size: 15px; line-height: 1.4; }
 label.check { display: flex; align-items: center; gap: 6px; font-size: 13px; margin-top: 8px; }
@@ -1857,20 +1859,49 @@ body.vr-on .stage { grid-row: 1; }
     return true;
   }
   // the bit as cnc-gcode-tools draws it (StockMeshRenderer.buildToolMesh + fluted: lathe profile, helical flute
-  // gullies), run unchanged against a stand-in gl that keeps the arrays; cutting part steel, shank lighter
-  function jobBitMesh(def) {
+  // gullies), run unchanged against a stand-in gl that keeps the arrays, and shaded like it too: its tool shader
+  // (light from the camera, sky term, highlight), the cutting part in the tool's colour (its palette), shank grey
+  const TOOL_RGB = ["#00ccff", "#00ff88", "#ff4dff", "#ffff00", "#ff8800", "#8888ff", "#ff0088", "#00ffff"];   // controller.js
+  function jobToolMaterial(rgb) {
+    const m = new THREE.ShaderMaterial({
+      side: THREE.DoubleSide,                        // its triangles wind the other way (drawn without culling there)
+      uniforms: { uColor: { value: new THREE.Vector3(...rgb) }, uLight: { value: new THREE.Vector3(0, 0, 1) }, uView: { value: new THREE.Vector3(0, 0, 1) } },
+      vertexShader: `varying vec3 vNormal;
+        void main() { vNormal = mat3(modelMatrix) * normal; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+      fragmentShader: `varying vec3 vNormal; uniform vec3 uLight; uniform vec3 uView; uniform vec3 uColor;
+        void main() {
+          vec3 n = normalize(vNormal);
+          float diffuse = max(dot(n, uLight), 0.0);
+          float sky = 0.5 + 0.5 * n.z;
+          float specular = pow(max(dot(reflect(-uLight, n), uView), 0.0), 24.0);
+          gl_FragColor = vec4(uColor * (0.22 + 0.16 * sky + 0.6 * diffuse) + vec3(0.35 * specular), 1.0);
+        }` });
+    return m;
+  }
+  const BIT_HELIX = 45;                               // deg, drawn flute helix (cnc-gcode-tools: 30)
+  function jobBitMesh(def, colour) {
     const tool = compileStockTool(def);
     if (!tool) return null;
     let cur = null;
     const gl = { ARRAY_BUFFER: 0, STATIC_DRAW: 0, createBuffer: () => ({}), bindBuffer: (t, b) => { cur = b; },
       bufferData: (t, data) => { cur.data = data; } };
-    const R = StockMeshRenderer.prototype, mb = R.buildToolMesh.call({ gl, fluted: R.fluted }, tool);
+    // helix: theirs is 30 deg - under a turn on a single flute, which reads as a bent bit (user); fluted() takes the
+    // twist (and only the flute runout) from tool.radius, so a scaled radius gives HELIX without changing their code
+    const k = Math.tan(30 * Math.PI / 180) / Math.tan(BIT_HELIX * Math.PI / 180);
+    const fluted = (o, t, top, pos, nor) => R.fluted.call(null, o, Object.assign({}, t, { radius: t.radius * k }), top, pos, nor);
+    const R = StockMeshRenderer.prototype, mb = R.buildToolMesh.call({ gl, fluted }, tool);
     const geo = new THREE.BufferGeometry();
     geo.setAttribute("position", new THREE.BufferAttribute(mb.position.data, 3));
     geo.setAttribute("normal", new THREE.BufferAttribute(mb.normal.data, 3));
     geo.addGroup(0, mb.cutterCount, 0); geo.addGroup(mb.cutterCount, mb.count - mb.cutterCount, 1);
-    return new THREE.Mesh(geo, [new THREE.MeshStandardMaterial({ color: 0x8c9198, metalness: 0.9, roughness: 0.3 }),
-      new THREE.MeshStandardMaterial({ color: 0xc4c8cc, metalness: 0.9, roughness: 0.25 })]);
+    const mats = [jobToolMaterial(new THREE.Color(colour).toArray()), jobToolMaterial([0.62, 0.64, 0.67])];
+    const mesh = new THREE.Mesh(geo, mats);
+    mesh.onBeforeRender = (r, sc, cam) => {         // stock-sim drawMesh: light = back + 0.6 up - 0.3 right of the camera
+      const e = cam.matrixWorld.elements, right = [e[0], e[1], e[2]], up = [e[4], e[5], e[6]], back = [e[8], e[9], e[10]];
+      const l = new THREE.Vector3(back[0] + up[0] * 0.6 - right[0] * 0.3, back[1] + up[1] * 0.6 - right[1] * 0.3, back[2] + up[2] * 0.6 - right[2] * 0.3).normalize();
+      for (const m of mats) { m.uniforms.uLight.value.copy(l); m.uniforms.uView.value.set(...back).normalize(); }
+    };
+    return mesh;
   }
   function jobClear() {
     if (jobTouch(null) && meta) move();
@@ -1929,7 +1960,11 @@ body.vr-on .stage { grid-row: 1; }
       jobUpdateMesh(true);
     }
     JOB.bits = new Map();                            // T number -> its bit, shown while that tool's moves play
-    for (const [n, def] of tl.tools) { const b = jobBitMesh(def); if (b) { b.visible = false; JOB.bits.set(n, b); JOB.group.add(b); } }
+    const order = [...new Set(tl.segs.map((q) => q.toolNumber))];   // palette by the order the tools are used, as there
+    for (const [n, def] of tl.tools) {
+      const i = order.indexOf(n), b = jobBitMesh(def, TOOL_RGB[(i < 0 ? order.length : i) % TOOL_RGB.length]);
+      if (b) { b.visible = false; JOB.bits.set(n, b); JOB.group.add(b); }
+    }
     if (JOB.bits.size && !jobBit) { jobBit = true; applyVisibility(); }
     const mv = jobMoves(tl, at);
     JOB.ahead = mv.ahead; JOB.done = mv.done;
@@ -1997,7 +2032,7 @@ body.vr-on .stage { grid-row: 1; }
     JOB.last = now;                                                                       // a slow GPU (tick's dt is capped)
     if (!JOB.tl) return;
     if (JOB.playing) {
-      JOB.spin = ((JOB.spin || 0) + dt * 2 * Math.PI * 2.7) % (2 * Math.PI);   // ~2.7 turns/s (not a whole half per capped frame)
+      JOB.spin = ((JOB.spin || 0) - dt * 2 * Math.PI) % (2 * Math.PI);   // clockwise from above, 1 turn/s, as cnc-gcode-tools
       const r = GcodePlay.step(JOB.tl, JOB.t, dt, +$("job-speed").value, JOB.k);
       JOB.k = r.k;
       jobSeek(r.t);
@@ -2013,6 +2048,27 @@ body.vr-on .stage { grid-row: 1; }
     jobPlaying(!JOB.playing);
   });
   $("job-resume").addEventListener("click", () => { $("job-pop").hidden = true; jobPlaying(true); });
+  {                                                  // drag the pause popup anywhere over the view (kept till reload)
+    const pop = $("job-pop");
+    let grab = null;
+    pop.addEventListener("pointerdown", (e) => {
+      if (e.target.closest("button")) return;
+      const r = pop.getBoundingClientRect(), host = pop.parentElement.getBoundingClientRect();
+      grab = { dx: e.clientX - r.left, dy: e.clientY - r.top, host };
+      pop.setPointerCapture(e.pointerId);
+      e.preventDefault();
+    });
+    pop.addEventListener("pointermove", (e) => {
+      if (!grab) return;
+      const { host } = grab, w = pop.offsetWidth, h = pop.offsetHeight;
+      const x = Math.min(Math.max(e.clientX - grab.dx - host.left, 0), host.width - w);
+      const y = Math.min(Math.max(e.clientY - grab.dy - host.top, 0), host.height - h);
+      Object.assign(pop.style, { left: `${x}px`, top: `${y}px`, transform: "none" });
+    });
+    const drop = () => { grab = null; };
+    pop.addEventListener("pointerup", drop);
+    pop.addEventListener("pointercancel", drop);
+  }
   $("job-reset").addEventListener("click", () => { jobPlaying(false); $("job-pop").hidden = true; jobSeek(0); JOB.k = 0; });
   $("job-t").addEventListener("input", (e) => {
     if (!JOB.tl) return;

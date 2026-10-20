@@ -9,7 +9,8 @@ the date the model data was built and the Printables file set it was solved for.
   config.yaml's) with acceleration; each M0 pauses with its message ("Attach Probe", ...) until you press Resume;
   G38.2 stops on the stock, with the Tiny Touch Plate taken off the core and laid on it under the bit (every probe: one per tool change) and the
   dust shoe's bottom (skirt + bristles) taken off meanwhile; the bit is drawn from the file's ToolDef as cnc-gcode-tools
-  draws it (helical flutes) and turns with the collet nut while the job runs; the 1/4" MDF at the cutting area's front-left corner is
+  draws and shades it (tool colours, 45 deg helix) and turns clockwise with the collet nut while the job runs; the
+  M0 popup opens mid-view and can be dragged; the 1/4" MDF at the cutting area's front-left corner is
   carved as it goes. The moves are drawn (faint ahead, solid once done; rapids orange, cuts blue, probes green).
   Work position and tool position read in mm while it runs. Play / pause, 1-300x, a time slider to scrub; touching
   the position sliders pauses it. "Play a G-code file..." runs your own file the same way (G20 inches and G20 / G21
