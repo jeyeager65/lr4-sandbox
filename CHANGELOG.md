@@ -3,6 +3,13 @@
 The version is the configurator page's (`VERSION` in `web/index.html`, shown in its footer). The footer also shows
 the date the model data was built and the Printables file set it was solved for.
 
+## 0.10.0 - 2026-10-20
+- Strut plate G-code: "Download G-code" under the strut plates makes the FluidNC job for this size in the browser
+  (both plates on one 1/4" MDF sheet along Y, bolt holes first, then each outline with tabs, 0.25 mm into the spoil
+  board; touch plate probing, router dial messages, stock-simulator comments). "G-code settings" sets stock
+  thickness, depth per pass, feed, plunge, tabs, tab height, router + dial and the touch plate; defaults are the
+  FreeCAD script's (`freecad/cam.py`), and tests/test_strut_cam.js checks the two agree.
+
 ## 0.9.0 - 2026-10-20
 - Temporary struts: Parts > "Strut plates: Permanent (MDF) / Temporary (printed)" shows the machine as it first
   runs, on V1E's 4 printed Temp_Strut_v1 (front + bottom at each end, end braces 180 mm from the next) before it

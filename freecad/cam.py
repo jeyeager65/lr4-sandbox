@@ -4,7 +4,7 @@
 #
 # Run headless (CAM is slow - never in the GUI):  python tools/run.py freecad/cam.py
 # Writes build/LowRider4-CAM.FCStd (open it to see/simulate the toolpaths) and
-# exports/cam/StrutPlates_T1_eighth.nc.
+# exports/cam/StrutPlates_T1_eighth.gcode.
 #
 # Setup on the machine:
 #   - Stock: 1/4" MDF (V1E: MDF or hardboard, not ply), at least STOCK_W x STOCK_L below, laid
@@ -14,6 +14,9 @@
 #     not inside the outlines.
 #   - Order: all bolt holes first (V1E: "drill all the holes first"), then each outline with
 #     tabs. Cuts 0.25 mm into the spoil board.
+#
+# Goldens for the page's JS CAM (tests/test_strut_cam.js): LR4_STRUT=<mm> LR4_CAM_OUT=<file.gcode> cuts that strut
+# length instead of build.py's and writes only that file (no FCStd).
 
 import importlib
 import os
@@ -56,7 +59,10 @@ ROUTER = "kobalt"
 # -----------------------------------------------------------------------------------------
 
 core.set_units("mm")
+GOLDEN = os.environ.get("LR4_CAM_OUT")
 strut = lr4.calculator(B["CUT_X_IN"] * 25.4, B["CUT_Y_IN"] * 25.4, B["XZ_PLATE"])["strut"]
+if os.environ.get("LR4_STRUT"):
+    strut = float(os.environ["LR4_STRUT"])
 faces = lr4.plate_faces(strut, B["WING"], B["DOGBONE"])
 
 # lay the plates along Y (length) side by side in X; SCAD (x, y) -> stock (X, Y) = (y, x) turned
@@ -104,13 +110,14 @@ doc.recompute()
 for o in ops:
     print(f"{o.Label}: {len(o.Path.Commands)} commands")
 cam.tidy_view(doc, job)
-doc.saveAs(os.path.join(ROOT, "build", f"{NAME}-CAM.FCStd"))
+if not GOLDEN:
+    doc.saveAs(os.path.join(ROOT, "build", f"{NAME}-CAM.FCStd"))
 
 outdir = os.path.join(ROOT, "exports", "cam")
 os.makedirs(outdir, exist_ok=True)
 from fclib import fluidnc_post                    # noqa: E402 - the same post the GUI uses ("fluidnc")
-fn = os.path.join(outdir, "StrutPlates_T1_eighth.nc")
-gcode = fluidnc_post.export([tc] + ops, fn, f'{POST_ARGS} --title="{NAME} strut plates {strut} mm"')
+fn = GOLDEN or os.path.join(outdir, "StrutPlates_T1_eighth.gcode")
+gcode = fluidnc_post.export([tc] + ops, fn, f'{POST_ARGS} --title="{NAME} strut plates {strut:g} mm"')
 mins = sum(fluidnc_post.op_minutes(o, tc) for o in ops)
 print(f"T1 1/8in 1F upcut, dial {cam.router_dial(RPM, ROUTER)}: {len(gcode.splitlines())} lines, ~{mins:.0f} min "
       f"-> {fn}")

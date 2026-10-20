@@ -33,7 +33,7 @@ which are missing or differ (a different version is still used, with a warning).
 
 1. **In the browser (light).** Open the configurator (GitHub Pages, once it's published), download the four
    Printables zips above and drop them on the page. Nothing to install; the files stay in your browser. You get
-   the 3D machine at your size, the cut list, the BOM, strut plate DXF / SVG and a FluidNC `config.yaml`.
+   the 3D machine at your size, the cut list, the BOM, strut plate DXF / SVG / G-code and a FluidNC `config.yaml`.
 2. **The FreeCAD scripts (heavy).** Clone the repo, unzip the same downloads into `parts/` (folders as in the
    table) and build. You get your own FCStd assembly with every fastener checked, the BOM, strut plate DXF and
    G-code. Needs FreeCAD 1.1+; see below.
@@ -88,6 +88,7 @@ npm run test:local                           # all the node tests below
 node test_config_model.js                    # the configurator's machine vs every FreeCAD size build
 node test_calculator.js                      # the JS and Python calculators agree (needs python)
 node test_vr.js                              # the VR menu layout and helpers
+node test_strut_cam.js                       # the page's strut plate G-code; vs freecad/cam.py if its goldens exist
 node test_strut_plate.js                     # JS strut plates vs Vector76's OpenSCAD generator (maintainer only)
 python ../tools/run.py test_strut_plate.py   # Python strut plates vs the same (maintainer only)
 node test_parts_files.js                     # the page's STL / DXF readers vs the reference build (needs parts/)

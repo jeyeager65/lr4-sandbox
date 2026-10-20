@@ -40,7 +40,7 @@ script is history only.
 - `check.py` - interference checks between mating parts (155 pairs, run by headless builds; ~11 s with
   `overlap_fast` + the pair cache `build/check_cache.json`).
 - `hosecheck.py` - vac hose bends, length and clearance over X x Z travel (~60 s).
-- `bom.py` - BOM writer. `cam.py` - strut plate CAM -> `exports/cam/*.nc`.
+- `bom.py` - BOM writer. `cam.py` - strut plate CAM -> `exports/cam/*.gcode`.
 - `private/export_step.py` - whole assembly to `exports/LowRider4.step` (meshes decimated as far as FreeCAD's
   decimator goes; 859 MB, 208 parts, 2026-10-19 - smaller needs pyfqmr, ask before installing).
 - `CONFIGURATOR.md` - plan for a separate LR4 web configurator (later).
@@ -155,7 +155,7 @@ section-overlap scan (touching, not intersecting) and against the V1E build phot
 - V1E: PLA, 3 walls, no supports, default orientation; 200 x 200 x 190 mm build volume (P1S ok).
   Infill per part in `build/bom.md`. Print Z_Stub + Z_Nut first to check the M5 nut fit.
 - Temp_Strut_v1 x 4 (not in the model) holds the beam until the machine cuts its own plates.
-- Strut plates: cut with the CURRENT LowRider (v3) - `exports/cam/StrutPlates_T1_eighth.nc`.
+- Strut plates: cut with the CURRENT LowRider (v3) - `exports/cam/StrutPlates_T1_eighth.gcode`.
 - Peter Plates: PLA like the rest; print orientation not checked yet (use the designer's). Designer: let the
   steppers breathe (vents, high-temp material, or no top / bottom layers) - the honeycomb style is open anyway.
 - TPU_Bristles_22mm (x2): TPU, printed flat; bent into the dust skirt's groove.

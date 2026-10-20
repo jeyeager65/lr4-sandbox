@@ -173,6 +173,11 @@ label.btn:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; 
 .warn { background: var(--warn-bg); color: var(--warn); border-radius: 4px; padding: 6px 8px; font-size: 12px; margin: 8px 0 0; line-height: 1.4; }
 #calc td small { color: var(--muted); font-size: 11px; margin-left: 4px; }
 .plates svg { width: 100%; height: auto; display: block; margin-bottom: 8px; }
+.cam { margin-top: 10px; }
+.cam summary { cursor: pointer; font-size: 13px; }
+.cam .trio { margin-top: 8px; grid-template-columns: 1fr 1fr; }
+.cam .wide { grid-column: 1 / -1; }
+.cam .buttons { margin-top: 8px; }
 .plate-fill { fill: var(--mdf); stroke: var(--mdf-edge); stroke-width: 0.8; fill-rule: evenodd; }
 .dim { stroke: var(--muted); stroke-width: 1.2; fill: none; }
 .dim-text { fill: var(--ink); font-family: var(--font-data); font-size: 30px; }
@@ -335,10 +340,37 @@ body.vr-on .stage { grid-row: 1; }
       <button type="button" id="dl-dxf">Download DXF</button>
       <button type="button" id="dl-svg">Download SVG</button>
       <button type="button" id="copy-dxf">Copy DXF text</button>
+      <button type="button" id="dl-nc">Download G-code</button>
     </div>
     <div id="dl-status" role="status"></div>
+    <details class="cam" id="cam-box">
+      <summary>G-code settings (FluidNC, 1/8" bit)</summary>
+      <div class="trio">
+        <div class="field"><label for="cam-t">Stock thickness</label>
+          <div class="unit-input"><input id="cam-t" type="number" step="any" min="1"><span>mm</span></div></div>
+        <div class="field"><label for="cam-step">Depth per pass</label>
+          <div class="unit-input"><input id="cam-step" type="number" step="any" min="0.1"><span>mm</span></div></div>
+        <div class="field"><label for="cam-plate">Touch plate (0 = none)</label>
+          <div class="unit-input"><input id="cam-plate" type="number" step="any" min="0"><span>mm</span></div></div>
+        <div class="field"><label for="cam-feed">Feed</label>
+          <div class="unit-input"><input id="cam-feed" type="number" step="any" min="0.1"><span>mm/s</span></div></div>
+        <div class="field"><label for="cam-plunge">Plunge</label>
+          <div class="unit-input"><input id="cam-plunge" type="number" step="any" min="0.1"><span>mm/s</span></div></div>
+        <div class="field"><label for="cam-dial">Router dial <span id="cam-rpm"></span></label>
+          <div class="unit-input"><input id="cam-dial" type="number" step="0.5" min="1" max="6"></div></div>
+        <div class="field"><label for="cam-tabs">Tabs per plate</label>
+          <div class="unit-input"><input id="cam-tabs" type="number" step="1" min="0"></div></div>
+        <div class="field"><label for="cam-tabh">Tab height</label>
+          <div class="unit-input"><input id="cam-tabh" type="number" step="any" min="0"><span>mm</span></div></div>
+        <div class="field wide"><label for="cam-router">Router</label><select id="cam-router"></select></div>
+      </div>
+      <div class="buttons"><button type="button" id="cam-reset">Defaults</button></div>
+    </details>
+    <p class="foot" id="cam-note"></p>
     <p class="foot">Vector76's strut plate generator, ported to the browser and checked against the original OpenSCAD output
-    at 58 sizes. 1/4" MDF, 1/8" bit (3.5 mm dogbones), 1" EMT wings (11.5 mm). The DXF comes zipped (closed polylines, mm).</p>
+    at 58 sizes. 1/4" MDF, 1/8" bit (3.5 mm dogbones), 1" EMT wings (11.5 mm). The DXF comes zipped (closed polylines, mm).
+    The G-code follows V1E's milling basics: bolt holes first, then each outline with tabs, 0.25 mm into the spoil board.
+    Check it in a G-code viewer before you cut.</p>
   </section>
 
   <section aria-labelledby="h-fluidnc">
@@ -400,6 +432,7 @@ body.vr-on .stage { grid-row: 1; }
 <script src="https://cdn.jsdelivr.net/npm/polygon-clipping@0.15.7/dist/polygon-clipping.umd.min.js"></script>
 <script src="js/calculator.js"></script>
 <script src="js/strut_plate.js"></script>
+<script src="js/strut_cam.js"></script>
 <script src="js/config_model.js"></script>
 <script src="js/parts_files.js"></script>
 <script src="js/vr.js"></script>
@@ -1418,6 +1451,7 @@ body.vr-on .stage { grid-row: 1; }
       updateCalc();
       rebuild();
       drawPlates();
+      camNote();
       updateYaml();
     };
     if (now) go(); else pending = setTimeout(go, 250);
@@ -1532,7 +1566,7 @@ body.vr-on .stage { grid-row: 1; }
   }
 
   // ---- version + feedback: the issue link carries the size, data date and the loaded files' checksums ----
-  const VERSION = "0.9.0";
+  const VERSION = "0.10.0";
   function setupAbout() {
     const bits = [`lr4-sandbox ${VERSION}`];
     if (cfg.built) bits.push(`model data built ${cfg.built}`);
@@ -1560,6 +1594,56 @@ body.vr-on .stage { grid-row: 1; }
     const q = laidOut(), t = StrutPlate.toDXF([q.front, q.bottom]);
     try { await navigator.clipboard.writeText(t); dlStatus("DXF copied. Paste it into a .dxf file."); }
     catch (e) { dlStatus("Copy blocked here. Use Download DXF."); }
+  });
+
+  // ---- strut plate G-code (strut_cam.js, twin of freecad/cam.py; defaults = cam.py). Settings kept per browser. ----
+  const CAM_FIELDS = { "cam-t": "t", "cam-step": "step", "cam-plate": "plate", "cam-feed": "feed", "cam-plunge": "plunge",
+    "cam-dial": "dial", "cam-tabs": "tabs", "cam-tabh": "tabH" };
+  function camFill(o) {
+    for (const [id, k] of Object.entries(CAM_FIELDS)) $(id).value = o[k] ?? StrutCam.DEFAULTS[k];
+    $("cam-router").value = StrutCam.ROUTERS[o.router] ? o.router : StrutCam.DEFAULTS.router;
+  }
+  function camSettings() {
+    const o = { router: $("cam-router").value };
+    for (const [id, k] of Object.entries(CAM_FIELDS)) {
+      const v = parseFloat($(id).value);
+      o[k] = Number.isFinite(v) && v >= 0 ? v : StrutCam.DEFAULTS[k];
+    }
+    o.tabs = Math.round(o.tabs);
+    o.dial = Math.min(6, Math.max(1, o.dial));
+    return o;
+  }
+  const camJob = () => StrutCam.job(polygonClipping, S.strut,
+    Object.assign(camSettings(), { nbraces: S.n === S.auto ? 0 : S.n, wing: WING, dogbones: DOGBONE }));
+  function camNote() {
+    let j;
+    try { j = camJob(); } catch (e) { $("cam-note").textContent = `G-code: ${e.message}`; $("dl-nc").disabled = true; return; }
+    $("dl-nc").disabled = false;
+    $("cam-rpm").textContent = `(~${Math.round(j.rpm / 100) * 100} RPM)`;
+    const w = j.stock.xmax, l = j.stock.ymax, ins = (v) => +(v / IN).toFixed(2);
+    let note = `G-code: stock ${w.toFixed(0)} × ${l.toFixed(0)} mm (${ins(w)} × ${ins(l)} in), long side along Y, zero at its ` +
+      `front-left corner on the top; screw it down outside the plates. ${j.depths.length} passes, ~${Math.round(j.minutes)} min, ` +
+      `chip load ${j.chipLoad.toFixed(3)} mm per tooth.`;
+    try {
+      const t = LR4Model.travel(cfg, S);
+      if (l > t.y[1] - t.y[0] || w > t.x[1] - t.x[0]) note += " The stock is bigger than this machine's travel: cut the plates on another machine.";
+    } catch (e) { /* model data not loaded yet */ }
+    $("cam-note").textContent = note;
+  }
+  for (const k of Object.keys(StrutCam.ROUTERS)) $("cam-router").add(new Option(StrutCam.ROUTERS[k].name, k));
+  { let o = {}; try { o = JSON.parse(localStorage.getItem("lr4-cam") || "{}"); } catch (e) { /* defaults */ } camFill(o); }
+  $("cam-box").addEventListener("change", () => {
+    try { localStorage.setItem("lr4-cam", JSON.stringify(camSettings())); } catch (e) { /* not kept */ }
+    camNote();
+  });
+  $("cam-reset").addEventListener("click", () => {
+    camFill({});
+    try { localStorage.removeItem("lr4-cam"); } catch (e) { /* nothing kept */ }
+    camNote();
+  });
+  $("dl-nc").addEventListener("click", () => {
+    try { const j = camJob(); save(`${baseName()}_T1_eighth.gcode`, j.gcode, "dl-status", "a local copy of the page"); }
+    catch (e) { dlStatus(`G-code: ${e.message}`); }
   });
 
   // ---- vacuum hose: clamped in the Min-end holder; between the clamp and the core it folds like a drag
