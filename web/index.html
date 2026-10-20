@@ -276,7 +276,7 @@ body.vr-on .stage { grid-row: 1; }
         <button type="button" id="job-play">Play</button>
         <button type="button" id="job-reset">Start over</button>
         <select id="job-speed" aria-label="Playback speed" style="width: auto">
-          <option value="1">1×</option><option value="10">10×</option><option value="30" selected>30×</option>
+          <option value="1">1×</option><option value="10" selected>10×</option><option value="30">30×</option>
           <option value="100">100×</option><option value="300">300×</option></select>
       </div>
       <div class="slider"><label for="job-t" title="Job time">⏱</label><input id="job-t" type="range" min="0" max="1000" step="1" value="0"><output id="job-o" for="job-t"></output></div>
@@ -285,7 +285,7 @@ body.vr-on .stage { grid-row: 1; }
         <div><b>Work Y</b><span id="wy">0.0</span> <small>mm</small></div>
         <div><b>Work Z</b><span id="wz">0.0</span> <small>mm</small></div>
       </div>
-      <label class="check"><input type="checkbox" id="job-moves" checked> Show the moves</label>
+      <label class="check"><input type="checkbox" id="job-moves"> Show the moves</label>
       <p class="foot" id="job-status" role="status"></p>
     </div>
     <div class="buttons">
