@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Questions about the LowRider itself
+    url: https://forum.v1e.com/
+    about: Building, wiring or running a LowRider 4 - ask on the V1 Engineering forum. This repo is an independent fan project.

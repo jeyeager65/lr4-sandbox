@@ -1335,7 +1335,7 @@ label.btn:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; 
   }
 
   // ---- version + feedback: the issue link carries the size, data date and the loaded files' checksums ----
-  const VERSION = "0.6.0";
+  const VERSION = "0.7.0";
   function setupAbout() {
     const bits = [`lr4-sandbox ${VERSION}`];
     if (cfg.built) bits.push(`model data built ${cfg.built}`);
@@ -1349,7 +1349,7 @@ label.btn:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; 
         `- Peter Plates: ${peterStyle}; detail: ${lite ? "lite" : "full"}`,
         `- Browser: ${navigator.userAgent}`,
         ...(cfg.files ? [`- Files loaded: ${userFiles.size} of ${needed ? needed.size : "?"}`, ...files] : [])].join("\n");
-      ev.currentTarget.href = "https://github.com/jeyeager65/lr4-sandbox/issues/new?" + new URLSearchParams({
+      ev.currentTarget.href = "https://github.com/jeyeager65/lr4-sandbox/issues/new?" + new URLSearchParams({ template: "problem.md",
         title: `[${(S.cutX / IN).toFixed(1)}x${(S.cutY / IN).toFixed(1)}] `, body: body.slice(0, 4500) });   // GitHub drops URLs over ~8 KB
     });
   }

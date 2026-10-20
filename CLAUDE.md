@@ -28,6 +28,8 @@ across many FreeCAD builds. See README.md for the layout. FreeCAD 1.1, Python 3,
   Change both and run the tests.
 - Units: mm inside; the cutting area and table are in inches. Axes: X along the beam, Y along the table (front 0),
   Z up.
+- **Versions:** a user-visible page change bumps `VERSION` in `web/index.html` and gets a CHANGELOG.md entry.
+  CI (`.github/workflows/ci.yml`) runs only what works without part files: the guard, a Python compile, `npm test`.
 
 ## Running
 
@@ -37,7 +39,8 @@ across many FreeCAD builds. See README.md for the layout. FreeCAD 1.1, Python 3,
 - Heavy work (builds, CAM, section sweeps, size builds) runs headless, never in the FreeCAD GUI: a long GUI call
   freezes it. Headless FCStd files carry no colours; open them in the GUI with `fclib.view.open_build`.
 - After a model change that the configurator shows: `python pipeline/size_builds.py` (~55 min) ->
-  `python pipeline/fit_config.py` -> `node tests/test_config_model.js` (must print "all sizes match").
+  `python pipeline/fit_config.py` -> `node tests/test_config_model.js` (must print "all N sizes match";
+  it fails when there are no size builds to compare).
 - Pages: `python tools/serve.py configurator` / `python tools/serve.py viewer`. Edit the viewer in
   `web/viewer.html` (export_web copies it into exports/web).
 

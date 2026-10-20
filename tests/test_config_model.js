@@ -12,11 +12,12 @@ const TOL = 0.05;
 const TOL_BELT = 0.15;      // stretched belt runs: their bbox ends move with where the teeth fall
 const sizes = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "web", "data", "sizes.json"), "utf8"));
 
-let fails = 0;
+let fails = 0, compared = 0;
 for (const [tag, [cx, cy]] of Object.entries(sizes)) {
   const f = path.join(SIZES, tag, "summary.json");
   if (!fs.existsSync(f)) { console.log(`skip ${tag}: no build`); continue; }
   const act = JSON.parse(fs.readFileSync(f, "utf8"));
+  compared++;
   const S = M.size(cx * M.IN, cy * M.IN);
   const inst = M.instances(cfg, S), got = new Map(inst.map((o) => [o.name, o]));
   const want = Object.keys(act).filter((n) => !/^StrutPlate_(Front|Bottom)$/.test(n));
@@ -113,5 +114,6 @@ for (const [tag, [cx, cy]] of Object.entries(sizes)) {
   if (!ok || !bad) fails++;
   console.log(`${ok && bad ? "ok  " : "FAIL"} config.yaml: ${diff.length} lines changed (${diff.map((d) => d[1].trim()).join(", ")}), no-x/y file ${bad ? "refused" : "accepted"}`);
 }
-console.log(fails ? `${fails} check(s) failed` : "all sizes match, config.yaml ok");
+if (!compared) { fails++; console.log(`FAIL no size builds in ${SIZES} - nothing compared (run pipeline/size_builds.py)`); }
+console.log(fails ? `${fails} check(s) failed` : `all ${compared} sizes match, config.yaml ok`);
 process.exit(fails ? 1 : 0);

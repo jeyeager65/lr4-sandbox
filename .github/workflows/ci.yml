@@ -1,0 +1,34 @@
+# What CI can check without the part files, the size builds or FreeCAD: no part / CAD / private files committed,
+# every Python script compiles, and the JS + Python calculators agree. The other tests need parts/, web/data/ or
+# the OpenSCAD goldens and run locally (README "Tests").
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: tests/package-lock.json
+
+      - name: No part / CAD / private files in the repo
+        run: python tools/check_no_parts.py --all
+
+      - name: Python scripts compile
+        run: python -m compileall -q freecad pipeline tools tests
+
+      - name: Node tests
+        working-directory: tests
+        run: |
+          npm ci
+          npm test

@@ -1,0 +1,47 @@
+# Publishes the configurator to GitHub Pages (jeyeager65.github.io/lr4-sandbox). Manual only, and not enabled:
+# it needs Pages turned on in the repo settings (Source: GitHub Actions) and the share data committed - web/data/share/
+# is git-ignored until V1E OKs shipping the placements (.gitignore has the line to uncomment).
+# The site is web/index.html (wrapped as a full page, as tools/serve.py does) + web/js/ with the share data as its data/ (so no ?share is needed): no V1E geometry,
+# visitors load their own part files.
+name: Pages
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check the share data is there
+        run: |
+          test -f web/data/share/lr4_config.json || { echo "web/data/share/ is not committed (see .gitignore)"; exit 1; }
+          python tools/check_no_parts.py --all
+
+      - name: Assemble the site
+        run: |
+          python -c "import sys; sys.path.insert(0, 'tools'); import serve; serve.wrap_configurator('web')"
+          mkdir -p _site/data
+          cp web/index_local.html _site/index.html
+          cp -r web/js _site/
+          cp -r web/data/share/. _site/data/
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - id: deployment
+        uses: actions/deploy-pages@v4

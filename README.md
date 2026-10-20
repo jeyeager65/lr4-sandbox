@@ -29,6 +29,18 @@ them yourself from Printables, and the model and configurator place your copies:
 `parts/manifest.json` lists every file with the SHA-256 it was tested with. `python tools/check_parts.py` says
 which are missing or differ (a different version is still used, with a warning).
 
+## Two ways to use it
+
+1. **In the browser (light).** Open the configurator (GitHub Pages, once it's published), download the four
+   Printables zips above and drop them on the page. Nothing to install; the files stay in your browser. You get
+   the 3D machine at your size, the cut list, the BOM, strut plate DXF / SVG and a FluidNC `config.yaml`.
+2. **The FreeCAD scripts (heavy).** Clone the repo, unzip the same downloads into `parts/` (folders as in the
+   table) and build. You get your own FCStd assembly with every fastener checked, the BOM, strut plate DXF and
+   G-code. Needs FreeCAD 1.1+; see below.
+
+Downloads: only the Printables files in the table. Nothing else is needed; the page and the scripts bring our own
+hardware models (steppers, bearings, rails, bolts, router, hose).
+
 ## Running the FreeCAD model
 
 Needs FreeCAD 1.1 or newer and Python 3.
@@ -66,6 +78,8 @@ python pipeline/fit_config.py                # fit -> web/data/
 
 ```sh
 cd tests && npm install                      # once
+npm test                                     # what CI runs (no part files needed)
+npm run test:local                           # all the node tests below
 node test_config_model.js                    # the configurator's machine vs every FreeCAD size build
 node test_calculator.js                      # the JS and Python calculators agree (needs python)
 node test_strut_plate.js                     # JS strut plates vs Vector76's OpenSCAD generator (maintainer only)
@@ -73,6 +87,15 @@ python ../tools/run.py test_strut_plate.py   # Python strut plates vs the same (
 node test_parts_files.js                     # the page's STL / DXF readers vs the reference build (needs parts/)
 python ../tools/run.py test_share.py         # the share data's placements vs the reference build (needs parts/)
 ```
+
+CI (`.github/workflows/ci.yml`) runs the no-part-files guard, a compile of every Python script and `npm test`.
+The rest need `parts/`, the size builds or the OpenSCAD goldens, so they run locally.
+
+## Problems and changes
+
+Something placed wrong, a file not recognised, a wrong number: use **Report a problem** in the page's footer. It
+opens a GitHub issue with your size and file checksums filled in. Questions about the LowRider itself go to the
+[V1E forum](https://forum.v1e.com/). What changed per version: [CHANGELOG.md](CHANGELOG.md).
 
 ## Layout
 
@@ -84,6 +107,7 @@ pipeline/   FreeCAD builds -> configurator data
 tests/      node tests, test_strut_plate.py, test_share.py, test_parts_files.js
 tools/      run.py, serve.py, repo tools (sync_fclib, check_no_parts, check_parts, page_shot = headless screenshots)
 docs/       PLAN.md: settings, measurements and decisions behind the model
+.github/    CI, the Pages workflow (manual), issue template
 ```
 
 `parts/` (except its manifest), `build/`, `exports/` and `web/data/` are git-ignored. A pre-commit check (`tools/check_no_parts.py`)
