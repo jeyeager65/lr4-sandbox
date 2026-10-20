@@ -255,6 +255,24 @@ body.vr-on .stage { grid-row: 1; }
     <div class="slider"><label for="sz">Z</label><input id="sz" type="range" step="0.5"><output id="oz" for="sz"></output></div>
   </section>
 
+  <section aria-labelledby="h-job">
+    <h2 id="h-job">Cut the strut plates</h2>
+    <p class="foot" id="job-off">V1E's build order: the machine runs on the printed temporary struts first and cuts its own MDF
+      strut plates. Switch Parts &gt; Strut plates to <b>Temporary</b> to play that job here.</p>
+    <div id="job-on" hidden>
+      <div class="buttons">
+        <button type="button" id="job-play">Play</button>
+        <button type="button" id="job-reset">Start over</button>
+        <select id="job-speed" aria-label="Playback speed" style="width: auto">
+          <option value="1">1×</option><option value="10">10×</option><option value="30" selected>30×</option>
+          <option value="100">100×</option><option value="300">300×</option></select>
+      </div>
+      <div class="slider"><label for="job-t" title="Job time">⏱</label><input id="job-t" type="range" min="0" max="1000" step="1" value="0"><output id="job-o" for="job-t"></output></div>
+      <p class="foot" id="job-status" role="status"></p>
+      <div class="buttons"><button type="button" id="job-install" hidden>Install the plates (Permanent)</button></div>
+    </div>
+  </section>
+
   <section aria-labelledby="h-view">
     <h2 id="h-view">View</h2>
     <div class="buttons">
@@ -433,6 +451,8 @@ body.vr-on .stage { grid-row: 1; }
 <script src="js/calculator.js"></script>
 <script src="js/strut_plate.js"></script>
 <script src="js/strut_cam.js"></script>
+<script src="js/strut_play.js"></script>
+<script src="js/stock_sim.js"></script>
 <script src="js/config_model.js"></script>
 <script src="js/parts_files.js"></script>
 <script src="js/vr.js"></script>
@@ -1319,7 +1339,7 @@ body.vr-on .stage { grid-row: 1; }
   // gantry and core at the same fraction of their travel. ----
   const sx = document.getElementById("sx"), sy = document.getElementById("sy"), sz = document.getElementById("sz");
   function setupSliders() {
-    [sx, sy, sz].forEach((el) => el.addEventListener("input", move));
+    [sx, sy, sz].forEach((el) => el.addEventListener("input", () => { jobPlaying(false); move(); }));   // the job pauses
   }
   function updateSliders() {
     const [cx, cy] = meta.cut_in, t = meta.travel, first = !sx.dataset.init;
@@ -1335,11 +1355,16 @@ body.vr-on .stage { grid-row: 1; }
     sx.dataset.init = "1";
     move();
   }
-  function move() {
-    // the parked pose is at -travel[0]; each motion frame moves by the slider's offset from it
+  function move(pose) {
+    // the parked pose is at -travel[0]; each motion frame moves by the slider's offset from it. pose = [dx, dy, dz]
+    // (mm from the parked pose; the job playback) sets the sliders instead of reading them
     const t = meta.travel;
-    const dx = sx.value * IN + t.x[0], dy = sy.value * IN + t.y[0];
-    const dz = sz.value - meta.tip_above_table;
+    if (pose) {
+      sx.value = ((pose[0] - t.x[0]) / IN).toFixed(1); sy.value = ((pose[1] - t.y[0]) / IN).toFixed(1);
+      sz.value = (pose[2] + meta.tip_above_table).toFixed(1);
+    }
+    const [dx, dy, dz] = pose || [sx.value * IN + t.x[0], sy.value * IN + t.y[0], sz.value - meta.tip_above_table];
+    const X = (dx - t.x[0]) / IN, Y = (dy - t.y[0]) / IN, Z = dz + meta.tip_above_table;
     for (const m of meshes) {
       const k = m.userData.motion;
       if (k === "hose") continue;
@@ -1354,12 +1379,12 @@ body.vr-on .stage { grid-row: 1; }
       }
     }
     if (hoseMesh) updateHose(dx, dy, dz);
-    document.getElementById("rx").textContent = Number(sx.value).toFixed(2);
-    document.getElementById("ry").textContent = Number(sy.value).toFixed(2);
-    document.getElementById("rz").textContent = Number(sz.value).toFixed(0);
-    document.getElementById("ox").textContent = `${Number(sx.value).toFixed(1)} / ${+Number(sx.max).toFixed(1)}`;
-    document.getElementById("oy").textContent = `${Number(sy.value).toFixed(1)} / ${+Number(sy.max).toFixed(1)}`;
-    document.getElementById("oz").textContent = `${Number(sz.value).toFixed(0)} mm`;
+    document.getElementById("rx").textContent = X.toFixed(2);
+    document.getElementById("ry").textContent = Y.toFixed(2);
+    document.getElementById("rz").textContent = Z.toFixed(pose ? 1 : 0);
+    document.getElementById("ox").textContent = `${X.toFixed(1)} / ${+Number(sx.max).toFixed(1)}`;
+    document.getElementById("oy").textContent = `${Y.toFixed(1)} / ${+Number(sy.max).toFixed(1)}`;
+    document.getElementById("oz").textContent = `${Z.toFixed(pose ? 1 : 0)} mm`;
   }
 
   // ---- size inputs, V1E calculator, cut list, strut plate drawing + downloads ----
@@ -1566,7 +1591,7 @@ body.vr-on .stage { grid-row: 1; }
   }
 
   // ---- version + feedback: the issue link carries the size, data date and the loaded files' checksums ----
-  const VERSION = "0.10.0";
+  const VERSION = "0.11.0";
   function setupAbout() {
     const bits = [`lr4-sandbox ${VERSION}`];
     if (cfg.built) bits.push(`model data built ${cfg.built}`);
@@ -1629,6 +1654,7 @@ body.vr-on .stage { grid-row: 1; }
       if (l > t.y[1] - t.y[0] || w > t.x[1] - t.x[0]) note += " The stock is bigger than this machine's travel: cut the plates on another machine.";
     } catch (e) { /* model data not loaded yet */ }
     $("cam-note").textContent = note;
+    jobSetup(j);
   }
   for (const k of Object.keys(StrutCam.ROUTERS)) $("cam-router").add(new Option(StrutCam.ROUTERS[k].name, k));
   { let o = {}; try { o = JSON.parse(localStorage.getItem("lr4-cam") || "{}"); } catch (e) { /* defaults */ } camFill(o); }
@@ -1644,6 +1670,139 @@ body.vr-on .stage { grid-row: 1; }
   $("dl-nc").addEventListener("click", () => {
     try { const j = camJob(); save(`${baseName()}_T1_eighth.gcode`, j.gcode, "dl-status", "a local copy of the page"); }
     catch (e) { dlStatus(`G-code: ${e.message}`); }
+  });
+
+  // ---- strut plate job playback (simulator stage 1; js/strut_play.js + js/stock_sim.js = cnc-gcode-tools'
+  // StockSimulator). Temporary struts only: the G-code above plays on the machine, the stock sits at the cutting
+  // area's front-left corner (= the job's zero) and is carved as the bit goes; the sliders take over when touched. ----
+  const JOB = { j: null, tl: null, sim: null, mesh: null, t: 0, playing: false, key: "" };
+  const MDF_RGB = [0.66, 0.52, 0.36];
+  function jobStockMesh(sim, at) {                   // the heightmap as one grid (top) + its four side walls
+    const { nx, ny, vx, vy, dx, dy, stock: s } = sim;
+    const pos = new Float32Array(vx * vy * 3), col = new Float32Array(vx * vy * 3);
+    for (let j = 0, k = 0; j < vy; j++) for (let i = 0; i < vx; i++, k++) {
+      pos[3 * k] = at[0] + s.xmin + i * dx; pos[3 * k + 1] = at[1] + s.ymin + j * dy;
+    }
+    const idx = new Uint32Array(nx * ny * 6);
+    for (let j = 0, q = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
+      const a = j * vx + i;
+      idx.set([a, a + 1, a + vx + 1, a, a + vx + 1, a + vx], q); q += 6;
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+    geo.setAttribute("normal", new THREE.BufferAttribute(new Float32Array(vx * vy * 3), 3));
+    geo.setAttribute("color", new THREE.BufferAttribute(col, 3));
+    geo.setIndex(new THREE.BufferAttribute(idx, 1));
+    // polygon offset: where the bit cut through, the stock's floor lies on the table top and the table shows
+    const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9, metalness: 0,
+      polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 });
+    const top = new THREE.Mesh(geo, mat);
+    const x0 = at[0] + s.xmin, x1 = at[0] + s.xmax, y0 = at[1] + s.ymin, y1 = at[1] + s.ymax, z0 = at[2] + s.zmin, z1 = at[2] + s.zmax;
+    const w = [[x0, y0, x1, y0], [x1, y0, x1, y1], [x1, y1, x0, y1], [x0, y1, x0, y0]].flatMap(([a, b, c, d]) =>
+      [a, b, z0, c, d, z0, c, d, z1, a, b, z0, c, d, z1, a, b, z1]);
+    const wg = new THREE.BufferGeometry();
+    wg.setAttribute("position", new THREE.Float32BufferAttribute(w, 3));
+    wg.computeVertexNormals();
+    top.add(new THREE.Mesh(wg, new THREE.MeshStandardMaterial({ color: new THREE.Color(...MDF_RGB).multiplyScalar(0.8), roughness: 0.9 })));
+    top.userData.z = at[2];
+    return top;
+  }
+  function jobUpdateMesh(all) {                      // copy the carved rows into the grid: heights, normals, shading
+    const sim = JOB.sim, mesh = JOB.mesh;
+    if (!sim || !mesh || (!all && !sim.isDirty)) return;
+    const { vx, vy, dx, dy, heights: h, stock: s } = sim, z0 = mesh.userData.z, span = s.zmax - s.zmin;
+    const j0 = all ? 0 : Math.max(0, sim.dirtyMin - 1), j1 = all ? vy - 1 : Math.min(vy - 1, sim.dirtyMax + 1);
+    const i0 = all ? 0 : Math.max(0, sim.dirtyMinI - 1), i1 = all ? vx - 1 : Math.min(vx - 1, sim.dirtyMaxI + 1);
+    const g = mesh.geometry, P = g.attributes.position, N = g.attributes.normal, C = g.attributes.color;
+    const p = P.array, n = N.array, c = C.array;
+    for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
+      const k = j * vx + i, z = h[k];
+      p[3 * k + 2] = z0 + z;
+      const gx = (h[j * vx + Math.min(vx - 1, i + 1)] - h[j * vx + Math.max(0, i - 1)]) / (2 * dx);
+      const gy = (h[Math.min(vy - 1, j + 1) * vx + i] - h[Math.max(0, j - 1) * vx + i]) / (2 * dy);
+      const l = Math.hypot(gx, gy, 1);
+      n[3 * k] = -gx / l; n[3 * k + 1] = -gy / l; n[3 * k + 2] = 1 / l;
+      const f = 0.72 + 0.28 * (z - s.zmin) / span;    // deeper = darker, so the passes read
+      c[3 * k] = MDF_RGB[0] * f; c[3 * k + 1] = MDF_RGB[1] * f; c[3 * k + 2] = MDF_RGB[2] * f;
+    }
+    for (const a of [P, N, C]) { a.updateRange = { offset: j0 * vx * 3, count: (j1 - j0 + 1) * vx * 3 }; a.needsUpdate = true; }
+    sim.clearDirty();
+  }
+  function jobClear() {
+    if (JOB.mesh) {
+      scene.remove(JOB.mesh);
+      JOB.mesh.traverse((o) => { if (o.geometry) { o.geometry.dispose(); o.material.dispose(); } });
+    }
+    Object.assign(JOB, { j: null, tl: null, sim: null, mesh: null, t: 0, playing: false, key: "" });
+  }
+  function jobSetup(j) {                             // after a size / settings change (camNote): a fresh job, uncut stock
+    const on = U.struts === "temp" && !!j && !!meta;
+    $("job-on").hidden = !on; $("job-off").hidden = on;
+    const key = on ? `${S.cutX},${S.cutY},${S.n},${tableTop},${lite},${j.gcode.length},${j.minutes}` : "";
+    if (key && key === JOB.key) return;
+    jobClear();
+    jobPlaying(false);
+    if (!on) return;
+    const t = meshes.find((m) => m.userData.name === "TableMDF");
+    if (!t) return;
+    const bb = new THREE.Box3().setFromObject(t), cx = (bb.min.x + bb.max.x) / 2, cy = (bb.min.y + bb.max.y) / 2;
+    const at = [cx - S.cutX / 2, cy - S.cutY / 2, bb.max.z + j.opts.t];   // the job's zero: stock top, front-left
+    JOB.j = j; JOB.tl = StrutPlay.timeline(j); JOB.key = key;
+    JOB.sim = new StockSimulator(j.stock, new Map([[1, { shape: "flat", diameter: j.opts.bit }]]), { maxCells: lite ? 1.2e5 : 4e5 });
+    JOB.sim.setSegments(JOB.tl.segs);
+    JOB.mesh = jobStockMesh(JOB.sim, at);
+    scene.add(JOB.mesh);
+    jobUpdateMesh(true);
+    const tv = meta.travel;
+    JOB.fits = j.stock.xmax <= tv.x[1] - tv.x[0] && j.stock.ymax <= tv.y[1] - tv.y[0];
+    jobSeek(0, false);
+  }
+  const clock = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
+  function jobSeek(s, carve = true) {                // the machine to the job at time s; the stock carved up to it
+    const tl = JOB.tl;
+    if (!tl) return;
+    JOB.t = Math.min(Math.max(s, 0), tl.total);
+    const p = StrutPlay.at(tl, JOB.t), tv = meta.travel, o = JOB.j.opts;
+    if (carve) JOB.sim.advanceTo(p.index, 15, p.progress);
+    jobUpdateMesh(false);
+    const clamp = (v, r) => Math.min(Math.max(v, r[0]), r[1]);
+    move([clamp(p.x + tv.x[0], tv.x), clamp(p.y + tv.y[0], tv.y), o.t + p.z - meta.tip_above_table]);
+    $("job-t").value = Math.round(JOB.t / tl.total * 1000);
+    $("job-o").textContent = clock(JOB.t);
+    const op = p.op >= 0 ? tl.ops[p.op] : null, done = JOB.t >= tl.total;
+    $("job-status").textContent = (done ? "Done: both plates cut, held by their tabs. " :
+      op ? `${p.op + 1}/${tl.ops.length} ${op.name}. ` : "") +
+      `${clock(tl.total)} in all (${JOB.j.depths.length} passes); stock ${JOB.j.stock.xmax.toFixed(0)} × ${JOB.j.stock.ymax.toFixed(0)} mm at the ` +
+      `cutting area's front-left corner.` + (JOB.fits ? "" : " The stock is bigger than this machine's travel: the bit stops at its limits.");
+    $("job-install").hidden = !done;
+    if (done) jobPlaying(false);
+  }
+  function jobPlaying(on) {
+    JOB.playing = on && !!JOB.tl;
+    $("job-play").textContent = JOB.playing ? "Pause" : "Play";
+  }
+  function jobTick() {
+    const now = performance.now(), dt = Math.min((now - (JOB.last || now)) / 1000, 0.5);   // wall time: the speed holds on
+    JOB.last = now;                                                                       // a slow GPU (tick's dt is capped)
+    if (!JOB.playing) {                              // catch up after a scrub (carving is spread over frames)
+      if (JOB.sim && JOB.tl) {
+        const p = StrutPlay.at(JOB.tl, JOB.t);
+        if (JOB.sim.carvedIndex < p.index) { JOB.sim.advanceTo(p.index, 15, p.progress); jobUpdateMesh(false); }
+      }
+      return;
+    }
+    jobSeek(JOB.t + dt * +$("job-speed").value);
+  }
+  $("job-play").addEventListener("click", () => {
+    if (!JOB.tl) return;
+    if (!JOB.playing && JOB.t >= JOB.tl.total) jobSeek(0);
+    jobPlaying(!JOB.playing);
+  });
+  $("job-reset").addEventListener("click", () => { jobPlaying(false); jobSeek(0); });
+  $("job-t").addEventListener("input", (e) => { if (JOB.tl) jobSeek(e.target.value / 1000 * JOB.tl.total); });
+  $("job-install").addEventListener("click", () => {
+    const b = document.querySelector('#strut-variant button[data-v="mdf"]');
+    if (b) b.click();
   });
 
   // ---- vacuum hose: clamped in the Min-end holder; between the clamp and the core it folds like a drag
@@ -2057,6 +2216,7 @@ body.vr-on .stage { grid-row: 1; }
     const now = performance.now(), dt = Math.min((now - lastT) / 1000, 0.1);
     lastT = now;
     if (shop) LR4Shop.cutaway(shop, camera.getWorldPosition(camPos));   // hide walls the camera is outside of
+    jobTick();
     if (vr.active()) vr.tick(dt);
     else { smApply(dt); controls.update(); }
     renderer.render(scene, camera);

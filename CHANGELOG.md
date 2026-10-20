@@ -3,6 +3,13 @@
 The version is the configurator page's (`VERSION` in `web/index.html`, shown in its footer). The footer also shows
 the date the model data was built and the Printables file set it was solved for.
 
+## 0.11.0 - 2026-10-20
+- Cut the strut plates (playback): with Temporary struts, "Cut the strut plates" plays the G-code above on the
+  machine - the bit follows the job and a 1/4" MDF sheet at the cutting area's front-left corner is carved as it
+  goes (cnc-gcode-tools' stock simulator). Play / pause, 1-300x, a time slider to scrub; touching the position
+  sliders pauses it. At the end, "Install the plates" switches to Permanent. tests/test_strut_play.js checks that
+  the full job frees both plates (holes and outlines through, tabs left, faces untouched, no rapids in the stock).
+
 ## 0.10.0 - 2026-10-20
 - Strut plate G-code: "Download G-code" under the strut plates makes the FluidNC job for this size in the browser
   (both plates on one 1/4" MDF sheet along Y, bolt holes first, then each outline with tabs, 0.25 mm into the spoil
