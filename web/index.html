@@ -1294,9 +1294,14 @@ body.vr-on .stage { grid-row: 1; }
   let lidHidden = false;
   const groupOn = (g) => { const el = document.getElementById("g-" + g); return !el || el.checked; };
   const hiddenParts = new Set();                     // single parts hidden from VR (by name; kept across sizes)
+  // G-code playback: probing = the touch plate is out, so the shoe's bottom (skirt + bristles) is off, as you would
+  // take it off (user); jobBit = the file's own bit (from its ToolDef) is drawn instead of the model's Router_Bit
+  let probing = false, jobBit = false;
+  const PROBE_OFF = /^(Dust_Skirt|Bristles_TPU)/;
   function applyVisibility() {
     for (const m of meshes) m.visible = groupOn(m.userData.group) && variantOK(m) && !(lidHidden && isLid(m))
-      && !hiddenParts.has(m.userData.name);
+      && !hiddenParts.has(m.userData.name) && !(probing && PROBE_OFF.test(m.userData.name))
+      && !(jobBit && m.userData.name === "Router_Bit");
     const un = document.getElementById("unhide");
     un.hidden = !hiddenParts.size;
     un.textContent = `Show ${hiddenParts.size} hidden part${hiddenParts.size === 1 ? "" : "s"}`;
@@ -1384,6 +1389,17 @@ body.vr-on .stage { grid-row: 1; }
     sx.dataset.init = "1";
     move();
   }
+  function spinNut() {                               // the collet nut turns with the bit, about the model bit's axis
+    const nut = meshes.find((m) => m.userData.name === "Router_Nut"), bit = meshes.find((m) => m.userData.name === "Router_Bit");
+    if (!nut || !bit || !(JOB.spinning && JOB.spin)) return;
+    const g = bit.geometry;                          // a plain cylinder: its box centre is on the axis
+    if (!g.boundingBox) g.computeBoundingBox();
+    const ax = (g.boundingBox.min.x + g.boundingBox.max.x) / 2 * bit.scale.x + bit.position.x;
+    const ay = (g.boundingBox.min.y + g.boundingBox.max.y) / 2 * bit.scale.y + bit.position.y;
+    const c = Math.cos(JOB.spin), sn = Math.sin(JOB.spin), px = nut.position.x - ax, py = nut.position.y - ay;
+    nut.quaternion.setFromAxisAngle(ZUP, JOB.spin);
+    nut.position.x = ax + c * px - sn * py; nut.position.y = ay + sn * px + c * py;
+  }
   function move(pose) {
     // the parked pose is at -travel[0]; each motion frame moves by the slider's offset from it. pose = [dx, dy, dz]
     // (mm from the parked pose; the job playback) sets the sliders instead of reading them
@@ -1400,6 +1416,7 @@ body.vr-on .stage { grid-row: 1; }
       const b = m.userData.base || { t: [0, 0, 0], s: [1, 1, 1] };
       m.scale.set(b.s[0], b.s[1], b.s[2]);
       m.position.set(b.t[0] + (k === "core" ? dx : 0), b.t[1] + (k === "table" ? 0 : dy), b.t[2] + (k === "core" || k === "beam" ? dz : 0));
+      if (m.userData.name === "Router_Nut") m.quaternion.identity();
       const c = m.userData.clip;
       if (c) {                          // straight belt run (exported at full reach): cut where it meets the moving
         const [px, py, pz] = c.p;       // idler / pulley - Y runs: the gantry (dy); X runs: the core (dx + beam)
@@ -1407,6 +1424,7 @@ body.vr-on .stage { grid-row: 1; }
           c.axis === "y" ? new THREE.Vector3(px, py + dy, pz) : new THREE.Vector3(px + dx, py + dy, pz + dz));
       }
     }
+    spinNut();
     if (hoseMesh) updateHose(dx, dy, dz);
     const mm = !!pose, u = (v) => (mm ? v * IN : v);  // G-code playback: mm (machine position from the corner)
     document.getElementById("ux").textContent = document.getElementById("uy").textContent = mm ? "mm" : "in";
@@ -1709,7 +1727,7 @@ body.vr-on .stage { grid-row: 1; }
   // moves are drawn, M0 pauses pop up their MSG, G38.2 stops on the stock (touch plate shown), the stock from the
   // (Stock:) header is carved as it goes. Work zero = the cutting area's front-left corner, stock top. Touching the
   // position sliders pauses it. ----
-  const JOB = { tl: null, sim: null, group: null, done: null, plate: null, at: null, t: 0, k: 0, playing: false,
+  const JOB = { tl: null, sim: null, group: null, done: null, at: null, t: 0, k: 0, playing: false,
     key: "", seq: 0, src: null, file: null, pageJob: null, last: 0 };
   const MDF_RGB = [0.66, 0.52, 0.36];
   const MOVE_RGB = { rapid: [0.95, 0.55, 0.1], cut: [0.15, 0.45, 0.95], probe: [0.1, 0.75, 0.3] };
@@ -1821,14 +1839,15 @@ body.vr-on .stage { grid-row: 1; }
     return (geo.userData.touch = { L: V(L), W: V(W), N: V(N),
       pad: V(c).addScaledVector(V(L), at[0]).addScaledVector(V(W), at[1]).addScaledVector(V(N), at[2]) });
   }
-  function jobTouch(on) {
+  function jobTouch(pl) {                           // pl: the probe's tl.plates entry, or null = back on the core
     const parts = meshes.filter((m) => TOUCH_PARTS.includes(m.userData.name)), plate = parts.find((m) => m.userData.name === "TouchPlate");
-    if (!on || !plate) {                             // back on the core: move() places them again
+    if (probing !== !!(pl && plate)) { probing = !!(pl && plate); applyVisibility(); }   // skirt off while probing
+    if (!pl || !plate) {                             // back on the core: move() places them again
       const was = parts.some((m) => m.userData.held);
       for (const m of parts) { m.userData.held = false; m.quaternion.identity(); }
       return was;
     }
-    const f = touchFrame(plate.geometry), pl = JOB.plate, at = JOB.at;
+    const f = touchFrame(plate.geometry), at = JOB.at;
     const dir = new THREE.Vector3(1, -1, 0).normalize(), up = new THREE.Vector3(0, 0, 1), side = up.clone().cross(dir);
     const R = new THREE.Matrix4().makeBasis(dir, side, up).multiply(new THREE.Matrix4().makeBasis(f.L, f.W, f.N).transpose());
     const q = new THREE.Quaternion().setFromRotationMatrix(R);
@@ -1837,13 +1856,31 @@ body.vr-on .stage { grid-row: 1; }
     for (const m of parts) { m.userData.held = true; m.quaternion.copy(q); m.position.copy(pos); m.scale.set(1, 1, 1); }
     return true;
   }
+  // the bit as cnc-gcode-tools draws it (StockMeshRenderer.buildToolMesh + fluted: lathe profile, helical flute
+  // gullies), run unchanged against a stand-in gl that keeps the arrays; cutting part steel, shank lighter
+  function jobBitMesh(def) {
+    const tool = compileStockTool(def);
+    if (!tool) return null;
+    let cur = null;
+    const gl = { ARRAY_BUFFER: 0, STATIC_DRAW: 0, createBuffer: () => ({}), bindBuffer: (t, b) => { cur = b; },
+      bufferData: (t, data) => { cur.data = data; } };
+    const R = StockMeshRenderer.prototype, mb = R.buildToolMesh.call({ gl, fluted: R.fluted }, tool);
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute("position", new THREE.BufferAttribute(mb.position.data, 3));
+    geo.setAttribute("normal", new THREE.BufferAttribute(mb.normal.data, 3));
+    geo.addGroup(0, mb.cutterCount, 0); geo.addGroup(mb.cutterCount, mb.count - mb.cutterCount, 1);
+    return new THREE.Mesh(geo, [new THREE.MeshStandardMaterial({ color: 0x8c9198, metalness: 0.9, roughness: 0.3 }),
+      new THREE.MeshStandardMaterial({ color: 0xc4c8cc, metalness: 0.9, roughness: 0.25 })]);
+  }
   function jobClear() {
-    if (jobTouch(false) && meta) move();
+    if (jobTouch(null) && meta) move();
     if (JOB.group) {
       scene.remove(JOB.group);
       JOB.group.traverse((o) => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); });
     }
-    Object.assign(JOB, { tl: null, sim: null, group: null, done: null, ahead: null, stock: null, plate: null, t: 0, k: 0, key: "" });
+    Object.assign(JOB, { tl: null, sim: null, group: null, done: null, ahead: null, stock: null, bits: null, t: 0, k: 0, key: "",
+      spinning: false });
+    if (jobBit) { jobBit = false; applyVisibility(); }
     jobPlaying(false);
     $("job-pop").hidden = true;
   }
@@ -1871,6 +1908,18 @@ body.vr-on .stage { grid-row: 1; }
     if (!t || !tl.segs.length) { $("job-on").hidden = true; $("job-src").textContent = `${src.name}: no moves.`; return; }
     const bb = new THREE.Box3().setFromObject(t), cx = (bb.min.x + bb.max.x) / 2, cy = (bb.min.y + bb.max.y) / 2;
     const at = [cx - S.cutX / 2, cy - S.cutY / 2, bb.max.z - (tl.stock ? tl.stock.zmin : 0)];   // work zero, world mm
+    // ...on the model router's own axis: it sits ~0.8 mm off the nominal tool spot (placed by the dust shoe's notch),
+    // so measure the model bit at machine zero (a plain cylinder: its box centre is on the axis)
+    const mb = meshes.find((m) => m.userData.name === "Router_Bit");
+    if (mb) {
+      const tv0 = meta.travel;
+      move([tv0.x[0], tv0.y[0], 0]);
+      const g = mb.geometry;
+      if (!g.boundingBox) g.computeBoundingBox();
+      at[0] = (g.boundingBox.min.x + g.boundingBox.max.x) / 2 * mb.scale.x + mb.position.x;
+      at[1] = (g.boundingBox.min.y + g.boundingBox.max.y) / 2 * mb.scale.y + mb.position.y;
+      JOB.tipErr = g.boundingBox.min.z * mb.scale.z + mb.position.z - (bb.max.z + meta.tip_above_table);   // model tip vs tip_above_table
+    }
     Object.assign(JOB, { tl, at, src, key, group: new THREE.Group() });
     if (tl.stock && tl.tools.size) {
       JOB.sim = new StockSimulator(tl.stock, tl.tools, { maxCells: lite ? 1.2e5 : 4e5 });
@@ -1879,11 +1928,13 @@ body.vr-on .stage { grid-row: 1; }
       JOB.group.add(JOB.stock);
       jobUpdateMesh(true);
     }
+    JOB.bits = new Map();                            // T number -> its bit, shown while that tool's moves play
+    for (const [n, def] of tl.tools) { const b = jobBitMesh(def); if (b) { b.visible = false; JOB.bits.set(n, b); JOB.group.add(b); } }
+    if (JOB.bits.size && !jobBit) { jobBit = true; applyVisibility(); }
     const mv = jobMoves(tl, at);
     JOB.ahead = mv.ahead; JOB.done = mv.done;
     JOB.group.add(mv.ahead, mv.done);
     mv.ahead.visible = mv.done.visible = $("job-moves").checked;
-    JOB.plate = tl.plates[0] || null;                 // the modelled touch plate comes off the core for it (jobTouch)
     scene.add(JOB.group);
     const tv = meta.travel, b = tl.segs.reduce((r, sg) => [Math.min(r[0], sg.end.x), Math.max(r[1], sg.end.x), Math.min(r[2], sg.end.y),
       Math.max(r[3], sg.end.y)], [Infinity, -Infinity, Infinity, -Infinity]);
@@ -1906,11 +1957,19 @@ body.vr-on .stage { grid-row: 1; }
     if (carve && JOB.sim) JOB.sim.advanceTo(p.index, 15, p.progress);
     jobUpdateMesh(false);
     JOB.done.geometry.setDrawRange(0, 2 * p.index);
-    const pl = JOB.plate;                            // on the stock from its attach pause until resumed past the next
-    jobTouch(pl && JOB.t >= pl.t0 && (JOB.t < pl.t1 || (JOB.t === pl.t1 && !JOB.playing)));
+    // each probe (one per tool change): the plate on the stock from its attach pause until resumed past the next
+    jobTouch(tl.plates.find((q) => JOB.t >= q.t0 && (JOB.t < q.t1 || (JOB.t === q.t1 && !JOB.playing))) || null);
     const clamp = (v, r) => Math.min(Math.max(v, r[0]), r[1]);
     // work zero is the cutting area's corner = slider 0; the tip's height above the table = stock + work Z
-    move([clamp(p.x + tv.x[0], tv.x), clamp(p.y + tv.y[0], tv.y), at[2] + p.z - tableZ - meta.tip_above_table]);
+    const mx = clamp(p.x + tv.x[0], tv.x), my = clamp(p.y + tv.y[0], tv.y);
+    // the bit turns while the job runs, but not with the touch plate out (the router is off for the probe)
+    JOB.spinning = JOB.playing && !probing;
+    move([mx, my, at[2] + p.z - tableZ - meta.tip_above_table]);
+    if (JOB.bits) {
+      const sg = tl.segs[Math.min(p.index, tl.segs.length - 1)], b = JOB.bits.get(sg.toolNumber) || JOB.bits.values().next().value;
+      for (const q of JOB.bits.values()) q.visible = q === b;
+      if (b) { b.position.set(at[0] + mx - tv.x[0], at[1] + my - tv.y[0], at[2] + p.z); b.rotation.z = JOB.spinning ? JOB.spin : 0; }
+    }
     $("wx").textContent = p.x.toFixed(1); $("wy").textContent = p.y.toFixed(1); $("wz").textContent = p.z.toFixed(2);
     $("job-t").value = Math.round(JOB.t / tl.total * 1000);
     $("job-o").textContent = clock(JOB.t);
@@ -1931,13 +1990,14 @@ body.vr-on .stage { grid-row: 1; }
     $("job-resume").textContent = e.kind === "alarm" ? "Carry on anyway" : "Resume (cycle start)";
     $("job-pop").hidden = false;
     $("job-status").textContent = $("job-pop-msg").textContent;   // not the MSG lines after the M0 yet
-    if (JOB.plate) jobTouch(JOB.t >= JOB.plate.t0 && JOB.t <= JOB.plate.t1);
+    jobTouch(JOB.tl.plates.find((q) => JOB.t >= q.t0 && JOB.t <= q.t1) || null);
   }
   function jobTick() {
     const now = performance.now(), dt = Math.min((now - (JOB.last || now)) / 1000, 0.5);   // wall time: the speed holds on
     JOB.last = now;                                                                       // a slow GPU (tick's dt is capped)
     if (!JOB.tl) return;
     if (JOB.playing) {
+      JOB.spin = ((JOB.spin || 0) + dt * 2 * Math.PI * 2.7) % (2 * Math.PI);   // ~2.7 turns/s (not a whole half per capped frame)
       const r = GcodePlay.step(JOB.tl, JOB.t, dt, +$("job-speed").value, JOB.k);
       JOB.k = r.k;
       jobSeek(r.t);
@@ -1952,7 +2012,7 @@ body.vr-on .stage { grid-row: 1; }
     if (!JOB.playing && JOB.t >= JOB.tl.total) { jobSeek(0); JOB.k = 0; }
     jobPlaying(!JOB.playing);
   });
-  $("job-resume").addEventListener("click", () => jobPlaying(true));
+  $("job-resume").addEventListener("click", () => { $("job-pop").hidden = true; jobPlaying(true); });
   $("job-reset").addEventListener("click", () => { jobPlaying(false); $("job-pop").hidden = true; jobSeek(0); JOB.k = 0; });
   $("job-t").addEventListener("input", (e) => {
     if (!JOB.tl) return;

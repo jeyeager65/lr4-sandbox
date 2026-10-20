@@ -68,11 +68,17 @@
     const t = anim.segmentEndTimes, total = anim.totalAnimTime;
     const timeOf = (index) => (index > 0 ? t[Math.min(index, segs.length) - 1] : 0);
     const events = p.events.map((e) => Object.assign({}, e, { time: timeOf(e.index) }));
+    // one per probe (a job re-probes after each tool change): from the pause before it ("attach") to the pause
+    // after it ("remove"), only counting pauses with no cutting between them and the probe; without those, the
+    // probe + its retract
     const plates = [];
     segs.forEach((s, i) => {
       if (s.type !== "probe" || !s.probe) return;
-      const before = events.filter((e) => e.kind === "pause" && e.index <= i).pop();
-      const after = events.find((e) => e.kind === "pause" && e.index > i);
+      let c0 = i - 1, c1 = i + 1;
+      while (c0 >= 0 && segs[c0].type !== "cut") c0--;
+      while (c1 < segs.length && segs[c1].type !== "cut") c1++;
+      const before = events.filter((e) => e.kind === "pause" && e.index <= i && e.index > c0).pop();
+      const after = events.find((e) => e.kind === "pause" && e.index > i && e.index <= c1);
       plates.push({ x: s.start.x, y: s.start.y, z: s.probe.surface, thick: s.probe.plate,
         t0: before ? before.time : timeOf(i), t1: after ? after.time : timeOf(i + 2) });
     });

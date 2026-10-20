@@ -117,6 +117,26 @@ const ok = (cond, msg) => { checks++; if (!cond) { fails++; console.log("FAIL " 
     `G20 clock ${a.total.toFixed(2)} / ${b.total.toFixed(2)} / ${c.total.toFixed(2)} s`);
   console.log(`G20/G21: ${a.segs.length} moves the same in mm, inch and mixed files; ${a.total.toFixed(1)} s`);
 
+  // several tools: each tool change re-probes, so each probe gets its own touch plate window (attach -> remove
+  // pause), and a probe with no pauses next to it only the probe + retract - never through a tool's cutting
+  const tc = ["(CNCSIM 1 UNITS=mm)", "(Stock: XMIN=0 XMAX=100 YMIN=0 YMAX=100 ZMIN=-6 ZMAX=0)",
+    "(ToolDef 1: SHAPE=flat D=3.175 NAME=eighth)", "(ToolDef 2: SHAPE=flat D=6.35 NAME=quarter)", "G21 G90",
+    "T1", "G0 Z10", "G0 X6 Y6", "M0 (MSG, Attach Probe)", "G38.2 Z-50 F100 P0.5", "G0 Z10", "M0 (MSG, Remove Probe)",
+    "G0 X20 Y20", "G1 Z-2 F300", "G1 X60 F900", "G0 Z10",
+    "M0 (MSG, Change to T2)", "T2", "G0 X6 Y6", "M0 (MSG, Attach Probe)", "G38.2 Z-50 F100 P0.5", "G0 Z10", "M0 (MSG, Remove Probe)",
+    "G0 X20 Y40", "G1 Z-3 F300", "G1 X60 F900", "G0 Z10",
+    "G0 X80 Y80", "G38.2 Z-50 F100 P0.5", "G0 Z10", "G0 X20 Y60", "G1 Z-1 F300", "G1 X60 F900", "G0 Z10", "M0 (MSG, Done)", "M30"];
+  const m3 = await GP.load(tc.join("\n"));
+  const pz = m3.events.filter((e) => e.kind === "pause"), txt = (e) => GP.pauseText(m3, e);
+  const att = pz.filter((e) => /Attach/.test(txt(e))), rem = pz.filter((e) => /Remove/.test(txt(e)));
+  const probes = m3.segs.map((s, i) => [s, i]).filter(([s]) => s.type === "probe");
+  ok(!m3.events.some((e) => e.kind === "alarm") && probes.length === 3 && m3.plates.length === 3, `tool changes: ${probes.length} probes, ${m3.plates.length} plates`);
+  ok(m3.plates.slice(0, 2).every((q, n) => q.t0 === att[n].time && q.t1 === rem[n].time), `tool changes: plate windows = attach -> remove pauses`);
+  const [, i3] = probes[2], q3 = m3.plates[2], change = pz.find((e) => /Change to T2/.test(txt(e)));
+  ok(q3.t0 === m3.t[i3 - 1] && q3.t1 === m3.t[i3 + 1] && q3.t0 > rem[1].time, `tool changes: a probe without pauses = probe + retract (${q3.t0.toFixed(2)}-${q3.t1.toFixed(2)})`);
+  ok(m3.plates[0].t1 < change.time && m3.plates[1].t0 > change.time, `tool changes: no plate through the tool change`);
+  console.log(`tool changes: 3 probes, plates ${m3.plates.map((q) => `${q.t0.toFixed(1)}-${q.t1.toFixed(1)} s`).join(", ")}`);
+
   console.log(`${checks - fails}/${checks} checks passed`);
   process.exit(fails ? 1 : 0);
 })().catch((e) => { console.error(e); process.exit(1); });
