@@ -1,0 +1,1105 @@
+<title>LowRider4 Assembly</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=Barlow:wght@400;500&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: full-height workbench — a narrow spec panel docked left like a machine's control
+   pendant, the model filling the rest; on phones the panel drops below the model. */
+:root {
+  --bg: #e4e7ea;          /* shop-wall grey, a touch blue */
+  --panel: #f4f5f6;
+  --ink: #1c2126;
+  --muted: #5d6670;
+  --line: #cfd4d9;
+  --accent: #c8241b;      /* V1E red, the printed accent parts */
+  --accent-ink: #ffffff;
+  --scene-top: #d5dadf;
+  --scene-bottom: #f1f2f3;
+  --font-display: "Barlow Semi Condensed", "Arial Narrow", system-ui, sans-serif;
+  --font-body: "Barlow", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-data: "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #15181b; --panel: #1c2024; --ink: #e6e9ec; --muted: #9aa3ab; --line: #2e343a;
+    --accent: #ff5a4c; --accent-ink: #1a0a08; --scene-top: #262b31; --scene-bottom: #121417;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #15181b; --panel: #1c2024; --ink: #e6e9ec; --muted: #9aa3ab; --line: #2e343a;
+  --accent: #ff5a4c; --accent-ink: #1a0a08; --scene-top: #262b31; --scene-bottom: #121417;
+  color-scheme: dark;
+}
+html, body { height: 100%; }
+body {
+  background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 14px;
+  display: grid; grid-template-columns: minmax(280px, 330px) 1fr; overflow: hidden;
+}
+.panel {
+  background: var(--panel); border-right: 1px solid var(--line); overflow-y: auto;
+  padding-block: 18px 24px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: 16px;
+  display: flex; flex-direction: column; gap: 20px; min-width: 0;
+}
+h1 { font-family: var(--font-display); font-weight: 700; font-size: 30px; line-height: 1; margin: 0; letter-spacing: 0.01em; text-wrap: balance; }
+.sub { color: var(--muted); margin-top: 6px; line-height: 1.4; }
+h2 {
+  font-family: var(--font-display); font-weight: 600; font-size: 12px; text-transform: uppercase;
+  letter-spacing: 0.12em; color: var(--muted); margin: 0 0 10px;
+}
+section { display: flex; flex-direction: column; }
+.readout { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.readout div { border: 1px solid var(--line); border-radius: 4px; padding: 8px 8px 6px; min-width: 0; }
+.readout b { display: block; font-family: var(--font-display); font-weight: 600; font-size: 11px; letter-spacing: 0.1em; color: var(--muted); }
+.readout span { font-family: var(--font-data); font-size: 16px; font-variant-numeric: tabular-nums; }
+.readout small { font-family: var(--font-data); color: var(--muted); font-size: 11px; }
+.slider { display: grid; grid-template-columns: 22px 1fr 70px; align-items: center; gap: 8px; margin-top: 8px; }
+.slider label { font-family: var(--font-display); font-weight: 700; font-size: 15px; }
+.slider output { font-family: var(--font-data); font-size: 12px; text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
+input[type=range] { width: 100%; accent-color: var(--accent); }
+.sm { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin-top: 10px; }
+.sm-status { font-family: var(--font-data); font-size: 12px; color: var(--muted); }
+.sm-row { flex-basis: 100%; margin-top: 0; }
+.sm-check { display: flex; align-items: center; gap: 6px; font-size: 13px; cursor: pointer; }
+.sm-check input { accent-color: var(--accent); margin: 0; }
+.buttons { display: flex; flex-wrap: wrap; gap: 6px; }
+button {
+  font: 500 13px var(--font-body); color: var(--ink); background: transparent;
+  border: 1px solid var(--line); border-radius: 4px; padding: 6px 10px; cursor: pointer;
+}
+button:hover { border-color: var(--muted); }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.swatches { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; }
+.swatches label { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+.swatches input[type=color] { width: 36px; height: 28px; padding: 0; border: 1px solid var(--line); border-radius: 4px; background: none; cursor: pointer; }
+.groups { display: flex; flex-direction: column; gap: 2px; }
+.groups label { display: grid; grid-template-columns: 18px 1fr auto; gap: 8px; align-items: center; padding: 4px 0; cursor: pointer; }
+.groups input { accent-color: var(--accent); margin: 0; }
+.groups em { font-style: normal; font-family: var(--font-data); font-size: 12px; color: var(--muted); }
+.pick { border-left: 3px solid var(--accent); padding: 6px 0 6px 10px; min-height: 44px; }
+.pick strong { font-family: var(--font-display); font-weight: 600; font-size: 17px; display: block; }
+.pick p { margin: 2px 0 0; color: var(--muted); line-height: 1.4; }
+table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+td { padding: 4px 0; border-bottom: 1px solid var(--line); }
+td:last-child { text-align: right; font-family: var(--font-data); font-size: 12px; }
+.foot { color: var(--muted); font-size: 12px; line-height: 1.5; }
+.stage { position: relative; min-width: 0; min-height: 0; }
+canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+.status {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  font-family: var(--font-data); color: var(--muted); background: var(--panel);
+  border: 1px solid var(--line); border-radius: 4px; padding: 12px 16px; min-width: min(300px, 80vw);
+  box-shadow: 0 6px 24px rgb(0 0 0 / 0.12);
+}
+.status .bar { height: 6px; margin: 9px 0 7px; border-radius: 3px; background: var(--line); overflow: hidden; }
+.status .bar > div { height: 100%; width: 0; background: var(--accent); }
+.status .detail { font-size: 12px; }
+.hint {
+  position: absolute; right: max(12px, env(safe-area-inset-right, 0px)); bottom: 10px;
+  font-size: 12px; color: var(--muted); background: color-mix(in srgb, var(--panel) 80%, transparent);
+  padding: 4px 8px; border-radius: 4px;
+}
+.variant { display: flex; align-items: center; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+.variant span { font-size: 13px; }
+.variant button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.bom-open { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.bom-open span { color: var(--muted); font-size: 13px; line-height: 1.4; }
+dialog.bom {
+  width: min(1180px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); padding: 0; border: 1px solid var(--line);
+  border-radius: 6px; background: var(--panel); color: var(--ink); overflow: hidden;
+}
+dialog.bom[open] { display: flex; flex-direction: column; }
+dialog.bom::backdrop { background: rgb(0 0 0 / 0.45); }
+.bom-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 16px;
+  border-bottom: 1px solid var(--line); }
+.bom-head h2 { margin: 0; font-size: 14px; color: var(--ink); }
+.bom-tools { display: flex; gap: 6px; }
+.bom-body { overflow: auto; padding: 8px 16px 18px; }
+.bom-body details { border-bottom: 1px solid var(--line); }
+.bom-body summary { cursor: pointer; padding: 10px 0; font-family: var(--font-display); font-weight: 600; font-size: 16px;
+  list-style-position: outside; }
+.bom-body summary em { font-style: normal; font-family: var(--font-data); font-size: 12px; color: var(--muted); margin-left: 8px; }
+.bom-body .note { color: var(--muted); margin: 0 0 8px; line-height: 1.45; max-width: 90ch; }
+.bom-wrap { overflow-x: auto; margin-bottom: 12px; }
+.bom-body table { font-size: 13px; min-width: 560px; }
+.bom-body th { text-align: left; font-family: var(--font-display); font-weight: 600; font-size: 11px; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--muted); padding: 6px 10px 6px 0; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.bom-body td { padding: 5px 10px 5px 0; vertical-align: top; text-align: left; font-family: var(--font-body); font-size: 13px; }
+.bom-body td:last-child { text-align: left; font-family: var(--font-body); }
+.bom-body td.num { font-family: var(--font-data); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.bom-body td.ok { color: var(--muted); }
+.bom-body td.bad { color: var(--accent); font-weight: 500; }
+@media (max-width: 760px) {
+  body { grid-template-columns: 1fr; grid-template-rows: minmax(0, 58%) minmax(0, 42%); }
+  .stage { grid-row: 1; }
+  .panel { grid-row: 2; border-right: 0; border-top: 1px solid var(--line); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+  h1 { font-size: 24px; }
+}
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto; } }
+</style>
+
+<aside class="panel">
+  <header>
+    <h1>LowRider4</h1>
+    <div class="sub">V1E LowRider 4 for a 26 × 50 in cutting area, on a 40 × 65 in MDF sheet. Every printed part is the official STL, placed from its holes.</div>
+  </header>
+
+  <section aria-labelledby="h-pos">
+    <h2 id="h-pos">Tool position</h2>
+    <div class="readout">
+      <div><b>X</b><span id="rx">13.00</span> <small>in</small></div>
+      <div><b>Y</b><span id="ry">17.50</span> <small>in</small></div>
+      <div><b>Tip</b><span id="rz">42</span> <small>mm</small></div>
+    </div>
+    <div class="slider"><label for="sx">X</label><input id="sx" type="range" step="0.1"><output id="ox" for="sx"></output></div>
+    <div class="slider"><label for="sy">Y</label><input id="sy" type="range" step="0.1"><output id="oy" for="sy"></output></div>
+    <div class="slider"><label for="sz">Z</label><input id="sz" type="range" step="0.5"><output id="oz" for="sz"></output></div>
+  </section>
+
+  <section aria-labelledby="h-view">
+    <h2 id="h-view">View</h2>
+    <div class="buttons">
+      <button id="v-iso" type="button">Iso</button>
+      <button id="v-front" type="button">Front</button>
+      <button id="v-top" type="button">Top</button>
+      <button id="v-side" type="button">Y-rail side</button>
+      <button id="v-back" type="button">Back</button>
+      <button id="v-fit" type="button">Fit all</button>
+    </div>
+    <div class="sm">
+      <button id="sm-connect" type="button">Connect SpaceMouse</button>
+      <span id="sm-status" class="sm-status">Not connected</span>
+      <div class="slider sm-row"><label for="sm-speed" title="SpaceMouse sensitivity">⇄</label><input id="sm-speed" type="range" min="0.2" max="3" step="0.1" value="1"><output id="sm-speed-out" for="sm-speed">1.0×</output></div>
+      <label class="sm-check"><input id="sm-inv-t" type="checkbox"> Invert pan/zoom</label>
+      <label class="sm-check"><input id="sm-inv-r" type="checkbox"> Invert rotate</label>
+    </div>
+  </section>
+
+  <section aria-labelledby="h-colours">
+    <h2 id="h-colours">Print colours</h2>
+    <div class="swatches">
+      <label><input id="c-main" type="color" value="#292a2e"> Main</label>
+      <label><input id="c-accent" type="color" value="#cc1f1a"> Accent</label>
+      <button id="c-reset" type="button">Reset</button>
+    </div>
+  </section>
+
+  <section aria-labelledby="h-parts">
+    <h2 id="h-parts">Parts</h2>
+    <div class="groups" id="groups"></div>
+    <div class="variant" id="peter-variant" hidden><span>Peter Plates</span>
+      <button type="button" data-v="solid" aria-pressed="false">Solid</button>
+      <button type="button" data-v="honeycomb" aria-pressed="false">Honeycomb</button>
+      <button type="button" data-v="none" aria-pressed="false">None</button></div>
+  </section>
+
+  <section aria-labelledby="h-pick">
+    <h2 id="h-pick">Selected</h2>
+    <div class="pick" id="pick"><strong>Nothing selected</strong><p>Click a part to name it. Click empty space to clear.</p></div>
+  </section>
+
+  <section aria-labelledby="h-bom">
+    <h2 id="h-bom">Bill of materials</h2>
+    <div class="bom-open"><button id="bom-btn" type="button" disabled>Open the full BOM</button><span id="bom-sum">Loading…</span></div>
+  </section>
+
+  <section aria-labelledby="h-calc">
+    <h2 id="h-calc">Sizes (V1E calculator)</h2>
+    <table id="calc"><tbody>
+      <tr><td>Strut plates (2)</td><td>830 mm</td></tr>
+      <tr><td>X rails, 1" EMT (2)</td><td>827 mm</td></tr>
+      <tr><td>Y rail, 1" EMT</td><td>1525 mm</td></tr>
+      <tr><td>Belts: X / Y (2)</td><td>1010 / 1725 mm</td></tr>
+      <tr><td>Footprint (min)</td><td>953 × 1583 mm</td></tr>
+    </tbody></table>
+  </section>
+
+  <p class="foot">Every bolt, screw and nut of the V1E kit sits on its part's holes, head and nut on the sides the V1E docs show,
+  each one checked along its axis; threads and belt teeth are drawn. Approximate: Jackpot3 lid, power supply, router sizes and colours
+  (Makita-style shape, not yet measured), the X belt's end loop screws, vacuum hose (route sketched, OD a guess; it folds like a
+  drag chain as you move X). Printed parts are the full-resolution STLs.</p>
+</aside>
+
+<dialog class="bom" id="bom" aria-labelledby="bom-title">
+  <div class="bom-head"><h2 id="bom-title">Bill of materials</h2>
+    <div class="bom-tools"><button id="bom-all" type="button">Expand all</button><button id="bom-close" type="button">Close</button></div></div>
+  <div class="bom-body" id="bom-body"></div>
+</dialog>
+
+<main class="stage">
+  <canvas id="c" aria-label="3D model of the LowRider 4 assembly"></canvas>
+  <div class="status" id="status" role="status" aria-live="polite"><div id="status-title">Loading model…</div><div class="bar"><div id="status-bar"></div></div><div class="detail" id="status-detail">&nbsp;</div></div>
+  <div class="hint">Drag to orbit · right-drag to pan · scroll to zoom</div>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/environments/RoomEnvironment.js"></script>
+<script>
+(function () {
+  const IN = 25.4;
+  const GROUPS = [
+    ["Table", "Table + Y rail"], ["YZ_Min", "YZ Min side"], ["YZ_Max", "YZ Max side"], ["Beam", "Beam"],
+    ["Core", "Core + router"], ["Hose", "Vacuum hose"], ["Belts", "Belts"], ["Electronics", "Electronics + switches"],
+    ["Hardware", "Bolts + nuts"]];
+  const SOURCE = {
+    printed: "V1E printed part (STL from Printables)",
+    hardware: "Purchased hardware (simplified shape)",
+    made: "Cut part: MDF / aluminium"};
+  const canvas = document.getElementById("c");
+  const statusEl = document.getElementById("status");
+  const css = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.outputEncoding = THREE.sRGBEncoding;
+  renderer.localClippingEnabled = true;             // straight belt runs are cut at the moving gantry / core
+  const scene = new THREE.Scene();
+
+  // ---- metals: they only look like metal when they have something to reflect, so the metal parts get a soft
+  // studio environment (RoomEnvironment) as their envMap; the XZ plates also get a fine brushed grain ----
+  const envMap = new THREE.PMREMGenerator(renderer).fromScene(new THREE.RoomEnvironment(), 0.04).texture;
+  const brushed = (() => {
+    const c = document.createElement("canvas");
+    c.width = 512; c.height = 128;
+    const g = c.getContext("2d");
+    g.fillStyle = "rgb(200,200,200)"; g.fillRect(0, 0, 512, 128);
+    for (let i = 0; i < 1400; i++) {                 // long thin streaks along u
+      const v = 175 + Math.random() * 80, y = Math.random() * 128;
+      g.strokeStyle = `rgba(${v},${v},${v},${0.12 + Math.random() * 0.25})`;
+      g.lineWidth = 0.5 + Math.random() * 0.8;
+      const x = Math.random() * 512, len = 60 + Math.random() * 300;
+      g.beginPath(); g.moveTo(x, y); g.lineTo(x + len, y); g.stroke();
+      if (x + len > 512) { g.beginPath(); g.moveTo(x - 512, y); g.lineTo(x + len - 512, y); g.stroke(); }
+    }
+    const t = new THREE.CanvasTexture(c);
+    t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    return t;
+  })();
+  const spangle = (() => {                            // galvanizing: soft irregular crystal patches
+    const c = document.createElement("canvas");
+    c.width = c.height = 256;
+    const g = c.getContext("2d");
+    g.fillStyle = "rgb(225,225,225)"; g.fillRect(0, 0, 256, 256);
+    for (let i = 0; i < 420; i++) {
+      const v = 200 + Math.random() * 50, x = Math.random() * 256, y = Math.random() * 256, r = 4 + Math.random() * 14;
+      g.fillStyle = `rgba(${v},${v},${v},${0.12 + Math.random() * 0.22})`;
+      g.beginPath();
+      for (let k = 0; k < 7; k++) {                 // ragged polygon, wrapped at the tile edges
+        const a = k / 7 * Math.PI * 2 + Math.random() * 0.6, rr = r * (0.6 + Math.random() * 0.5);
+        g.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr);
+      }
+      g.fill();
+    }
+    const t = new THREE.CanvasTexture(c);
+    t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    t.encoding = THREE.sRGBEncoding;
+    return t;
+  })();
+  const FINISH = {                                    // colour (sRGB), roughness; all fully metallic
+    aluminium: { c: [0.86, 0.87, 0.89], r: 0.36 },
+    aluminium_plate: { c: [0.80, 0.81, 0.83], r: 0.40, brushed: true },
+    steel: { c: [0.72, 0.73, 0.75], r: 0.28 },
+    galvanized: { c: [0.79, 0.81, 0.83], r: 0.46, spangle: true },
+    rail_steel: { c: [0.56, 0.58, 0.61], r: 0.30 },
+    leadscrew: { c: [0.80, 0.81, 0.83], r: 0.30, thread: true },
+    thread: { c: [0.76, 0.77, 0.79], r: 0.30, thread: true },
+    brass: { c: [0.86, 0.69, 0.36], r: 0.32 }};
+  function creaseNormals(geo, deg) {                  // smooth across shallow angles, keep sharp edges sharp
+    const g = geo.index ? geo.toNonIndexed() : geo;
+    const P = g.attributes.position.array, nt = P.length / 9, fn = new Float32Array(nt * 3);
+    const key = (i) => `${Math.round(P[i] * 200)},${Math.round(P[i + 1] * 200)},${Math.round(P[i + 2] * 200)}`;
+    const at = new Map();
+    for (let t = 0; t < nt; t++) {
+      const o = t * 9;
+      const ax = P[o + 3] - P[o], ay = P[o + 4] - P[o + 1], az = P[o + 5] - P[o + 2];
+      const bx = P[o + 6] - P[o], by = P[o + 7] - P[o + 1], bz = P[o + 8] - P[o + 2];
+      let nx = ay * bz - az * by, ny = az * bx - ax * bz, nz = ax * by - ay * bx;
+      const l = Math.hypot(nx, ny, nz) || 1;
+      fn[t * 3] = nx / l; fn[t * 3 + 1] = ny / l; fn[t * 3 + 2] = nz / l;
+      for (let k = 0; k < 3; k++) { const kk = key(o + k * 3); (at.get(kk) || at.set(kk, []).get(kk)).push(t); }
+    }
+    const cos = Math.cos(deg * Math.PI / 180), N = new Float32Array(P.length);
+    for (let t = 0; t < nt; t++) for (let k = 0; k < 3; k++) {
+      let sx = 0, sy = 0, sz = 0;
+      for (const f of at.get(key(t * 9 + k * 3))) {
+        if (fn[f * 3] * fn[t * 3] + fn[f * 3 + 1] * fn[t * 3 + 1] + fn[f * 3 + 2] * fn[t * 3 + 2] < cos) continue;
+        sx += fn[f * 3]; sy += fn[f * 3 + 1]; sz += fn[f * 3 + 2];
+      }
+      const l = Math.hypot(sx, sy, sz) || 1, o = t * 9 + k * 3;
+      N[o] = sx / l; N[o + 1] = sy / l; N[o + 2] = sz / l;
+    }
+    g.setAttribute("normal", new THREE.BufferAttribute(N, 3));
+    return g;
+  }
+  const thread = (() => {                             // one tile = one lead (u, along the axis) x one turn (v)
+    const n = 256, c = document.createElement("canvas");
+    c.width = c.height = n;
+    const g = c.getContext("2d"), img = g.createImageData(n, n);
+    for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+      const t = ((4 * (x - y) / n) % 1 + 1) % 1;                 // 4 starts: crests where u - v = k / 4
+      const prof = Math.min(1, 1.6 * (1 - Math.abs(2 * t - 1)));  // trapezoid-ish (ACME) flank profile
+      const v = 70 + 185 * prof, i = (y * n + x) * 4;
+      img.data[i] = img.data[i + 1] = img.data[i + 2] = v; img.data[i + 3] = 255;
+    }
+    g.putImageData(img, 0, 0);
+    const t = new THREE.CanvasTexture(c);
+    t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    t.encoding = THREE.sRGBEncoding;
+    return t;
+  })();
+  const threadV = (() => {                            // per-part UVs from export_web: u = along / pitch, v = starts x turns
+    const n = 128, c = document.createElement("canvas");
+    c.width = c.height = n;
+    const g = c.getContext("2d"), img = g.createImageData(n, n);
+    for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+      const t = (((x - y) / n) % 1 + 1) % 1;                      // crest where u - v is a whole number
+      const prof = Math.min(1, 1.25 * (1 - Math.abs(2 * t - 1)));  // 60 deg V, small flats
+      const v = 55 + 200 * prof, i = (y * n + x) * 4;
+      img.data[i] = img.data[i + 1] = img.data[i + 2] = v; img.data[i + 3] = 255;
+    }
+    g.putImageData(img, 0, 0);
+    const t = new THREE.CanvasTexture(c);
+    t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    t.encoding = THREE.sRGBEncoding;
+    return t;
+  })();
+  function threadUV(g, lead) {                        // u = axial / lead, v = turns round the longest axis
+    g.computeBoundingBox();
+    const bb = g.boundingBox, lo = bb.min.toArray(), hi = bb.max.toArray();
+    const ax = [0, 1, 2].sort((a, b) => (hi[b] - lo[b]) - (hi[a] - lo[a]));
+    const ca = (lo[ax[1]] + hi[ax[1]]) / 2, cb = (lo[ax[2]] + hi[ax[2]]) / 2;
+    const P = g.attributes.position.array, uv = new Float32Array(P.length / 3 * 2);
+    for (let i = 0, j = 0; i < P.length; i += 3, j += 2) {
+      uv[j] = P[i + ax[0]] / lead;
+      uv[j + 1] = Math.atan2(P[i + ax[2]] - cb, P[i + ax[1]] - ca) / (2 * Math.PI);
+    }
+    g.setAttribute("uv", new THREE.BufferAttribute(uv, 2));
+  }
+  function tubeUV(g, s) {                             // cylindrical UVs round a tube's longest axis (mm per tile)
+    g.computeBoundingBox();
+    const bb = g.boundingBox, lo = bb.min.toArray(), hi = bb.max.toArray();
+    const ax = [0, 1, 2].sort((a, b) => (hi[b] - lo[b]) - (hi[a] - lo[a]));
+    const ca = (lo[ax[1]] + hi[ax[1]]) / 2, cb = (lo[ax[2]] + hi[ax[2]]) / 2, r = (hi[ax[1]] - lo[ax[1]]) / 2;
+    const P = g.attributes.position.array, uv = new Float32Array(P.length / 3 * 2);
+    for (let i = 0, j = 0; i < P.length; i += 3, j += 2) {
+      uv[j] = P[i + ax[0]] / s;
+      uv[j + 1] = Math.atan2(P[i + ax[2]] - cb, P[i + ax[1]] - ca) * r / s;   // seam where atan2 wraps: hard to spot
+    }
+    g.setAttribute("uv", new THREE.BufferAttribute(uv, 2));
+  }
+  function plateUV(g, su = 120, sv = 30) {            // planar UVs on a part's two long axes (mm per texture tile)
+    g.computeBoundingBox();
+    const s = g.boundingBox.getSize(new THREE.Vector3()).toArray(), ax = [0, 1, 2].sort((a, b) => s[b] - s[a]);
+    const P = g.attributes.position.array, uv = new Float32Array(P.length / 3 * 2);
+    for (let i = 0, j = 0; i < P.length; i += 3, j += 2) { uv[j] = P[i + ax[0]] / su; uv[j + 1] = P[i + ax[1]] / sv; }
+    g.setAttribute("uv", new THREE.BufferAttribute(uv, 2));
+  }
+  const camera = new THREE.PerspectiveCamera(35, 1, 5, 20000);
+  camera.up.set(0, 0, 1);
+  const controls = new THREE.OrbitControls(camera, canvas);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.12;
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x6b6157, 0.85));
+  const sun = new THREE.DirectionalLight(0xffffff, 0.75);
+  sun.position.set(-900, -1400, 2200);
+  scene.add(sun);
+  const fill = new THREE.DirectionalLight(0xffffff, 0.25);
+  fill.position.set(1600, 2000, 600);
+  scene.add(fill);
+
+  function paintBackground() {
+    const c = document.createElement("canvas");
+    c.width = 2; c.height = 256;
+    const g = c.getContext("2d");
+    const grad = g.createLinearGradient(0, 0, 0, 256);
+    grad.addColorStop(0, css("--scene-top") || "#d5dadf");
+    grad.addColorStop(1, css("--scene-bottom") || "#f1f2f3");
+    g.fillStyle = grad; g.fillRect(0, 0, 2, 256);
+    const tex = new THREE.CanvasTexture(c);
+    tex.encoding = THREE.sRGBEncoding;
+    scene.background = tex;
+  }
+  paintBackground();
+  window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", paintBackground);
+  new MutationObserver(paintBackground).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+
+  function resize() {
+    const r = canvas.parentElement.getBoundingClientRect();
+    renderer.setSize(Math.max(r.width, 1), Math.max(r.height, 1), false);
+    camera.aspect = Math.max(r.width, 1) / Math.max(r.height, 1);
+    camera.updateProjectionMatrix();
+  }
+  new ResizeObserver(resize).observe(canvas.parentElement);
+
+  let meta = null, meshes = [], center = new THREE.Vector3(), radius = 1500, selected = null;
+  const groupMeshes = {};
+
+  function frame(dir, dist) {
+    const d = new THREE.Vector3(...dir).normalize();
+    camera.position.copy(center).addScaledVector(d, dist || radius * 2.3);
+    controls.target.copy(center);
+    controls.update();
+  }
+
+  // loading popup: a title, a bar (0..1, or null to leave it) and a detail line
+  function progress(title, frac, detail) {
+    document.getElementById("status-title").textContent = title;
+    if (frac !== null) document.getElementById("status-bar").style.width = (100 * Math.min(1, frac)).toFixed(1) + "%";
+    document.getElementById("status-detail").textContent = detail || "\u00a0";
+  }
+  const MB = (n) => (n / 1e6).toFixed(1) + " MB";
+  const nextFrame = () => new Promise((res) => setTimeout(res, 0));   // yield so the popup repaints (rAF stalls in background tabs)
+  async function fetchBytes(url, onChunk) {           // the body as an ArrayBuffer, reporting each chunk's size
+    const r = await fetch(url);
+    if (!r.ok) throw new Error(url + " " + r.status);
+    if (!r.body) { const b = await r.arrayBuffer(); onChunk(b.byteLength); return b; }
+    const rd = r.body.getReader(), chunks = [];
+    let n = 0;
+    for (;;) {
+      const { done, value } = await rd.read();
+      if (done) break;
+      chunks.push(value); n += value.length; onChunk(value.length);
+    }
+    const out = new Uint8Array(n);
+    let o = 0;
+    for (const c of chunks) { out.set(c, o); o += c.length; }
+    return out.buffer;
+  }
+
+  async function load() {
+    // local copy (LowRider4_local.html, served from exports/web): one .bin per part, full detail, no size cap;
+    // the published page: one gzip + base64 text file (artifact files are text, 16 MB max)
+    const local = window.LR4_LOCAL === true;
+    progress("Loading model…", 0, "parts list");
+    const mr = await fetch(local ? "lr4_local.json" : "lr4.json");
+    if (!mr.ok) throw new Error((local ? "lr4_local.json " : "lr4.json ") + mr.status);
+    meta = await mr.json();
+    const bufs = [];
+    let bin = null;
+    if (local) {
+      const total = meta.parts.reduce((a, p) => a + p.bytes, 0);
+      let got = 0, done = 0, next = 0;
+      const tick = (n) => { got += n; progress("Downloading parts…", got / total, `${done} / ${meta.parts.length} parts · ${MB(got)} of ${MB(total)}`); };
+      const worker = async () => {
+        while (next < meta.parts.length) {
+          const i = next++;
+          bufs[i] = await fetchBytes(meta.parts[i].file, tick);
+          done++;
+        }
+      };
+      await Promise.all(Array.from({ length: 8 }, worker));
+    } else {
+      const total = meta.geometry_chars || 0;
+      let got = 0;
+      const raw = await fetchBytes("lr4_geometry.txt", (n) => { got += n;
+        progress("Downloading geometry…", total ? got / total : null, total ? `${MB(got)} of ${MB(total)}` : MB(got)); });
+      progress("Unpacking…", 1, "gzip");
+      await nextFrame();
+      const s = atob(new TextDecoder().decode(raw).trim()), u = new Uint8Array(s.length);
+      for (let i = 0; i < s.length; i++) u[i] = s.charCodeAt(i);
+      bin = await new Response(new Blob([u]).stream().pipeThrough(new DecompressionStream("gzip"))).arrayBuffer();
+    }
+    const box = new THREE.Box3();
+    for (const [pi, p] of meta.parts.entries()) {
+      if (pi % 40 === 0) {
+        progress("Building the scene…", pi / meta.parts.length, `${pi} / ${meta.parts.length} parts`);
+        await nextFrame();
+      }
+      const buf = local ? bufs[pi] : bin;
+      const pos = new Float32Array(buf, p.pos[0], p.pos[1] * 3);
+      const idx = p.idx[2] === 32 ? new Uint32Array(buf, p.idx[0], p.idx[1]) : new Uint16Array(buf, p.idx[0], p.idx[1]);
+      let geo = new THREE.BufferGeometry();
+      geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+      geo.setIndex(new THREE.BufferAttribute(idx, 1));
+      if (p.uv !== undefined) geo.setAttribute("uv", new THREE.BufferAttribute(new Float32Array(buf, p.uv, p.pos[1] * 2), 2));
+      const fin = FINISH[p.finish];
+      let mat;
+      if (fin) {                                      // metal: reflects the environment, smooth-shaded
+        geo = creaseNormals(geo, 35);
+        mat = new THREE.MeshStandardMaterial({
+          color: new THREE.Color().setRGB(...fin.c).convertSRGBToLinear(), metalness: 1.0, roughness: fin.r,
+          envMap, envMapIntensity: 1.0, side: THREE.DoubleSide});
+        if (fin.brushed) {
+          plateUV(geo);
+          Object.assign(mat, { roughnessMap: brushed, bumpMap: brushed, bumpScale: 0.04 });
+        }
+        if (fin.spangle) {
+          tubeUV(geo, 70);
+          Object.assign(mat, { map: spangle, roughnessMap: spangle });
+        }
+        if (fin.thread && p.uv !== undefined) {      // screw / leadscrew threads: a texture on a plain cylinder
+          Object.assign(mat, { map: threadV, bumpMap: threadV, bumpScale: 0.9 });
+        } else if (fin.thread) {                      // (older data) T8: 4 starts, 2 mm pitch, 8 mm lead
+          threadUV(geo, 8.0);
+          Object.assign(mat, { map: thread, bumpMap: thread, bumpScale: 1.2 });
+        }
+      } else {
+        mat = new THREE.MeshStandardMaterial({
+          color: new THREE.Color().setRGB(...p.color).convertSRGBToLinear(),
+          flatShading: true, roughness: 0.72, metalness: 0.0, side: THREE.DoubleSide});
+      }
+      if (p.clip) mat.clippingPlanes = [new THREE.Plane()];   // belt run: cut at its moving end (move())
+      const m = new THREE.Mesh(geo, mat);
+      m.userData = p;
+      scene.add(m);
+      meshes.push(m);
+      (groupMeshes[p.group] = groupMeshes[p.group] || []).push(m);
+      geo.computeBoundingBox();
+      box.union(geo.boundingBox);
+    }
+    if (meta.hose) makeHose();
+    setupBom();
+    box.getCenter(center);
+    radius = box.getSize(new THREE.Vector3()).length() / 2;
+    buildGroups();
+    setupVariants();
+    setupColours();
+    setupSliders();
+    progress("Ready", 1, `${meta.parts.length} parts · ${(meta.triangles / 1e6).toFixed(2)} M triangles`);
+    frame([1, -1.15, 0.85]);
+    await nextFrame();
+    statusEl.hidden = true;
+  }
+
+  // ---- Peter Plates: solid (stepper openings filled) or open honeycomb in a solid border - one shown at a time ----
+  let peterStyle = "solid";
+  // "none" hides both styles and the covers' M3s (peter_hw: the screws and their threads, shown with either style)
+  const variantOK = (m) => m.userData.peter_hw ? peterStyle !== "none"
+    : !m.userData.variant || m.userData.variant === peterStyle;
+  function setupVariants() {
+    const box = document.getElementById("peter-variant");
+    const have = new Set(meshes.map((m) => m.userData.variant).filter(Boolean));
+    if (have.size < 2) return;
+    have.add("none");
+    let saved = null;
+    try { saved = localStorage.getItem("peter-style"); } catch (e) { /* defaults */ }
+    peterStyle = saved && have.has(saved) ? saved : (meta.peter_style || "solid");
+    const apply = () => {
+      for (const m of meshes) {
+        if (!m.userData.variant && !m.userData.peter_hw) continue;
+        const grp = document.getElementById("g-" + m.userData.group);
+        m.visible = (!grp || grp.checked) && variantOK(m);
+        if (selected === m && !m.visible) select(null);
+      }
+      box.querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.v === peterStyle)));
+    };
+    box.querySelectorAll("button").forEach((b) => b.addEventListener("click", () => {
+      peterStyle = b.dataset.v;
+      try { localStorage.setItem("peter-style", peterStyle); } catch (e) { /* not kept */ }
+      apply();
+    }));
+    box.hidden = false;
+    apply();
+  }
+
+  // the Jackpot3 lid, its fan and their screws can be hidden on their own to see the board inside
+  const isLid = (m) => /^Jackpot3_(Lid|Fan)/.test(m.userData.name);
+  let lidHidden = false;
+  function buildGroups() {
+    const host = document.getElementById("groups");
+    for (const [key, label] of GROUPS) {
+      const list = groupMeshes[key] || [];
+      const nParts = list.filter((m) => !m.userData.of).length;
+      if (!list.length) continue;
+      const row = document.createElement("label");
+      row.innerHTML = `<input type="checkbox" id="g-${key}" checked><span>${label}</span><em>${nParts}</em>`;
+      row.querySelector("input").addEventListener("change", (e) => {
+        list.forEach((m) => (m.visible = e.target.checked && variantOK(m) && !(lidHidden && isLid(m))));
+        if (selected && !selected.visible) select(null);
+      });
+      host.appendChild(row);
+    }
+    const lid = meshes.filter(isLid);
+    if (lid.length) {
+      const row = document.createElement("label");
+      row.innerHTML = `<input type="checkbox" id="g-jp3lid" checked><span>Jackpot3 lid + fan</span><em>${lid.filter((m) => !m.userData.of).length}</em>`;
+      row.querySelector("input").addEventListener("change", (e) => {
+        lidHidden = !e.target.checked;
+        const grp = document.getElementById("g-" + lid[0].userData.group);
+        lid.forEach((m) => (m.visible = !lidHidden && (!grp || grp.checked) && variantOK(m)));
+        if (selected && !selected.visible) select(null);
+      });
+      host.appendChild(row);
+    }
+  }
+
+  // ---- print colours: the printed parts come in two colours (main, accent); the pickers recolour each set.
+  // The choice is kept in this browser only. ----
+  const PRINT_ROLE = { main: [0.16, 0.16, 0.18], accent: [0.80, 0.12, 0.10] };   // build.py PRINT_MAIN / PRINT_ACCENT
+  const PRINT_DEFAULT = { main: "#292a2e", accent: "#cc1f1a" };
+  function setupColours() {
+    for (const m of meshes) {
+      const p = m.userData;
+      if (p.source !== "printed") continue;
+      for (const [role, c] of Object.entries(PRINT_ROLE))
+        if (p.color.every((v, i) => Math.abs(v - c[i]) < 0.02)) p.role = role;
+    }
+    const pick = { main: document.getElementById("c-main"), accent: document.getElementById("c-accent") };
+    const apply = (role, hex) => {
+      const col = new THREE.Color(hex).convertSRGBToLinear();
+      for (const m of meshes) if (m.userData.role === role) m.material.color.copy(col);
+    };
+    for (const role of Object.keys(pick)) {
+      let saved = null;
+      try { saved = localStorage.getItem("print-" + role); } catch (e) { /* storage blocked: defaults */ }
+      if (saved && /^#[0-9a-f]{6}$/i.test(saved)) pick[role].value = saved;
+      apply(role, pick[role].value);
+      pick[role].addEventListener("input", () => {
+        apply(role, pick[role].value);
+        try { localStorage.setItem("print-" + role, pick[role].value); } catch (e) { /* not kept */ }
+      });
+    }
+    document.getElementById("c-reset").addEventListener("click", () => {
+      for (const role of Object.keys(pick)) {
+        pick[role].value = PRINT_DEFAULT[role];
+        apply(role, PRINT_DEFAULT[role]);
+        try { localStorage.removeItem("print-" + role); } catch (e) { /* fine */ }
+      }
+    });
+  }
+
+  // ---- travel sliders: X along the beam, Y along the table, Z by bit-tip height ----
+  const sx = document.getElementById("sx"), sy = document.getElementById("sy"), sz = document.getElementById("sz");
+  function setupSliders() {
+    const [cx, cy] = meta.cut_in, t = meta.travel;
+    sx.min = 0; sx.max = cx; sx.value = (-t.x[0] / IN).toFixed(1);
+    sy.min = 0; sy.max = cy; sy.value = (-t.y[0] / IN).toFixed(1);
+    sz.min = (meta.tip_above_table + t.z[0]).toFixed(1);
+    sz.max = (meta.tip_above_table + t.z[1]).toFixed(1);
+    sz.value = meta.tip_above_table.toFixed(1);
+    [sx, sy, sz].forEach((s) => s.addEventListener("input", move));
+    move();
+  }
+  function move() {
+    const t = meta.travel;
+    const dx = sx.value * IN + t.x[0], dy = sy.value * IN + t.y[0], dz = sz.value - meta.tip_above_table;
+    for (const m of meshes) {
+      const k = m.userData.motion;
+      if (k === "hose") continue;
+      if (k === "stretch") {            // Y belt run: scale in Y about its fixed holder end (exact for a straight run)
+        const [a, e] = m.userData.stretch, sc = (e - a + dy) / (e - a);
+        m.scale.y = sc; m.position.set(0, a * (1 - sc), 0);
+        continue;
+      }
+      if (k === "stretch_x") {          // X belt run: rides the beam (Y + Z), scaled in X about its fixed end
+        const [a, e] = m.userData.stretch, sc = (e - a + dx) / (e - a);
+        m.scale.x = sc; m.position.set(a * (1 - sc), dy, dz);
+        continue;
+      }
+      m.position.set(k === "core" ? dx : 0, k === "table" ? 0 : dy, k === "core" || k === "beam" ? dz : 0);
+      const c = m.userData.clip;
+      if (c) {                          // straight belt run (exported at full reach): cut where it meets the moving
+        const [px, py, pz] = c.p;       // idler / pulley - Y runs: the gantry (dy); X runs: the core (dx + beam)
+        m.material.clippingPlanes[0].setFromNormalAndCoplanarPoint(new THREE.Vector3(...c.n),
+          c.axis === "y" ? new THREE.Vector3(px, py + dy, pz) : new THREE.Vector3(px + dx, py + dy, pz + dz));
+      }
+    }
+    if (hoseMesh) updateHose(dx, dy, dz);
+    document.getElementById("rx").textContent = Number(sx.value).toFixed(2);
+    document.getElementById("ry").textContent = Number(sy.value).toFixed(2);
+    document.getElementById("rz").textContent = Number(sz.value).toFixed(0);
+    document.getElementById("ox").textContent = `${Number(sx.value).toFixed(1)} / ${sx.max}`;
+    document.getElementById("oy").textContent = `${Number(sy.value).toFixed(1)} / ${sy.max}`;
+    document.getElementById("oz").textContent = `${Number(sz.value).toFixed(0)} mm`;
+  }
+
+  // ---- vacuum hose: clamped in the Min-end holder; between the clamp and the core it folds like a drag
+  // chain (lower run in the trays, U-turn, upper run on top back to the core), so it is re-swept for every
+  // pose. hoseRoute mirrors lr4.hose_route (Python) - keep the two in step. ----
+  let hoseMesh = null, hoseWire = null;
+  function hoseRoute(h, dx, dz) {
+    const r = h.od / 2, od = h.od, R = h.loop_r;
+    const px = h.port[0] + dx, py = h.port[1], pz = h.port[2] - h.cuff_in;
+    const ztop = h.top + h.clear + r;
+    const ty = h.tray_y, tz = h.tray_z, [x0, x1, zl] = h.bump, zb = Math.max(zl + r + 2.0, tz);
+    const xa = h.clamp_x, xn = h.bump_next;
+    const trayZ = (x) => {
+      if (x >= xa && x < x0) return tz + (zb - tz) * (x - xa) / (x0 - xa);
+      if (x >= x0 && x <= x1) return zb;
+      if (x > x1 && x < xn) return zb + (tz - zb) * (x - x1) / (xn - x1);
+      return tz;
+    };
+    const runXs = (hi, lo) => {
+      const cor = [xn, x1, x0, xa], xs = [];
+      const brk = [xn - 30, xn + 30, x1 - 30, x1 + 30, x0 + 30, xa].filter((b) => lo <= b && b < hi);
+      for (let x = hi; x > lo; x -= h.pitch) if (cor.every((b) => Math.abs(x - b) > 40) && brk.every((b) => Math.abs(x - b) > 25)) xs.push(x);
+      return xs.concat(brk).sort((a, b) => b - a);
+    };
+    const Rb = h.rise_r, T = h.turn, L = h.out_dx, zc = h.over_z, yh = h.tie_y, zr = h.tie_z;
+    const pts = [[px, py, pz, "core"], [px, py, (pz + zc - Rb) / 2, "core"]];
+    for (let k = 0; k < 5; k++) {
+      const a = 22.5 * k * Math.PI / 180;
+      pts.push([px, py + Rb * (1 - Math.cos(a)), zc - Rb + Rb * Math.sin(a), "core"]);
+    }
+    for (let k = 0; k < 5; k++) {
+      const a = (180 - 22.5 * k) * Math.PI / 180;
+      pts.push([px + T + T * Math.cos(a), yh - T + T * Math.sin(a), zc + (zr - zc) * k / 4, "core"]);
+    }
+    const xe = px + h.core_end_dx, zt = zr;
+    const ch = h.uturn_gap, Ld = L, xu = Math.max(xe + ch, (h.run + xa + xe) / 2), g = xu - xe;
+    const Ly = Math.min(L, g), Af = (Ly / L) ** 2, dip = Math.min(1, (g / (2 * Ld)) ** 2);
+    const [ry, rz, rr] = h.rail_up;
+    const nest = (zl) => {                       // on the lower hose (ty, zl), against the upper X rail
+      const ay = ty, az = zl, ra = od + 1.0, rb = r + rr + 1.0, d = Math.hypot(ry - ay, rz - az);
+      const a_ = (ra * ra - rb * rb + d * d) / (2 * d), hh = Math.sqrt(Math.max(ra * ra - a_ * a_, 0));
+      const py_ = ay + a_ * (ry - ay) / d, pz_ = az + a_ * (rz - az) / d;
+      return [py_ + hh * (rz - az) / d, pz_ - hh * (ry - ay) / d];
+    };
+    const S = (q) => (1 - Math.cos(Math.PI * Math.min(Math.max(q, 0), 1))) / 2;
+    const S5 = (q) => { const v = Math.min(Math.max(q, 0), 1); return v * v * v * (v * (6 * v - 15) + 10); };
+    const yu = yh + (nest(trayZ(xu))[0] - yh) * Af;
+    const reach = (x0) => Math.min(1, Math.max(0, (xu + R + r - x0 + 40) / 40));
+    let zu = zt;
+    for (const [x0, x1, ey, ez0, fr] of h.plates) {
+      const ez = fr === "gantry" ? ez0 - dz : ez0;
+      if (ez + r + 3 > zt) zu = Math.max(zu, zt + (ez + r + 3 - zt) * reach(x0));
+    }
+    const dyz = [ty - yu, tz - zu], Lc = Math.hypot(dyz[0], dyz[1]);
+    const u = [dyz[0] / Lc, dyz[1] / Lc], nv = [-u[1], u[0]];
+    let bulge = 0;
+    for (const [x0, x1, ey, ez0, fr] of h.plates) {
+      const ez = fr === "gantry" ? ez0 - dz : ez0;
+      const cy = ey - yu, cz = ez - zu;
+      const sc = nv[0] * cy + nv[1] * cz, tc = (u[0] * cy + u[1] * cz) / Lc;
+      if (tc > 0 && tc < 1 && sc > -(r + 3)) {
+        const need = (r + 3 + sc) / Math.sqrt(Math.max(0.2, 1 - (1 - 2 * tc) ** 2));
+        bulge = Math.max(bulge, need * reach(x0));
+      }
+    }
+    const x0s = px + T, nseg = Math.max(2, Math.ceil((xu - x0s) / 20.0));
+    for (let i = 1; i < nseg; i++) {
+      const x = x0s + (xu - x0s) * i / nseg;
+      if (x <= xe) { pts.push([x, yh, zr, "core"]); continue; }
+      const t = x - xe, [ys, zs] = nest(trayZ(x)), zl = zt + (zu - zt) * S(t / g);
+      pts.push([x, yh + (ys - yh) * Af * S5(t / Ly), zl - (zl - zs) * dip * S5(t / Ld) * S5((g - t) / Ld), "beam"]);
+    }
+    const acc = Math.hypot(dyz[0] / 2 + 2 * bulge * nv[0], dyz[1] / 2 + 2 * bulge * nv[1]);
+    const Rx = Math.max(R, Math.sqrt(40.0 * acc));
+    for (let k = g >= 30 ? 0 : 1; k < 13; k++) {
+      const a = (90 - 15 * k) * Math.PI / 180, f = (1 - Math.sin(a)) / 2, b = bulge * Math.cos(a) ** 2;
+      pts.push([xu + Rx * Math.cos(a), yu + f * dyz[0] + b * nv[0], zu + f * dyz[1] + b * nv[1], "beam"]);
+    }
+    pts.push([xu - 40, ty, trayZ(xu - 40), "beam"]);
+    for (const x of runXs(xu - 100, Math.max(xa, h.exit_x + 60))) pts.push([x, ty, trayZ(x), "beam"]);
+    pts.push([h.exit_x, ty, trayZ(h.exit_x), "beam"]);
+    const [ddx, ddy, ddz] = h.drop;
+    pts.push([h.exit_x + ddx * 0.55, ty + ddy * 0.4, tz + ddz * 0.25, "beam"]);
+    pts.push([h.exit_x + ddx, ty + ddy, tz + ddz, "beam"]);
+    pts.push([h.exit_x + h.floor[0], h.floor_y, h.table_t + h.floor[2], "table"]);
+    return pts;
+  }
+  function makeHose() {
+    // clear PVC with a steel wire helix: one tile = one turn (u along the hose, v round it), the wire a
+    // diagonal line across it, the rest translucent
+    const c = document.createElement("canvas");
+    c.width = c.height = 64;
+    const g = c.getContext("2d");
+    g.fillStyle = "rgba(225,233,238,0.30)"; g.fillRect(0, 0, 64, 64);
+    g.strokeStyle = "rgba(95,100,106,1)"; g.lineWidth = 7;
+    for (const o of [-64, 0, 64]) { g.beginPath(); g.moveTo(o, 0); g.lineTo(o + 64, 64); g.stroke(); }
+    hoseWire = new THREE.CanvasTexture(c);
+    hoseWire.wrapS = hoseWire.wrapT = THREE.RepeatWrapping;
+    hoseWire.encoding = THREE.sRGBEncoding;
+    const mat = new THREE.MeshStandardMaterial({ map: hoseWire, transparent: true, depthWrite: false,
+      roughness: 0.25, metalness: 0.1, side: THREE.DoubleSide });
+    hoseMesh = new THREE.Mesh(new THREE.BufferGeometry(), mat);
+    hoseMesh.renderOrder = 1;
+    hoseMesh.userData = { label: `Vacuum hose, Fulton 2-1/2" clear PVC wire (${meta.hose.od} mm OD, GUESS)`,
+      source: "hardware", group: "Hose", motion: "hose" };
+    scene.add(hoseMesh);
+    meshes.push(hoseMesh);
+    groupMeshes.Hose = [hoseMesh];
+    const cable = (label, rgb, rough) => {
+      const mm = new THREE.Mesh(new THREE.BufferGeometry(), new THREE.MeshStandardMaterial({
+        color: new THREE.Color(...rgb).convertSRGBToLinear(), roughness: rough, metalness: 0.0 }));
+      mm.userData = { label, source: "hardware", group: "Hose", motion: "hose" };
+      scene.add(mm);
+      meshes.push(mm);
+      groupMeshes.Hose.push(mm);
+      return mm;
+    };
+    if (meta.hose.cord) cordMesh = cable(`Router cord (${meta.hose.cord.d} mm), zip-tied along the hose`, [0.07, 0.07, 0.08], 0.6);
+    if (meta.hose.sleeve) sleeveMesh = cable(`Cable sleeve, ${meta.hose.sleeve.d} mm braided (X motor, X endstop, touch plate; GUESS)`,
+      [0.12, 0.12, 0.13], 0.85);
+  }
+  function updateHose(dx, dy, dz) {
+    const pts = hoseRoute(meta.hose, dx, dz).map(([x, y, z, f]) =>
+      f === "table" ? new THREE.Vector3(x, y, z) : new THREE.Vector3(x, y + dy, z + dz));
+    const curve = new THREE.CatmullRomCurve3(pts, false, "centripetal");
+    const len = curve.getLength();
+    hoseMesh.geometry.dispose();
+    hoseMesh.geometry = new THREE.TubeGeometry(curve, Math.ceil(len / 4), meta.hose.od / 2, 28, false);
+    hoseWire.repeat.set(len / 10, 1);                    // wire pitch ~10 mm
+    if (cordMesh || sleeveMesh) {                        // cord + sleeve tied along it: low-poly, rebuilt with it
+      const dense = curve.getPoints(12 * (pts.length - 1)).map((p) => [p.x, p.y, p.z]);
+      const tube = (mesh, cp, d) => {
+        const cc = new THREE.CatmullRomCurve3(cp.map((p) => new THREE.Vector3(...p)), false, "centripetal");
+        mesh.geometry.dispose();
+        mesh.geometry = new THREE.TubeGeometry(cc, Math.ceil(cc.getLength() / 12), d / 2, 8, false);
+      };
+      const c = meta.hose.cord, sh = (p) => [p[0] + dx, p[1] + dy, p[2] + dz];
+      if (cordMesh) tube(cordMesh, cordRoute(dense, meta.hose, c, sh(c.tip), sh(c.tip2), dx), c.d);
+      if (sleeveMesh) tube(sleeveMesh, cordRoute(dense, meta.hose, meta.hose.sleeve, null, null, dx, [0, dy, dz]), meta.hose.sleeve.d);
+    }
+  }
+  // cordRoute mirrors lr4.cord_route (Python) - keep the two in step
+  let cordMesh = null, sleeveMesh = null;
+  function cordRoute(curve, h, c, tip, tip2, dx, pose) {
+    const dist = (p, q) => Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2]);
+    const xStart = h.port[0] + dx + h.turn + 10.0, xe = h.port[0] + dx + h.core_end_dx;
+    const i0 = curve.findIndex((p) => p[0] >= xStart);
+    let iTurn = 0;
+    for (let i = 1; i < curve.length; i++) if (curve[i][0] > curve[iTurn][0]) iTurn = i;
+    let iEnd = iTurn;
+    for (let i = i0; i < iTurn; i++) if (curve[i][0] >= xe) { iEnd = i; break; }
+    const arc = [0];
+    for (let i = 1; i < curve.length; i++) arc.push(arc[i - 1] + dist(curve[i], curve[i - 1]));
+    const square = (v, t) => {               // v made square to the unit tangent t, unit length (or null)
+      const k = v.reduce((s, x, q) => s + x * t[q], 0);
+      const w = v.map((x, q) => x - k * t[q]), wl = Math.hypot(...w);
+      return wl > 1e-6 ? w.map((x) => x / wl) : null;
+    };
+    const cross = (t, e) => [t[1] * e[2] - t[2] * e[1], t[2] * e[0] - t[0] * e[2], t[0] * e[1] - t[1] * e[0]];
+    // a frame carried along the hose (e1 up at the core-top run's start): each cable's place is an angle in it
+    const tans = [], e1s = [];
+    let e1 = null;
+    for (let i = i0; i < curve.length; i++) {
+      const a = curve[Math.max(i - 1, 0)], b = curve[Math.min(i + 1, curve.length - 1)];
+      const tn = dist(a, b) || 1, t = b.map((v, k) => (v - a[k]) / tn);
+      e1 = square(e1 || [0, 0, 1], t) || e1;
+      tans[i] = t; e1s[i] = e1;
+    }
+    const ang = (v, i) => {
+      const e = e1s[i], e2 = cross(tans[i], e);
+      return Math.atan2(v.reduce((s, x, q) => s + x * e2[q], 0), v.reduce((s, x, q) => s + x * e[q], 0));
+    };
+    const at = (s_) => { let best = i0; for (let i = i0; i < curve.length; i++) if (Math.abs(arc[i] - s_) < Math.abs(arc[best] - s_)) best = i; return best; };
+    const a1 = arc[iEnd], a2 = arc[iTurn];
+    const keys = [a1, a1 + c.wrap, a2 - c.turn_blend, a2 + c.turn_blend];
+    for (let k = 1; k < keys.length; k++) keys[k] = Math.max(keys[k], keys[k - 1]);
+    const th = [ang(c.core_side, i0), ang(c.up_dir, at(keys[1])), 0, ang(c.lo_dir, at(keys[3]))];
+    th[2] = th[1];
+    for (let k = 1; k < th.length; k++) {   // (no jumps across +-180)
+      while (th[k] - th[k - 1] > Math.PI) th[k] -= 2 * Math.PI;
+      while (th[k] - th[k - 1] < -Math.PI) th[k] += 2 * Math.PI;
+    }
+    const rads = [c.core_r, c.up_r, c.up_r, c.lo_r];
+    let pts = [], acc = c.step;
+    for (let i = i0; i < curve.length; i++) {
+      if (i > i0) acc += arc[i] - arc[i - 1];
+      if (acc < c.step && i !== curve.length - 1) continue;
+      acc = 0;
+      const s = arc[i];
+      let k = keys.findIndex((q) => s < q);
+      if (k < 0) k = keys.length;
+      let q, r;
+      if (k === 0) { q = th[0]; r = rads[0]; }
+      else if (k === keys.length) { q = th[th.length - 1]; r = rads[rads.length - 1]; }
+      else {
+        const w = (s - keys[k - 1]) / ((keys[k] - keys[k - 1]) || 1);
+        q = (1 - w) * th[k - 1] + w * th[k];
+        r = (1 - w) * rads[k - 1] + w * rads[k] + (k === 1 ? c.lift * Math.sin(Math.PI * w) : 0);
+      }
+      const e = e1s[i], e2 = cross(tans[i], e);
+      pts.push(curve[i].map((x, j) => x + (Math.cos(q) * e[j] + Math.sin(q) * e2[j]) * r));
+      if (c.exit && i > iTurn && pts[pts.length - 1][0] < c.exit.x) break;
+    }
+    if (c.exit) {                            // off the lower run, down into the box's opening (it rides the beam)
+      const sh = (p) => p.map((v, k) => v + (pose ? pose[k] : 0));
+      const e = sh(c.exit.p), d = c.exit.d, last = pts[pts.length - 1], via = (c.exit.via || []).map(sh);
+      const pOut = e.map((v, k) => v - d[k] * 12.0), first = via.length ? via[0] : pOut;
+      const n = Math.max(1, Math.floor(Math.hypot(...first.map((v, k) => v - last[k])) / 35.0));
+      for (let k = 1; k <= n; k++) {           // a gradual descent (eased) to the first via point
+        const f = k / (n + 1), e_ = (1 - Math.cos(Math.PI * f)) / 2;
+        pts.push([last[0] + (first[0] - last[0]) * f, last[1] + (first[1] - last[1]) * e_, last[2] + (first[2] - last[2]) * e_]);
+      }
+      pts.push(...via);
+      pts.push(pOut, e.map((v, k) => v - d[k] * 1.0));   // stops at the wall, the wires go in
+    }
+    if (tip) {                               // from the router: out of the stub, then straight back
+      const td = tip2.map((v, k) => v - tip[k]), tl = Math.hypot(...td);
+      const p1 = tip.map((v, k) => v + td[k] / tl * c.lead);
+      pts = [tip, p1, [p1[0], pts[0][1], (p1[2] + pts[0][2]) / 2]].concat(pts);
+    }
+    return pts;
+  }
+
+  // ---- bill of materials (build/bom.json via lr4.json): one collapsible section per table ----
+  function setupBom() {
+    const secs = meta.bom || [], body = document.getElementById("bom-body"), dlg = document.getElementById("bom");
+    const btn = document.getElementById("bom-btn"), sum = document.getElementById("bom-sum");
+    if (!secs.length) { sum.textContent = "Not in this export."; return; }
+    for (const s of secs) {
+      const d = document.createElement("details"), sm = document.createElement("summary");
+      sm.textContent = s.title;
+      const em = document.createElement("em");
+      em.textContent = `${s.rows.length} row${s.rows.length === 1 ? "" : "s"}`;
+      sm.appendChild(em);
+      d.appendChild(sm);
+      if (s.note) { const n = document.createElement("p"); n.className = "note"; n.textContent = s.note; d.appendChild(n); }
+      const wrap = document.createElement("div"), t = document.createElement("table");
+      wrap.className = "bom-wrap";
+      const hr = t.createTHead().insertRow();
+      for (const c of s.columns) { const th = document.createElement("th"); th.textContent = c; hr.appendChild(th); }
+      const tb = t.createTBody();
+      for (const r of s.rows) {
+        const tr = tb.insertRow();
+        r.forEach((v, i) => {
+          const td = tr.insertCell();
+          td.textContent = v === null ? "" : String(v);
+          if (typeof v === "number") td.className = "num";
+          if (s.columns[i] === "Check") td.className = String(v).startsWith("CHECK") ? "bad" : "ok";
+        });
+      }
+      wrap.appendChild(t);
+      d.appendChild(wrap);
+      body.appendChild(d);
+    }
+    const hwSec = secs.find((s) => s.title.startsWith("Hardware: where"));
+    const nFast = hwSec ? hwSec.rows.reduce((a, r) => a + (Number(r[0]) || 0), 0) : 0;
+    const nBad = hwSec ? hwSec.rows.filter((r) => String(r[r.length - 1]).startsWith("CHECK")).length : 0;
+    sum.textContent = `${secs.length} sections · ${nFast} fasteners checked` + (nBad ? `, ${nBad} to look at` : ", all OK");
+    btn.disabled = false;
+    btn.addEventListener("click", () => dlg.showModal());
+    document.getElementById("bom-close").addEventListener("click", () => dlg.close());
+    dlg.addEventListener("click", (e) => { if (e.target === dlg) dlg.close(); });
+    const all = document.getElementById("bom-all");
+    all.addEventListener("click", () => {
+      const ds = [...body.querySelectorAll("details")], open = !ds.every((d) => d.open);
+      ds.forEach((d) => (d.open = open));
+      all.textContent = open ? "Collapse all" : "Expand all";
+    });
+  }
+
+  // ---- picking ----
+  const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
+  let down = null;
+  canvas.addEventListener("pointerdown", (e) => (down = [e.clientX, e.clientY]));
+  canvas.addEventListener("pointerup", (e) => {
+    if (!down || Math.hypot(e.clientX - down[0], e.clientY - down[1]) > 5) return;
+    const r = canvas.getBoundingClientRect();
+    ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+    ray.setFromCamera(ndc, camera);
+    const hit = ray.intersectObjects(meshes.filter((m) => m.visible), false)[0];
+    select(hit ? hit.object : null);
+  });
+  function select(m) {
+    if (selected) selected.material.emissive.setHex(0x000000);
+    selected = m;
+    const box = document.getElementById("pick");
+    if (!m) {
+      box.innerHTML = "<strong>Nothing selected</strong><p>Click a part to name it. Click empty space to clear.</p>";
+      return;
+    }
+    m.material.emissive.set(css("--accent") || "#c8241b");
+    m.material.emissiveIntensity = 0.45;
+    const p = m.userData, grp = (GROUPS.find((g) => g[0] === p.group) || [0, p.group])[1];
+    box.innerHTML = `<strong></strong><p></p>`;
+    box.querySelector("strong").textContent = p.label;
+    box.querySelector("p").textContent = `${SOURCE[p.source] || p.source} · ${grp}`;
+  }
+
+  // ---- views ----
+  const views = { iso: [1, -1.15, 0.85], front: [0, -1, 0.18], top: [0, -0.001, 1], side: [1, 0, 0.18], back: [-0.6, 1, 0.55] };
+  for (const [k, d] of Object.entries(views)) document.getElementById("v-" + k).addEventListener("click", () => frame(d));
+  document.getElementById("v-fit").addEventListener("click", () => {
+    const d = camera.position.clone().sub(controls.target);
+    frame([d.x, d.y, d.z]);
+  });
+
+  // ---- SpaceMouse (3Dconnexion) over WebHID, Chrome / Edge. Object mode: push the cap and the model goes
+  // that way (X pans across, lift/press pans up/down, push away/pull zooms); tilt and twist orbit round the
+  // target. Left button = fit all, right button = iso. ----
+  const sm = { t: [0, 0, 0], r: [0, 0, 0], last: 0, dev: null };
+  const smStatus = document.getElementById("sm-status"), smSpeed = document.getElementById("sm-speed");
+  const smInvT = document.getElementById("sm-inv-t"), smInvR = document.getElementById("sm-inv-r");
+  const store = { get: (k) => { try { return localStorage.getItem(k); } catch (e) { return null; } },
+                  set: (k, v) => { try { localStorage.setItem(k, v); } catch (e) { /* storage blocked: fine */ } } };
+  if (store.get("sm-speed")) smSpeed.value = store.get("sm-speed");
+  smInvT.checked = store.get("sm-inv-t") === "1";
+  smInvR.checked = store.get("sm-inv-r") === "1";
+  const smSpeedOut = () => (document.getElementById("sm-speed-out").textContent = `${Number(smSpeed.value).toFixed(1)}×`);
+  smSpeedOut();
+  smSpeed.addEventListener("input", () => { smSpeedOut(); store.set("sm-speed", smSpeed.value); });
+  smInvT.addEventListener("change", () => store.set("sm-inv-t", smInvT.checked ? "1" : "0"));
+  smInvR.addEventListener("change", () => store.set("sm-inv-r", smInvR.checked ? "1" : "0"));
+  const hidAllowed = () => !!navigator.hid && !(document.featurePolicy && !document.featurePolicy.allowsFeature("hid"));
+  function smOnReport(e) {
+    const v = e.data, n = v.byteLength >> 1, w = (i) => v.getInt16(i * 2, true);
+    if (e.reportId === 1) {
+      sm.t = [w(0), w(1), w(2)];
+      if (n >= 6) sm.r = [w(3), w(4), w(5)];      // newer devices send all six axes in report 1
+    } else if (e.reportId === 2) {
+      sm.r = [w(0), w(1), w(2)];
+    } else if (e.reportId === 3) {
+      const b = v.getUint8(0);
+      if (b & 1) document.getElementById("v-fit").click();
+      if (b & 2) frame(views.iso);
+    }
+    sm.last = performance.now();
+  }
+  async function smOpen(dev) {
+    if (!dev.opened) await dev.open();
+    dev.addEventListener("inputreport", smOnReport);
+    sm.dev = dev;
+    smStatus.textContent = dev.productName || "SpaceMouse connected";
+  }
+  const SM_FILTERS = [{ vendorId: 0x256f }, { vendorId: 0x046d, usagePage: 0x01, usage: 0x08 }];   // 3Dconnexion, older Logitech-made
+  document.getElementById("sm-connect").addEventListener("click", async () => {
+    if (!hidAllowed()) {
+      smStatus.textContent = navigator.hid ? "Blocked in this embedded page: open the page from your PC" : "Needs Chrome or Edge (WebHID)";
+      return;
+    }
+    try {
+      const [dev] = await navigator.hid.requestDevice({ filters: SM_FILTERS });
+      if (dev) await smOpen(dev); else smStatus.textContent = "No device chosen";
+    } catch (err) { smStatus.textContent = "Could not open: " + err.message; }
+  });
+  if (hidAllowed()) {
+    navigator.hid.getDevices().then((ds) => {
+      const d = ds.find((x) => x.vendorId === 0x256f || x.vendorId === 0x046d);
+      if (d) smOpen(d).catch(() => {});
+    }).catch(() => {});
+    navigator.hid.addEventListener("disconnect", (e) => {
+      if (e.device === sm.dev) { sm.dev = null; sm.t = [0, 0, 0]; sm.r = [0, 0, 0]; smStatus.textContent = "Disconnected"; }
+    });
+  }
+  const ZUP = new THREE.Vector3(0, 0, 1);
+  function smApply(dt) {
+    if (!sm.dev || performance.now() - sm.last > 250) return;   // stale report: the cap is at rest
+    const dead = (x) => (Math.abs(x) < 12 ? 0 : x / 350);            // raw counts run to about +-350
+    const k = Number(smSpeed.value) * dt, st = smInvT.checked ? -1 : 1, sr = smInvR.checked ? -1 : 1;
+    const [tx, ty, tz] = sm.t.map(dead), [rx, , rz] = sm.r.map(dead);
+    if (!(tx || ty || tz || rx || rz)) return;
+    const offset = camera.position.clone().sub(controls.target);
+    let dist = offset.length();
+    const right = new THREE.Vector3().setFromMatrixColumn(camera.matrix, 0);
+    const up = new THREE.Vector3().setFromMatrixColumn(camera.matrix, 1);
+    const pan = right.multiplyScalar(-tx * st * dist * 0.9 * k).add(up.multiplyScalar(tz * st * dist * 0.9 * k));
+    controls.target.add(pan);
+    dist *= Math.exp(ty * st * 1.6 * k);                              // push away = zoom in, pull = zoom out
+    offset.setLength(Math.min(Math.max(dist, 50), 20000));
+    offset.applyAxisAngle(ZUP, -rz * sr * 1.8 * k);                   // twist: spin about the vertical
+    const pitchAxis = new THREE.Vector3().crossVectors(offset, ZUP).normalize();
+    const tilted = offset.clone().applyAxisAngle(pitchAxis, rx * sr * 1.4 * k);
+    if (Math.abs(tilted.clone().normalize().z) < 0.995) offset.copy(tilted);   // stop short of the poles
+    camera.position.copy(controls.target).add(offset);
+    camera.lookAt(controls.target);
+  }
+
+  let lastT = performance.now();
+  function tick() {
+    const now = performance.now(), dt = Math.min((now - lastT) / 1000, 0.1);
+    lastT = now;
+    smApply(dt);
+    controls.update();
+    renderer.render(scene, camera);
+    requestAnimationFrame(tick);
+  }
+  resize();
+  tick();
+  load().catch((err) => { statusEl.textContent = "Could not load the model: " + err.message; });
+})();
+</script>

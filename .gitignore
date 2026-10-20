@@ -1,0 +1,30 @@
+# Generated output
+build/
+exports/
+__pycache__/
+*.pyc
+*.FCBak
+tests/node_modules/
+web/index_local.html
+# page data made from the V1E meshes (pipeline/fit_config.py)
+web/data/
+
+# Third-party files: users download their own (parts/ = V1E / Printables STLs, DXFs, STEPs)
+parts/
+# V1E calculator JS + Vector76's SCAD - not ours to redistribute
+vendor/
+# OpenSCAD golden outputs (local-only tests)
+tests/golden/
+*.stl
+*.STL
+*.step
+*.STEP
+*.stp
+*.dxf
+*.DXF
+*.3mf
+*.obj
+*.FCStd
+
+# Private: logs, notes, the user's board files, size builds, STEP export, private publish steps
+private/
