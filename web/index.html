@@ -286,6 +286,7 @@ body.vr-on .stage { grid-row: 1; }
         <div><b>Work Z</b><span id="wz">0.0</span> <small>mm</small></div>
       </div>
       <label class="check"><input type="checkbox" id="job-moves"> Show the moves</label>
+      <label class="check"><input type="checkbox" id="job-closeup" checked> Close-up while probing</label>
       <p class="foot" id="job-status" role="status"></p>
     </div>
     <div class="buttons">
@@ -1915,7 +1916,35 @@ body.vr-on .stage { grid-row: 1; }
     };
     return mesh;
   }
+  // probe close-up (as cnc-gcode-tools): playing into a probe eases the view to a low front look at the touch plate
+  // (65 deg down from the top, framed to the plate / bit), and back to the saved view once the plate is put away
+  let camTween = null;
+  function camEase(pos, tgt, ms = 700) {
+    camTween = { p0: camera.position.clone(), t0: controls.target.clone(), p1: pos.clone(), t1: tgt.clone(), start: performance.now(), ms };
+  }
+  function camStep() {
+    if (!camTween) return;
+    const k = Math.min(1, (performance.now() - camTween.start) / camTween.ms), e = k * k * (3 - 2 * k);
+    camera.position.lerpVectors(camTween.p0, camTween.p1, e);
+    controls.target.lerpVectors(camTween.t0, camTween.t1, e);
+    if (k >= 1) camTween = null;
+  }
+  function jobCloseUp(pl) {
+    if (pl && !JOB.camSaved && JOB.playing && $("job-closeup").checked && !vr.active()) {
+      JOB.camSaved = { p: (camTween ? camTween.p1 : camera.position).clone(), t: (camTween ? camTween.t1 : controls.target).clone() };
+      const def = JOB.tl.tools.get(pl.tool), d = def && def.diameter > 0 ? def.diameter : 6;
+      const len = def && def.overallLength > 0 ? def.overallLength : d * 6, size = Math.max(30, d * 4);
+      const at = JOB.at, tgt = new THREE.Vector3(at[0] + pl.x, at[1] + pl.y, at[2] + pl.z + len * 0.35);
+      const tilt = 65 * Math.PI / 180, dir = new THREE.Vector3(0, -Math.sin(tilt), Math.cos(tilt));
+      const dist = Math.max(size * 0.8, len * 0.7) / 2 / Math.tan(camera.fov * Math.PI / 360);
+      camEase(tgt.clone().addScaledVector(dir, dist), tgt);
+    } else if (!pl && JOB.camSaved) {
+      camEase(JOB.camSaved.p, JOB.camSaved.t);
+      JOB.camSaved = null;
+    }
+  }
   function jobClear() {
+    jobCloseUp(null);
     if (jobTouch(null) && meta) move();
     if (JOB.group) {
       scene.remove(JOB.group);
@@ -2011,7 +2040,9 @@ body.vr-on .stage { grid-row: 1; }
       JOB.partial.geometry.setDrawRange(0, 2);
     } else JOB.partial.geometry.setDrawRange(0, 0);
     // each probe (one per tool change): the plate on the stock from its attach pause until resumed past the next
-    jobTouch(tl.plates.find((q) => JOB.t >= q.t0 && (JOB.t < q.t1 || (JOB.t === q.t1 && !JOB.playing))) || null);
+    const pw = tl.plates.find((q) => JOB.t >= q.t0 && JOB.t <= q.t1) || null;   // through its remove pause, till resumed past it
+    jobTouch(pw);
+    jobCloseUp(pw);
     const clamp = (v, r) => Math.min(Math.max(v, r[0]), r[1]);
     // work zero is the cutting area's corner = slider 0; the tip's height above the table = stock + work Z
     const mx = clamp(p.x + tv.x[0], tv.x), my = clamp(p.y + tv.y[0], tv.y);
@@ -2093,6 +2124,11 @@ body.vr-on .stage { grid-row: 1; }
     $("job-pop").hidden = true;
     jobSeek(e.target.value / 1000 * JOB.tl.total);
     JOB.k = GcodePlay.pending(JOB.tl, JOB.t);
+  });
+  try { $("job-closeup").checked = localStorage.getItem("lr4-probe-closeup") !== "0"; } catch (e) { /* on */ }
+  $("job-closeup").addEventListener("change", (e) => {
+    try { localStorage.setItem("lr4-probe-closeup", e.target.checked ? "1" : "0"); } catch (err) { /* not kept */ }
+    if (!e.target.checked) jobCloseUp(null);
   });
   $("job-moves").addEventListener("change", (e) => { if (JOB.ahead) JOB.ahead.visible = JOB.done.visible = JOB.partial.visible = e.target.checked; });
   $("job-file").addEventListener("change", async (e) => {
@@ -2521,7 +2557,7 @@ body.vr-on .stage { grid-row: 1; }
     if (shop) LR4Shop.cutaway(shop, camera.getWorldPosition(camPos));   // hide walls the camera is outside of
     jobTick();
     if (vr.active()) vr.tick(dt);
-    else { smApply(dt); controls.update(); }
+    else { smApply(dt); camStep(); controls.update(); }
     renderer.render(scene, camera);
   }
   resize();

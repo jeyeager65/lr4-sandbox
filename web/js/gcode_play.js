@@ -79,7 +79,7 @@
       while (c1 < segs.length && segs[c1].type !== "cut") c1++;
       const before = events.filter((e) => e.kind === "pause" && e.index <= i && e.index > c0).pop();
       const after = events.find((e) => e.kind === "pause" && e.index > i && e.index <= c1);
-      plates.push({ x: s.start.x, y: s.start.y, z: s.probe.surface, thick: s.probe.plate,
+      plates.push({ x: s.start.x, y: s.start.y, z: s.probe.surface, thick: s.probe.plate, tool: s.toolNumber,
         t0: before ? before.time : timeOf(i), t1: after ? after.time : timeOf(i + 2) });
     });
     return { segs, t, total, events, stock, tools, plates, anim, lines: text.split("\n").length,
