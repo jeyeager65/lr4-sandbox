@@ -486,10 +486,10 @@ body.vr-on .stage { grid-row: 1; }
 <script>
 (function () {
   const IN = 25.4;
-  const DUST_PARTS = /^(Dust_Shoe|Dust_Skirt|Bristles_TPU)/;   // moved from Core into their own group (Shoe)
+  const DUST_PARTS = /^(Dust_Skirt|Bristles_TPU)/;   // the shoe's bottom: own group (Shoe); its top stays with the core
   const GROUPS = [
     ["Table", "Table + Y rail"], ["YZ_Min", "YZ Min side"], ["YZ_Max", "YZ Max side"], ["Beam", "Beam"],
-    ["Core", "Core + router"], ["Hose", "Vacuum hose"], ["Shoe", "Dust shoe + bristles"], ["Belts", "Belts"], ["Electronics", "Electronics + switches"],
+    ["Core", "Core + router"], ["Hose", "Vacuum hose"], ["Shoe", "Dust skirt + bristles"], ["Belts", "Belts"], ["Electronics", "Electronics + switches"],
     ["Hardware", "Bolts + nuts"]];
   const SOURCE = {
     printed: "V1E printed part (STL from Printables)",
