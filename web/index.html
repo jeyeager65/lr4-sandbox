@@ -1732,7 +1732,12 @@ body.vr-on .stage { grid-row: 1; }
   const JOB = { tl: null, sim: null, group: null, done: null, at: null, t: 0, k: 0, playing: false,
     key: "", seq: 0, src: null, file: null, pageJob: null, last: 0 };
   const MDF_RGB = [0.66, 0.52, 0.36];
-  const MOVE_RGB = { rapid: [0.95, 0.55, 0.1], cut: [0.15, 0.45, 0.95], probe: [0.1, 0.75, 0.3] };
+  // move colours as cnc-gcode-tools (renderer3d): cuts in their tool's colour (TOOL_RGB, as the bit), rapids grey,
+  // probes red (its dark / light theme shades)
+  const RAPID_RGB = [0.6, 0.6, 0.6];
+  const probeRgb = () => (matchMedia("(prefers-color-scheme: dark)").matches ? [1.0, 0.42, 0.42] : [0.84, 0.16, 0.16]);
+  const toolOrder = (tl) => [...new Set(tl.segs.map((q) => q.toolNumber))];   // palette by the order tools are used
+  const toolRgb = (tl, n) => { const o = toolOrder(tl), i = o.indexOf(n); return TOOL_RGB[(i < 0 ? o.length : i) % TOOL_RGB.length]; };
   function jobRates() {                              // the user's own config.yaml if they brought one, else V1E's
     try { if (yamlBase && /^From your/.test(yamlBase.note)) return GcodePlay.motion(parseFluidNCConfig(yamlBase.text).values); }
     catch (e) { /* V1E's */ }
@@ -1789,9 +1794,10 @@ body.vr-on .stage { grid-row: 1; }
     sim.clearDirty();
   }
   function jobMoves(tl, at) {                        // every move as a line: faint ahead, solid once done (drawRange)
-    const n = tl.segs.length, pos = new Float32Array(n * 6), col = new Float32Array(n * 6);
+    const n = tl.segs.length, pos = new Float32Array(n * 6), col = new Float32Array(n * 6), probe = probeRgb(), rgb = new Map();
+    for (const t of toolOrder(tl)) rgb.set(t, new THREE.Color(toolRgb(tl, t)).toArray());
     tl.segs.forEach((sg, i) => {
-      const { start: a, end: b } = sg, c = MOVE_RGB[sg.type] || MOVE_RGB.cut;
+      const { start: a, end: b } = sg, c = sg.type === "rapid" ? RAPID_RGB : sg.type === "probe" ? probe : rgb.get(sg.toolNumber);
       pos.set([at[0] + a.x, at[1] + a.y, at[2] + a.z, at[0] + b.x, at[1] + b.y, at[2] + b.z], 6 * i);
       col.set([...c, ...c], 6 * i);
     });
@@ -1800,7 +1806,13 @@ body.vr-on .stage { grid-row: 1; }
     const ahead = new THREE.LineSegments(geo(), new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.28, depthWrite: false }));
     const done = new THREE.LineSegments(geo(), new THREE.LineBasicMaterial({ vertexColors: true }));
     done.geometry.setDrawRange(0, 0);
-    return { ahead, done };
+    // the move in progress, from its start to the bit (as there)
+    const now = new THREE.BufferGeometry();
+    now.setAttribute("position", new THREE.BufferAttribute(new Float32Array(6), 3));
+    now.setAttribute("color", new THREE.BufferAttribute(new Float32Array(6), 3));
+    const partial = new THREE.LineSegments(now, new THREE.LineBasicMaterial({ vertexColors: true }));
+    partial.frustumCulled = false;
+    return { ahead, done, partial, col };
   }
   // the modelled Tiny Touch Plate (TouchPlate + its spade + wire stub, stored in the top mount's slot) laid flat on
   // the stock for the probe: pad centred under the bit, the strip angled front-right off the front edge (user). Its frame comes
@@ -1960,16 +1972,15 @@ body.vr-on .stage { grid-row: 1; }
       jobUpdateMesh(true);
     }
     JOB.bits = new Map();                            // T number -> its bit, shown while that tool's moves play
-    const order = [...new Set(tl.segs.map((q) => q.toolNumber))];   // palette by the order the tools are used, as there
     for (const [n, def] of tl.tools) {
-      const i = order.indexOf(n), b = jobBitMesh(def, TOOL_RGB[(i < 0 ? order.length : i) % TOOL_RGB.length]);
+      const b = jobBitMesh(def, toolRgb(tl, n));
       if (b) { b.visible = false; JOB.bits.set(n, b); JOB.group.add(b); }
     }
     if (JOB.bits.size && !jobBit) { jobBit = true; applyVisibility(); }
     const mv = jobMoves(tl, at);
-    JOB.ahead = mv.ahead; JOB.done = mv.done;
-    JOB.group.add(mv.ahead, mv.done);
-    mv.ahead.visible = mv.done.visible = $("job-moves").checked;
+    JOB.ahead = mv.ahead; JOB.done = mv.done; JOB.partial = mv.partial; JOB.moveRgb = mv.col;
+    JOB.group.add(mv.ahead, mv.done, mv.partial);
+    mv.ahead.visible = mv.done.visible = mv.partial.visible = $("job-moves").checked;
     scene.add(JOB.group);
     const tv = meta.travel, b = tl.segs.reduce((r, sg) => [Math.min(r[0], sg.end.x), Math.max(r[1], sg.end.x), Math.min(r[2], sg.end.y),
       Math.max(r[3], sg.end.y)], [Infinity, -Infinity, Infinity, -Infinity]);
@@ -1992,6 +2003,13 @@ body.vr-on .stage { grid-row: 1; }
     if (carve && JOB.sim) JOB.sim.advanceTo(p.index, 15, p.progress);
     jobUpdateMesh(false);
     JOB.done.geometry.setDrawRange(0, 2 * p.index);
+    if (p.index < tl.segs.length) {                  // the move in progress: its start to the bit, in its colour
+      const sg = tl.segs[p.index], P = JOB.partial.geometry.attributes.position, C = JOB.partial.geometry.attributes.color;
+      P.array.set([at[0] + sg.start.x, at[1] + sg.start.y, at[2] + sg.start.z, at[0] + p.x, at[1] + p.y, at[2] + p.z]);
+      C.array.set(JOB.moveRgb.subarray(6 * p.index, 6 * p.index + 6));
+      P.needsUpdate = C.needsUpdate = true;
+      JOB.partial.geometry.setDrawRange(0, 2);
+    } else JOB.partial.geometry.setDrawRange(0, 0);
     // each probe (one per tool change): the plate on the stock from its attach pause until resumed past the next
     jobTouch(tl.plates.find((q) => JOB.t >= q.t0 && (JOB.t < q.t1 || (JOB.t === q.t1 && !JOB.playing))) || null);
     const clamp = (v, r) => Math.min(Math.max(v, r[0]), r[1]);
@@ -2076,7 +2094,7 @@ body.vr-on .stage { grid-row: 1; }
     jobSeek(e.target.value / 1000 * JOB.tl.total);
     JOB.k = GcodePlay.pending(JOB.tl, JOB.t);
   });
-  $("job-moves").addEventListener("change", (e) => { if (JOB.ahead) JOB.ahead.visible = JOB.done.visible = e.target.checked; });
+  $("job-moves").addEventListener("change", (e) => { if (JOB.ahead) JOB.ahead.visible = JOB.done.visible = JOB.partial.visible = e.target.checked; });
   $("job-file").addEventListener("change", async (e) => {
     const f = e.target.files[0];
     e.target.value = "";
