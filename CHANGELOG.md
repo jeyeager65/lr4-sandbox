@@ -4,6 +4,9 @@ The version is the configurator page's (`VERSION` in `web/index.html`, shown in 
 the date the model data was built and the Printables file set it was solved for.
 
 ## 0.11.0 - 2026-10-20
+- tools/record_demo.js: records a demo video (QHD by default) - a turn round the workshop and the LR4, then a G-code
+  file running (M0s resumed after 2 s, probe close-ups), the gantry parked at the end to show the result. Drives the
+  page through `window.LR4Demo`, one frame at a time, so the video plays at true speed.
 - Run G-code: with Temporary struts, the strut plate G-code above plays on the machine - the file's own text,
   parsed by cnc-gcode-tools (#<variables>, arcs, messages). The bit follows it at V1E's JP3_LR speeds (or your
   config.yaml's) with acceleration; each M0 pauses with its message ("Attach Probe", ...) until you press Resume;

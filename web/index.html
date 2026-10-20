@@ -110,6 +110,8 @@ canvas { display: block; width: 100%; height: 100%; touch-action: none; }
   border-radius: 4px; padding: 10px 14px 12px; box-shadow: 0 6px 24px rgb(0 0 0 / 0.18); font-size: 14px;
 }
 .job-pop[hidden] { display: none; }
+body.rec { grid-template-columns: 1fr; }            /* recording (LR4Demo.recording): the 3D view only */
+body.rec .panel, body.rec .hint { display: none; }
 .job-pop button { cursor: pointer; }
 .job-pop b { font-family: var(--font-display); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
 .job-pop p { margin: 4px 0 10px; font-size: 15px; line-height: 1.4; }
@@ -2588,7 +2590,47 @@ body.vr-on .stage { grid-row: 1; }
     groupLabel: (k) => (GROUPS.find((g) => g[0] === k) || [0, k])[1],
     scenery: (on) => { shopVR = on; updateShop(); return !!shop; },
     room: () => (shop ? shopRoom : null) });   // the workshop at 1:1, not on the tabletop
-  window.LR4VR.page = vr;                             // testing without a headset: page_shot --eval "LR4VR.page.preview('one')"
+  window.LR4VR.page = vr;
+  // ---- automation handle for scripted videos (tools/record_demo.js); nothing on the page uses it ----
+  window.LR4Demo = {
+    THREE, camera, controls,
+    machineBox() {                                   // the machine (no hose, legs or floor-standing scenery)
+      const b = new THREE.Box3();
+      for (const m of meshes) if (m.visible && m.userData.motion !== "hose" && !m.userData.floor) { m.updateMatrixWorld(); b.expandByObject(m); }
+      return b;
+    },
+    floorZ() { const l = meshes.find((m) => m.userData.name === "TableLegs"); return l ? new THREE.Box3().setFromObject(l).min.z : 0; },
+    room: () => shopRoom,
+    recording(on) { document.body.classList.toggle("rec", on); controls.enableDamping = !on; resize(); },
+    async playFile(name, text) {                     // as "Play a G-code file...": resolves once it is loaded
+      JOB.file = { kind: "file", name, text };
+      jobSetup(JOB.pageJob);
+      for (let i = 0; i < 600 && !(JOB.tl && JOB.src && JOB.src.name === name); i++) await new Promise((r) => setTimeout(r, 50));
+      if (!JOB.tl) throw new Error($("job-src").textContent);
+      return { total: JOB.tl.total, stock: JOB.tl.stock, at: JOB.at, pauses: JOB.tl.events.filter((e) => e.kind === "pause").length };
+    },
+    speed(x) {                                       // any playback speed (adds it to the menu)
+      const sel = $("job-speed");
+      if (![...sel.options].some((o) => +o.value === x)) sel.add(new Option(`${x}×`, String(x)));
+      sel.value = String(x);
+    },
+    play() { if (!JOB.playing) $("job-play").click(); },
+    resume() { $("job-resume").click(); },
+    pose(x, y, z) {                                  // the machine at work X, Y, Z (mm), the job's bit with it
+      const tv = meta.travel, at = JOB.at, st = JOB.tl.stock, tableZ = at[2] + (st ? st.zmin : 0);
+      const clamp = (v, r) => Math.min(Math.max(v, r[0]), r[1]), mx = clamp(x + tv.x[0], tv.x), my = clamp(y + tv.y[0], tv.y);
+      const tip = Math.min(at[2] + z - tableZ, meta.tip_above_table + tv.z[1]);   // no higher than Z can go
+      move([mx, my, tip - meta.tip_above_table]);
+      for (const b of JOB.bits ? JOB.bits.values() : []) if (b.visible) b.position.set(at[0] + mx - tv.x[0], at[1] + my - tv.y[0], tableZ + tip);
+    },
+    park() {                                         // where the job ended -> gantry at the back, Z at the top
+      const p = GcodePlay.at(JOB.tl, JOB.tl.total), tv = meta.travel, at = JOB.at, st = JOB.tl.stock;
+      const tableZ = at[2] + (st ? st.zmin : 0);
+      return { from: [p.x, p.y, p.z], to: [p.x, tv.y[1] - tv.y[0], meta.tip_above_table + tv.z[1] - (at[2] - tableZ)] };
+    },
+    job: () => ({ t: JOB.t, total: JOB.tl ? JOB.tl.total : 0, playing: JOB.playing, paused: !$("job-pop").hidden,
+      closeUp: !!JOB.camSaved || !!camTween }),
+  };                             // testing without a headset: page_shot --eval "LR4VR.page.preview('one')"
 
   let lastT = performance.now();
   const camPos = new THREE.Vector3();
