@@ -1907,18 +1907,13 @@ body.vr-on .stage { grid-row: 1; }
         }` });
     return m;
   }
-  const BIT_HELIX = 45;                               // deg, drawn flute helix (cnc-gcode-tools: 30)
   function jobBitMesh(def, colour) {
     const tool = compileStockTool(def);
     if (!tool) return null;
     let cur = null;
     const gl = { ARRAY_BUFFER: 0, STATIC_DRAW: 0, createBuffer: () => ({}), bindBuffer: (t, b) => { cur = b; },
       bufferData: (t, data) => { cur.data = data; } };
-    // helix: theirs is 30 deg - under a turn on a single flute, which reads as a bent bit (user); fluted() takes the
-    // twist (and only the flute runout) from tool.radius, so a scaled radius gives HELIX without changing their code
-    const k = Math.tan(30 * Math.PI / 180) / Math.tan(BIT_HELIX * Math.PI / 180);
-    const fluted = (o, t, top, pos, nor) => R.fluted.call(null, o, Object.assign({}, t, { radius: t.radius * k }), top, pos, nor);
-    const R = StockMeshRenderer.prototype, mb = R.buildToolMesh.call({ gl, fluted }, tool);
+    const R = StockMeshRenderer.prototype, mb = R.buildToolMesh.call({ gl, fluted: R.fluted }, tool);
     const geo = new THREE.BufferGeometry();
     geo.setAttribute("position", new THREE.BufferAttribute(mb.position.data, 3));
     geo.setAttribute("normal", new THREE.BufferAttribute(mb.normal.data, 3));

@@ -112,6 +112,10 @@ const ok = (cond, msg) => { checks++; if (!cond) { fails++; console.log("FAIL " 
   ok(b.units === "in" && c.units === "mixed" && a.units === "mm", `units ${a.units} ${b.units} ${c.units}`);
   ok(same(a, b) < 0.1, `G20 file: ${b.segs.length} moves, off the mm path by ${same(a, b).toFixed(4)}`);
   ok(same(a, c) < 0.1, `G20/G21 file: ${c.segs.length} moves, off the mm path by ${same(a, c).toFixed(4)}`);
+  // G20 on the move's own line: the line's F word is already in inches (units switch before the other words)
+  const d = await GP.load(mm.map((l, i) => (i === 8 ? "G20 " + inch(l) : i === 9 ? inch(l) : i === 10 ? "G21 " + l : l)).join("\n"));
+  ok(same(a, d) < 0.1 && Math.abs(a.total - d.total) < 1e-3 * a.total,
+    `G20 on the move's line: off the mm path by ${same(a, d).toFixed(4)}, clock ${d.total.toFixed(2)} vs ${a.total.toFixed(2)} s`);
   ok(Math.abs(b.stock.xmax - 50.8) < 1e-9 && Math.abs(b.tools.get(1).diameter - 3.175) < 1e-9, `G20 stock / tool in mm`);
   ok(Math.abs(a.total - b.total) < 1e-3 * a.total && Math.abs(a.total - c.total) < 1e-3 * a.total,
     `G20 clock ${a.total.toFixed(2)} / ${b.total.toFixed(2)} / ${c.total.toFixed(2)} s`);

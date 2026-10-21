@@ -22,24 +22,14 @@
 
   // text -> { segs, t (end time of each move, s), total, events [{index, time, kind, text, lineNum}], stock, tools,
   // plates [{x, y, z, t0, t1}] (touch plate on the stock from its "attach" pause to the next one), anim, lines }
-  // G20 / G21: the parser keeps each move in the units in force when it was read (a file may switch), so this
-  // subclass tags every move with them and load() turns everything into mm - the scene, the stock and the clock.
-  // It also converts the current position + offsets on a switch (the parser doesn't - fix in cnc-gcode-tools), else
-  // a move after G20 without a Z reads the old mm Z as inches.
+  // G20 / G21: the parser keeps each move in the units in force when it was read (a file may switch; it carries the
+  // position, offsets and feed over at the switch), so this subclass tags every move with them and load() turns
+  // everything into mm - the scene, the stock and the clock
   const IN = 25.4;
   let Parser = null;
   function parser() {
     if (!Parser) Parser = class extends GCodeParser {
       addSegment(s) { s.inch = this.units === "inches"; super.addSegment(s); }
-      processGCode(code, words, lineNum, value = code) {
-        const to = code === 20 ? "inches" : code === 21 ? "mm" : null;
-        if (to && to !== this.units) {
-          const k = to === "inches" ? 1 / IN : IN, sc = (q) => { q.x *= k; q.y *= k; q.z *= k; };
-          [this.position, this.g92, this.g92Saved, ...this.wcsOffsets].forEach((q) => q && sc(q));
-          this.feedRate *= k;                        // a modal F is a speed: it carries over (FluidNC keeps mm/min)
-        }
-        return super.processGCode(code, words, lineNum, value);
-      }
     };
     return new Parser();
   }

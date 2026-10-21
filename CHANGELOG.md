@@ -4,6 +4,8 @@ The version is the configurator page's (`VERSION` in `web/index.html`, shown in 
 the date the model data was built and the Printables file set it was solved for.
 
 ## 0.11.0 - 2026-10-20
+- cnc-gcode-tools copies updated to 0.6.2 (G20/G21 carry the position and feed over; 45° flute helix); the page's
+  own workarounds for both are gone.
 - Page data: the geometry is `lr4_config_geometry.bin.gz` (plain gzip, fetched as bytes) instead of base64 text -
   a quarter smaller (share data 2.86 MB) and no decode step.
 - One data set: the page always loads web/data/ (the share data, no V1E geometry) - locally exactly what is published;
