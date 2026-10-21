@@ -112,7 +112,8 @@ freecad/    the model: build.py, lr4.py (measured placements), hardware.py, bom.
 web/        the pages: index.html (configurator), viewer.html, js/
 pipeline/   FreeCAD builds -> configurator data
 tests/      node tests, test_strut_plate.py, test_share.py, test_parts_files.js
-tools/      run.py, serve.py, repo tools (sync_fclib, check_no_parts, check_parts, page_shot = headless screenshots)
+tools/      run.py, serve.py, repo tools (sync_fclib, check_no_parts, check_parts, page_shot = headless screenshots,
+            build_fluidnc_wasm = FluidNC for the browser -> web/fluidnc/)
 docs/       PLAN.md: settings, measurements and decisions behind the model
 .github/    CI, the Pages workflow (manual), issue template
 ```
@@ -128,6 +129,11 @@ stops STL, STEP, DXF and FCStd files from being committed.
   (OpenSCAD) that the strut plate code follows.
 - "Run G-code" parses, times and carves with [cnc-gcode-tools](https://github.com/jeyeager65/cnc-gcode-tools) (MIT):
   its parser, expander, animator and stock simulator, copied unmodified into `web/js/lib/cnc-gcode-tools/`.
+- The Run tab's controller is **[FluidNC](https://github.com/bdring/FluidNC)** (GPL-3.0) itself, built for the
+  browser with its wasm port, from the `wasm-sim` branch of [a fork](https://github.com/jeyeager65/FluidNC/tree/wasm-sim)
+  (`web/fluidnc/build.json` names the exact commit; `tools/build_fluidnc_wasm.py` rebuilds it).
+- [coi-serviceworker](https://github.com/gzuidhof/coi-serviceworker) (MIT, `web/coi-serviceworker.js`) makes the page
+  cross-origin isolated on GitHub Pages, which FluidNC's threads need.
 
 ### Built with Claude
 
@@ -138,5 +144,6 @@ instructions Claude follows when working in this repo.
 
 ## License
 
-The code in this repo is [MIT-licensed](LICENSE). The LowRider 4 design and its part files belong to V1 Engineering
-and their other authors, and are not covered by this licence.
+The code in this repo is [MIT-licensed](LICENSE), except `web/fluidnc/` (FluidNC, built from its source:
+[GPL-3.0](web/fluidnc/LICENSE)). The LowRider 4 design and its part files belong to V1 Engineering and their other
+authors, and are not covered by this license.
