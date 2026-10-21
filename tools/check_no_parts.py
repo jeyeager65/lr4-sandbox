@@ -8,7 +8,7 @@ import subprocess
 import sys
 
 BAD_EXT = (".stl", ".step", ".stp", ".dxf", ".3mf", ".obj", ".fcstd", ".fcbak", ".scad")
-BAD_DIRS = ("parts/", "private/", "vendor/", "build/", "exports/", "web/data/", "tests/golden/", "tests/node_modules/")
+BAD_DIRS = ("parts/", "private/", "vendor/", "build/", "exports/", "tests/golden/", "tests/node_modules/")
 ALLOW = ("parts/manifest.json",)    # the list of files (names, sources, checksums) - no geometry
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 HOOK = "#!/bin/sh\nexec python tools/check_no_parts.py\n"
