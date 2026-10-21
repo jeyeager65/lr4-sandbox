@@ -411,8 +411,10 @@ body.vr-on .stage { grid-row: 1; }
         <summary>About this config</summary>
         <p class="foot" id="yaml-note">V1 Engineering's Jackpot3 LowRider config (<a href="https://github.com/V1EngineeringInc/FluidNC_Configs/blob/3bb36506b0fcd2b0caca7c108ec150ccbb0c055c/LowRider%20CNC/Jackpot3/JP3_LR/config.yaml"
         target="_blank" rel="noopener">FluidNC_Configs, JP3_LR</a>, AGPL-3.0, read from GitHub when you click) with the X and Y
-        max_travel_mm set to this cutting area: <b id="yaml-xy"></b>. Everything else is V1E's (Z travel, homing, pins, motor
-        currents). Or bring your own config.yaml and only its two travel lines change. Check it against your machine before use.</p>
+        max_travel_mm set for this machine: <b id="yaml-xy"></b> (home switch to the far stop, less pulloff_mm: FluidNC
+        counts the travel from the pulled-off spot). Everything else is V1E's (Z travel, homing, pins, motor
+        currents). Or bring your own config.yaml and only its two travel lines change. Check it against your machine before use.
+        <span id="yaml-short"></span></p>
       </details>
     </section>
   </div>
@@ -428,6 +430,17 @@ body.vr-on .stage { grid-row: 1; }
       <div class="slider"><label for="sx">X</label><input id="sx" type="range" step="0.1"><output id="ox" for="sx"></output></div>
       <div class="slider"><label for="sy">Y</label><input id="sy" type="range" step="0.1"><output id="oy" for="sy"></output></div>
       <div class="slider"><label for="sz">Z</label><input id="sz" type="range" step="0.5"><output id="oz" for="sz"></output></div>
+      <div class="readout" aria-label="Machine position (MPos), mm">
+        <div><b>MPos X</b><span id="mx">–</span> <small>mm</small></div>
+        <div><b>MPos Y</b><span id="my">–</span> <small>mm</small></div>
+        <div><b>MPos Z</b><span id="mz">–</span> <small>mm</small></div>
+      </div>
+      <div class="buttons">
+        <button type="button" id="home">Home ($H)</button>
+        <label class="check"><input type="checkbox" id="home-real"> Real speed</label>
+      </div>
+      <p class="foot" id="home-status" role="status">Not homed. Home runs FluidNC's $H: Z up to its switch, then X and Y
+        together to theirs (each Y motor stops on its own switch, squaring the gantry).</p>
     </section>
 
     <section aria-labelledby="h-job">
@@ -499,6 +512,7 @@ body.vr-on .stage { grid-row: 1; }
     <button id="v-side" type="button" title="Y-rail side">Side</button>
     <button id="v-back" type="button">Back</button>
     <button id="v-fit" type="button">Fit all</button>
+    <button id="v-home" type="button" title="Home the machine ($H)">⌂ Home</button>
     <button id="v-vr" type="button" hidden title="PC VR headset (SteamVR / OpenXR)">Enter VR</button>
     <button id="v-more" type="button" aria-expanded="false" aria-controls="view-pop" title="View settings" aria-label="View settings">⚙</button>
   </div>
@@ -565,6 +579,7 @@ body.vr-on .stage { grid-row: 1; }
 <script src="js/lib/cnc-gcode-tools/parser.js"></script>
 <script src="js/lib/cnc-gcode-tools/animator.js"></script>
 <script src="js/gcode_play.js"></script>
+<script src="js/homing.js"></script>
 <script src="js/config_model.js"></script>
 <script src="js/parts_files.js"></script>
 <script src="js/vr.js"></script>
@@ -1464,16 +1479,21 @@ body.vr-on .stage { grid-row: 1; }
     });
   }
 
-  // ---- travel sliders: X along the beam, Y along the table, Z by bit-tip height. A new size keeps the
-  // gantry and core at the same fraction of their travel. ----
+  // ---- travel sliders: X along the beam, Y along the table, Z by bit-tip height, over the real travel (0 = the
+  // home switch trip, lr4.STOPS). A new size keeps the gantry and core at the same fraction of their travel. ----
   const sx = document.getElementById("sx"), sy = document.getElementById("sy"), sz = document.getElementById("sz");
   function setupSliders() {
-    [sx, sy, sz].forEach((el) => el.addEventListener("input", () => { jobPlaying(false); move(); }));   // the job pauses
+    [sx, sy, sz].forEach((el) => el.addEventListener("input", () => { jobPlaying(false); homeCancel(); move(); }));   // the job pauses
   }
   function updateSliders() {
-    const [cx, cy] = meta.cut_in, t = meta.travel, first = !sx.dataset.init;
+    const t = meta.travel, first = !sx.dataset.init, cx = (t.x[1] - t.x[0]) / IN, cy = (t.y[1] - t.y[0]) / IN;
     const fx = first ? -t.x[0] / (t.x[1] - t.x[0]) : sx.value / sx.max;
     const fy = first ? -t.y[0] / (t.y[1] - t.y[0]) : sy.value / sy.max;
+    if (JSON.stringify(t) !== HOME.travel) {         // another machine: not homed
+      if (HOME.home || HOME.run) $("home-status").textContent = "New size: not homed.";
+      HOME.run = null; HOME.home = null; HOME.travel = JSON.stringify(t);
+      $("home").textContent = "Home ($H)";
+    }
     sx.min = 0; sx.max = cx.toFixed(2); sx.value = (fx * cx).toFixed(1);
     sy.min = 0; sy.max = cy.toFixed(2); sy.value = (fy * cy).toFixed(1);
     if (first) {
@@ -1522,6 +1542,8 @@ body.vr-on .stage { grid-row: 1; }
     spinNut();
     if (hoseMesh) updateHose(dx, dy, dz);
     readout(X, Y, Z, !!pose);
+    HOME.pose = { x: dx, y: dy, z: dz };
+    dro();
   }
   let lastPos = null;
   function readout(X, Y, Z, playing) {                // X, Y in inches (the sliders); shown in the page's units
@@ -1536,6 +1558,76 @@ body.vr-on .stage { grid-row: 1; }
     document.getElementById("oy").textContent = `${u(Y).toFixed(mm ? 0 : 1)} / ${+u(Number(sy.max)).toFixed(mm ? 0 : 1)}`;
     document.getElementById("oz").textContent = `${Z.toFixed(playing ? 1 : 0)} mm`;
   }
+
+  // ---- Home ($H, js/homing.js): FluidNC's homing with the config.yaml in use (V1E's JP3_LR values until one is
+  // read): Z up to its switch, then X + Y to theirs; seek, pull off, feed back, pull off; the switches flash at each
+  // trip. Homed: the DRO shows MPos (mpos_mm at the pulled-off spot) and Run G-code starts there. Touching the
+  // sliders mid-home stops it; a new size un-homes. ----
+  const HOME = { run: null, t: 0, k: 0, home: null, s: null, pose: null, travel: "" };
+  const SWITCHES = { x: ["Endstop_X"], y: ["Endstop_Y_Min", "Endstop_Y_Max"], z: ["Endstop_Z_Min", "Endstop_Z_Max"] };
+  let flashMat = null;
+  function homeStart() {
+    if (!meta || !HOME.pose) return;
+    jobClear();                                      // its bit / stock would stay behind; reloaded when done
+    const s = Homing.settings(yamlBase ? yamlBase.text : null);
+    Object.assign(HOME, { s, t: 0, k: 0, home: null, last: performance.now(),
+      run: Homing.plan(HOME.pose, meta.travel, s, $("home-real").checked ? { seek: 1, feed: 1 } : undefined) });
+    $("home").textContent = "Stop homing";
+    dro();
+  }
+  function homeCancel() {
+    if (!HOME.run) return;
+    HOME.run = null;
+    $("home").textContent = "Home ($H)";
+    $("home-status").textContent = "Homing stopped: not homed.";
+    jobSetup(JOB.pageJob);
+  }
+  function homeTick() {
+    const r = HOME.run, now = performance.now();
+    if (!r) return;
+    HOME.t = Math.min(HOME.t + Math.min((now - (HOME.last || now)) / 1000, 0.5), r.total);   // wall time, as jobTick
+    HOME.last = now;
+    for (; HOME.k < r.events.length && r.events[HOME.k].time <= HOME.t; HOME.k++) clickSwitch(r.events[HOME.k].axis);
+    const p = GcodePlay.at(r, HOME.t), sg = r.segs[Math.min(p.index, r.segs.length - 1)];
+    move([p.x, p.y, p.z]);
+    if (HOME.t < r.total) {
+      const axes = sg.cycle === r.settings.z.cycle && r.settings.x.cycle !== sg.cycle ? "Z" : "X + Y";
+      $("home-status").textContent = `Homing ${axes}: ${{ seek: "seeking the switch", pulloff: "pulling off",
+        feed: "feeding back to the switch", settle: "settling" }[sg.phase]}…`;
+      return;
+    }
+    HOME.home = r.home; HOME.run = null;
+    $("home").textContent = "Home ($H)";
+    const s = HOME.s, src = ["x", "y", "z"].some((a) => s[a].from === "yaml") && /^From your/.test(yamlBase && yamlBase.note)
+      ? "your config.yaml's" : "V1E's JP3_LR";
+    $("home-status").textContent = `Homed (${src} homing: mpos_mm ${s.x.mpos} / ${s.y.mpos} / ${s.z.mpos}, pulloff_mm ` +
+      `${s.x.pulloff} / ${s.y.pulloff} / ${s.z.pulloff}). Run G-code starts from here.`;
+    dro();
+    jobSetup(JOB.pageJob);                           // the job reloads to start from the homed spot
+  }
+  function clickSwitch(axis) {                       // the switch + its lever light up for a moment at each trip
+    if (!flashMat) flashMat = new THREE.MeshBasicMaterial({ color: 0xffc400 });
+    for (const n of SWITCHES[axis] || []) for (const name of [n, n + "_Lever"]) {
+      const m = meshes.find((q) => q.userData.name === name);
+      if (!m) continue;
+      if (!m.userData.flashOrig) m.userData.flashOrig = m.material;
+      m.material = flashMat;
+      clearTimeout(m.userData.flashT);
+      m.userData.flashT = setTimeout(() => { m.material = m.userData.flashOrig; delete m.userData.flashOrig; }, 300);
+    }
+  }
+  function dro() {                                   // MPos once homed, else dashes
+    const m = HOME.home && HOME.pose && !HOME.run ? Homing.mpos(HOME.s, HOME.home, HOME.pose) : null;
+    for (const a of ["x", "y", "z"]) $("m" + a).textContent = m && m[a] !== null ? m[a].toFixed(1) : "–";
+  }
+  // the homed spot in the job's work mm (work zero = the cutting area's corner = the X / Y trips, Z on the stock
+  // top), for GcodePlay.load's start; undefined when not homed
+  function jobStartAt() {
+    if (!HOME.home) return undefined;
+    const tv = meta.travel, h = HOME.home;
+    return (stock) => ({ x: h.x - tv.x[0], y: h.y - tv.y[0], z: h.z + meta.tip_above_table + (stock ? stock.zmin : 0) });
+  }
+  for (const id of ["home", "v-home"]) document.getElementById(id).addEventListener("click", () => (HOME.run ? homeCancel() : homeStart()));
 
   // ---- size inputs, V1E calculator, cut list, strut plate drawing + downloads ----
   const EMT_STICK = 3048, KERF = 3, XZ = 6.5;
@@ -1710,16 +1802,23 @@ body.vr-on .stage { grid-row: 1; }
     if (!f) return;
     const prev = yamlBase;
     yamlBase = { text: await f.text(), note: `From your ${f.name}.` };
-    try { const r = await yamlText(); dlStatus(`Using your ${f.name} (x ${r.x[0]}, y ${r.y[0]} -> this size). Download or copy it.`, "yaml-status"); }
+    try { const r = await yamlText(); updateYaml(); dlStatus(`Using your ${f.name} (x ${r.x[0]}, y ${r.y[0]} -> this size). Download or copy it.`, "yaml-status"); }
     catch (e) { yamlBase = prev; dlStatus(`${f.name}: ${e.message}`, "yaml-status"); }
   });
   function updateYaml() {
-    const t = LR4Model.travel(cfg, S);
-    $("yaml-xy").textContent = `X ${(t.x[1] - t.x[0]).toFixed(1)} mm, Y ${(t.y[1] - t.y[0]).toFixed(1)} mm`;
+    // max_travel_mm = trip -> stop less pulloff_mm (as LR4Model.fluidncConfig writes it); FluidNC's soft range
+    // [mpos, mpos + max_travel] then ends at the stop. Short of the cutting area at most sizes (26 x 50: ~2.4 mm)
+    const t = LR4Model.travel(cfg, S), s = Homing.settings(yamlBase ? yamlBase.text : null);
+    const mt = { x: t.x[1] - t.x[0] - s.x.pulloff, y: t.y[1] - t.y[0] - s.y.pulloff };
+    $("yaml-xy").textContent = `X ${mt.x.toFixed(1)} mm, Y ${mt.y.toFixed(1)} mm`;
+    const short = [["X", S.cutX - mt.x], ["Y", S.cutY - mt.y]].filter(([, d]) => d > 0.05);
+    $("yaml-short").textContent = short.length ? `That's ${short.map(([a, d]) => `${a} ${d.toFixed(1)} mm`).join(", ")} short ` +
+      "of the cutting area: with soft_limits on (V1E's file has them off), FluidNC won't jog or cut that last bit at the far " +
+      "end, though the tool physically reaches it." : "";
   }
 
   // ---- version + feedback: the issue link carries the size, data date and the loaded files' checksums ----
-  const VERSION = "0.12.0";
+  const VERSION = "0.13.0";
   function setupAbout() {
     const bits = [`lr4-sandbox ${VERSION}`];
     if (cfg.built) bits.push(`model data built ${cfg.built}`);
@@ -2055,7 +2154,7 @@ body.vr-on .stage { grid-row: 1; }
     if (jobTouch(null) && meta) move();
     if (JOB.group) {
       scene.remove(JOB.group);
-      JOB.group.traverse((o) => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); });
+      JOB.group.traverse((o) => { if (o.geometry) o.geometry.dispose(); if (o.material) [].concat(o.material).forEach((m) => m.dispose()); });
     }
     Object.assign(JOB, { tl: null, sim: null, group: null, done: null, ahead: null, stock: null, bits: null, t: 0, k: 0, key: "",
       spinning: false });
@@ -2071,7 +2170,7 @@ body.vr-on .stage { grid-row: 1; }
     $("job-off").hidden = !!src;
     $("job-back").hidden = !(JOB.file && page);
     if (!src || !meta) { jobClear(); $("job-on").hidden = true; $("job-src").textContent = ""; return; }
-    const key = `${src.kind}|${src.name}|${src.text.length}|${src.text.slice(-200)}|${S.cutX},${S.cutY},${S.n},${lite},${tableTop}`;
+    const key = `${src.kind}|${src.name}|${src.text.length}|${src.text.slice(-200)}|${S.cutX},${S.cutY},${S.n},${lite},${tableTop}|${!!HOME.home}`;
     if (key === JOB.key) return;
     jobLoad(src, key);
   }
@@ -2079,7 +2178,7 @@ body.vr-on .stage { grid-row: 1; }
     const seq = ++JOB.seq;
     $("job-src").textContent = `${src.name}: reading…`;
     let tl;
-    try { tl = await GcodePlay.load(src.text, jobRates()); }
+    try { tl = await GcodePlay.load(src.text, jobRates(), jobStartAt()); }
     catch (e) { if (seq === JOB.seq) { jobClear(); $("job-on").hidden = true; $("job-src").textContent = `${src.name}: ${e.message}`; } return; }
     if (seq !== JOB.seq) return;                     // a newer one started meanwhile
     jobClear();
@@ -2200,6 +2299,7 @@ body.vr-on .stage { grid-row: 1; }
   }
   $("job-play").addEventListener("click", () => {
     if (!JOB.tl) return;
+    homeCancel();
     if (!JOB.playing && JOB.t >= JOB.tl.total) { jobSeek(0); JOB.k = 0; }
     jobPlaying(!JOB.playing);
   });
@@ -2760,6 +2860,7 @@ body.vr-on .stage { grid-row: 1; }
     const now = performance.now(), dt = Math.min((now - lastT) / 1000, 0.1);
     lastT = now;
     if (shop) LR4Shop.cutaway(shop, camera.getWorldPosition(camPos));   // hide walls the camera is outside of
+    homeTick();
     jobTick();
     if (vr.active()) vr.tick(dt);
     else { smApply(dt); camStep(); controls.update(); }

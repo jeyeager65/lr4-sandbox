@@ -239,30 +239,43 @@
   }
 
   // FluidNC config.yaml (V1E's FluidNC_Configs "LowRider CNC/Jackpot3/JP3_LR", or the user's own) with axes x / y
-  // max_travel_mm set to this travel (home trip -> the far stop, lr4.STOPS: a little over the cutting area; V1E's
-  // 4 x 8 file has 1220 x 2440). Line edits only, so
-  // comments and layout stay; a header comment says what changed. -> {text, x: [old, new], y: [old, new]}
-  function fluidncConfig(text, cfg, S, note) {
-    const t = travel(cfg, S), want = { x: t.x[1] - t.x[0], y: t.y[1] - t.y[0] }, got = {};
+  // max_travel_mm set to this travel less the axis' pulloff_mm (home trip -> the far stop, lr4.STOPS: a little over
+  // the cutting area; V1E's 4 x 8 file has 1220 x 2440). FluidNC's soft range starts at the pulled-off spot, so the
+  // whole trip -> stop would put the far soft limit pulloff_mm past the hard stop (user 2026-10-20). pulloff_mm = the
+  // largest of the axis' motors in this file, else V1E's 4. Line edits only, so comments and layout stay; a header
+  // comment says what changed. -> {text, x: [old, new], y: [old, new], pulloff: {x, y}}
+  const PULLOFF = 4;
+  function yamlAxes(text, f) {                       // each line under axes: f(axis, key, value, depth, match) -> new line
     let inAxes = false, axis = null, axisIndent = -1;
-    const lines = text.split(/\r?\n/).map((ln) => {
+    return text.split(/\r?\n/).map((ln) => {
       const m = /^(\s*)([^\s#][^:]*):\s*(.*?)\s*(#.*)?$/.exec(ln);
       if (!m) return ln;
       const ind = m[1].length, key = m[2].trim();
       if (ind === 0) { inAxes = key === "axes"; axis = null; return ln; }
       if (!inAxes) return ln;
       if (axis === null || ind <= axisIndent) { axis = /^[xyzabc]$/.test(key) && !m[3] ? key : null; axisIndent = ind; return ln; }
-      if (key === "max_travel_mm" && want[axis] !== undefined && ind === axisIndent + 2) {
-        got[axis] = [m[3], want[axis].toFixed(1)];
-        return `${m[1]}max_travel_mm: ${want[axis].toFixed(1)}`;
-      }
-      return ln;
+      const r = f(axis, key, m[3], ind - axisIndent, m);
+      return r === undefined ? ln : r;
+    });
+  }
+  function fluidncConfig(text, cfg, S, note) {
+    const pulloff = {};
+    yamlAxes(text, (axis, key, v) => {
+      if (key === "pulloff_mm" && parseFloat(v) >= 0) pulloff[axis] = Math.max(pulloff[axis] || 0, parseFloat(v));
+    });
+    for (const a of ["x", "y"]) if (pulloff[a] === undefined) pulloff[a] = PULLOFF;
+    const t = travel(cfg, S), want = { x: t.x[1] - t.x[0] - pulloff.x, y: t.y[1] - t.y[0] - pulloff.y }, got = {};
+    const lines = yamlAxes(text, (axis, key, v, depth, m) => {
+      if (key !== "max_travel_mm" || want[axis] === undefined || depth !== 2) return undefined;
+      got[axis] = [v, want[axis].toFixed(1)];
+      return `${m[1]}max_travel_mm: ${want[axis].toFixed(1)}`;
     });
     if (!got.x || !got.y) throw new Error("no axes x / y max_travel_mm found - is this a FluidNC config.yaml?");
     const head = [`# lr4-sandbox: max_travel_mm set for a ${(S.cutX / IN).toFixed(2)} x ${(S.cutY / IN).toFixed(2)} in cutting area`
-      + ` (x ${got.x[0]} -> ${got.x[1]}, y ${got.y[0]} -> ${got.y[1]}); everything else unchanged.`];
+      + ` (x ${got.x[0]} -> ${got.x[1]}, y ${got.y[0]} -> ${got.y[1]}: home trip to the far stop less pulloff_mm`
+      + ` ${pulloff.x} / ${pulloff.y}); everything else unchanged.`];
     if (note) head.push(`# ${note}`);
-    return { text: head.concat(lines).join("\n"), x: got.x, y: got.y };
+    return { text: head.concat(lines).join("\n"), x: got.x, y: got.y, pulloff };
   }
 
   const api = { size, instances, hose, travel, plateFrame, bom, jp3Fits, fluidncConfig, braceOffsets, IN };

@@ -104,7 +104,7 @@ for (const [tag, [cx, cy], struts] of runs) {
     (bad.length ? `\n     off: ${bad.slice(0, 12).join("; ")}` : ""));
 }
 // config.yaml: only axes x / y max_travel_mm change (laid out like V1E's JP3_LR file: nested keys, comments, a
-// commented-out axis, a max_travel_mm outside axes)
+// commented-out axis, a max_travel_mm outside axes); X / Y = travel - pulloff_mm (x has one, y the fallback 4)
 {
   const yaml = ["board: Jackpot3", "axes:", "  shared_stepper_disable_pin: NO_PIN", "  x:", "    steps_per_mm: 50.000",
     "    max_travel_mm: 1220", "    homing:", "      cycle: 2", "    #X", "    motor0:", "      pulloff_mm: 4.000", "  y:",
@@ -112,8 +112,9 @@ for (const [tag, [cx, cy], struts] of runs) {
     "other:", "  max_travel_mm: 5"].join("\n");
   const S = M.size(24.5 * M.IN, 45 * M.IN), r = M.fluidncConfig(yaml, cfg, S, "note");
   const out = r.text.split("\n"), body = out.slice(2), diff = yaml.split("\n").map((l, i) => l === body[i] ? null : [l, body[i]]).filter(Boolean);
-  const ok = out.length === yaml.split("\n").length + 2 && diff.length === 2 && body[5] === "    max_travel_mm: 624.1"
-    && body[12] === "    max_travel_mm: 1144.5" && out[1] === "# note";
+  const ok = out.length === yaml.split("\n").length + 2 && diff.length === 2 && body[5] === "    max_travel_mm: 620.1"
+    && body[12] === "    max_travel_mm: 1140.5" && out[1] === "# note"
+    && r.pulloff.x === 4 && r.pulloff.y === 4;
   let bad = false;
   try { M.fluidncConfig("axes:\n  z:\n    max_travel_mm: 150\n", cfg, S); } catch (e) { bad = true; }
   if (!ok || !bad) fails++;

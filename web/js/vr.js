@@ -46,7 +46,8 @@
   }
 
   // the menu: buttons (with what they do) and plain text, from a snapshot of the page state
-  //   s = { unit, cutX, cutY (mm), braces: { label }, peter: [{ v, label, on }], groups: [{ id, label, on }], mode, hidden }
+  //   s = { unit, cutX, cutY (mm), braces: { label }, peter: [{ v, label, on }], groups: [{ id, label, on }], mode, hidden,
+  //         homing }
   function layout(s) {
     const B = [], T = [];
     const btn = (x, y, w, h, label, act, on) => B.push({ x, y, w, h, label, act, on: !!on, id: JSON.stringify(act) });
@@ -79,11 +80,12 @@
     s.groups.slice(0, 10).forEach((g, i) => btn(16 + (i % 2) * 242, 370 + Math.floor(i / 2) * 50, 236, 44, g.label,
       { a: "group", id: g.id }, g.on));
     B.forEach((b) => (b.toggle = b.act.a === "group"));   // on / off chips, not a choice
-    btn(16, 634, 116, 54, s.mode === "table" ? "Tabletop" : "1:1", { a: "mode" }, s.mode === "table");
-    btn(136, 634, 116, 54, "Re-center", { a: "recenter" });
-    btn(256, 634, 116, 54, `Unhide ${s.hidden || 0}`, { a: "unhide" });
+    btn(16, 634, 92, 54, s.mode === "table" ? "Tabletop" : "1:1", { a: "mode" }, s.mode === "table");
+    btn(112, 634, 92, 54, "Re-center", { a: "recenter" });
+    btn(208, 634, 92, 54, `Unhide ${s.hidden || 0}`, { a: "unhide" });
     B[B.length - 1].dim = !s.hidden;
-    btn(376, 634, 120, 54, "Exit VR", { a: "exit" });
+    btn(304, 634, 92, 54, s.homing ? "Stop" : "Home", { a: "home" }, s.homing);
+    btn(400, 634, 96, 54, "Exit VR", { a: "exit" });
     return { buttons: B, texts: T };
   }
 
@@ -206,7 +208,7 @@
         id: l.querySelector("input").id, label: l.querySelector("span").textContent, on: l.querySelector("input").checked }));
       const [cutX, cutY] = cut();
       return { unit: unit(), cutX, cutY, mode: mode === "table" ? "table" : "one", peter, groups, hidden: api.hiddenCount(),
-        braces: { label: opt ? opt.textContent : "" } };
+        braces: { label: opt ? opt.textContent : "" }, homing: !!$("home") && /^Stop/.test($("home").textContent) };
     }
     function act(a) {
       if (a.a === "cut") { const [x, y] = cut(); setCut(x + (a.axis === "x" ? a.d * IN : 0), y + (a.axis === "y" ? a.d * IN : 0)); }
@@ -220,6 +222,7 @@
       else if (a.a === "mode") { mode = mode === "table" ? "one" : "table"; place(true); }
       else if (a.a === "recenter") place(true);
       else if (a.a === "unhide") api.showHidden();
+      else if (a.a === "home") $("home").click();      // the Run tab's Home ($H) button
       else if (a.a === "hide") { if (cardPart) api.hidePart(cardPart); closeCard(); }
       else if (a.a === "hidegroup") {
         const g = cardPart && $("g-" + cardPart.userData.group);

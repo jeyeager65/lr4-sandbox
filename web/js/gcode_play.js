@@ -27,15 +27,26 @@
   // everything into mm - the scene, the stock and the clock
   const IN = 25.4;
   let Parser = null;
-  function parser() {
+  // start: where the machine is when the file starts (work mm; the page's homed spot), else 0, 0, 0
+  function parser(start) {
     if (!Parser) Parser = class extends GCodeParser {
+      reset() { super.reset(); if (this.start) this.position = Object.assign({}, this.start); }
       addSegment(s) { s.inch = this.units === "inches"; super.addSegment(s); }
     };
-    return new Parser();
+    const p = new Parser();
+    p.start = start || null;
+    return p;
   }
 
-  async function load(text, rates) {
-    const p = parser();
+  // start = {x, y, z} (work mm), or a function (stock from the header, or null) -> that, as the start can depend on
+  // the stock (the page's work Z is on the stock top): then the file is read twice
+  async function load(text, rates, start) {
+    if (typeof start === "function") {
+      const q = parser(), qs = await q.parseString(text), st = q.simMeta.stock;
+      const inch = q.simMeta.units ? q.simMeta.units === "inches" : qs.length && qs[0].inch;
+      start = start(st ? Object.fromEntries(Object.entries(st).map(([key, v]) => [key, inch ? v * IN : v])) : null);
+    }
+    const p = parser(start);
     let segs = await p.parseString(text);
     if (p.expansion && p.expansion.error) throw new Error(`G-code variables: ${p.expansion.error}`);
     const inches = segs.filter((s) => s.inch).length;

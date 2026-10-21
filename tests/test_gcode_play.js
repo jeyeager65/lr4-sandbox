@@ -141,6 +141,19 @@ const ok = (cond, msg) => { checks++; if (!cond) { fails++; console.log("FAIL " 
   ok(m3.plates[0].t1 < change.time && m3.plates[1].t0 > change.time, `tool changes: no plate through the tool change`);
   console.log(`tool changes: 3 probes, plates ${m3.plates.map((q) => `${q.t0.toFixed(1)}-${q.t1.toFixed(1)} s`).join(", ")}`);
 
+  // start (the page's homed spot): the file starts from there, X / Y stay put until moved; G20 files too; a start
+  // function gets the header's stock in mm
+  {
+    const s0 = { x: 3, y: 4, z: 2 }, a = await GP.load("G21\nG0 Z5\nG0 X10\n", null, s0);
+    const g = a.segs[0];
+    ok(g.start.x === 3 && g.start.y === 4 && g.start.z === 2 && g.end.x === 3 && g.end.z === 5 && a.segs[1].end.x === 10, `start: ${JSON.stringify(g)}`);
+    const b = await GP.load("G20\nG0 Z0.2\n", null, s0);
+    ok(Math.abs(b.segs[0].start.x - 3) < 1e-9 && Math.abs(b.segs[0].start.z - 2) < 1e-9 && Math.abs(b.segs[0].end.z - 5.08) < 1e-9, `start G20: ${JSON.stringify(b.segs[0])}`);
+    let seen = null;
+    const c = await GP.load("(CNCSIM UNITS=INCH)\n(Stock: XMIN=0 XMAX=2 YMIN=0 YMAX=3 ZMIN=-0.5 ZMAX=0)\nG20\nG0 Z0.2\n", null, (st) => { seen = st; return s0; });
+    ok(c.segs[0].start.x === 3 && seen && Math.abs(seen.zmin + 12.7) < 1e-9 && Math.abs(seen.xmax - 50.8) < 1e-9, `start fn: stock ${JSON.stringify(seen)}`);
+  }
+
   console.log(`${checks - fails}/${checks} checks passed`);
   process.exit(fails ? 1 : 0);
 })().catch((e) => { console.error(e); process.exit(1); });

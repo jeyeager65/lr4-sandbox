@@ -3,6 +3,17 @@
 The version is the configurator page's (`VERSION` in `web/index.html`, shown in its footer). The footer also shows
 the date the model data was built and the Printables file set it was solved for.
 
+## 0.13.0 - 2026-10-20
+- Home ($H): a Home button (Run tab, the canvas toolbar and the VR menu) homes the machine as FluidNC does with V1E's
+  JP3_LR config.yaml: Z up to its switch, then X and Y together (each Y motor stops on its own switch, squaring the
+  gantry); seek, pull off, feed back, pull off. Each switch lights up as it trips. Settings come from the config.yaml
+  in use (yours, if you brought one). Played faster than life; "Real speed" plays it at the config's rates.
+- A machine position readout (MPos X / Y / Z) once homed: mpos_mm at the pulled-off spot. Run G-code then starts from
+  the homed spot instead of jumping to work zero.
+- The tool position sliders span the machine's real travel (home switch to the far stop), not the cutting area.
+- config.yaml: X / Y max_travel_mm = the travel less pulloff_mm (FluidNC counts it from the pulled-off spot), with a
+  note when that's short of the cutting area.
+
 ## 0.12.0 - 2026-10-20
 - The panel is reorganized into tabs: Machine (cutting area, parts, colours), Build it (BOM, cut list, strut plates,
   config.yaml) and Run (tool position, G-code). The page remembers the last tab. Once all the part files load, they

@@ -29,6 +29,7 @@ for (const s of [state(), state({ unit: "mm", mode: "table", peter: [] }), state
   ok(buttons.filter((b) => b.act.a === "group").length === Math.min(10, s.groups.length), "group buttons");
   ok(buttons.filter((b) => b.act.a === "peter").length === s.peter.length, "peter buttons");
   ok(buttons.filter((b) => b.act.a === "unit" && b.on).map((b) => b.act.u).join() === s.unit, "unit marked");
+  ok(buttons.filter((b) => b.act.a === "home").length === 1, "Home button");
 }
 {
   const { buttons } = V.layout(state());
