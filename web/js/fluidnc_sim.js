@@ -61,20 +61,21 @@
     };
   }
 
-  function loadScript(src) {
+  function loadScript(doc, src) {
     return new Promise((res, rej) => {
-      const s = document.createElement("script");
+      const s = doc.createElement("script");
       s.src = src;
       s.onload = res;
       s.onerror = () => rej(new Error("could not load " + src));
-      document.head.appendChild(s);
+      doc.head.appendChild(s);
     });
   }
 
   // start({ base: "fluidnc/", config: yaml text, files: { "/native_sd/job.gcode": text | Uint8Array }, onLine, timeout })
   // (onLine = sim.on("line") from before the boot, so it sees the boot messages too)
-  // -> Promise<sim>, resolved once FluidNC has printed its greeting. One FluidNC per page (the module's output hook is
-  // the global self.fluidncOnOutput, and fluidnc_start runs once per module).
+  // -> Promise<sim>, resolved once FluidNC has printed its greeting. Each FluidNC runs in its own hidden same-origin
+  // iframe (the module's output hook is that window's fluidncOnOutput, and fluidnc_start runs once per module):
+  // sim.stop() removes it, which ends its threads, so stop() + start() = a fresh boot (a new config.yaml).
   //   sim.on(type | "line", fn)       every parsed line ("line") or one type ("status", "msg", "alarm", ...)
   //   sim.send(text)                  a line (newline added); sim.realtime(byte) a realtime command ("?", "!", "~",
   //                                   0x18 reset, 0x85 jog cancel, ...)
@@ -82,21 +83,30 @@
   //   sim.status() -> Promise<status>                       sends "?" and waits for the report
   //   sim.waitFor(fn, ms) -> Promise<event>                 the next parsed line fn(ev) is true for
   //   sim.writeFile(path, data) / sim.readFile(path)        the module's filesystem
-  //   sim.info = web/fluidnc/build.json (repo, commit, source link, ...)
+  //   sim.info = web/fluidnc/build.json (repo, commit, source link, ...); sim.stop(); sim.stopped
   async function start(opts = {}) {
     if (!root.crossOriginIsolated) throw new Error("FluidNC needs a cross-origin isolated page (SharedArrayBuffer)");
-    if (root.__fluidncStarted) throw new Error("FluidNC is already running on this page");
-    root.__fluidncStarted = true;
-    const base = opts.base || "fluidnc/";
+    const base = new URL(opts.base || "fluidnc/", root.location.href).href;
     const info = await fetch(base + "build.json").then((r) => (r.ok ? r.json() : {})).catch(() => ({}));
-    if (typeof root.FluidNCModule !== "function") await loadScript(base + "program.js");
+    const frame = document.createElement("iframe");   // about:blank: same origin, inherits the page's isolation
+    frame.hidden = true;
+    frame.setAttribute("aria-hidden", "true");
+    frame.tabIndex = -1;
+    document.body.appendChild(frame);
+    const win = frame.contentWindow;
+    let stopped = false;
+    const stop = () => { stopped = true; win.fluidncOnOutput = () => {}; frame.remove(); };
     const listeners = new Map();
     const emit = (ev) => {
       for (const k of ["line", ev.type]) for (const fn of listeners.get(k) || []) fn(ev);
     };
     const feed = splitter((l) => emit(parseLine(l)));
-    root.fluidncOnOutput = feed;
-    const Module = await root.FluidNCModule({ locateFile: (f) => base + f, print: () => {}, printErr: () => {} });
+    win.fluidncOnOutput = feed;
+    let Module;
+    try {
+      await loadScript(win.document, base + "program.js");
+      Module = await win.FluidNCModule({ locateFile: (f) => base + f, print: () => {}, printErr: () => {} });
+    } catch (e) { stop(); throw e; }
     const FS = Module.FS;
     const writeFile = (path, data) => {
       FS.mkdirTree(path.slice(0, path.lastIndexOf("/")) || "/");
@@ -116,7 +126,7 @@
       const off = on("line", (ev) => { if (pred(ev)) { clearTimeout(t); off(); res(ev); } });
     });
     // bytes, not a JS string: a string would go in as UTF-8 (0x85 -> C2 85); fluidnc_send_text reads to the NUL
-    const sendBytes = (bytes) => Module.ccall("fluidnc_send_text", null, ["array"], [Uint8Array.from([...bytes, 0])]);
+    const sendBytes = (bytes) => stopped || Module.ccall("fluidnc_send_text", null, ["array"], [Uint8Array.from([...bytes, 0])]);
     const send = (text) => sendBytes(new TextEncoder().encode(text.replace(/\r?\n?$/, "") + "\n"));
     const realtime = (b) => sendBytes([typeof b === "string" ? b.charCodeAt(0) : b]);
     // replies come in order, one ok / error per line sent; FIFO of the commands waiting on theirs
@@ -141,9 +151,13 @@
     if (opts.onLine) on("line", opts.onLine);
     const booted = waitFor((ev) => ev.type === "greeting", opts.timeout || 15000);
     Module.ccall("fluidnc_start", null, [], []);
-    const greeting = await booted;
-    return { Module, FS, info, greeting: greeting.text, on, waitFor, send, realtime, command, status, writeFile,
-      readFile: (p, enc) => FS.readFile(p, enc ? { encoding: enc } : undefined) };
+    let greeting;
+    try { greeting = await booted; } catch (e) { stop(); throw e; }
+    const sim = { Module, FS, info, greeting: greeting.text, on, waitFor, send, realtime, command, status, writeFile,
+      readFile: (p, enc) => FS.readFile(p, enc ? { encoding: enc } : undefined),
+      stop: () => { stop(); for (const q of queue.splice(0)) clearTimeout(q.timer); } };
+    Object.defineProperty(sim, "stopped", { get: () => stopped });
+    return sim;
   }
 
   const api = { parseLine, parseStatus, splitter, start };

@@ -433,6 +433,34 @@ body.vr-on .stage { grid-row: 1; }
   </div>
 
   <div class="tabpanel" role="tabpanel" id="tab-run" aria-labelledby="t-run" hidden>
+    <section aria-labelledby="h-ctl">
+      <h2 id="h-ctl">Controller</h2>
+      <div class="variant" id="ctl-mode"><span>Runs on</span>
+        <button type="button" data-v="play" aria-pressed="true">Playback</button>
+        <button type="button" data-v="fluidnc" aria-pressed="false">FluidNC</button></div>
+      <p class="foot" id="ctl-note">Playback: the page moves the machine itself. FluidNC (preview): the real firmware,
+        built to run in your browser, drives the machine with the config.yaml in use (V1E's JP3_LR until you load your
+        own, under Build it); the sliders jog it. It runs a copy with plain stepper drivers ($CD shows that copy).</p>
+      <p class="foot" id="ctl-msg" role="status"></p>
+      <details class="cam" id="ctl-box" hidden>
+        <summary>FluidNC console</summary>
+        <p class="ctl-state" id="ctl-state"></p>
+        <div class="ctl-log" id="ctl-log" role="log"></div>
+        <form class="ctl-form" id="ctl-form">
+          <input id="ctl-in" autocomplete="off" spellcheck="false" placeholder="G-code or $ command" aria-label="Send to FluidNC">
+          <button type="submit">Send</button>
+        </form>
+        <div class="buttons">
+          <button type="button" data-ctl="$I" title="Build info">$I</button>
+          <button type="button" data-ctl="$X" title="Clear an alarm">Unlock $X</button>
+          <button type="button" data-rt="!" title="Feed hold">Hold !</button>
+          <button type="button" data-rt="~" title="Cycle start / resume">Resume ~</button>
+          <button type="button" data-rt="24" title="Soft reset (Ctrl-X)">Reset</button>
+        </div>
+      </details>
+      <p class="foot" id="ctl-src"></p>
+    </section>
+
     <section aria-labelledby="h-pos">
       <h2 id="h-pos">Tool position</h2>
       <div class="readout">
@@ -487,32 +515,6 @@ body.vr-on .stage { grid-row: 1; }
         <button type="button" id="job-back" hidden>Back to the strut plate job</button>
         <button type="button" id="job-install" hidden>Install the plates (Permanent)</button>
       </div>
-    </section>
-
-    <section aria-labelledby="h-ctl">
-      <h2 id="h-ctl">Controller</h2>
-      <details class="cam" id="ctl-box">
-        <summary>FluidNC console (preview)</summary>
-        <p class="foot" id="ctl-note">The real FluidNC firmware, built to run in your browser, with a console like a
-          serial terminal. For now it runs FluidNC's own demo machine: the LowRider doesn't follow it yet.</p>
-        <div class="buttons"><button type="button" id="ctl-start">Start FluidNC</button></div>
-        <div id="ctl-run" hidden>
-          <p class="ctl-state" id="ctl-state" role="status"></p>
-          <div class="ctl-log" id="ctl-log" role="log"></div>
-          <form class="ctl-form" id="ctl-form">
-            <input id="ctl-in" autocomplete="off" spellcheck="false" placeholder="G-code or $ command" aria-label="Send to FluidNC">
-            <button type="submit">Send</button>
-          </form>
-          <div class="buttons">
-            <button type="button" data-ctl="$I" title="Build info">$I</button>
-            <button type="button" data-ctl="$X" title="Clear an alarm">Unlock $X</button>
-            <button type="button" data-rt="!" title="Feed hold">Hold !</button>
-            <button type="button" data-rt="~" title="Cycle start / resume">Resume ~</button>
-            <button type="button" data-rt="24" title="Soft reset (Ctrl-X)">Reset</button>
-          </div>
-        </div>
-        <p class="foot" id="ctl-src"></p>
-      </details>
     </section>
   </div>
 
@@ -620,6 +622,7 @@ body.vr-on .stage { grid-row: 1; }
 <script src="js/gcode_play.js"></script>
 <script src="js/homing.js"></script>
 <script src="js/fluidnc_sim.js"></script>
+<script src="js/sim_config.js"></script>
 <script src="js/config_model.js"></script>
 <script src="js/parts_files.js"></script>
 <script src="js/vr.js"></script>
@@ -1523,7 +1526,14 @@ body.vr-on .stage { grid-row: 1; }
   // home switch trip, lr4.STOPS). A new size keeps the gantry and core at the same fraction of their travel. ----
   const sx = document.getElementById("sx"), sy = document.getElementById("sy"), sz = document.getElementById("sz");
   function setupSliders() {
-    [sx, sy, sz].forEach((el) => el.addEventListener("input", () => { jobPlaying(false); homeCancel(); move(); }));   // the job pauses
+    [sx, sy, sz].forEach((el) => {
+      el.addEventListener("input", () => {
+        if (CTL.mode === "fluidnc") { ctlJog(el); return; }   // FluidNC: a jog; the model follows its MPos
+        jobPlaying(false); homeCancel(); move();             // the job pauses
+      });
+      el.addEventListener("pointerdown", () => { CTL.drag = el; });
+    });
+    for (const ev of ["pointerup", "pointercancel"]) window.addEventListener(ev, () => { CTL.drag = null; });
   }
   function updateSliders() {
     const t = meta.travel, first = !sx.dataset.init, cx = (t.x[1] - t.x[0]) / IN, cy = (t.y[1] - t.y[0]) / IN;
@@ -1560,8 +1570,9 @@ body.vr-on .stage { grid-row: 1; }
     // (mm from the parked pose; the job playback) sets the sliders instead of reading them
     const t = meta.travel;
     if (pose) {
-      sx.value = ((pose[0] - t.x[0]) / IN).toFixed(1); sy.value = ((pose[1] - t.y[0]) / IN).toFixed(1);
-      sz.value = (pose[2] + meta.tip_above_table).toFixed(1);
+      if (CTL.drag !== sx) sx.value = ((pose[0] - t.x[0]) / IN).toFixed(1);
+      if (CTL.drag !== sy) sy.value = ((pose[1] - t.y[0]) / IN).toFixed(1);
+      if (CTL.drag !== sz) sz.value = (pose[2] + meta.tip_above_table).toFixed(1);
     }
     const [dx, dy, dz] = pose || [sx.value * IN + t.x[0], sy.value * IN + t.y[0], sz.value - meta.tip_above_table];
     const X = (dx - t.x[0]) / IN, Y = (dy - t.y[0]) / IN, Z = dz + meta.tip_above_table;
@@ -1604,6 +1615,9 @@ body.vr-on .stage { grid-row: 1; }
   // trip. Homed: the DRO shows MPos (mpos_mm at the pulled-off spot) and Run G-code starts there. Touching the
   // sliders mid-home stops it; a new size un-homes. ----
   const HOME = { run: null, t: 0, k: 0, home: null, s: null, pose: null, travel: "" };
+  // the Controller (setupController): mode, the running sim, its config copy, the MPos <-> pose anchor, last status
+  const CTL = { mode: "play", sim: null, cfg: null, anchor: null, mpos: null, state: "", drag: null, jog: null,
+    jogBusy: false, cancelled: false, booting: null };
   const SWITCHES = { x: ["Endstop_X"], y: ["Endstop_Y_Min", "Endstop_Y_Max"], z: ["Endstop_Z_Min", "Endstop_Z_Max"] };
   let flashMat = null;
   function homeStart() {
@@ -1656,7 +1670,11 @@ body.vr-on .stage { grid-row: 1; }
       m.userData.flashT = setTimeout(() => { m.material = m.userData.flashOrig; delete m.userData.flashOrig; }, 300);
     }
   }
-  function dro() {                                   // MPos once homed, else dashes
+  function dro() {                                   // MPos once homed, else dashes (FluidNC mode: its MPos)
+    if (CTL.mode === "fluidnc") {
+      for (const [i, a] of ["x", "y", "z"].entries()) $("m" + a).textContent = CTL.mpos ? CTL.mpos[i].toFixed(1) : "–";
+      return;
+    }
     const m = HOME.home && HOME.pose && !HOME.run ? Homing.mpos(HOME.s, HOME.home, HOME.pose) : null;
     for (const a of ["x", "y", "z"]) $("m" + a).textContent = m && m[a] !== null ? m[a].toFixed(1) : "–";
   }
@@ -1846,6 +1864,7 @@ body.vr-on .stage { grid-row: 1; }
     catch (e) { yamlBase = prev; dlStatus(`${f.name}: ${e.message}`, "yaml-status"); }
   });
   function updateYaml() {
+    ctlConfigChanged();
     // max_travel_mm = trip -> stop less pulloff_mm (as LR4Model.fluidncConfig writes it); FluidNC's soft range
     // [mpos, mpos + max_travel] then ends at the stop. Short of the cutting area at most sizes (26 x 50: ~2.4 mm)
     const t = LR4Model.travel(cfg, S), s = Homing.settings(yamlBase ? yamlBase.text : null);
@@ -1857,69 +1876,174 @@ body.vr-on .stage { grid-row: 1; }
       "end, though the tool physically reaches it." : "";
   }
 
-  // ---- Controller (Run tab): FluidNC itself built for the browser (js/fluidnc_sim.js + fluidnc/), with a console.
-  // Boots with the wasm demo's config.yaml for now; the model doesn't follow it yet. Status lines go to the line
-  // above the log (polled with "?" while the box is open), not into it. window.LR4FluidNC = the running sim.
-  function setupController() {
-    const log = $("ctl-log"), stateEl = $("ctl-state"), start = $("ctl-start");
-    const add = (text, cls) => {
-      const d = document.createElement("div");
-      d.textContent = text;
-      if (cls) d.className = cls;
-      log.appendChild(d);
-      while (log.childElementCount > 500) log.firstChild.remove();
-      log.scrollTop = log.scrollHeight;
-    };
-    if (!window.crossOriginIsolated) {
-      start.disabled = true;
-      $("ctl-src").textContent = "This page isn't cross-origin isolated, so FluidNC can't run here (reload once; " +
-        "browsers without service workers, e.g. private windows in some browsers, can't run it).";
+  // ---- Controller (Run tab): Playback (the page moves the machine) or FluidNC: the firmware in the page
+  // (js/fluidnc_sim.js), booted with js/sim_config.js's copy of the config.yaml in use. In FluidNC mode the machine
+  // follows its MPos (auto reports, $RI=50, plus a slow "?") and the sliders jog it ($J=G53 to the slider's spot; a
+  // new spot mid-jog cancels the jog first, 0x85). Not homed yet (Part 16 brings the switches): MPos 0 = the pose at
+  // power-up, as on a real machine. A new size or config.yaml restarts it. window.LR4FluidNC = the running sim. ----
+  function ctlAdd(text, cls) {
+    const log = $("ctl-log"), d = document.createElement("div");
+    d.textContent = text;
+    if (cls) d.className = cls;
+    log.appendChild(d);
+    while (log.childElementCount > 500) log.firstChild.remove();
+    log.scrollTop = log.scrollHeight;
+  }
+  const ctlMsg = (t) => { $("ctl-msg").textContent = t; };
+  let ctlLastSent = "";
+  const CTL_CLS = { error: "err", alarm: "err", msg: "dim", greeting: "dim" };
+  function ctlLine(ev) {
+    if (ev.type === "status") {
+      $("ctl-state").textContent = ev.line;
+      const m = ev.MPos || (ev.WPos && ev.WCO ? ev.WPos.map((v, i) => v + ev.WCO[i]) : null);
+      if (m) CTL.mpos = m;
+      CTL.state = ev.state;
+      if (CTL.state !== "Jog") CTL.cancelled = false;
+      ctlFollow();
+      ctlJogPump();
       return;
     }
-    let sim = null, lastSent = "";
-    const CLS = { error: "err", alarm: "err", msg: "dim", greeting: "dim" };
-    const onLine = (ev) => {
-      if (ev.type === "status") { stateEl.textContent = ev.line; return; }
-      if (ev.type === "blank" || (ev.type === "text" && ev.line === lastSent)) return;  // the console's echo
-      add(ev.line, CLS[ev.type]);
-    };
-    const sendLine = (text) => {
-      if (!sim || !text.trim()) return;
-      lastSent = text.trim();
-      add("> " + lastSent, "in");
-      sim.send(lastSent);
-    };
-    start.addEventListener("click", async () => {
-      start.disabled = true;
-      $("ctl-run").hidden = false;
-      add("Loading FluidNC…", "dim");
-      try {
-        const config = await fetch("fluidnc/demo_config.yaml").then((r) => r.text());
-        sim = await FluidNCSim.start({ base: "fluidnc/", config, onLine });
-        window.LR4FluidNC = sim;
-        start.hidden = true;
-        const i = sim.info, src = $("ctl-src");
-        src.innerHTML = "";
-        src.append(`FluidNC ${i.branch || ""} ${String(i.commit || "").slice(0, 8)}${i.dirty ? " (local build)" : ""}, GPL-3.0: `);
-        for (const [t, href] of [["source", i.source], ["license", "fluidnc/LICENSE"]]) {
-          const a = document.createElement("a");
-          a.textContent = t; a.href = href; a.target = "_blank"; a.rel = "noopener";
-          src.append(a, t === "source" ? " · " : "");
-        }
-        setInterval(() => { if ($("ctl-box").open && !document.hidden) sim.realtime("?"); }, 250);
-      } catch (e) {
-        add("FluidNC didn't start: " + e.message, "err");
-      }
+    if (ev.type === "alarm") ctlMsg(`FluidNC ${ev.line}: send $X (Unlock) in the console to carry on.`);
+    if (ev.type === "blank" || (ev.type === "text" && ev.line === ctlLastSent)) return;   // the console's echo
+    ctlAdd(ev.line, CTL_CLS[ev.type]);
+  }
+  // MPos -> the page's pose (mm from the parked pose): anchor.pose + (MPos - anchor.mpos), held inside the travel
+  function ctlPose(mpos) {
+    const a = CTL.anchor;
+    return [0, 1, 2].map((i) => a.pose[i] + mpos[i] - a.mpos[i]);
+  }
+  function ctlFollow() {
+    if (!CTL.sim || !CTL.mpos || !meta) return;
+    const t = meta.travel, p = ctlPose(CTL.mpos), past = [];
+    const q = p.map((v, i) => {
+      const r = t["xyz"[i]], c = Math.min(Math.max(v, r[0]), r[1]);
+      if (Math.abs(c - v) > 0.5) past.push(`${"XYZ"[i]} ${Math.abs(c - v).toFixed(1)} mm`);
+      return c;
     });
+    move(q);
+    const warn = past.length ? `Past the hard stop (${past.join(", ")}): the real machine would hit it there. ` +
+      "This config.yaml's soft_limits are off, so FluidNC doesn't stop it." : "";
+    if (warn || /^Past the hard stop/.test($("ctl-msg").textContent)) ctlMsg(warn);
+  }
+  function ctlJog(el) {                             // only the slider's own axis moves (the others' sliders are rounded)
+    if (!CTL.sim || !meta) return;
+    const t = meta.travel, i = [sx, sy, sz].indexOf(el);
+    CTL.jog = Object.assign(CTL.jog || {}, { [i]: [sx.value * IN + t.x[0], sy.value * IN + t.y[0], sz.value - meta.tip_above_table][i] });
+    ctlJogPump();
+  }
+  function ctlJogPump() {
+    const sim = CTL.sim;
+    if (!sim || !CTL.jog || CTL.jogBusy || !CTL.mpos) return;
+    if (CTL.state === "Jog") {                       // chase the slider: stop this jog, then aim at the new spot
+      if (!CTL.cancelled) { CTL.cancelled = true; sim.realtime(0x85); }
+      return;
+    }
+    if (CTL.state !== "Idle") return;                // alarm / hold: no jogs
+    const a = CTL.anchor, cur = CTL.mpos, m = {};
+    for (const [i, p] of Object.entries(CTL.jog)) m[i] = a.mpos[i] + p - a.pose[i];
+    CTL.jog = null;
+    const axes = [0, 1, 2].filter((i) => m[i] !== undefined && Math.abs(m[i] - cur[i]) >= 0.05);
+    if (!axes.length) return;
+    const f = Math.min(...axes.map((i) => CTL.cfg.rates["xyz"[i]] || 1000));
+    CTL.jogBusy = true;
+    sim.command(`$J=G53 G21 ${axes.map((i) => "XYZ"[i] + m[i].toFixed(2)).join(" ")} F${f}`)
+      .then((r) => { if (!r.ok) ctlAdd(`jog: error:${r.code}`, "err"); })
+      .catch(() => {})
+      .finally(() => { CTL.jogBusy = false; ctlJogPump(); });
+  }
+  function ctlStop() {
+    if (CTL.sim) CTL.sim.stop();
+    Object.assign(CTL, { sim: null, mpos: null, state: "", jog: null, jogBusy: false, cancelled: false });
+    window.LR4FluidNC = null;
+    $("ctl-state").textContent = "";
+  }
+  async function ctlBoot() {                         // (re)start FluidNC with the config.yaml in use
+    const me = CTL.booting = {};
+    ctlStop();
+    ctlMsg("Starting FluidNC…");
+    let tr;
+    try { tr = SimConfig.translate((await yamlText()).text); }
+    catch (e) { if (CTL.booting === me) { CTL.booting = null; ctlMsg(`No config.yaml for FluidNC: ${e.message}`); } return; }
+    if (CTL.booting !== me) return;
+    ctlAdd(`Starting FluidNC with ${yamlBase && /^From your/.test(yamlBase.note) ? "your" : "V1E's JP3_LR"} config.yaml…`, "dim");
+    let sim;
+    try { sim = await FluidNCSim.start({ config: tr.text, onLine: ctlLine }); }
+    catch (e) {
+      if (CTL.booting === me) { CTL.booting = null; ctlAdd("FluidNC didn't start: " + e.message, "err"); ctlMsg("FluidNC didn't start."); }
+      return;
+    }
+    if (CTL.booting !== me || CTL.mode !== "fluidnc") { sim.stop(); return; }
+    CTL.booting = null;
+    Object.assign(CTL, { sim, cfg: tr, anchor: { pose: [HOME.pose.x, HOME.pose.y, HOME.pose.z], mpos: [0, 0, 0] } });
+    window.LR4FluidNC = sim;
+    await sim.command("$RI=50").catch(() => {});
+    sim.realtime("?");
+    ctlMsg("FluidNC is running. Not homed: MPos 0 is where the machine was when it started, as on a real one." +
+      (tr.dropped.length ? ` Left out of the simulator's copy: ${tr.dropped.join(", ")}.` : ""));
+    const i = sim.info, src = $("ctl-src");
+    src.innerHTML = "";
+    src.append(`FluidNC ${i.branch || ""} ${String(i.commit || "").slice(0, 8)}${i.dirty ? " (local build)" : ""}, GPL-3.0: `);
+    for (const [t, href] of [["source", i.source], ["license", "fluidnc/LICENSE"]]) {
+      const a = document.createElement("a");
+      a.textContent = t; a.href = href; a.target = "_blank"; a.rel = "noopener";
+      src.append(a, t === "source" ? " · " : "");
+    }
+  }
+  function ctlConfigChanged() {                      // a new size or config.yaml: restart FluidNC with it
+    if (CTL.mode !== "fluidnc" || !CTL.sim) return;
+    yamlText().then((r) => {
+      if (CTL.mode === "fluidnc" && CTL.sim && SimConfig.translate(r.text).text !== CTL.cfg.text) {
+        ctlAdd("New size / config.yaml: restarting FluidNC.", "dim");
+        ctlBoot();
+      }
+    }).catch(() => {});
+  }
+  function ctlSetMode(mode) {
+    if (mode === CTL.mode) return;
+    CTL.mode = mode;
+    const on = mode === "fluidnc";
+    for (const b of $("ctl-mode").querySelectorAll("button")) b.setAttribute("aria-pressed", String(b.dataset.v === mode));
+    $("ctl-box").hidden = !on;
+    for (const id of ["home", "v-home", "job-play"]) $(id).disabled = on;
+    if (on) {
+      jobPlaying(false); homeCancel();
+      $("ctl-box").open = true;
+      $("home-status").textContent = "FluidNC mode: homing needs its virtual switches, which aren't in yet. Jog with the sliders.";
+      ctlBoot();
+    } else {
+      CTL.booting = null;
+      ctlStop();
+      ctlMsg("");
+      $("home-status").textContent = HOME.home ? "Homed." : "Not homed.";
+      move();
+    }
+  }
+  function setupController() {
+    if (!window.crossOriginIsolated) {
+      $("ctl-mode").querySelector('[data-v="fluidnc"]').disabled = true;
+      ctlMsg("FluidNC can't run here: this page isn't cross-origin isolated (reload once; private windows in some " +
+        "browsers have no service workers).");
+    }
+    for (const b of $("ctl-mode").querySelectorAll("button")) b.addEventListener("click", () => ctlSetMode(b.dataset.v));
+    const sendLine = (text) => {
+      if (!CTL.sim || !text.trim()) return;
+      ctlLastSent = text.trim();
+      ctlAdd("> " + ctlLastSent, "in");
+      CTL.sim.send(ctlLastSent);
+    };
     $("ctl-form").addEventListener("submit", (e) => { e.preventDefault(); sendLine($("ctl-in").value); $("ctl-in").value = ""; });
-    for (const b of document.querySelectorAll("#ctl-run [data-ctl]")) b.addEventListener("click", () => sendLine(b.dataset.ctl));
-    for (const b of document.querySelectorAll("#ctl-run [data-rt]"))
-      b.addEventListener("click", () => sim && sim.realtime(/^\d+$/.test(b.dataset.rt) ? Number(b.dataset.rt) : b.dataset.rt));
+    for (const b of document.querySelectorAll("#ctl-box [data-ctl]")) b.addEventListener("click", () => sendLine(b.dataset.ctl));
+    for (const b of document.querySelectorAll("#ctl-box [data-rt]"))
+      b.addEventListener("click", () => CTL.sim && CTL.sim.realtime(/^\d+$/.test(b.dataset.rt) ? Number(b.dataset.rt) : b.dataset.rt));
+    setInterval(() => { if (CTL.sim && !document.hidden) CTL.sim.realtime("?"); }, 500);   // auto reports only come on a change
   }
   setupController();
+  // for tests/test_page_fluidnc.js: the controller's state and the model's pose (mm from the parked pose)
+  window.LR4Ctl = { mode: () => CTL.mode, state: () => CTL.state, mpos: () => CTL.mpos, anchor: () => CTL.anchor,
+    cfg: () => CTL.cfg, pose: () => HOME.pose && [HOME.pose.x, HOME.pose.y, HOME.pose.z], travel: () => meta && meta.travel };
 
   // ---- version + feedback: the issue link carries the size, data date and the loaded files' checksums ----
-  const VERSION = "0.14.0";
+  const VERSION = "0.15.0";
   function setupAbout() {
     const bits = [`lr4-sandbox ${VERSION}`];
     if (cfg.built) bits.push(`model data built ${cfg.built}`);

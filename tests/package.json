@@ -1,13 +1,13 @@
 {
   "name": "lr4-sandbox-tests",
-  "version": "0.14.0",
+  "version": "0.15.0",
   "private": true,
   "description": "Tests for the LR4 Sandbox configurator (web/js) and its Python twins",
   "license": "MIT",
   "type": "commonjs",
   "scripts": {
-    "test": "node test_calculator.js && node test_vr.js && node test_strut_cam.js && node test_gcode_play.js && node test_homing.js && node test_fluidnc_sim.js",
-    "test:local": "node test_calculator.js && node test_vr.js && node test_config_model.js && node test_parts_files.js && node test_strut_plate.js && node test_strut_cam.js && node test_gcode_play.js && node test_homing.js && node test_fluidnc_sim.js"
+    "test": "node test_calculator.js && node test_vr.js && node test_strut_cam.js && node test_gcode_play.js && node test_homing.js && node test_fluidnc_sim.js && node test_sim_config.js",
+    "test:local": "node test_calculator.js && node test_vr.js && node test_config_model.js && node test_parts_files.js && node test_strut_plate.js && node test_strut_cam.js && node test_gcode_play.js && node test_homing.js && node test_fluidnc_sim.js && node test_sim_config.js"
   },
   "dependencies": {
     "polygon-clipping": "^0.15.7"
