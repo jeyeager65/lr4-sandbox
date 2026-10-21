@@ -1,18 +1,19 @@
 // The configurator's machine vs the FreeCAD builds, part by part:
 //   python pipeline/fit_config.py && node tests/test_config_model.js
 // For every size build (private/sizes/<tag>/summary.json, written by fit_config.py) the page's model
-// (config_model.js + web/data/lr4_config.json) must produce exactly the build's parts, each within TOL:
+// (config_model.js + build/config/lr4_config.json) must produce exactly the build's parts, each within TOL:
 // rigid parts by centroid, stretched parts by bounding box. Also checks the hose anchors and travel. The temp strut
-// builds (private/sizes/<tag>_temp, web/data/sizes_temp.json) are checked the same way with S.struts = "temp".
+// builds (private/sizes/<tag>_temp, build/config/sizes_temp.json) are checked the same way with S.struts = "temp".
 "use strict";
 const fs = require("fs"), path = require("path");
 const M = require("../web/js/config_model.js");
-const cfg = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "web", "data", "lr4_config.json"), "utf8"));
+const CONF = path.join(__dirname, "..", "build", "config");      // fit_config.py's output
+const cfg = JSON.parse(fs.readFileSync(path.join(CONF, "lr4_config.json"), "utf8"));
 const SIZES = path.join(__dirname, "..", "private", "sizes");
 const TOL = 0.05;
 const TOL_BELT = 0.15;      // stretched belt runs: their bbox ends move with where the teeth fall
-const sizes = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "web", "data", "sizes.json"), "utf8"));
-const tempFile = path.join(__dirname, "..", "web", "data", "sizes_temp.json");
+const sizes = JSON.parse(fs.readFileSync(path.join(CONF, "sizes.json"), "utf8"));
+const tempFile = path.join(CONF, "sizes_temp.json");
 const runs = Object.entries(sizes).map(([tag, c]) => [tag, c, "mdf"]).concat(
   (fs.existsSync(tempFile) && cfg.temp ? JSON.parse(fs.readFileSync(tempFile, "utf8")) : []).map((t) => [t + "_temp", sizes[t], "temp"]));
 

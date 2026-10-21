@@ -59,7 +59,6 @@ top of `freecad/build.py` (`CUT_X_IN`, `CUT_Y_IN`). Output goes to `build/` (FCS
 
 ```sh
 python tools/serve.py configurator 48x96     # optional size in inches
-python tools/serve.py configurator --share   # the share data: no V1E geometry, load your own part files
 ```
 
 With the share data the page draws only our hardware until you give it the part files: drop the Printables zips,

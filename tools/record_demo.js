@@ -3,16 +3,16 @@
 // resumed after --pause seconds), and at the end the gantry driven to the back to show the result. QHD by default. The page's clock (performance.now) is taken over and stepped one
 // frame at a time, so the video runs at true speed however long each frame takes to render. Frames are JPEGs piped
 // into ffmpeg (H.264 MP4).
-//   python tools/serve.py configurator        (serves the local page on 127.0.0.1:8767)
+//   python tools/serve.py configurator        (serves the repo on 127.0.0.1:8767; the page loads parts/)
 //   node tools/record_demo.js <file.nc> [out.mp4] [--size 2560x1440] [--fps 30] [--job 75] [--pause 2] [--orbit 10]
-//        [--url http://127.0.0.1:8767/index.html] [--swiftshader]
+//        [--url http://127.0.0.1:8767/web/index.html?parts=/parts/] [--swiftshader]
 // --job: seconds of video for the job's moves (sets the playback speed; pauses and probes come on top).
 // Needs Chrome (CHROME env or the usual path), ffmpeg on PATH, Node 22+. Uses the page's window.LR4Demo handle.
 "use strict";
 const { spawn } = require("child_process"), fs = require("fs"), os = require("os"), path = require("path");
 
 const args = process.argv.slice(2), opt = { size: [2560, 1440], fps: 30, job: 75, pause: 2, orbit: 10,
-  url: "http://127.0.0.1:8767/index.html", gpu: true };
+  url: "http://127.0.0.1:8767/web/index.html?parts=/parts/", gpu: true };
 const pos = [];
 for (let i = 0; i < args.length; i++) {
   const a = args[i];
@@ -75,7 +75,9 @@ const PAGE_REC = `(() => {
       await sleep(1000);
       if (await val("!!document.getElementById('status') && document.getElementById('status').hidden")) {
         await sleep(1500);
-        if (await val("document.getElementById('status').hidden")) return;
+        // and the part files (?parts=) placed: the files panel says "All N files loaded" (or there is none)
+        if (await val(`document.getElementById('status').hidden && (document.getElementById('files-sec').hidden ||
+            /All \\d+ files loaded/.test(document.getElementById('files-sec').textContent))`)) return;
       }
       if (Date.now() - t0 > 180000) throw new Error("page didn't load: " + await val("document.getElementById('status').innerText"));
     }

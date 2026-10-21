@@ -114,8 +114,8 @@ canvas { display: block; width: 100%; height: 100%; touch-action: none; }
   border-radius: 4px; padding: 10px 14px 12px; box-shadow: 0 6px 24px rgb(0 0 0 / 0.18); font-size: 14px;
 }
 .job-pop[hidden] { display: none; }
-body.rec { grid-template-columns: 1fr; }            /* recording (LR4Demo.recording): the 3D view only */
-body.rec .panel, body.rec .hint { display: none; }
+body.rec .panel, body.rec .hint { display: none; }  /* recording (LR4Demo.recording): the 3D view, whole window */
+body.rec .stage { position: fixed; inset: 0; }
 .job-pop button { cursor: pointer; }
 .job-pop b { font-family: var(--font-display); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
 .job-pop p { margin: 4px 0 10px; font-size: 15px; line-height: 1.4; }
@@ -806,7 +806,7 @@ body.vr-on .stage { grid-row: 1; }
 
   // ---- bring your own files (share data: cfg.files + a `src` per V1E part instead of its mesh - pipeline/share_data.py).
   // The user's files are matched by SHA-256 (js/parts_files.js), kept in IndexedDB, and placed by each part's A. ----
-  const DATA = new URLSearchParams(location.search).has("share") ? "data/share/" : "data/";
+  const DATA = "data/";                                // pipeline/share_data.py (no V1E geometry); the same file published
   const userFiles = new Map();                        // manifest path -> {name, sha256, ok, buf}
   const srcCache = new Map(), soupCache = new Map();
   let needed = null;                                  // manifest path -> the part names placed from it
@@ -1635,7 +1635,7 @@ body.vr-on .stage { grid-row: 1; }
     $("fb-issue").addEventListener("click", (ev) => {
       const files = [...userFiles.entries()].map(([p, f]) => `- ${p}: ${f.ok ? "match" : "DIFFERENT"} ${f.sha256.slice(0, 12)}${f.name.toLowerCase().endsWith(p.split("/").pop().toLowerCase()) ? "" : ` (${f.name})`}`);
       const body = [`**What happened:**\n\n\n**Expected:**\n\n`, "---",
-        `- Page: ${VERSION}, data ${cfg.built || "?"}${cfg.files ? `, files as of ${cfg.files.tested}` : " (private data)"}`,
+        `- Page: ${VERSION}, data ${cfg.built || "?"}${cfg.files ? `, files as of ${cfg.files.tested}` : ""}`,
         `- Size: ${(S.cutX / IN).toFixed(2)} x ${(S.cutY / IN).toFixed(2)} in, ${S.n} braces (strut ${S.strut.toFixed(1)} mm)`,
         `- Peter Plates: ${peterStyle}; detail: ${lite ? "lite" : "full"}`,
         `- Browser: ${navigator.userAgent}`,

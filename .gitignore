@@ -5,11 +5,10 @@ __pycache__/
 *.pyc
 *.FCBak
 tests/node_modules/
-# page data made from the V1E meshes (pipeline/fit_config.py)
-web/data/*
-# the share data (no V1E geometry; the Pages site needs it) - uncomment once V1E OKs shipping the placements,
-# and drop web/data/ from BAD_DIRS in tools/check_no_parts.py for it
-# !web/data/share/
+# the page data (pipeline/share_data.py: no V1E geometry; the Pages site needs it). V1E OK'd shipping it (2026-10-20):
+# delete this line, and web/data/ from BAD_DIRS in tools/check_no_parts.py, when the user says publish. The private
+# data with the V1E meshes (fit_config.py) is build/config/, ignored with build/.
+web/data/
 
 # Third-party files: users download their own (parts/ = V1E / Printables STLs, DXFs, STEPs)
 parts/*

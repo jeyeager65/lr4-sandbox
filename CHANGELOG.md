@@ -6,6 +6,10 @@ the date the model data was built and the Printables file set it was solved for.
 ## 0.11.0 - 2026-10-20
 - Page data: the geometry is `lr4_config_geometry.bin.gz` (plain gzip, fetched as bytes) instead of base64 text -
   a quarter smaller (share data 2.86 MB) and no decode step.
+- One data set: the page always loads web/data/ (the share data, no V1E geometry) - locally exactly what is published;
+  `python tools/serve.py configurator` serves the repo and loads your parts/ (?parts=/parts/). `?share` and
+  `serve.py --share` are gone. fit_config.py's output with the V1E meshes moved to build/config/ (share_data.py's
+  input and the tests' reference only).
 - No more claude.ai artifact workarounds: index.html and viewer.html are complete pages (no wrapping by serve.py, the
   Pages workflow or export_web); DXF downloads as .dxf (was zipped), no "Copy DXF text"; downloads are plain browser downloads; the viewer
   loads only its per-part .bin files (export_web no longer writes lr4_geometry.txt / lr4.json / LowRider4.html).

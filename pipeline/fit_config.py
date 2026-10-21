@@ -1,7 +1,7 @@
 # Configurator phase 2: from the size builds (size_builds.py -> private/sizes/<tag>/), work out how every part
 # moves with the machine's size, check it against every build, and write the page's data:
 #   python pipeline/fit_config.py        (plain Python + numpy; no FreeCAD)
-# -> web/data/lr4_config.json (parts, rules, fitted coefficients) + lr4_config_geometry.bin.gz (gzip
+# -> build/config/lr4_config.json (parts, rules, fitted coefficients + lr4_config_geometry.bin.gz (gzip
 #    of each mesh once, at the reference size), and a report of anything that doesn't fit.
 #
 # Size features (all computable in the page from the cut area): f = [1, TW, TL, strut, pitch, cutY]
@@ -31,7 +31,7 @@ import numpy as np
 HERE = os.path.dirname(os.path.abspath(__file__))
 PROJ = os.path.dirname(HERE)
 SIZES_DIR = os.path.join(PROJ, "private", "sizes")    # = lr4.SIZES_DIR
-OUT = os.path.join(PROJ, "web", "data")    # the page data
+OUT = os.path.join(PROJ, "build", "config")    # with V1E meshes: share_data.py's input + the tests' reference
 sys.path.insert(0, HERE)
 from size_builds import SIZES                       # noqa: E402
 sys.path.insert(0, os.path.join(PROJ, "freecad"))

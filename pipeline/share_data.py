@@ -4,9 +4,9 @@
 # so the page places the user's own copy exactly where the mesh was. Our meshes (hardware, strut plates, table, bolts)
 # stay. Plain Python (numpy).
 #   python pipeline/share_data.py
-# in : web/data/lr4_config.json + lr4_config_geometry.bin.gz (fit_config.py), private/sizes/source_frames.json
+# in : build/config/lr4_config.json + lr4_config_geometry.bin.gz (fit_config.py), private/sizes/source_frames.json
 #      (source_frames.py), parts/manifest.json
-# out: web/data/share/lr4_config.json + lr4_config_geometry.bin.gz (same layout as the private data) - the
+# out: web/data/lr4_config.json + lr4_config_geometry.bin.gz (what the page loads; same layout as the private data) - the
 #      tests/test_share.py check rebuilds every src part from parts/ and compares it with the private meshes.
 # src kinds: stl {file, sha256, A}; dxf {.., depth: extrusion along the DXF's z, before A}; peter {open: {.., piece:
 # connected component by ZMax, highest first}, closed: {..}} (the "~honeycomb" alternates are dropped - part 6 builds
@@ -20,8 +20,8 @@ import numpy as np
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 PROJ = os.path.dirname(HERE)
-DATA = os.path.join(PROJ, "web", "data")
-OUT = os.path.join(DATA, "share")
+DATA = os.path.join(PROJ, "build", "config")    # fit_config.py's output (with V1E meshes)
+OUT = os.path.join(PROJ, "web", "data")         # the page data (local and public)
 FRAMES = os.path.join(PROJ, "private", "sizes", "source_frames.json")
 FRAMES_TEMP = os.path.join(PROJ, "private", "sizes", "source_frames_temp.json")   # source_frames.py LR4_TEMP=1
 MANIFEST = os.path.join(PROJ, "parts", "manifest.json")

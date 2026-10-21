@@ -1,4 +1,4 @@
-# Share data test: rebuild every part the share data points at a file for (web/data/share, pipeline/share_data.py)
+# Share data test: rebuild every part the share data points at a file for (web/data, pipeline/share_data.py)
 # from the files in parts/, the way the page will, and compare it with the private page data's mesh (the reference
 # build). Also checks the share data holds no V1E geometry.
 #   python tools/run.py tests/test_share.py     (FreeCAD only for the XZ plate DXFs; the STLs are read with numpy)
@@ -19,7 +19,8 @@ import numpy as np
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 PARTS = os.path.join(ROOT, "parts")
-DATA = os.path.join(ROOT, "web", "data")
+DATA = os.path.join(ROOT, "build", "config")    # fit_config.py: the reference meshes
+SHARE = os.path.join(ROOT, "web", "data")
 TOL = 0.002          # mm: grid cell for the vertex match (a match = within 0.4 cell per axis)
 LO = -1000.0         # grid origin (mm); coordinates up to LO + 2^21 * TOL
 
@@ -128,7 +129,7 @@ def dxf_solid(rel, depth, A):
 def main():
     cfg = json.load(open(os.path.join(DATA, "lr4_config.json")))
     ref = ref_meshes(cfg, gzip.decompress(open(os.path.join(DATA, "lr4_config_geometry.bin.gz"), "rb").read()))
-    share = json.load(open(os.path.join(DATA, "share", "lr4_config.json")))
+    share = json.load(open(os.path.join(SHARE, "lr4_config.json")))
     fails, done = [], 0
     printed = {p["meta"]["name"] for p in cfg["parts"] if p["meta"].get("source") == "printed" and "mesh" in p}
     for p in share["parts"]:

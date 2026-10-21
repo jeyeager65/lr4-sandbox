@@ -1,6 +1,6 @@
 // The page's file readers (web/js/parts_files.js) vs the private page data: every part the share data places from a
 // file is rebuilt from parts/ the way the page does it and compared with the reference build's mesh.
-//   node tests/test_parts_files.js       (needs parts/, web/data/ and web/data/share/ - local only)
+//   node tests/test_parts_files.js       (needs parts/, build/config/ and web/data/ - local only)
 // stl / bent: the same vertex set both ways (grid match, TOL) + the same triangle count; peter open: the piece's
 // vertices all on the built plate (the build fills openings), closed: >= 99 % on the open piece; dxf: every reference
 // vertex within DXF_TOL of an outline and inside the slab (back through A), the same face / hole count, area x depth = the mesh's volume.
@@ -10,10 +10,10 @@
 const fs = require("fs"), path = require("path"), zlib = require("zlib");
 const F = require("../web/js/parts_files.js");
 
-const ROOT = path.join(__dirname, ".."), PARTS = path.join(ROOT, "parts"), DATA = path.join(ROOT, "web", "data");
+const ROOT = path.join(__dirname, ".."), PARTS = path.join(ROOT, "parts"), DATA = path.join(ROOT, "build", "config");
 const TOL = 0.002, DXF_TOL = 0.02;
 const cfg = JSON.parse(fs.readFileSync(path.join(DATA, "lr4_config.json"), "utf8"));
-const share = JSON.parse(fs.readFileSync(path.join(DATA, "share", "lr4_config.json"), "utf8"));
+const share = JSON.parse(fs.readFileSync(path.join(ROOT, "web", "data", "lr4_config.json"), "utf8"));
 const blob = zlib.gunzipSync(fs.readFileSync(path.join(DATA, "lr4_config_geometry.bin.gz")));
 const ab = blob.buffer.slice(blob.byteOffset, blob.byteOffset + blob.byteLength);
 const ref = {};
