@@ -87,9 +87,9 @@ plates, front_wing_size 11.5 (1" EMT). Plates 830 x 90.5 (front) and 830 x 78.5 
 | Power supply | 150 x 60 x 32 mm brick | GUESS |
 | Bottom temp strut orientation | both ends the same way round, bed face down, small d 3.5 hole at the back edge | GUESS from beam5 (`lr4.TEMP_STRUT_FRAMES`); front ones from the notches (B4/B5) |
 | Z stepper shaft | 24 mm from the face (`Z_SHAFT`) | GUESS - V1E says 20 mm+; MEASURE (sets the coupler / leadscrew height) |
-| Endstop lever | Omron SS-3GL13PT, tip 2.1 above the body, 10 mm past its end | GUESS from the user's photo |
 | Vacuum hose | Fulton 2-1/2" x 20 ft clear PVC, steel wire (user's) - 73 mm OD | OD GUESS - MEASURE (`lr4.HOSE['od']`) |
-| Endstop lever shape | arch, crest 1.5 wide x 2.6 high, arm +-7.6 from the pivot (`hw.SS_GL13`) | GUESS from the photo - sets whether the Y levers reach the stop screws (~0.9 short in the model) |
+| Endstop lever | Omron SS-3GL13PT 19.8 x 10.0 body, hinge 2.7 in, curl 1.0 past the body, crest 6.5 free / 4.5 at the click (`hw.SS_GL13`) | MEASURED 2026-10-20; lever width + curl shape still from the photo |
+| Y stop screws | backed out 5 mm (`lr4.Y_STOP_OUT`) - sets Y home, clicks ~3 mm before the wheels hit the front holders | CHOICE - set on the machine |
 | Bearings | 608 (8 x 22 x 7) | datasheet; real size/tolerance may explain the 0.26 mm beam level difference |
 | Router colours | blue grip, charcoal head, black cap/switch/cord, grey dial | GUESS (screen only) |
 
