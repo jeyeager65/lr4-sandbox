@@ -140,7 +140,7 @@
     h.bump_next = Math.min(...boxes.filter((b) => b.name.startsWith("Hose_Holder") && b.lo[0] > lidX1).map(cx));
     const holders = boxes.filter((b) => b.name.startsWith("Hose_"));
     h.clamp_x = cx(holders.reduce((a, b) => (b.lo[0] < a.lo[0] ? b : a)));
-    h.run = h.port[0] + (1 - h.x_pos) * S.cutX + h.core_end_dx + 2 * h.uturn_gap - h.clamp_x;
+    h.run = h.port[0] + travel(cfg, S).x[1] + h.core_end_dx + 2 * h.uturn_gap - h.clamp_x;
     const braces = boxes.filter((b) => /^Brace_(\d+|Max)$/.test(b.name)).sort((a, b) => cx(a) - cx(b));
     if (h.sleeve && h.sleeve.exit) h.sleeve.exit.x = braces[Math.floor(braces.length / 2)].lo[0] - 5.0;
     return h;
@@ -239,7 +239,8 @@
   }
 
   // FluidNC config.yaml (V1E's FluidNC_Configs "LowRider CNC/Jackpot3/JP3_LR", or the user's own) with axes x / y
-  // max_travel_mm set to this travel (= the cutting area; V1E's 4 x 8 file has 1220 x 2440). Line edits only, so
+  // max_travel_mm set to this travel (home trip -> the far stop, lr4.STOPS: a little over the cutting area; V1E's
+  // 4 x 8 file has 1220 x 2440). Line edits only, so
   // comments and layout stay; a header comment says what changed. -> {text, x: [old, new], y: [old, new]}
   function fluidncConfig(text, cfg, S, note) {
     const t = travel(cfg, S), want = { x: t.x[1] - t.x[0], y: t.y[1] - t.y[0] }, got = {};

@@ -112,8 +112,8 @@ for (const [tag, [cx, cy], struts] of runs) {
     "other:", "  max_travel_mm: 5"].join("\n");
   const S = M.size(24.5 * M.IN, 45 * M.IN), r = M.fluidncConfig(yaml, cfg, S, "note");
   const out = r.text.split("\n"), body = out.slice(2), diff = yaml.split("\n").map((l, i) => l === body[i] ? null : [l, body[i]]).filter(Boolean);
-  const ok = out.length === yaml.split("\n").length + 2 && diff.length === 2 && body[5] === "    max_travel_mm: 622.3"
-    && body[12] === "    max_travel_mm: 1143.0" && out[1] === "# note";
+  const ok = out.length === yaml.split("\n").length + 2 && diff.length === 2 && body[5] === "    max_travel_mm: 624.1"
+    && body[12] === "    max_travel_mm: 1144.5" && out[1] === "# note";
   let bad = false;
   try { M.fluidncConfig("axes:\n  z:\n    max_travel_mm: 150\n", cfg, S); } catch (e) { bad = true; }
   if (!ok || !bad) fails++;

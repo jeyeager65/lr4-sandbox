@@ -32,6 +32,8 @@ COARSE = 4                                        # centreline samples per span 
 REPORT = 2.0                                      # list parts closer than this (mm); further ones aren't measured                     # the lower run lies against its back edge (the trays' line is
                                                   # 793, the plate's back 759.3: a 2.8 mm sliver by design)
 SKIP_MM = 15.0                                    # hose skipped at its start: the cuff, threaded into the dust shoe
+RIDES = ("Vac_Hose", "Router_Cord_Run", "Cable_Sleeve")   # the hose + what's tied along it (built from its
+                                                  # route at the parked pose only, so held still they'd false-flag)
 
 B = {"__file__": os.path.join(HERE, "build.py")}  # the build's parameters (cut area, parked pose)
 src = open(B["__file__"], encoding="utf-8").read()
@@ -44,7 +46,7 @@ h = json.load(open(os.path.join(ROOT, "build", "hose.json")))
 doc = App.openDocument(os.path.join(ROOT, "build", "LowRider4.FCStd"))
 parts = []
 for o in doc.Objects:
-    if o.Name == "Vac_Hose" or o.TypeId not in ("Mesh::Feature", "Part::Feature"):
+    if o.Name in RIDES or o.TypeId not in ("Mesh::Feature", "Part::Feature"):
         continue
     s = o.Mesh if o.TypeId == "Mesh::Feature" else o.Shape
     if s.isNull() if hasattr(s, "isNull") else s.CountFacets == 0:

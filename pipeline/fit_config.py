@@ -492,7 +492,7 @@ def main():
     kinds = {}
     for p in out_parts:
         kinds[p["kind"]] = kinds.get(p["kind"], 0) + 1
-    print(f"parts {len(out_parts)} {kinds}; geometry {len(txt) / 1e6:.2f} MB text; "
+    print(f"parts {len(out_parts)} {kinds}; geometry {len(blob) / 1e6:.2f} MB ({len(gz) / 1e6:.2f} MB gz); "
           f"{cfg['triangles']} triangles; hose leaves fitted {len(hose_fit)}")
     print("stretch:", ", ".join(p["key"] for p in out_parts if p["kind"] == "stretch"))
     print("worst fits:", ", ".join(f"{p['key']} {p['err']}" for p in sorted(out_parts, key=lambda p: -p["err"])[:8]))
