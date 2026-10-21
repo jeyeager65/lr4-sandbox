@@ -3,6 +3,21 @@
 The version is the configurator page's (`VERSION` in `web/index.html`, shown in its footer). The footer also shows
 the date the model data was built and the Printables file set it was solved for.
 
+## 0.12.0 - 2026-10-20
+- The panel is reorganized into tabs: Machine (cutting area, parts, colours), Build it (BOM, cut list, strut plates,
+  config.yaml) and Run (tool position, G-code). The page remembers the last tab. Once all the part files load, they
+  fold to one line ("Manage" opens them).
+- View controls are on the canvas: a toolbar (☰, Iso / Front / Top / Side / Back / Fit all / VR) and ⚙ for Detail,
+  Background, table height, building size and SpaceMouse (a bottom sheet on phones). ☰ hides the panel so the model
+  fills the window, and the page remembers that too. The selected part shows as a chip on the canvas.
+- Long notes fold away ("About these files", "About this config"); the fit and credits notes moved to an "About this
+  model" dialog. Run G-code has a "Use the temporary struts" button.
+- Tool position X / Y follow the inches / mm toggle (they were always inches).
+- The "Viewing in VR" card has ✕: it shrinks to a pill ("Viewing in VR ▾ · Exit VR") so the desktop mirror stays
+  clear, and the page remembers this.
+- tests/test_page_vr.js: the VR menu still reads and drives the panel's controls while their tab is hidden, and the
+  canvas overlays hide in VR (headless Chrome; not part of `npm test`).
+
 ## 0.11.0 - 2026-10-20
 - cnc-gcode-tools copies updated to 0.6.2 (G20/G21 carry the position and feed over; 45° flute helix); the page's
   own workarounds for both are gone.

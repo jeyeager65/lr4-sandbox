@@ -89,9 +89,39 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 .groups label { display: grid; grid-template-columns: 18px 1fr auto; gap: 8px; align-items: center; padding: 4px 0; cursor: pointer; }
 .groups input { accent-color: var(--accent); margin: 0; }
 .groups em { font-style: normal; font-family: var(--font-data); font-size: 12px; color: var(--muted); }
-.pick { border-left: 3px solid var(--accent); padding: 6px 0 6px 10px; min-height: 44px; }
-.pick strong { font-family: var(--font-display); font-weight: 600; font-size: 17px; display: block; }
-.pick p { margin: 2px 0 0; color: var(--muted); line-height: 1.4; }
+/* panel tabs: the panel is three tasks - set up the machine, get what you need to build it, run it */
+.tabs { display: flex; border-bottom: 1px solid var(--line); margin-bottom: -6px; }
+.tabs button { flex: 1; border: 0; border-bottom: 2px solid transparent; border-radius: 0; margin-bottom: -1px; padding: 8px 4px;
+  font: 600 13px var(--font-display); letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.tabs button:hover { color: var(--ink); }
+.tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); }
+.tabpanel { display: flex; flex-direction: column; gap: 20px; }
+.files-line { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 13px; color: var(--muted); }
+.files-line button { padding: 3px 8px; font-size: 12px; }
+.files-line:not([hidden]) + #files-body { margin-top: 12px; }
+details.more summary { color: var(--muted); }
+.about-line { margin: 0; }
+button.link { border: 0; padding: 0; font: inherit; color: var(--ink); text-decoration: underline; text-decoration-color: var(--accent);
+  text-underline-offset: 2px; }
+dialog.about { width: min(520px, calc(100vw - 32px)); border: 1px solid var(--line); border-radius: 6px; background: var(--panel);
+  color: var(--ink); padding: 16px 18px; line-height: 1.5; }
+dialog.about::backdrop { background: rgb(0 0 0 / 0.45); }
+dialog.about h2 { font-size: 14px; color: var(--ink); }
+dialog.about p { margin: 0 0 10px; color: var(--muted); font-size: 13px; }
+/* on the canvas: view toolbar + settings popover (top left), the selected part (bottom left) */
+.toolbar { position: absolute; left: 12px; top: 12px; right: 12px; display: flex; flex-wrap: wrap; gap: 4px; pointer-events: none; }
+.toolbar button, .pick, .view-pop { background: color-mix(in srgb, var(--panel) 90%, transparent); backdrop-filter: blur(4px); }
+.toolbar button { pointer-events: auto; padding: 5px 9px; }
+#v-more { font-size: 15px; line-height: 1; padding: 4px 8px; }
+#v-more[aria-expanded="true"] { border-color: var(--accent); }
+.view-pop { position: absolute; left: 12px; top: 52px; width: min(330px, calc(100% - 24px)); max-height: calc(100% - 64px); overflow-y: auto;
+  border: 1px solid var(--line); border-radius: 6px; padding: 4px 14px 14px; box-shadow: 0 10px 32px rgb(0 0 0 / 0.22); }
+.pick { position: absolute; left: 12px; bottom: 10px; max-width: min(420px, calc(100% - 24px)); display: flex; align-items: flex-start; gap: 10px;
+  border: 1px solid var(--line); border-left: 3px solid var(--accent); border-radius: 4px; padding: 6px 6px 6px 10px; }
+.pick strong { font-family: var(--font-display); font-weight: 600; font-size: 16px; display: block; }
+.pick p { margin: 1px 0 0; color: var(--muted); font-size: 12px; line-height: 1.4; }
+.pick button { border: 0; padding: 2px 6px; color: var(--muted); }
+.pick:not([hidden]) ~ .hint { display: none; }
 table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
 td { padding: 4px 0; border-bottom: 1px solid var(--line); }
 td:last-child { text-align: right; font-family: var(--font-data); font-size: 12px; }
@@ -114,7 +144,7 @@ canvas { display: block; width: 100%; height: 100%; touch-action: none; }
   border-radius: 4px; padding: 10px 14px 12px; box-shadow: 0 6px 24px rgb(0 0 0 / 0.18); font-size: 14px;
 }
 .job-pop[hidden] { display: none; }
-body.rec .panel, body.rec .hint { display: none; }  /* recording (LR4Demo.recording): the 3D view, whole window */
+body.rec .panel, body.rec .hint, body.rec .toolbar, body.rec .view-pop, body.rec .pick { display: none; }  /* recording (LR4Demo.recording): the 3D view, whole window */
 body.rec .stage { position: fixed; inset: 0; }
 .job-pop button { cursor: pointer; }
 .job-pop b { font-family: var(--font-display); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
@@ -205,10 +235,21 @@ label.btn:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; 
   .stage { grid-row: 1; }
   .panel { grid-row: 2; border-right: 0; border-top: 1px solid var(--line); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
   h1 { font-size: 24px; }
+  .toolbar { left: 8px; top: 8px; right: 8px; }
+  .toolbar button { padding: 4px 7px; font-size: 12px; }
+  /* view settings: a sheet over the panel's half of the screen */
+  .view-pop { position: fixed; left: 0; right: 0; top: auto; bottom: 0; width: auto; max-height: 60dvh; border-radius: 10px 10px 0 0;
+    padding-bottom: max(14px, env(safe-area-inset-bottom, 0px)); background: var(--panel); z-index: 5; }
+  .pick { left: 8px; bottom: 8px; }
 }
 /* VR on: no side panel, the stage fills the window, a popup card instead (js/vr.js toggles body.vr-on) */
 body.vr-on { grid-template-columns: 1fr; grid-template-rows: 1fr; }
-body.vr-on .panel, body.vr-on .hint { display: none; }
+/* panel collapsed (toolbar ☰): the model fills the window, on phones too */
+body.panel-off { grid-template-columns: 1fr; grid-template-rows: 1fr; }
+body.panel-off .panel { display: none; }
+body.panel-off .stage { grid-row: 1; }
+#v-panel[aria-pressed="true"] { border-color: var(--accent); }
+body.vr-on .panel, body.vr-on .hint, body.vr-on .toolbar, body.vr-on .view-pop, body.vr-on .pick { display: none; }
 body.vr-on .stage { grid-row: 1; }
 .vr-pop {
   position: absolute; right: 16px; top: 16px; width: min(400px, calc(100% - 32px));
@@ -222,6 +263,14 @@ body.vr-on .stage { grid-row: 1; }
 .vr-pop dt { font-weight: 600; color: var(--ink); }
 .vr-pop dd { margin: 0; color: var(--muted); }
 .vr-pop #vr-exit { width: 100%; }
+#vr-min { border: 0; padding: 2px 6px; color: var(--muted); font-size: 15px; line-height: 1; }
+/* minimized (✕): a pill - title, expand, Exit VR - so the desktop mirror stays clear */
+.vr-pop.min { width: auto; display: flex; align-items: center; gap: 10px; padding: 8px 10px 8px 14px; }
+.vr-pop.min h2 { font-size: 15px; }
+.vr-pop.min :is(.seg, #vr-size, #vr-pick, dl) { display: none; }
+.vr-pop.min #vr-exit { width: auto; order: 2; }
+.vr-head { flex: 1; }
+.vr-head .seg { margin-left: auto; }
 .vr-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 @media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto; } }
 </style>
@@ -234,87 +283,226 @@ body.vr-on .stage { grid-row: 1; }
     <div class="sub" id="sub">V1E LowRider 4, built to your cutting area. Every printed part is the official STL, placed from its holes.</div>
   </header>
 
-  <section id="files-sec" aria-labelledby="h-files" hidden>
-    <h2 id="h-files">Your part files</h2>
-    <div class="drop" id="drop">Drop the Printables zips, a folder or the STL / DXF files here<br>
-      <small>Read in this browser only - nothing is uploaded. Kept here for next time.</small></div>
-    <div class="buttons">
-      <label class="btn"><input type="file" id="f-files" multiple accept=".zip,.stl,.dxf" hidden>Choose files…</label>
-      <label class="btn"><input type="file" id="f-dir" webkitdirectory hidden>Choose a folder…</label>
-      <button type="button" id="f-forget">Forget files</button>
-    </div>
-    <div id="files-list" role="status"></div>
-  </section>
-
-  <section aria-labelledby="h-size">
-    <h2 id="h-size">Cutting area</h2>
-    <div class="seg" role="group" aria-label="Units">
-      <button type="button" id="u-in" aria-pressed="true">INCHES</button>
-      <button type="button" id="u-mm" aria-pressed="false">MM</button>
-    </div>
-    <div class="pair">
-      <div class="field"><label for="cut-x">X, along the beam</label>
-        <div class="unit-input"><input id="cut-x" type="number" step="any" min="1" value="26"><span class="u">in</span></div></div>
-      <div class="field"><label for="cut-y">Y, along the table</label>
-        <div class="unit-input"><input id="cut-y" type="number" step="any" min="1" value="50"><span class="u">in</span></div></div>
-    </div>
-    <div class="field"><label for="braces">Braces</label><select id="braces"></select></div>
-    <div id="warnings"></div>
-  </section>
-
-  <section aria-labelledby="h-pos">
-    <h2 id="h-pos">Tool position</h2>
-    <div class="readout">
-      <div><b>X</b><span id="rx">13.00</span> <small id="ux">in</small></div>
-      <div><b>Y</b><span id="ry">17.50</span> <small id="uy">in</small></div>
-      <div><b>Tip</b><span id="rz">42</span> <small>mm</small></div>
-    </div>
-    <div class="slider"><label for="sx">X</label><input id="sx" type="range" step="0.1"><output id="ox" for="sx"></output></div>
-    <div class="slider"><label for="sy">Y</label><input id="sy" type="range" step="0.1"><output id="oy" for="sy"></output></div>
-    <div class="slider"><label for="sz">Z</label><input id="sz" type="range" step="0.5"><output id="oz" for="sz"></output></div>
-  </section>
-
-  <section aria-labelledby="h-job">
-    <h2 id="h-job">Run G-code</h2>
-    <p class="foot" id="job-off">V1E's build order: the machine runs on the printed temporary struts first and cuts its own MDF
-      strut plates. Switch Parts &gt; Strut plates to <b>Temporary</b> to run that job here, or play a G-code file.</p>
-    <p class="foot" id="job-src"></p>
-    <div id="job-on" hidden>
+  <section id="files-sec" aria-label="Your part files" hidden>
+    <div class="files-line" id="files-line" hidden><span id="files-sum"></span>
+      <button type="button" id="files-manage" aria-expanded="false" aria-controls="files-body">Manage</button></div>
+    <div id="files-body">
+      <h2 id="h-files">Your part files</h2>
+      <div class="drop" id="drop">Drop the Printables zips, a folder or the STL / DXF files here<br>
+        <small>Read in this browser only - nothing is uploaded. Kept here for next time.</small></div>
       <div class="buttons">
-        <button type="button" id="job-play">Play</button>
-        <button type="button" id="job-reset">Start over</button>
-        <select id="job-speed" aria-label="Playback speed" style="width: auto">
-          <option value="1">1×</option><option value="10" selected>10×</option><option value="30">30×</option>
-          <option value="100">100×</option><option value="300">300×</option></select>
+        <label class="btn"><input type="file" id="f-files" multiple accept=".zip,.stl,.dxf" hidden>Choose files…</label>
+        <label class="btn"><input type="file" id="f-dir" webkitdirectory hidden>Choose a folder…</label>
+        <button type="button" id="f-forget">Forget files</button>
       </div>
-      <div class="slider"><label for="job-t" title="Job time">⏱</label><input id="job-t" type="range" min="0" max="1000" step="1" value="0"><output id="job-o" for="job-t"></output></div>
-      <div class="readout" aria-label="Work position, mm">
-        <div><b>Work X</b><span id="wx">0.0</span> <small>mm</small></div>
-        <div><b>Work Y</b><span id="wy">0.0</span> <small>mm</small></div>
-        <div><b>Work Z</b><span id="wz">0.0</span> <small>mm</small></div>
-      </div>
-      <label class="check"><input type="checkbox" id="job-moves"> Show the moves</label>
-      <label class="check"><input type="checkbox" id="job-closeup" checked> Close-up while probing</label>
-      <p class="foot" id="job-status" role="status"></p>
-    </div>
-    <div class="buttons">
-      <label class="btn">Play a G-code file…<input type="file" id="job-file" accept=".gcode,.nc,.ngc,.tap,.gc,.txt" hidden></label>
-      <button type="button" id="job-back" hidden>Back to the strut plate job</button>
-      <button type="button" id="job-install" hidden>Install the plates (Permanent)</button>
+      <div id="files-list" role="status"></div>
     </div>
   </section>
 
-  <section aria-labelledby="h-view">
-    <h2 id="h-view">View</h2>
-    <div class="buttons">
-      <button id="v-iso" type="button">Iso</button>
-      <button id="v-front" type="button">Front</button>
-      <button id="v-top" type="button">Top</button>
-      <button id="v-side" type="button">Y-rail side</button>
-      <button id="v-back" type="button">Back</button>
-      <button id="v-fit" type="button">Fit all</button>
-      <button id="v-vr" type="button" hidden title="PC VR headset (SteamVR / OpenXR)">Enter VR</button>
-    </div>
+  <div class="tabs" role="tablist" aria-label="Panel">
+    <button type="button" role="tab" id="t-machine" aria-controls="tab-machine" aria-selected="true">Machine</button>
+    <button type="button" role="tab" id="t-build" aria-controls="tab-build" aria-selected="false" tabindex="-1">Build it</button>
+    <button type="button" role="tab" id="t-run" aria-controls="tab-run" aria-selected="false" tabindex="-1">Run</button>
+  </div>
+
+  <!-- tab panels: hide the panel, never the controls inside (js/vr.js reads them by id and checks their own hidden) -->
+  <div class="tabpanel" role="tabpanel" id="tab-machine" aria-labelledby="t-machine">
+    <section aria-labelledby="h-size">
+      <h2 id="h-size">Cutting area</h2>
+      <div class="seg" role="group" aria-label="Units">
+        <button type="button" id="u-in" aria-pressed="true">INCHES</button>
+        <button type="button" id="u-mm" aria-pressed="false">MM</button>
+      </div>
+      <div class="pair">
+        <div class="field"><label for="cut-x">X, along the beam</label>
+          <div class="unit-input"><input id="cut-x" type="number" step="any" min="1" value="26"><span class="u">in</span></div></div>
+        <div class="field"><label for="cut-y">Y, along the table</label>
+          <div class="unit-input"><input id="cut-y" type="number" step="any" min="1" value="50"><span class="u">in</span></div></div>
+      </div>
+      <div class="field"><label for="braces">Braces</label><select id="braces"></select></div>
+      <div id="warnings"></div>
+    </section>
+
+    <section aria-labelledby="h-parts">
+      <h2 id="h-parts">Parts</h2>
+      <div class="groups" id="groups"></div>
+      <button type="button" id="unhide" hidden></button>
+      <div class="variant" id="strut-variant" hidden><span>Strut plates</span>
+        <button type="button" data-v="mdf" aria-pressed="true">Permanent (MDF)</button>
+        <button type="button" data-v="temp" aria-pressed="false">Temporary (printed)</button></div>
+      <div class="variant" id="peter-variant" hidden><span>Peter Plates</span>
+        <button type="button" data-v="solid" aria-pressed="false">Solid</button>
+        <button type="button" data-v="honeycomb" aria-pressed="false">Honeycomb</button>
+        <button type="button" data-v="none" aria-pressed="false">None</button></div>
+    </section>
+
+    <section aria-labelledby="h-colours">
+      <h2 id="h-colours">Print colours</h2>
+      <div class="swatches">
+        <label><input id="c-main" type="color" value="#292a2e"> Main</label>
+        <label><input id="c-accent" type="color" value="#cc1f1a"> Accent</label>
+        <button id="c-reset" type="button">Reset</button>
+      </div>
+    </section>
+  </div>
+
+  <div class="tabpanel" role="tabpanel" id="tab-build" aria-labelledby="t-build" hidden>
+    <section aria-labelledby="h-bom">
+      <h2 id="h-bom">Bill of materials</h2>
+      <div class="bom-open"><button id="bom-btn" type="button" disabled>Open the full BOM</button><span id="bom-sum">Loading…</span></div>
+    </section>
+
+    <section aria-labelledby="h-calc">
+      <h2 id="h-calc">Cut list (V1E calculator)</h2>
+      <table id="calc"><tbody></tbody></table>
+    </section>
+
+    <section class="plates" aria-labelledby="h-plates">
+      <h2 id="h-plates">Strut plates</h2>
+      <div id="plate-draw"></div>
+      <div class="buttons">
+        <button type="button" id="dl-dxf">Download DXF</button>
+        <button type="button" id="dl-svg">Download SVG</button>
+        <button type="button" id="dl-nc">Download G-code</button>
+      </div>
+      <div id="dl-status" role="status"></div>
+      <details class="cam" id="cam-box">
+        <summary>G-code settings (FluidNC, 1/8" bit)</summary>
+        <div class="trio">
+          <div class="field"><label for="cam-t">Stock thickness</label>
+            <div class="unit-input"><input id="cam-t" type="number" step="any" min="1"><span>mm</span></div></div>
+          <div class="field"><label for="cam-step">Depth per pass</label>
+            <div class="unit-input"><input id="cam-step" type="number" step="any" min="0.1"><span>mm</span></div></div>
+          <div class="field"><label for="cam-plate">Touch plate (0 = none)</label>
+            <div class="unit-input"><input id="cam-plate" type="number" step="any" min="0"><span>mm</span></div></div>
+          <div class="field"><label for="cam-feed">Feed</label>
+            <div class="unit-input"><input id="cam-feed" type="number" step="any" min="0.1"><span>mm/s</span></div></div>
+          <div class="field"><label for="cam-plunge">Plunge</label>
+            <div class="unit-input"><input id="cam-plunge" type="number" step="any" min="0.1"><span>mm/s</span></div></div>
+          <div class="field"><label for="cam-dial">Router dial <span id="cam-rpm"></span></label>
+            <div class="unit-input"><input id="cam-dial" type="number" step="0.5" min="1" max="6"></div></div>
+          <div class="field"><label for="cam-tabs">Tabs per plate</label>
+            <div class="unit-input"><input id="cam-tabs" type="number" step="1" min="0"></div></div>
+          <div class="field"><label for="cam-tabh">Tab height</label>
+            <div class="unit-input"><input id="cam-tabh" type="number" step="any" min="0"><span>mm</span></div></div>
+          <div class="field wide"><label for="cam-router">Router</label><select id="cam-router"></select></div>
+        </div>
+        <div class="buttons"><button type="button" id="cam-reset">Defaults</button></div>
+      </details>
+      <p class="foot" id="cam-note"></p>
+      <details class="cam more">
+        <summary>About these files</summary>
+        <p class="foot">Vector76's strut plate generator, ported to the browser and checked against the original OpenSCAD output
+        at 58 sizes. 1/4" MDF, 1/8" bit (3.5 mm dogbones), 1" EMT wings (11.5 mm). The DXF is closed polylines in mm.
+        The G-code follows V1E's milling basics: bolt holes first, then each outline with tabs, 0.25 mm into the spoil board.
+        Check it in a G-code viewer before you cut.</p>
+      </details>
+    </section>
+
+    <section aria-labelledby="h-fluidnc">
+      <h2 id="h-fluidnc">FluidNC config</h2>
+      <div class="buttons">
+        <button type="button" id="dl-yaml">Download config.yaml</button>
+        <label class="btn"><input type="file" id="f-yaml" accept=".yaml,.yml" hidden>Use my own config.yaml…</label>
+        <button type="button" id="copy-yaml">Copy text</button>
+      </div>
+      <div id="yaml-status" role="status"></div>
+      <details class="cam more">
+        <summary>About this config</summary>
+        <p class="foot" id="yaml-note">V1 Engineering's Jackpot3 LowRider config (<a href="https://github.com/V1EngineeringInc/FluidNC_Configs/blob/3bb36506b0fcd2b0caca7c108ec150ccbb0c055c/LowRider%20CNC/Jackpot3/JP3_LR/config.yaml"
+        target="_blank" rel="noopener">FluidNC_Configs, JP3_LR</a>, AGPL-3.0, read from GitHub when you click) with the X and Y
+        max_travel_mm set to this cutting area: <b id="yaml-xy"></b>. Everything else is V1E's (Z travel, homing, pins, motor
+        currents). Or bring your own config.yaml and only its two travel lines change. Check it against your machine before use.</p>
+      </details>
+    </section>
+  </div>
+
+  <div class="tabpanel" role="tabpanel" id="tab-run" aria-labelledby="t-run" hidden>
+    <section aria-labelledby="h-pos">
+      <h2 id="h-pos">Tool position</h2>
+      <div class="readout">
+        <div><b>X</b><span id="rx">13.00</span> <small id="ux">in</small></div>
+        <div><b>Y</b><span id="ry">17.50</span> <small id="uy">in</small></div>
+        <div><b>Tip</b><span id="rz">42</span> <small>mm</small></div>
+      </div>
+      <div class="slider"><label for="sx">X</label><input id="sx" type="range" step="0.1"><output id="ox" for="sx"></output></div>
+      <div class="slider"><label for="sy">Y</label><input id="sy" type="range" step="0.1"><output id="oy" for="sy"></output></div>
+      <div class="slider"><label for="sz">Z</label><input id="sz" type="range" step="0.5"><output id="oz" for="sz"></output></div>
+    </section>
+
+    <section aria-labelledby="h-job">
+      <h2 id="h-job">Run G-code</h2>
+      <div id="job-off">
+        <p class="foot">V1E's build order: the machine runs on the printed temporary struts first and cuts its own MDF
+          strut plates. Switch to the temporary struts to run that job here, or play a G-code file.</p>
+        <div class="buttons"><button type="button" id="job-temp">Use the temporary struts</button></div>
+      </div>
+      <p class="foot" id="job-src"></p>
+      <div id="job-on" hidden>
+        <div class="buttons">
+          <button type="button" id="job-play">Play</button>
+          <button type="button" id="job-reset">Start over</button>
+          <select id="job-speed" aria-label="Playback speed" style="width: auto">
+            <option value="1">1×</option><option value="10" selected>10×</option><option value="30">30×</option>
+            <option value="100">100×</option><option value="300">300×</option></select>
+        </div>
+        <div class="slider"><label for="job-t" title="Job time">⏱</label><input id="job-t" type="range" min="0" max="1000" step="1" value="0"><output id="job-o" for="job-t"></output></div>
+        <div class="readout" aria-label="Work position, mm">
+          <div><b>Work X</b><span id="wx">0.0</span> <small>mm</small></div>
+          <div><b>Work Y</b><span id="wy">0.0</span> <small>mm</small></div>
+          <div><b>Work Z</b><span id="wz">0.0</span> <small>mm</small></div>
+        </div>
+        <label class="check"><input type="checkbox" id="job-moves"> Show the moves</label>
+        <label class="check"><input type="checkbox" id="job-closeup" checked> Close-up while probing</label>
+        <p class="foot" id="job-status" role="status"></p>
+      </div>
+      <div class="buttons">
+        <label class="btn">Play a G-code file…<input type="file" id="job-file" accept=".gcode,.nc,.ngc,.tap,.gc,.txt" hidden></label>
+        <button type="button" id="job-back" hidden>Back to the strut plate job</button>
+        <button type="button" id="job-install" hidden>Install the plates (Permanent)</button>
+      </div>
+    </section>
+  </div>
+
+  <footer class="foot about-line" id="about"><span id="version"></span><br>
+    <a id="fb-issue" href="https://github.com/jeyeager65/lr4-sandbox/issues/new" target="_blank" rel="noopener">Report a problem</a>
+    · <a href="https://forum.v1e.com/" target="_blank" rel="noopener">V1E forum</a>
+    · <button type="button" class="link" id="about-btn">About this model</button></footer>
+</aside>
+
+<dialog class="about" id="about-dlg" aria-labelledby="about-h">
+  <h2 id="about-h">About this model</h2>
+  <p>The machine is rebuilt from the measured FreeCAD model: every part's position was fitted across 13
+  FreeCAD builds from 15 x 30 in to 48 x 96 in (3 to 8 braces) and checked part by part against each, and against
+  builds left out of the fit (within 0.1 mm).</p>
+  <p>Fixed for now: 1" EMT (29.5 mm), 6.5 mm XZ plates, the Makita / Kobalt compact router mount. Approximate: Jackpot3 lid,
+  power supply, router colours, the X belt's end loop screws, the vacuum hose route.</p>
+  <p>LowRider 4 parts by V1 Engineering, CC BY-NC-SA 4.0; strut plates by Vector76. Personal use; not affiliated with
+  V1 Engineering. "Report a problem" opens a GitHub issue with your size and file checksums filled in.</p>
+  <form method="dialog" class="buttons"><button>Close</button></form>
+</dialog>
+
+<dialog class="bom" id="bom" aria-labelledby="bom-title">
+  <div class="bom-head"><h2 id="bom-title">Bill of materials</h2>
+    <div class="bom-tools"><button id="bom-all" type="button">Expand all</button><button id="bom-close" type="button">Close</button></div></div>
+  <div class="bom-body" id="bom-body"></div>
+</dialog>
+
+<main class="stage">
+  <canvas id="c" aria-label="3D model of the LowRider 4 assembly"></canvas>
+  <div class="status" id="status" role="status" aria-live="polite"><div id="status-title">Loading model…</div><div class="bar"><div id="status-bar"></div></div><div class="detail" id="status-detail">&nbsp;</div></div>
+  <div class="toolbar" role="toolbar" aria-label="View">
+    <button id="v-panel" type="button" aria-pressed="false" aria-label="Hide the panel" title="Hide the panel">☰</button>
+    <button id="v-iso" type="button">Iso</button>
+    <button id="v-front" type="button">Front</button>
+    <button id="v-top" type="button">Top</button>
+    <button id="v-side" type="button" title="Y-rail side">Side</button>
+    <button id="v-back" type="button">Back</button>
+    <button id="v-fit" type="button">Fit all</button>
+    <button id="v-vr" type="button" hidden title="PC VR headset (SteamVR / OpenXR)">Enter VR</button>
+    <button id="v-more" type="button" aria-expanded="false" aria-controls="view-pop" title="View settings" aria-label="View settings">⚙</button>
+  </div>
+  <div class="view-pop" id="view-pop" role="dialog" aria-label="View settings" hidden>
     <div class="variant" id="detail"><span>Detail</span>
       <button type="button" data-v="full" aria-pressed="false">Full</button>
       <button type="button" data-v="lite" aria-pressed="false">Lite</button></div>
@@ -343,125 +531,15 @@ body.vr-on .stage { grid-row: 1; }
       <label class="sm-check"><input id="sm-inv-t" type="checkbox"> Invert pan/zoom</label>
       <label class="sm-check"><input id="sm-inv-r" type="checkbox"> Invert rotate</label>
     </div>
-  </section>
-
-  <section aria-labelledby="h-colours">
-    <h2 id="h-colours">Print colours</h2>
-    <div class="swatches">
-      <label><input id="c-main" type="color" value="#292a2e"> Main</label>
-      <label><input id="c-accent" type="color" value="#cc1f1a"> Accent</label>
-      <button id="c-reset" type="button">Reset</button>
-    </div>
-  </section>
-
-  <section aria-labelledby="h-parts">
-    <h2 id="h-parts">Parts</h2>
-    <div class="groups" id="groups"></div>
-    <button type="button" id="unhide" hidden></button>
-    <div class="variant" id="strut-variant" hidden><span>Strut plates</span>
-      <button type="button" data-v="mdf" aria-pressed="true">Permanent (MDF)</button>
-      <button type="button" data-v="temp" aria-pressed="false">Temporary (printed)</button></div>
-    <div class="variant" id="peter-variant" hidden><span>Peter Plates</span>
-      <button type="button" data-v="solid" aria-pressed="false">Solid</button>
-      <button type="button" data-v="honeycomb" aria-pressed="false">Honeycomb</button>
-      <button type="button" data-v="none" aria-pressed="false">None</button></div>
-  </section>
-
-  <section aria-labelledby="h-pick">
-    <h2 id="h-pick">Selected</h2>
-    <div class="pick" id="pick"><strong>Nothing selected</strong><p>Click a part to name it. Click empty space to clear.</p></div>
-  </section>
-
-  <section aria-labelledby="h-bom">
-    <h2 id="h-bom">Bill of materials</h2>
-    <div class="bom-open"><button id="bom-btn" type="button" disabled>Open the full BOM</button><span id="bom-sum">Loading…</span></div>
-  </section>
-
-  <section aria-labelledby="h-calc">
-    <h2 id="h-calc">Cut list (V1E calculator)</h2>
-    <table id="calc"><tbody></tbody></table>
-  </section>
-
-  <section class="plates" aria-labelledby="h-plates">
-    <h2 id="h-plates">Strut plates</h2>
-    <div id="plate-draw"></div>
-    <div class="buttons">
-      <button type="button" id="dl-dxf">Download DXF</button>
-      <button type="button" id="dl-svg">Download SVG</button>
-      <button type="button" id="dl-nc">Download G-code</button>
-    </div>
-    <div id="dl-status" role="status"></div>
-    <details class="cam" id="cam-box">
-      <summary>G-code settings (FluidNC, 1/8" bit)</summary>
-      <div class="trio">
-        <div class="field"><label for="cam-t">Stock thickness</label>
-          <div class="unit-input"><input id="cam-t" type="number" step="any" min="1"><span>mm</span></div></div>
-        <div class="field"><label for="cam-step">Depth per pass</label>
-          <div class="unit-input"><input id="cam-step" type="number" step="any" min="0.1"><span>mm</span></div></div>
-        <div class="field"><label for="cam-plate">Touch plate (0 = none)</label>
-          <div class="unit-input"><input id="cam-plate" type="number" step="any" min="0"><span>mm</span></div></div>
-        <div class="field"><label for="cam-feed">Feed</label>
-          <div class="unit-input"><input id="cam-feed" type="number" step="any" min="0.1"><span>mm/s</span></div></div>
-        <div class="field"><label for="cam-plunge">Plunge</label>
-          <div class="unit-input"><input id="cam-plunge" type="number" step="any" min="0.1"><span>mm/s</span></div></div>
-        <div class="field"><label for="cam-dial">Router dial <span id="cam-rpm"></span></label>
-          <div class="unit-input"><input id="cam-dial" type="number" step="0.5" min="1" max="6"></div></div>
-        <div class="field"><label for="cam-tabs">Tabs per plate</label>
-          <div class="unit-input"><input id="cam-tabs" type="number" step="1" min="0"></div></div>
-        <div class="field"><label for="cam-tabh">Tab height</label>
-          <div class="unit-input"><input id="cam-tabh" type="number" step="any" min="0"><span>mm</span></div></div>
-        <div class="field wide"><label for="cam-router">Router</label><select id="cam-router"></select></div>
-      </div>
-      <div class="buttons"><button type="button" id="cam-reset">Defaults</button></div>
-    </details>
-    <p class="foot" id="cam-note"></p>
-    <p class="foot">Vector76's strut plate generator, ported to the browser and checked against the original OpenSCAD output
-    at 58 sizes. 1/4" MDF, 1/8" bit (3.5 mm dogbones), 1" EMT wings (11.5 mm). The DXF comes zipped (closed polylines, mm).
-    The G-code follows V1E's milling basics: bolt holes first, then each outline with tabs, 0.25 mm into the spoil board.
-    Check it in a G-code viewer before you cut.</p>
-  </section>
-
-  <section aria-labelledby="h-fluidnc">
-    <h2 id="h-fluidnc">FluidNC config</h2>
-    <div class="buttons">
-      <button type="button" id="dl-yaml">Download config.yaml</button>
-      <label class="btn"><input type="file" id="f-yaml" accept=".yaml,.yml" hidden>Use my own config.yaml…</label>
-      <button type="button" id="copy-yaml">Copy text</button>
-    </div>
-    <div id="yaml-status" role="status"></div>
-    <p class="foot" id="yaml-note">V1 Engineering's Jackpot3 LowRider config (<a href="https://github.com/V1EngineeringInc/FluidNC_Configs/blob/3bb36506b0fcd2b0caca7c108ec150ccbb0c055c/LowRider%20CNC/Jackpot3/JP3_LR/config.yaml"
-    target="_blank" rel="noopener">FluidNC_Configs, JP3_LR</a>, AGPL-3.0, read from GitHub when you click) with the X and Y
-    max_travel_mm set to this cutting area: <b id="yaml-xy"></b>. Everything else is V1E's (Z travel, homing, pins, motor
-    currents). Or bring your own config.yaml and only its two travel lines change. Check it against your machine before use.</p>
-  </section>
-
-  <p class="foot" id="about"><span id="version"></span><br>
-    <a id="fb-issue" href="https://github.com/jeyeager65/lr4-sandbox/issues/new" target="_blank" rel="noopener">Report a problem</a>
-    (a GitHub issue with your size and file checksums filled in) ·
-    <a href="https://forum.v1e.com/" target="_blank" rel="noopener">Discuss on the V1E forum</a></p>
-
-  <p class="foot">The machine is rebuilt from the measured FreeCAD model: every part's position was fitted across 13
-  FreeCAD builds from 15 x 30 in to 48 x 96 in (3 to 8 braces) and checked part by part against each, and against
-  builds left out of the fit (within 0.1 mm). Fixed for now: 1" EMT (29.5 mm), 6.5 mm XZ
-  plates, the Makita / Kobalt compact router mount. Approximate: Jackpot3 lid, power supply, router colours, the X belt's end loop
-  screws, the vacuum hose route. LowRider 4 parts by V1 Engineering, CC BY-NC-SA 4.0; strut plates by Vector76. Personal use;
-  not affiliated with V1 Engineering.</p>
-</aside>
-
-<dialog class="bom" id="bom" aria-labelledby="bom-title">
-  <div class="bom-head"><h2 id="bom-title">Bill of materials</h2>
-    <div class="bom-tools"><button id="bom-all" type="button">Expand all</button><button id="bom-close" type="button">Close</button></div></div>
-  <div class="bom-body" id="bom-body"></div>
-</dialog>
-
-<main class="stage">
-  <canvas id="c" aria-label="3D model of the LowRider 4 assembly"></canvas>
-  <div class="status" id="status" role="status" aria-live="polite"><div id="status-title">Loading model…</div><div class="bar"><div id="status-bar"></div></div><div class="detail" id="status-detail">&nbsp;</div></div>
+  </div>
+  <div class="pick" id="pick" role="status" hidden><div><strong></strong><p></p></div>
+    <button type="button" id="pick-clear" aria-label="Clear the selection" title="Clear">✕</button></div>
   <div class="hint">Drag to orbit · right-drag to pan · scroll to zoom</div>
   <div class="job-pop" id="job-pop" role="alertdialog" aria-labelledby="job-pop-h" hidden><b id="job-pop-h">Paused (M0)</b><p id="job-pop-msg"></p><div class="buttons"><button type="button" id="job-resume">Resume (cycle start)</button></div></div>
   <div class="vr-pop" id="vr-pop" role="dialog" aria-labelledby="vr-pop-h" hidden>
     <div class="vr-head"><h2 id="vr-pop-h">Viewing in VR</h2>
-      <div class="seg"><button type="button" id="vr-u-in" aria-pressed="true">Inches</button><button type="button" id="vr-u-mm" aria-pressed="false">mm</button></div></div>
+      <div class="seg"><button type="button" id="vr-u-in" aria-pressed="true">Inches</button><button type="button" id="vr-u-mm" aria-pressed="false">mm</button></div>
+      <button type="button" id="vr-min" aria-expanded="true" aria-label="Minimize" title="Minimize">✕</button></div>
     <div class="vr-size" id="vr-size"></div>
     <p id="vr-pick">Touch a part, or point at it and pull the trigger, to see what it is.</p>
     <dl>
@@ -1295,7 +1373,16 @@ body.vr-on .stage { grid-row: 1; }
       : `<p class="sub">${have} of ${total} files loaded${have < total ? " - the missing parts are left out of the model. Download them from Printables (the links below) and drop them here" : ""}.</p>`;
     const warn = diff ? `<p class="warn">${diff} file(s) differ from the ones this page was solved for (as of ${esc(F.tested)}) - placed anyway, check they fit.</p>` : "";
     host.innerHTML = head + warn + html;
+    // all there: one line above the tabs ("Manage" opens the box); anything missing or different: the box stays open
+    const ok = have === total && !diff, open = document.getElementById("files-manage").getAttribute("aria-expanded") === "true";
+    document.getElementById("files-line").hidden = !ok;
+    document.getElementById("files-body").hidden = ok && !open;
+    document.getElementById("files-sum").textContent = `✓ All ${total} part files loaded`;
   }
+  document.getElementById("files-manage").addEventListener("click", (e) => {
+    e.target.setAttribute("aria-expanded", String(e.target.getAttribute("aria-expanded") !== "true"));
+    renderFiles();
+  });
 
   // the Jackpot3 lid, its fan and their screws can be hidden on their own to see inside the box
   const isLid = (m) => /^Jackpot3_(Lid|Fan)/.test(m.userData.name);
@@ -1434,14 +1521,20 @@ body.vr-on .stage { grid-row: 1; }
     }
     spinNut();
     if (hoseMesh) updateHose(dx, dy, dz);
-    const mm = !!pose, u = (v) => (mm ? v * IN : v);  // G-code playback: mm (machine position from the corner)
+    readout(X, Y, Z, !!pose);
+  }
+  let lastPos = null;
+  function readout(X, Y, Z, playing) {                // X, Y in inches (the sliders); shown in the page's units
+    if (X === undefined) { if (!lastPos) return; [X, Y, Z, playing] = lastPos; }
+    lastPos = [X, Y, Z, playing];
+    const mm = playing || U.unit === "mm", u = (v) => (mm ? v * IN : v);  // G-code playback: always mm
     document.getElementById("ux").textContent = document.getElementById("uy").textContent = mm ? "mm" : "in";
     document.getElementById("rx").textContent = u(X).toFixed(mm ? 1 : 2);
     document.getElementById("ry").textContent = u(Y).toFixed(mm ? 1 : 2);
-    document.getElementById("rz").textContent = Z.toFixed(pose ? 1 : 0);
+    document.getElementById("rz").textContent = Z.toFixed(playing ? 1 : 0);
     document.getElementById("ox").textContent = `${u(X).toFixed(mm ? 0 : 1)} / ${+u(Number(sx.max)).toFixed(mm ? 0 : 1)}`;
     document.getElementById("oy").textContent = `${u(Y).toFixed(mm ? 0 : 1)} / ${+u(Number(sy.max)).toFixed(mm ? 0 : 1)}`;
-    document.getElementById("oz").textContent = `${Z.toFixed(pose ? 1 : 0)} mm`;
+    document.getElementById("oz").textContent = `${Z.toFixed(playing ? 1 : 0)} mm`;
   }
 
   // ---- size inputs, V1E calculator, cut list, strut plate drawing + downloads ----
@@ -1572,8 +1665,8 @@ body.vr-on .stage { grid-row: 1; }
       U.struts = b.dataset.v; keep(); markStruts(); applySize(true);
     }));
     markStruts();
-    $("u-in").addEventListener("click", () => { U.unit = "in"; keep(); fillInputs(); updateCalc(); });
-    $("u-mm").addEventListener("click", () => { U.unit = "mm"; keep(); fillInputs(); updateCalc(); });
+    $("u-in").addEventListener("click", () => { U.unit = "in"; keep(); fillInputs(); updateCalc(); readout(); });
+    $("u-mm").addEventListener("click", () => { U.unit = "mm"; keep(); fillInputs(); updateCalc(); readout(); });
     fillInputs();
     applySize(true);
   }
@@ -1626,7 +1719,7 @@ body.vr-on .stage { grid-row: 1; }
   }
 
   // ---- version + feedback: the issue link carries the size, data date and the loaded files' checksums ----
-  const VERSION = "0.11.0";
+  const VERSION = "0.12.0";
   function setupAbout() {
     const bits = [`lr4-sandbox ${VERSION}`];
     if (cfg.built) bits.push(`model data built ${cfg.built}`);
@@ -2157,6 +2250,10 @@ body.vr-on .stage { grid-row: 1; }
     const b = document.querySelector('#strut-variant button[data-v="mdf"]');
     if (b) b.click();
   });
+  $("job-temp").addEventListener("click", () => {    // the same switch as Machine > Parts > Strut plates
+    const b = document.querySelector('#strut-variant button[data-v="temp"]');
+    if (b) b.click();
+  });
 
   // ---- vacuum hose: clamped in the Min-end holder; between the clamp and the core it folds like a drag
   // chain (lower run in the trays, U-turn, upper run on top back to the core), so it is re-swept for every
@@ -2452,15 +2549,12 @@ body.vr-on .stage { grid-row: 1; }
   function select(m) {
     if (selected) selected.material.emissive.setHex(0x000000);
     selected = m;
-    const box = document.getElementById("pick");
-    if (!m) {
-      box.innerHTML = "<strong>Nothing selected</strong><p>Click a part to name it. Click empty space to clear.</p>";
-      return;
-    }
+    const box = document.getElementById("pick");     // a chip on the canvas, only while a part is selected
+    box.hidden = !m;
+    if (!m) return;
     m.material.emissive.set(css("--accent") || "#c8241b");
     m.material.emissiveIntensity = 0.45;
     const p = m.userData, grp = (GROUPS.find((g) => g[0] === p.group) || [0, p.group])[1];
-    box.innerHTML = `<strong></strong><p></p>`;
     box.querySelector("strong").textContent = p.label;
     box.querySelector("p").textContent = `${SOURCE[p.source] || p.source} · ${grp}`;
   }
@@ -2472,6 +2566,63 @@ body.vr-on .stage { grid-row: 1; }
     const d = camera.position.clone().sub(controls.target);
     fitView([d.x, d.y, d.z]);
   });
+  document.getElementById("pick-clear").addEventListener("click", () => select(null));
+
+  // ---- panel tabs (the last one kept per browser) and the view settings popover ----
+  const tabs = [...document.querySelectorAll('.tabs [role="tab"]')];
+  function showTab(t, focus) {
+    for (const b of tabs) {
+      const on = b === t;
+      b.setAttribute("aria-selected", String(on));
+      b.tabIndex = on ? 0 : -1;
+      document.getElementById(b.getAttribute("aria-controls")).hidden = !on;
+    }
+    if (focus) t.focus();
+    try { localStorage.setItem("lr4-tab", t.id); } catch (e) { /* not kept */ }
+  }
+  tabs.forEach((b, i) => {
+    b.addEventListener("click", () => showTab(b));
+    b.addEventListener("keydown", (e) => {
+      const d = { ArrowRight: 1, ArrowLeft: -1 }[e.key];
+      if (d) { e.preventDefault(); showTab(tabs[(i + d + tabs.length) % tabs.length], true); }
+    });
+  });
+  try { const t = document.getElementById(localStorage.getItem("lr4-tab")); if (tabs.includes(t)) showTab(t); } catch (e) { /* Machine */ }
+  const viewPop = document.getElementById("view-pop"), viewMore = document.getElementById("v-more");
+  function showViewPop(on) { viewPop.hidden = !on; viewMore.setAttribute("aria-expanded", String(on)); }
+  viewMore.addEventListener("click", () => showViewPop(viewPop.hidden));
+  document.addEventListener("pointerdown", (e) => {
+    if (!viewPop.hidden && !viewPop.contains(e.target) && e.target !== viewMore) showViewPop(false);
+  });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !viewPop.hidden) { showViewPop(false); viewMore.focus(); } });
+  const panelBtn = document.getElementById("v-panel");
+  function showPanel(on) {
+    document.body.classList.toggle("panel-off", !on);
+    panelBtn.setAttribute("aria-pressed", String(!on));
+    panelBtn.title = on ? "Hide the panel" : "Show the panel";
+    panelBtn.setAttribute("aria-label", panelBtn.title);
+  }
+  panelBtn.addEventListener("click", () => {
+    const on = document.body.classList.contains("panel-off");
+    showPanel(on);
+    try { localStorage.setItem("lr4-panel", on ? "on" : "off"); } catch (e) { /* not kept */ }
+  });
+  try { if (localStorage.getItem("lr4-panel") === "off") showPanel(false); } catch (e) { /* shown */ }
+  const vrPop = document.getElementById("vr-pop"), vrMin = document.getElementById("vr-min");
+  function minVrPop(min) {
+    vrPop.classList.toggle("min", min);
+    vrMin.textContent = min ? "▾" : "✕";
+    vrMin.title = min ? "Show the VR help" : "Minimize";
+    vrMin.setAttribute("aria-label", vrMin.title);
+    vrMin.setAttribute("aria-expanded", String(!min));
+  }
+  vrMin.addEventListener("click", () => {
+    const min = !vrPop.classList.contains("min");
+    minVrPop(min);
+    try { localStorage.setItem("lr4-vr-pop", min ? "min" : "open"); } catch (e) { /* not kept */ }
+  });
+  try { if (localStorage.getItem("lr4-vr-pop") === "min") minVrPop(true); } catch (e) { /* open */ }
+  document.getElementById("about-btn").addEventListener("click", () => document.getElementById("about-dlg").showModal());
 
   // ---- SpaceMouse (3Dconnexion) over WebHID, Chrome / Edge. Object mode: push the cap and the model goes
   // that way (X pans across, lift/press pans up/down, push away/pull zooms); tilt and twist orbit round the

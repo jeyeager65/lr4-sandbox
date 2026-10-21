@@ -613,7 +613,7 @@
       card: () => cardPart && cardPart.userData.name,
     };
 
-    return { active: () => active, tick, preview, act, probe, rig };
+    return { active: () => active, tick, preview, act, probe, rig, state };   // state: what the menu reads from the page
   }
 
   const out = { setup, layout, cardLayout, twoHand, snap, clampCut, clampS, hit, tabletopScale, fmtLen, fmtScale, PRESETS, IN };
