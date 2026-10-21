@@ -18,6 +18,7 @@ from collections import Counter
 import FreeCAD as App
 from fclib import fasteners as fx
 from fclib import core, hw, mesh
+import lr4
 
 V = App.Vector
 
@@ -367,7 +368,8 @@ def extra_specs(plan, extra):
         sp = plan.place(c - d * 40.0, d, 5.0, 30.0, "button", "Core", "Core", after=40.0 + 6.0, label=name)
         plan.add(f"Core__M5_to_{name}", sp, KIT[5.0], NUTS[5.0] if sp.get("nut") else None,
                  "cu/cv: from the core top, nut below the idler")
-    # Y stop screws (yr3 / yb85): M3 fully into the front holders' end hole, head toward the gantry
+    # Y stop screws (yr3 / yb85): M3 in the front holders' end hole, head toward the gantry, backed out
+    # lr4.Y_STOP_OUT from seated (it sets Y home)
     for s in ("Min", "Max"):
         f = f"Y_Belt_{s}F"
         if f not in P:
@@ -377,7 +379,11 @@ def extra_specs(plan, extra):
             if abs(a.normalize().y) < 0.9:
                 continue
             top = h["p0"] if h["p0"].y > h["p1"].y else h["p1"]
-            sp = plan.place(top + V(0, 4.0, 0), V(0, -1, 0), 3.0, 10.0, "button", f, None, label=f"Y stop {s}")
+            p0 = top + V(0, 4.0, 0)
+            sp = plan.place(p0, V(0, -1, 0), 3.0, 10.0, "button", f, None, label=f"Y stop {s}")
+            seated = p0.y - sp["seat"][1]
+            sp = plan.place(p0, V(0, -1, 0), 3.0, 10.0, "button", f, None, label=f"Y stop {s}",
+                            head_seat=seated - lr4.Y_STOP_OUT)
             plan.add(f"{f}__Ystop", sp, KIT[3.0], None, "yr3 / yb85: Y stop screw")
     # Y belt tension (yb4/yb5): M5 from the back holder's end into the nylock sunk in the tension block
     for s in ("Min", "Max"):

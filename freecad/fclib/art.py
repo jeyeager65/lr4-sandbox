@@ -286,12 +286,13 @@ def faces_from_wires(wires):
     return Part.makeFace(wires, "Part::FaceMakerBullseye").Faces
 
 
-def svg_color_solids(path, max_w, max_h, depth):
+def svg_color_solids(path, max_w, max_h, depth, skip=()):
     """Filled shapes from an SVG, one solid per fill colour, all scaled together to
     fit max_w x max_h and centred on the origin, z from 0 to depth.
     Returns [(colour "#rrggbb", solid), ...] in drawing order of first appearance.
     Colours drawn later are cut out of the ones beneath, so the solids don't overlap.
-    Strokes are ignored; fill="none" shapes are skipped."""
+    Strokes are ignored; fill="none" shapes are skipped, and so are fills listed in `skip`
+    (e.g. a white page background), which also don't count towards the size."""
     import copy
     import xml.etree.ElementTree as ET
     ET.register_namespace("", "http://www.w3.org/2000/svg")
@@ -309,7 +310,7 @@ def svg_color_solids(path, max_w, max_h, depth):
         if tag(el) in SVG_SHAPES:
             el.set("data-cadlib", str(n))
             n += 1
-            if fill != "none" and fill not in order:
+            if fill != "none" and fill not in order and fill not in skip:
                 order.append(fill)
             el.set("data-cadlib-fill", fill)
         for child in list(el):

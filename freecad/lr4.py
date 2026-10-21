@@ -100,6 +100,27 @@ MGN_RAILS = {85.0: (68.8, 218.8), 177.0: (78.8, 228.8)}   # Min plate: rail px -
 BLOCKS_MIN = {177.0: 32.5, 85.0: 42.5}   # XZ_Min DXF carriage centres (D y) per YZ rail px
 BLOCKS_MAX = {177.0: 68.5, 85.0: 78.5}   # XZ_Max: 36 mm higher - the Max side rides the Y rail
 B_RANGE = (134.0, 238.6)         # Min: b = D y + py; carriage (45.4 long) stays on its 150 rail
+# Real travel ends (travelcheck.py on the 26 x 50 build, measured switch levers, 2026-10-20) - X / Y home to min, Z homes up (V1E JP3_LR
+# config.yaml); the home ends are where the endstop lever meets its striker, the others the first part contact.
+Y_STOP_OUT = 5.0     # Y stop screws (yr3 / yb85) backed out this far from seated (M3 x 10: 5 mm left in the holder).
+                     # The screw sets Y home: seated, the lever would only meet it after the front wheels hit the
+                     # front holders. 5 out -> the switch clicks ~3 mm before that. (choice 2026-10-20, adjust on the machine)
+Y_TAB_OUT = 0.0      # Y endstop levers' curled end bent out this far (V1E yb85, if the lever misses the stop screw
+                     # head); 0 = as measured (hw.SS_GL13, user's calipers 2026-10-20) - it reaches
+SW_CLICK = 2.0       # lever crest travel from first touch to the click (hw.SS_GL13 pretravel, measured)
+Y_CLICK = SW_CLICK * 2 ** 0.5   # gantry travel for it: the Y switches sit at 45 deg to Y (approximate)
+STOPS = dict(
+    y_home=108.3 + Y_STOP_OUT - Y_CLICK,   # tool Y - FY0 (front holder face) at the Y trip. 108.3 = first touch,
+                     # curl on the stop screw head with the screw seated (travelcheck.py, measured lever)
+                     # (the front wheels hit the front holders at 107.5)
+    y_end=201.0,     # FY1 - tool Y at the back: back wheels on the back holders / tensioners
+    x_home=96.91 - SW_CLICK,   # tool X - X_s0 at the X trip: Endstop_X lever on XZ_Plate_Min (96.91 = first touch,
+                     # pressed head-on - approximate); the core hits XZ_Plate_Min 4.4 mm past first touch
+    x_end=73.0,      # X_s0 + strut - tool X at the Max end: core on XZ_Plate_Max
+    b_home=138.21 - SW_CLICK,  # b at the Z trip (beam up): XZ plates on the Endstop_Z levers (138.21 = first touch);
+                     # the MGN carriages hit the YZ plates 6 mm past first touch
+    b_low=238.05,    # b at the bottom: Z brass nut M3s on the couplers
+)
 WHEEL_BOTTOM_PY = 238.94         # Min plate print y of the lowest bearing bottom (M8 axle + 11): table top.
                                  # Wheels flush on their screw seats: front axle py 227.68, back 227.94 -> the
                                  # back bearing touches, the front one is 0.27 up (2026-10-17; was 240.5 with

@@ -244,7 +244,6 @@ for pt in list(parts):
                 parts.append(dict(pt, name=pt["name"] + "~" + other, pos=[off, len(apts)],
                                   idx=[ioff, len(afac) * 3, 32 if wide else 16], variant=other, of=pt["name"]))
 
-# travel: the build's parked position and how far each axis can go from it (mm)
 CUT_X, CUT_Y = B["CUT_X_IN"] * IN, B["CUT_Y_IN"] * IN
 b_lo, b_hi = lr4.B_RANGE
 b_now = b_hi - B["Z_POS"] * (b_hi - b_lo)
@@ -254,9 +253,7 @@ meta = dict(
     name=NAME, parts=parts, triangles=tris_total,
     cut_in=[B["CUT_X_IN"], B["CUT_Y_IN"]],
     table_in=None,
-    travel=dict(x=[-B["X_POS"] * CUT_X, (1 - B["X_POS"]) * CUT_X],
-                y=[-B["Y_POS"] * CUT_Y, (1 - B["Y_POS"]) * CUT_Y],
-                z=[-(b_hi - b_now), b_now - b_lo]),
+    travel=load("travel.json"),                 # build.py: home trip -> first contact, from the parked pose (lr4.STOPS)
     tip_above_table=tip_now - T,
     calc=lr4.calculator(CUT_X, CUT_Y, B["XZ_PLATE"]),
 )

@@ -335,11 +335,15 @@ def mgn12h_block(pl=None):
     return _moved(b.cut(Part.makeBox(46, 12.6, 6.0, V(-23, -6.3, 2.9))), pl)
 
 
-SS_GL13 = dict(body=(19.8, 10.2, 6.4), hole_d=2.35, pitch=9.5, hole_in=2.9,   # Omron SS-3GL13PT (from the user's photo +
-               pivot_x=7.6, tip_x=-7.6, tip_rise=1.0, lever_w=3.6, lever_t=0.5,     # Omron SS proportions; lever from
-               arch=(1.5, 2.6), tab_x=(-7.4, 0.0, 7.4), tab=(3.2, 7.0, 0.5),        # the user's photo, GUESS)
-               tab_hole=1.3)    # arch: the "simulated roller" - the arm's end rises into a rounded crest over the body's
-                                # end (half-ellipse, half-width x height) and turns back down on the far side
+SS_GL13 = dict(body=(19.8, 10.0, 6.4), hole_d=2.35, pitch=9.5, hole_in=2.9,   # Omron SS-3GL13PT, user's calipers
+               pivot_x=7.2, tip_x=-7.9, tip_rise=3.05, lever_w=3.6, lever_t=0.5,     # 2026-10-20: hinge 2.7 in from its
+               arch=(1.5, 2.6), tab_x=(-7.4, 0.0, 7.4), tab=(3.2, 7.0, 0.5),         # end, curl 1.0 past the far end,
+               tab_hole=1.3, tab_out=0.0, pretravel=2.0)   # crest 6.5 above the body free, 4.5 at the click
+                                # (pretravel = crest travel to the click). lever_w, arch shape: from a photo, GUESS.
+                                # tab_out: the curled end bent out this much further past the body's end (V1E yb85:
+                                # bend the tab out if the lever misses its striker). arch: the "simulated roller" - the
+                                # arm's end rises into a rounded crest over the body's end (half-ellipse, half-width x
+                                # height) and turns back down on the far side
 
 
 def omron_ss_gl13(pl=None, hand=1, **dims):
@@ -356,7 +360,7 @@ def omron_ss_gl13(pl=None, hand=1, **dims):
     for x in (-d["pitch"] / 2, d["pitch"] / 2):
         body = body.cut(Part.makeCylinder(d["hole_d"] / 2, W, V(x, 0, 0)))
     body = body.fuse(Part.makeBox(1.6, 0.7, 2.2, V(hand * 1.5 - 0.8, y1, W / 2 - 1.1)))      # plunger under the lever
-    px, tx, zc = hand * d["pivot_x"], hand * d["tip_x"], W / 2
+    px, tx, zc = hand * d["pivot_x"], hand * (d["tip_x"] - d["tab_out"]), W / 2
     yb = y1 + 0.35 + d["lever_t"] / 2                         # lever centre line at the pivot
     yt = yb + d["tip_rise"]                                   # ... at the tip (free position)
     rx, ry = d["arch"]

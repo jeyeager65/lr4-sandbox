@@ -165,8 +165,16 @@ printed = []          # (part file, qty) for the BOM
 threads = []          # threaded stretches the web viewer draws as a texture (hardware.py adds the fasteners')
 hw_extra = dict(x_idlers=[], loops=[])   # placements hardware.py needs (tilted X drive, belt loop screws)
 belt_runs = []        # straight belt runs: the viewer extends them over the travel and clips them at the gantry
-T_X = (-X_POS * CUT_X_IN * IN, (1 - X_POS) * CUT_X_IN * IN)      # travel from the parked pose (mm)
-T_Y = (-Y_POS * CUT_Y_IN * IN, (1 - Y_POS) * CUT_Y_IN * IN)
+# travel from the parked pose (mm): home switch trip -> first part contact (lr4.STOPS, travelcheck.py)
+ST = lr4.STOPS
+T_X = (X_s0 + ST["x_home"] - tool_x, X_s0 + strut - ST["x_end"] - tool_x)
+T_Y = (FY0 + ST["y_home"] - tool_y, FY1 - ST["y_end"] - tool_y)
+T_Z = (-(ST["b_low"] - b), b - ST["b_home"])       # beam down / up
+os.makedirs(os.path.join(ROOT, "build"), exist_ok=True)
+json.dump(dict(x=T_X, y=T_Y, z=T_Z), open(os.path.join(ROOT, "build", "travel.json"), "w"))
+if T_Y[1] - T_Y[0] < CUT_Y or T_X[1] - T_X[0] < CUT_X:
+    print(f"travel: {T_X[1] - T_X[0]:.1f} x {T_Y[1] - T_Y[0]:.1f} mm from the home trips - LESS than the "
+          f"{CUT_X:.1f} x {CUT_Y:.1f} cutting area")
 
 
 def stl(name, file, pl, group, colour=PRINT_MAIN, folder=LR4, count=True):
@@ -742,7 +750,7 @@ try:
 except (OSError, ValueError):
     sw_old = {}
 sw_new, scene = {}, {p["name"]: p["shape"] for p in m.parts}
-sw_code = inspect.getsource(lr4.switch_frame) + inspect.getsource(hw.omron_ss_gl13)
+sw_code = inspect.getsource(lr4.switch_frame) + inspect.getsource(hw.omron_ss_gl13) + repr(sorted(hw.SS_GL13.items()))
 for nm, (host, hint) in hints.items():                     # Omron SS-3GL13PT (user, 2026-10-19), lever + tabs
     near = []
     for n_, s_ in sorted(scene.items()):
@@ -759,7 +767,7 @@ for nm, (host, hint) in hints.items():                     # Omron SS-3GL13PT (u
         pl, hand, why = lr4.switch_frame(m.shape(host), hint, lr4.SWITCH_HOME.get(nm), scene, nm, lr4.SWITCH_TIP.get(nm))
     sw_new[key] = [list(pl.toMatrix().A) if pl else None, hand, why]
     print(f"{nm}: {why}")
-    sw = hw.omron_ss_gl13(pl or hint, hand=hand)
+    sw = hw.omron_ss_gl13(pl or hint, hand=hand, tab_out=lr4.Y_TAB_OUT if nm.startswith("Endstop_Y") else 0.0)
     m.add(nm, sw["body"], group="Electronics", colour=hw.BLACK)
     m.add(f"{nm}_Lever", sw["metal"], group="Electronics", colour=hw.STEEL)
 os.makedirs(os.path.dirname(sw_path), exist_ok=True)
@@ -844,7 +852,7 @@ HOSE["plates"] = [[b.XMin, b.XMax, b.YMax, b.ZMax, fr] for b, fr in
                   ((m.shape("XZ_Plate_Max").BoundBox, "beam"), (m.shape("YZ_Plate_Max").BoundBox, "gantry"))]
 # fixed run (upper + lower): at full +X travel the U-turn starts uturn_gap past the core's end (lr4.hose_route:
 # xu = xe + uturn_gap; user, 2026-10-18: keep it within about the machine's end)
-HOSE["run"] = HOSE["port"][0] + (1 - X_POS) * CUT_X + HOSE["core_end_dx"] + 2 * HOSE["uturn_gap"] - HOSE["clamp_x"]
+HOSE["run"] = HOSE["port"][0] + T_X[1] + HOSE["core_end_dx"] + 2 * HOSE["uturn_gap"] - HOSE["clamp_x"]
 hose_pts = lr4.hose_route(HOSE)
 hose_curve = lr4.catmull_rom(hose_pts, 12)
 hose_len = sum(math.dist(a, b) for a, b in zip(hose_curve, hose_curve[1:]))

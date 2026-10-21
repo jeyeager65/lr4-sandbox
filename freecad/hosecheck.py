@@ -24,7 +24,7 @@ import FreeCAD as App                             # noqa: E402
 from fclib import mesh                            # noqa: E402
 import lr4                                        # noqa: E402
 
-N_X = 41                                          # X positions, 0 .. 1 of the travel
+N_X = 41                                          # X positions, home trip .. Max-end stop
 CUT_IN = 1.0                                      # flag a part the hose cuts into deeper than this (mm)
 ALLOW = {"YZ_Plate_Max": 3.0, "Dust_Shoe_Kobalt": 2.5}   # the shoe: the ~73 mm hose threads into its 69 socket
 THREADS = 12                                      # numpy releases the GIL in the heavy maths (Ryzen 9 3900X: 12 cores)
@@ -36,10 +36,8 @@ SKIP_MM = 15.0                                    # hose skipped at its start: t
 B = {"__file__": os.path.join(HERE, "build.py")}  # the build's parameters (cut area, parked pose)
 src = open(B["__file__"], encoding="utf-8").read()
 exec("IN = 25.4\n" + "\n".join(src.split("# ---- parameters", 1)[1].split("# ----------", 1)[0].splitlines()[1:]), B)
-CUT_X = B["CUT_X_IN"] * 25.4
-b_lo, b_hi = lr4.B_RANGE
-b_now = b_hi - B["Z_POS"] * (b_hi - b_lo)
-DZS = (-(b_hi - b_now), 0.0, b_now - b_lo)        # beam lowest, parked, highest (Z travel)
+TRAVEL = json.load(open(os.path.join(ROOT, "build", "travel.json")))   # build.py: from the parked pose (lr4.STOPS)
+DZS = (TRAVEL["z"][0], 0.0, TRAVEL["z"][1])       # beam lowest, parked, highest (Z travel)
 
 t0 = time.time()
 h = json.load(open(os.path.join(ROOT, "build", "hose.json")))
@@ -75,7 +73,7 @@ poses = []                                        # every pose's centreline firs
 for dz in DZS:
     for k in range(N_X):
         xpos = k / (N_X - 1)
-        dx = (xpos - B["X_POS"]) * CUT_X
+        dx = TRAVEL["x"][0] + xpos * (TRAVEL["x"][1] - TRAVEL["x"][0])
         route = lr4.hose_route(h, dx, dz)
         c = lr4.catmull_rom(route, 12)
         cc = lr4.catmull_rom(route, COARSE)
