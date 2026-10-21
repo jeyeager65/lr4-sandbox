@@ -1,8 +1,8 @@
 {
  "repo": "https://github.com/jeyeager65/FluidNC",
  "branch": "wasm-sim",
- "commit": "5d79300f643eda9db7d4f309d1a313dc883d8cb5",
- "source": "https://github.com/jeyeager65/FluidNC/tree/5d79300f643eda9db7d4f309d1a313dc883d8cb5",
+ "commit": "2969e6d16593ca5c3f47c23992c4053c3e09897a",
+ "source": "https://github.com/jeyeager65/FluidNC/tree/2969e6d16593ca5c3f47c23992c4053c3e09897a",
  "dirty": false,
  "emcc": "emcc (Emscripten gcc/clang-like replacement + linker emulating GNU ld) 6.0.13 (e13ee988ce3d87a738dd8f3661d02223308c412a)",
  "built": "2026-10-21",

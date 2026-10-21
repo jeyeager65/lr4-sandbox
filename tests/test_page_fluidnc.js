@@ -4,9 +4,11 @@
 //  - the module on its own (js/fluidnc_sim.js + the wasm demo's config): boots, $I, "?", G0 X10 ends at MPos X 10,
 //    stop() removes its iframe;
 //  - the page (Run > Controller > FluidNC): boots V1E's JP3_LR through js/sim_config.js, max_travel_mm = the size's
-//    travel less pulloff, G0 moves the model by MPos from where it started, a slider jog ends at the slider's spot,
-//    the console shows the traffic; a new config.yaml and a new size each restart it (new pulloff / travel); back to
-//    Playback: FluidNC gone and the sliders move the model directly again.
+//    travel less pulloff, G0 moves the model by MPos from where it started (greyed: not homed),
+//    the jog pad jogs it, the console shows the traffic; Home ($H on the virtual switches, at 10x) ends at MPos = mpos_mm on Part 13's homed
+//    spot (trip + pulloff) with both Y motors level; G38.2 stops with the tip on the touch plate; an unplugged switch
+//    makes $HX alarm; a move takes 1/5 and 1/10 of its time at 5x / 10x; a new config.yaml and a new size each
+//    restart it (new pulloff / travel); back to Playback: FluidNC gone, the sliders move the model directly again.
 //   node tests/test_page_fluidnc.js [headers|plain]      (both by default; not in npm test: needs Chrome + Python
 //   and build/fixtures/JP3_LR.yaml - node tests/test_sim_config.js fetches it)
 "use strict";
@@ -124,27 +126,30 @@ async function run(mode) {
       const sim = await T.booted(null), out = {};
       if (!sim) return { msg: document.getElementById("ctl-msg").textContent, log: document.getElementById("ctl-log").textContent.slice(-300) };
       out.greeting = sim.greeting;
-      out.disabled = ["home", "job-play"].map((id) => document.getElementById(id).disabled);
+      out.ui = { play: document.getElementById("job-play").disabled, home: document.getElementById("home").disabled,
+        sliders: document.getElementById("pos-play").hidden, jog: document.getElementById("pos-jog").hidden,
+        status: document.getElementById("home-status").textContent, grey: document.getElementById("mx").style.opacity };
       const i = await sim.command("$I");
       out.machine = i.lines.map((e) => e.line).find((l) => /Machine:/.test(l));
       out.mt = await T.setting(sim, "/axes/x/max_travel_mm");
       out.mty = await T.setting(sim, "/axes/y/max_travel_mm");
       out.span = [T.travelX(), LR4Ctl.travel().y[1] - LR4Ctl.travel().y[0]];
-      await T.idle();
-      out.anchor = LR4Ctl.anchor();
-      out.pose0 = LR4Ctl.pose();
+      await T.idle(); LR4Ctl.sync();
+      out.boot = LR4Ctl.boot(); out.mpos0 = LR4Ctl.mpos(); out.pose0 = LR4Ctl.pose();
       await sim.command("G0 X100 Y200");
       await T.until(() => LR4Ctl.mpos() && Math.abs(LR4Ctl.mpos()[1] - 200) < 0.01 && LR4Ctl.state() === "Idle");
+      LR4Ctl.sync();
       out.mpos1 = LR4Ctl.mpos(); out.pose1 = LR4Ctl.pose();
       out.dro = ["mx", "my"].map((id) => document.getElementById(id).textContent);
-      // jog: the X slider 2 in further
-      const sx = document.getElementById("sx");
-      out.jogTo = (Number(sx.value) + 2) * 25.4 + LR4Ctl.travel().x[0];
-      sx.value = (Number(sx.value) + 2).toFixed(1);
-      sx.dispatchEvent(new Event("input"));
-      await T.sleep(400);
-      await T.until(() => LR4Ctl.state() === "Idle" && Math.abs(LR4Ctl.pose()[0] - out.jogTo) < 0.2, 15000);
-      out.pose2 = LR4Ctl.pose(); out.mpos2 = LR4Ctl.mpos();
+      // the jog pad: 10 mm steps, X+ twice, Z- once
+      document.getElementById("jog-step").value = "10";
+      document.querySelector('#pos-jog [data-jog="X+"]').click();
+      document.querySelector('#pos-jog [data-jog="X+"]').click();
+      document.querySelector('#pos-jog [data-jog="Z-"]').click();
+      await T.sleep(500);
+      await T.until(() => LR4Ctl.state() === "Idle" && Math.abs(LR4Ctl.mpos()[0] - 120) < 0.01 && Math.abs(LR4Ctl.mpos()[2] + 10) < 0.01, 20000);
+      LR4Ctl.sync();
+      out.mpos2 = LR4Ctl.mpos(); out.pose2 = LR4Ctl.pose();
       // the console: $I from its button
       document.querySelector('#ctl-box [data-ctl="$I"]').click();
       await T.sleep(500);
@@ -153,19 +158,82 @@ async function run(mode) {
       return out;
     })()`);
     if (!p1.greeting) { ok(false, "FluidNC mode boots: " + JSON.stringify(p1)); return; }
-    ok(p1.disabled.every(Boolean), "FluidNC mode: Home + Play disabled");
+    ok(p1.ui.play && !p1.ui.home && p1.ui.sliders && !p1.ui.jog, "FluidNC mode: Play off, Home on, sliders hidden, jog pad shown");
+    ok(/^Not homed/.test(p1.ui.status) && p1.ui.grey === "0.55", `not homed: MPos greyed, "${p1.ui.status.slice(0, 60)}…"`);
     ok(p1.machine === "[MSG:Machine: LowRider]", `boots V1E's JP3_LR (${p1.machine})`);
     ok(Math.abs(p1.mt - (p1.span[0] - 4)) < 0.06 && Math.abs(p1.mty - (p1.span[1] - 4)) < 0.06,
       `max_travel_mm ${p1.mt} / ${p1.mty} = travel ${p1.span.map((v) => v.toFixed(1))} less pulloff 4`);
-    ok(p1.anchor.mpos.every((v) => v === 0) && p1.anchor.pose.every((v, k) => Math.abs(v - p1.pose0[k]) < 0.01), "MPos 0 = the pose at power-up");
-    const d1 = p1.pose1.map((v, k) => v - p1.anchor.pose[k]);
+    ok(p1.mpos0.every((v) => v === 0) && p1.boot.every((v, k) => Math.abs(v - p1.pose0[k]) < 0.01), "MPos 0 = where it started");
+    const d1 = p1.pose1.map((v, k) => v - p1.boot[k]);
     ok(Math.abs(d1[0] - 100) < 0.01 && Math.abs(d1[1] - 200) < 0.01 && Math.abs(d1[2]) < 0.01, `G0 X100 Y200 moves the model by ${d1.map((v) => v.toFixed(2))}`);
     ok(p1.dro[0] === "100.0" && p1.dro[1] === "200.0", `MPos DRO ${p1.dro}`);
-    const want = p1.jogTo - p1.anchor.pose[0];          // the slider's spot (its 0.1 in grid) as MPos
-    ok(Math.abs(p1.pose2[0] - p1.jogTo) < 0.1 && Math.abs(p1.mpos2[0] - want) < 0.1 && Math.abs(p1.mpos2[1] - 200) < 1e-6,
-      `slider jog ends at X ${p1.pose2[0].toFixed(2)} (slider ${p1.jogTo.toFixed(2)}), MPos ${p1.mpos2}: X only`);
+    const d2 = p1.pose2.map((v, k) => v - p1.boot[k]);
+    ok(Math.abs(d2[0] - 120) < 0.01 && Math.abs(d2[1] - 200) < 0.01 && Math.abs(d2[2] + 10) < 0.01,
+      `jog pad X+ X+ Z- (10 mm): MPos ${p1.mpos2}, the model by ${d2.map((v) => v.toFixed(2))}`);
     ok(/> \$I/.test(p1.log) && /\[VER:/.test(p1.log) && !/\$J=/.test(p1.log), "console shows the typed $I and its reply (jogs stay out of it)");
-    ok(p1.state.startsWith(`<Idle|MPos:${p1.mpos2[0].toFixed(3)},200.000,`), `console status line: ${p1.state}`);
+    ok(p1.state.startsWith("<Idle|MPos:120.000,200.000,-10.000"), `console status line: ${p1.state}`);
+
+    // Part 16: home on the virtual switches, probe the touch plate, an unplugged switch, the time scale
+    const h = await page.val(`(async () => {
+      const sim = window.LR4FluidNC, out = {}, sp = document.getElementById("ctl-speed");
+      const speed = (k) => { sp.value = String(k); sp.dispatchEvent(new Event("change")); };
+      speed(10);
+      const t0 = performance.now();
+      document.getElementById("home").click();
+      await T.until(() => /^Homed by FluidNC|^Homing failed/.test(document.getElementById("home-status").textContent), 120000);
+      out.secs = (performance.now() - t0) / 1000;
+      out.status = document.getElementById("home-status").textContent;
+      await T.idle(); await T.sleep(600); await T.idle(); LR4Ctl.sync();
+      out.mpos = LR4Ctl.mpos(); out.pose = LR4Ctl.pose(); out.t = LR4Ctl.travel(); out.grey = document.getElementById("mx").style.opacity;
+      out.steps = Object.fromEntries(LR4Ctl.cfg().pins.motors.map((m) => [m.axis + m.motor, sim.motorSteps(m.step)]));
+      // the touch plate on the stock under the bit: G38.2 down stops with the bit's end on it
+      document.getElementById("ctl-plate").click();
+      const pr = await sim.command("G38.2 Z-200 F300", 120000);
+      out.probe = { ok: pr.ok, code: pr.code, lines: pr.lines.map((e) => e.line) };
+      await T.idle(); await T.sleep(300); LR4Ctl.sync();
+      out.endZ = LR4Ctl.pose()[2] + LR4Ctl.tip();     // where it came to rest (FluidNC's motion cancel decelerates)
+      const prb = out.probe.lines.find((l) => l.startsWith("[PRB:"));      // where it tripped, in MPos; homed: MPos 3 = pose tz[1] - 4
+      out.tripZ = prb ? LR4Ctl.travel().z[1] - 4 + (Number(prb.slice(5).split(",")[2].split(":")[0]) - 3) + LR4Ctl.tip() : NaN;
+      out.plateTop = LR4Ctl.TOUCH_PLATE.stock + LR4Ctl.TOUCH_PLATE.plate;
+      document.getElementById("ctl-plate").click();
+      await sim.command("G53 G0 Z-10");
+      await T.idle();
+      // the time scale: G1 X at F600
+      const xm = LR4Ctl.cfg().pins.motors.find((m) => m.axis === "x");
+      out.timing = [];
+      for (const [k, d] of [[1, 20], [5, 50], [10, 100]]) {
+        speed(k);
+        const s0 = sim.motorSteps(xm.step), goal = s0 + d * LR4Ctl.cfg().steps.x.to, a = performance.now();
+        await sim.command("G91 G1 X" + d + " F600");
+        await T.until(() => sim.motorSteps(xm.step) >= goal, 60000);
+        out.timing.push([k, d, (performance.now() - a) / 1000, d / 10]);
+        await sim.command("G90");
+      }
+      speed(10);
+      // unplug the X switch: $HX runs past it and alarms, as on the real machine
+      const xg = Object.values(xm.limits)[0];
+      sim.clearSwitch(xg);
+      const al = sim.waitFor((e) => e.type === "alarm", 120000).catch(() => null);
+      await sim.command("$HX", 120000).catch(() => null);
+      const alarm = await al;
+      out.unplug = { alarm: alarm && alarm.line, homed: LR4Ctl.homed() };
+      await sim.command("$X");
+      return out;
+    })()`);
+    const tv = h.t;
+    ok(/^Homed by FluidNC/.test(h.status) && h.grey === "", `Home ($H) at 10x: "${h.status}" in ${h.secs.toFixed(1)} s, MPos no longer greyed`);
+    ok(h.mpos.every((v) => Math.abs(v - 3) < 1e-6), `homed: MPos = mpos_mm (${h.mpos})`);
+    const spot = [tv.x[0] + 4, tv.y[0] + 4, tv.z[1] - 4];
+    ok(h.pose.every((v, k) => Math.abs(v - spot[k]) < 0.15), `homed at Part 13's spot (trip + pulloff): ${h.pose.map((v) => v.toFixed(2))} vs ${spot.map((v) => v.toFixed(2))}`);
+    ok(h.steps.y0 === h.steps.y1 && h.steps.z0 === h.steps.z1, `each Y / Z motor on its own switch, level: ${JSON.stringify(h.steps)}`);
+    ok(h.probe.ok && h.probe.lines.some((l) => /^\[PRB:.*:1\]$/.test(l)), `G38.2 stops on the plate: ${h.probe.lines.join(" ")}`);
+    ok(Math.abs(h.tripZ - h.plateTop) < 0.15, `G38.2 trips with the bit's end on the plate: ${h.tripZ.toFixed(2)} mm above the table ` +
+      `(plate top ${h.plateTop}); comes to rest ${(h.tripZ - h.endZ).toFixed(2)} mm further down`);
+    for (const [k, d, secs, want] of h.timing) {
+      const real = want / k;     // 30%: headless software rendering competes for the CPU (short 10x moves ran up to ~25% long)
+      ok(Math.abs(secs - real) < Math.max(0.3 * real, 0.12), `${k}x: G1 X${d} F600 (${want} s machine time) took ${secs.toFixed(2)} s (want ${real.toFixed(2)})`);
+    }
+    ok(h.unplug.alarm && /^ALARM:(8|9)$/.test(h.unplug.alarm) && !h.unplug.homed, `X switch unplugged: $HX -> ${h.unplug.alarm}, not homed`);
 
     // a new config.yaml (pulloff 2, another name) restarts it
     if (!fs.existsSync(FIX)) { ok(false, "build/fixtures/JP3_LR.yaml missing - run node tests/test_sim_config.js"); return; }
@@ -200,13 +268,13 @@ async function run(mode) {
       document.querySelector('#ctl-mode [data-v="play"]').click();
       await T.sleep(300);
       const out = { sim: window.LR4FluidNC, frames: document.querySelectorAll("iframe").length, box: document.getElementById("ctl-box").hidden,
-        home: document.getElementById("home").disabled };
+        home: document.getElementById("home").disabled, sliders: !document.getElementById("pos-play").hidden && document.getElementById("pos-jog").hidden };
       const sy = document.getElementById("sy");
       sy.value = "10"; sy.dispatchEvent(new Event("input"));
       out.y = LR4Ctl.pose()[1]; out.want = 10 * 25.4 + LR4Ctl.travel().y[0];
       return out;
     })()`);
-    ok(p3.sim === null && p3.frames === 0 && p3.box && !p3.home, "Playback: FluidNC stopped, console hidden, Home back");
+    ok(p3.sim === null && p3.frames === 0 && p3.box && !p3.home && p3.sliders, "Playback: FluidNC stopped, console hidden, sliders back");
     ok(Math.abs(p3.y - p3.want) < 0.01, `Playback: the Y slider moves the model at once (${p3.y.toFixed(1)})`);
   } finally {
     await page.close();

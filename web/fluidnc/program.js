@@ -7126,12 +7126,12 @@ function checkIncomingModuleAPI() {
 }
 
 var ASM_CONSTS = {
-  177960: $0 => {
+  178248: $0 => {
     if (typeof self.fluidncOnVconnClose === "function") {
       self.fluidncOnVconnClose($0);
     }
   },
-  178050: ($0, $1, $2) => {
+  178338: ($0, $1, $2) => {
     if (typeof growMemViews === "function") {
       growMemViews();
     }
@@ -7140,7 +7140,7 @@ var ASM_CONSTS = {
       self.fluidncOnVconnData($0, bytes);
     }
   },
-  178246: ($0, $1) => {
+  178534: ($0, $1) => {
     const text = UTF8ToString($0, $1);
     if (typeof self.fluidncOnOutput === "function") {
       self.fluidncOnOutput(text);
@@ -7160,6 +7160,22 @@ var _fluidnc_vconn_send = Module["_fluidnc_vconn_send"] = makeInvalidEarlyAccess
 var _fluidnc_vconn_close = Module["_fluidnc_vconn_close"] = makeInvalidEarlyAccess("_fluidnc_vconn_close");
 
 var _pthread_self = makeInvalidEarlyAccess("_pthread_self");
+
+var _fluidnc_output_queue = Module["_fluidnc_output_queue"] = makeInvalidEarlyAccess("_fluidnc_output_queue");
+
+var _fluidnc_take_output = Module["_fluidnc_take_output"] = makeInvalidEarlyAccess("_fluidnc_take_output");
+
+var _fluidnc_set_switch = Module["_fluidnc_set_switch"] = makeInvalidEarlyAccess("_fluidnc_set_switch");
+
+var _fluidnc_clear_switch = Module["_fluidnc_clear_switch"] = makeInvalidEarlyAccess("_fluidnc_clear_switch");
+
+var _fluidnc_add_motor = Module["_fluidnc_add_motor"] = makeInvalidEarlyAccess("_fluidnc_add_motor");
+
+var _fluidnc_motor_steps = Module["_fluidnc_motor_steps"] = makeInvalidEarlyAccess("_fluidnc_motor_steps");
+
+var _fluidnc_pin_mask = Module["_fluidnc_pin_mask"] = makeInvalidEarlyAccess("_fluidnc_pin_mask");
+
+var _fluidnc_set_time_scale = Module["_fluidnc_set_time_scale"] = makeInvalidEarlyAccess("_fluidnc_set_time_scale");
 
 var _fluidnc_start = Module["_fluidnc_start"] = makeInvalidEarlyAccess("_fluidnc_start");
 
@@ -7235,6 +7251,14 @@ function assignWasmExports(wasmExports) {
   assert(typeof wasmExports["fluidnc_vconn_send"] !== "undefined", "missing Wasm export: fluidnc_vconn_send");
   assert(typeof wasmExports["fluidnc_vconn_close"] !== "undefined", "missing Wasm export: fluidnc_vconn_close");
   assert(typeof wasmExports["pthread_self"] !== "undefined", "missing Wasm export: pthread_self");
+  assert(typeof wasmExports["fluidnc_output_queue"] !== "undefined", "missing Wasm export: fluidnc_output_queue");
+  assert(typeof wasmExports["fluidnc_take_output"] !== "undefined", "missing Wasm export: fluidnc_take_output");
+  assert(typeof wasmExports["fluidnc_set_switch"] !== "undefined", "missing Wasm export: fluidnc_set_switch");
+  assert(typeof wasmExports["fluidnc_clear_switch"] !== "undefined", "missing Wasm export: fluidnc_clear_switch");
+  assert(typeof wasmExports["fluidnc_add_motor"] !== "undefined", "missing Wasm export: fluidnc_add_motor");
+  assert(typeof wasmExports["fluidnc_motor_steps"] !== "undefined", "missing Wasm export: fluidnc_motor_steps");
+  assert(typeof wasmExports["fluidnc_pin_mask"] !== "undefined", "missing Wasm export: fluidnc_pin_mask");
+  assert(typeof wasmExports["fluidnc_set_time_scale"] !== "undefined", "missing Wasm export: fluidnc_set_time_scale");
   assert(typeof wasmExports["fluidnc_start"] !== "undefined", "missing Wasm export: fluidnc_start");
   assert(typeof wasmExports["fluidnc_send_text"] !== "undefined", "missing Wasm export: fluidnc_send_text");
   assert(typeof wasmExports["fflush"] !== "undefined", "missing Wasm export: fflush");
@@ -7273,6 +7297,14 @@ function assignWasmExports(wasmExports) {
   _fluidnc_vconn_send = Module["_fluidnc_vconn_send"] = createExportWrapper("fluidnc_vconn_send", wasmExports["fluidnc_vconn_send"], 3);
   _fluidnc_vconn_close = Module["_fluidnc_vconn_close"] = createExportWrapper("fluidnc_vconn_close", wasmExports["fluidnc_vconn_close"], 1);
   _pthread_self = wasmExports["pthread_self"];
+  _fluidnc_output_queue = Module["_fluidnc_output_queue"] = createExportWrapper("fluidnc_output_queue", wasmExports["fluidnc_output_queue"], 1);
+  _fluidnc_take_output = Module["_fluidnc_take_output"] = createExportWrapper("fluidnc_take_output", wasmExports["fluidnc_take_output"], 0);
+  _fluidnc_set_switch = Module["_fluidnc_set_switch"] = createExportWrapper("fluidnc_set_switch", wasmExports["fluidnc_set_switch"], 5);
+  _fluidnc_clear_switch = Module["_fluidnc_clear_switch"] = createExportWrapper("fluidnc_clear_switch", wasmExports["fluidnc_clear_switch"], 1);
+  _fluidnc_add_motor = Module["_fluidnc_add_motor"] = createExportWrapper("fluidnc_add_motor", wasmExports["fluidnc_add_motor"], 2);
+  _fluidnc_motor_steps = Module["_fluidnc_motor_steps"] = createExportWrapper("fluidnc_motor_steps", wasmExports["fluidnc_motor_steps"], 1);
+  _fluidnc_pin_mask = Module["_fluidnc_pin_mask"] = createExportWrapper("fluidnc_pin_mask", wasmExports["fluidnc_pin_mask"], 0);
+  _fluidnc_set_time_scale = Module["_fluidnc_set_time_scale"] = createExportWrapper("fluidnc_set_time_scale", wasmExports["fluidnc_set_time_scale"], 1);
   _fluidnc_start = Module["_fluidnc_start"] = createExportWrapper("fluidnc_start", wasmExports["fluidnc_start"], 0);
   _fluidnc_send_text = Module["_fluidnc_send_text"] = createExportWrapper("fluidnc_send_text", wasmExports["fluidnc_send_text"], 1);
   _fflush = createExportWrapper("fflush", wasmExports["fflush"], 1);

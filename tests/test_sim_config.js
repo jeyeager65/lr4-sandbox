@@ -98,7 +98,8 @@ function check(name, src) {
   }
   for (const a of r.axes) {
     const sx = ch(sa, a), tx = ch(ta, a);
-    ok(v(tx, "steps_per_mm") === String(C.SIM_STEPS), `${name}: ${a} steps_per_mm ${C.SIM_STEPS}`);
+    const want = Math.min(Number(v(sx, "steps_per_mm")), C.MAX_STEPS);
+    ok(v(tx, "steps_per_mm") === String(want) && r.steps[a].to === want, `${name}: ${a} steps_per_mm ${want}`);
     for (const k of ["max_rate_mm_per_min", "acceleration_mm_per_sec2", "max_travel_mm", "soft_limits"])
       ok(v(tx, k) === v(sx, k), `${name}: ${a} ${k} kept (${v(sx, k)})`);
     const sh = ch(sx, "homing"), th = ch(tx, "homing");
@@ -125,7 +126,7 @@ function check(name, src) {
   ok(v(ch(t, "parking"), "pullout_rate_mm_per_min") === "600", "user: parking kept");
   ok(v(ch(t, "stepping"), "idle_ms") === "250", "user: idle_ms kept");
   ok(["spindle", "Laser", "coolant", "axes/a"].every((k) => r.dropped.includes(k)), "user: dropped " + r.dropped.join(", "));
-  ok(r.steps.x.from === 100 && r.steps.z.from === 400 && r.steps.x.to === C.SIM_STEPS, "user: steps from / to");
+  ok(r.steps.x.from === 100 && r.steps.x.to === 100 && r.steps.z.from === 400 && r.steps.z.to === C.MAX_STEPS, "user: steps from / to (capped)");
   let threw = false;
   try { C.translate("name: x\nstepping:\n  engine: timed\n"); } catch (e) { threw = /axes/.test(e.message); }
   ok(threw, "no axes -> an error");

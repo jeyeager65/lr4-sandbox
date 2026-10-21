@@ -18,11 +18,11 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(HERE, "..", "web", "fluidnc")
 SRC = os.environ.get("FLUIDNC", r"D:/GitHub/FluidNC")
-EMSDK = os.environ.get("EMSDK", r"D:/emsdk")
+EMSDK = os.path.normpath(os.environ.get("EMSDK", r"D:/emsdk"))
 REPO = "https://github.com/jeyeager65/FluidNC"
 BRANCH = "wasm-sim"
 # the wasm-sim commit the page ships; bump it after committing (and pushing) a change on the branch
-PIN = "5d79300f643eda9db7d4f309d1a313dc883d8cb5"
+PIN = "2969e6d16593ca5c3f47c23992c4053c3e09897a"
 
 
 def git(*args):
@@ -37,12 +37,16 @@ def pio():
 
 
 def run_in_emsdk(cmd):
-    # emsdk_env puts emcc / em++ on PATH for this one command (the wasm env's pio_toolchain_wasm.py looks for them)
-    if os.name == "nt":
-        line = f'call "{os.path.join(EMSDK, "emsdk_env.bat")}" >nul 2>&1 && {subprocess.list2cmdline(cmd)}'
-        return subprocess.run(line, shell=True, cwd=SRC, capture_output=True, text=True)
-    line = f'source "{os.path.join(EMSDK, "emsdk_env.sh")}" >/dev/null 2>&1 && {subprocess.list2cmdline(cmd)}'
-    return subprocess.run(["bash", "-c", line], cwd=SRC, capture_output=True, text=True)
+    # emcc / em++ on PATH for this one command (the wasm env's pio_toolchain_wasm.py looks for them) - what emsdk_env
+    # does, set here: emsdk_env.bat prints bash exports instead when it's started from Git Bash
+    env = dict(os.environ, EMSDK=EMSDK, EM_CONFIG=os.path.join(EMSDK, ".emscripten"))
+    node = os.path.join(EMSDK, "node")
+    extra = [EMSDK, os.path.join(EMSDK, "upstream", "emscripten")]
+    if os.path.isdir(node):
+        extra += [os.path.join(node, d, "bin") for d in sorted(os.listdir(node))]
+    env["PATH"] = os.pathsep.join(extra + [env.get("PATH", "")])
+    exe = shutil.which(cmd[0], path=env["PATH"]) or cmd[0]
+    return subprocess.run([exe] + cmd[1:], cwd=SRC, capture_output=True, text=True, env=env)
 
 
 if __name__ == "__main__":

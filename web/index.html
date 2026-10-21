@@ -241,6 +241,8 @@ label.btn:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; 
 .ctl-log .err { color: var(--warn); }
 .ctl-state { font-family: var(--font-data); font-size: 12px; color: var(--muted); margin: 8px 0 0; word-break: break-all; min-height: 1.35em; }
 .ctl-form { display: flex; gap: 6px; margin-top: 6px; }
+.jog { display: grid; grid-template-columns: repeat(4, 52px); gap: 6px; margin-top: 10px; }
+.jog button { padding: 8px 0; font-family: var(--font-data); }
 .ctl-form input { flex: 1; min-width: 0; font-family: var(--font-data); }
 #dl-status { font-size: 12px; color: var(--muted); min-height: 1.3em; margin-top: 6px; }
 @media (max-width: 760px) {
@@ -440,7 +442,13 @@ body.vr-on .stage { grid-row: 1; }
         <button type="button" data-v="fluidnc" aria-pressed="false">FluidNC</button></div>
       <p class="foot" id="ctl-note">Playback: the page moves the machine itself. FluidNC (preview): the real firmware,
         built to run in your browser, drives the machine with the config.yaml in use (V1E's JP3_LR until you load your
-        own, under Build it); the sliders jog it. It runs a copy with plain stepper drivers ($CD shows that copy).</p>
+        own, under Build it): jog it, home it ($H on the machine's switches), send it G-code. It runs a copy with plain
+        stepper drivers ($CD shows that copy).</p>
+      <div class="buttons" id="ctl-opts" hidden>
+        <label class="check">Machine speed <select id="ctl-speed" aria-label="Machine speed" style="width: auto">
+          <option value="1" selected>1×</option><option value="2">2×</option><option value="5">5×</option><option value="10">10×</option></select></label>
+        <label class="check"><input type="checkbox" id="ctl-plate"> Touch plate under the bit (on 1/4" stock)</label>
+      </div>
       <p class="foot" id="ctl-msg" role="status"></p>
       <details class="cam" id="ctl-box" hidden>
         <summary>FluidNC console</summary>
@@ -463,22 +471,38 @@ body.vr-on .stage { grid-row: 1; }
 
     <section aria-labelledby="h-pos">
       <h2 id="h-pos">Tool position</h2>
-      <div class="readout">
-        <div><b>X</b><span id="rx">13.00</span> <small id="ux">in</small></div>
-        <div><b>Y</b><span id="ry">17.50</span> <small id="uy">in</small></div>
-        <div><b>Tip</b><span id="rz">42</span> <small>mm</small></div>
+      <div id="pos-play">
+        <div class="readout" title="X, Y from the home switches; Z from Z's homed spot (0 there, negative below)">
+          <div><b>X</b><span id="rx">13.00</span> <small id="ux">in</small></div>
+          <div><b>Y</b><span id="ry">17.50</span> <small id="uy">in</small></div>
+          <div><b>Z</b><span id="rz">0</span> <small>mm</small></div>
+        </div>
+        <div class="slider"><label for="sx">X</label><input id="sx" type="range" step="0.1"><output id="ox" for="sx"></output></div>
+        <div class="slider"><label for="sy">Y</label><input id="sy" type="range" step="0.1"><output id="oy" for="sy"></output></div>
+        <div class="slider"><label for="sz">Z</label><input id="sz" type="range" step="0.5"><output id="oz" for="sz"></output></div>
       </div>
-      <div class="slider"><label for="sx">X</label><input id="sx" type="range" step="0.1"><output id="ox" for="sx"></output></div>
-      <div class="slider"><label for="sy">Y</label><input id="sy" type="range" step="0.1"><output id="oy" for="sy"></output></div>
-      <div class="slider"><label for="sz">Z</label><input id="sz" type="range" step="0.5"><output id="oz" for="sz"></output></div>
       <div class="readout" aria-label="Machine position (MPos), mm">
         <div><b>MPos X</b><span id="mx">–</span> <small>mm</small></div>
         <div><b>MPos Y</b><span id="my">–</span> <small>mm</small></div>
         <div><b>MPos Z</b><span id="mz">–</span> <small>mm</small></div>
       </div>
+      <div id="pos-jog" hidden>
+        <div class="jog" role="group" aria-label="Jog">
+          <span></span><button type="button" data-jog="Y+">Y+</button><span></span><button type="button" data-jog="Z+">Z+</button>
+          <button type="button" data-jog="X-">X−</button><button type="button" id="jog-stop" title="Stop the jog (0x85)">■</button>
+          <button type="button" data-jog="X+">X+</button><span></span>
+          <span></span><button type="button" data-jog="Y-">Y−</button><span></span><button type="button" data-jog="Z-">Z−</button>
+        </div>
+        <div class="buttons">
+          <label class="check">Step <select id="jog-step" aria-label="Jog step" style="width: auto">
+            <option value="0.1">0.1</option><option value="1">1</option><option value="10" selected>10</option><option value="100">100</option></select> mm</label>
+          <label class="check">Feed <select id="jog-feed" aria-label="Jog feed" style="width: auto">
+            <option value="300">300</option><option value="1000">1000</option><option value="3000" selected>3000</option><option value="6000">6000</option></select> mm/min</label>
+        </div>
+      </div>
       <div class="buttons">
         <button type="button" id="home">Home ($H)</button>
-        <label class="check"><input type="checkbox" id="home-real"> Real speed</label>
+        <label class="check" id="home-real-l"><input type="checkbox" id="home-real"> Real speed</label>
       </div>
       <p class="foot" id="home-status" role="status">Not homed. Home runs FluidNC's $H: Z up to its switch, then X and Y
         together to theirs (each Y motor stops on its own switch, squaring the gantry).</p>
@@ -1528,7 +1552,7 @@ body.vr-on .stage { grid-row: 1; }
   function setupSliders() {
     [sx, sy, sz].forEach((el) => {
       el.addEventListener("input", () => {
-        if (CTL.mode === "fluidnc") { ctlJog(el); return; }   // FluidNC: a jog; the model follows its MPos
+        if (CTL.mode === "fluidnc") return;                  // hidden in FluidNC mode (the jog pad instead)
         jobPlaying(false); homeCancel(); move();             // the job pauses
       });
       el.addEventListener("pointerdown", () => { CTL.drag = el; });
@@ -1596,7 +1620,14 @@ body.vr-on .stage { grid-row: 1; }
     HOME.pose = { x: dx, y: dy, z: dz };
     dro();
   }
-  let lastPos = null;
+  let lastPos = null, zHomeMemo = null;
+  // the tip height (above the table) at Z's homed spot: the readout's Z is measured from there (0, negative below)
+  function zHomeTip() {
+    if (!zHomeMemo || zHomeMemo.yaml !== yamlBase || zHomeMemo.t !== meta.travel)
+      zHomeMemo = { yaml: yamlBase, t: meta.travel,
+        v: meta.tip_above_table + meta.travel.z[1] - Homing.settings(yamlBase ? yamlBase.text : null).z.pulloff };
+    return zHomeMemo.v;
+  }
   function readout(X, Y, Z, playing) {                // X, Y in inches (the sliders); shown in the page's units
     if (X === undefined) { if (!lastPos) return; [X, Y, Z, playing] = lastPos; }
     lastPos = [X, Y, Z, playing];
@@ -1604,10 +1635,11 @@ body.vr-on .stage { grid-row: 1; }
     document.getElementById("ux").textContent = document.getElementById("uy").textContent = mm ? "mm" : "in";
     document.getElementById("rx").textContent = u(X).toFixed(mm ? 1 : 2);
     document.getElementById("ry").textContent = u(Y).toFixed(mm ? 1 : 2);
-    document.getElementById("rz").textContent = Z.toFixed(playing ? 1 : 0);
+    const zr = Z - zHomeTip();                       // Z from its homed spot
+    document.getElementById("rz").textContent = zr.toFixed(playing ? 1 : 0);
     document.getElementById("ox").textContent = `${u(X).toFixed(mm ? 0 : 1)} / ${+u(Number(sx.max)).toFixed(mm ? 0 : 1)}`;
     document.getElementById("oy").textContent = `${u(Y).toFixed(mm ? 0 : 1)} / ${+u(Number(sy.max)).toFixed(mm ? 0 : 1)}`;
-    document.getElementById("oz").textContent = `${Z.toFixed(playing ? 1 : 0)} mm`;
+    document.getElementById("oz").textContent = `${zr.toFixed(playing ? 1 : 0)} mm`;
   }
 
   // ---- Home ($H, js/homing.js): FluidNC's homing with the config.yaml in use (V1E's JP3_LR values until one is
@@ -1616,8 +1648,8 @@ body.vr-on .stage { grid-row: 1; }
   // sliders mid-home stops it; a new size un-homes. ----
   const HOME = { run: null, t: 0, k: 0, home: null, s: null, pose: null, travel: "" };
   // the Controller (setupController): mode, the running sim, its config copy, the MPos <-> pose anchor, last status
-  const CTL = { mode: "play", sim: null, cfg: null, anchor: null, mpos: null, state: "", drag: null, jog: null,
-    jogBusy: false, cancelled: false, booting: null };
+  const CTL = { mode: "play", sim: null, cfg: null, boot: null, mpos: null, state: "", drag: null, booting: null,
+    pins: 0, pose: null, yaml: "", homed: false };
   const SWITCHES = { x: ["Endstop_X"], y: ["Endstop_Y_Min", "Endstop_Y_Max"], z: ["Endstop_Z_Min", "Endstop_Z_Max"] };
   let flashMat = null;
   function homeStart() {
@@ -1671,10 +1703,14 @@ body.vr-on .stage { grid-row: 1; }
     }
   }
   function dro() {                                   // MPos once homed, else dashes (FluidNC mode: its MPos)
-    if (CTL.mode === "fluidnc") {
-      for (const [i, a] of ["x", "y", "z"].entries()) $("m" + a).textContent = CTL.mpos ? CTL.mpos[i].toFixed(1) : "–";
+    if (CTL.mode === "fluidnc") {                   // its own MPos; greyed until homed (it doesn't know where it is)
+      for (const [i, a] of ["x", "y", "z"].entries()) {
+        $("m" + a).textContent = CTL.mpos ? CTL.mpos[i].toFixed(1) : "–";
+        $("m" + a).style.opacity = CTL.homed ? "" : "0.55";
+      }
       return;
     }
+    for (const a of ["x", "y", "z"]) $("m" + a).style.opacity = "";
     const m = HOME.home && HOME.pose && !HOME.run ? Homing.mpos(HOME.s, HOME.home, HOME.pose) : null;
     for (const a of ["x", "y", "z"]) $("m" + a).textContent = m && m[a] !== null ? m[a].toFixed(1) : "–";
   }
@@ -1685,7 +1721,8 @@ body.vr-on .stage { grid-row: 1; }
     const tv = meta.travel, h = HOME.home;
     return (stock) => ({ x: h.x - tv.x[0], y: h.y - tv.y[0], z: h.z + meta.tip_above_table + (stock ? stock.zmin : 0) });
   }
-  for (const id of ["home", "v-home"]) document.getElementById(id).addEventListener("click", () => (HOME.run ? homeCancel() : homeStart()));
+  for (const id of ["home", "v-home"]) document.getElementById(id).addEventListener("click", () =>
+    (CTL.mode === "fluidnc" ? ctlHome() : HOME.run ? homeCancel() : homeStart()));
 
   // ---- size inputs, V1E calculator, cut list, strut plate drawing + downloads ----
   const EMT_STICK = 3048, KERF = 3, XZ = 6.5;
@@ -1878,9 +1915,15 @@ body.vr-on .stage { grid-row: 1; }
 
   // ---- Controller (Run tab): Playback (the page moves the machine) or FluidNC: the firmware in the page
   // (js/fluidnc_sim.js), booted with js/sim_config.js's copy of the config.yaml in use. In FluidNC mode the machine
-  // follows its MPos (auto reports, $RI=50, plus a slow "?") and the sliders jog it ($J=G53 to the slider's spot; a
-  // new spot mid-jog cancels the jog first, 0x85). Not homed yet (Part 16 brings the switches): MPos 0 = the pose at
-  // power-up, as on a real machine. A new size or config.yaml restarts it. window.LR4FluidNC = the running sim. ----
+  // follows its motors: each frame, each axis' first motor's step count (from the pose it booted at; status reports
+  // come ~1 s apart while homing). Every limit switch is a virtual one on its motor (sim.setSwitch: the trip at the
+  // travel's end, travel.x[0] etc., each Y / Z motor its own), so $H homes on them and squares the gantry; the touch
+  // plate (checkbox: on the strut job's stock) trips the probe at the bit's end on it. The jog pad jogs ($J=G91);
+  // Home sends $H. Until it has homed, its MPos is greyed: it doesn't know where it is. Machine speed = FluidNC's time scale. A new size or
+  // config.yaml restarts it. window.LR4FluidNC = the running sim. ----
+  // the touch plate: on the strut job's stock (strut_cam: 6.35 mm MDF, a 0.5 mm Tiny Touch Plate) - the tip can't
+  // reach the table itself (~2.9 mm above it at the bottom of Z)
+  const TOUCH_PLATE = { stock: StrutCam.DEFAULTS.t, plate: StrutCam.DEFAULTS.plate };
   function ctlAdd(text, cls) {
     const log = $("ctl-log"), d = document.createElement("div");
     d.textContent = text;
@@ -1898,62 +1941,81 @@ body.vr-on .stage { grid-row: 1; }
       const m = ev.MPos || (ev.WPos && ev.WCO ? ev.WPos.map((v, i) => v + ev.WCO[i]) : null);
       if (m) CTL.mpos = m;
       CTL.state = ev.state;
-      if (CTL.state !== "Jog") CTL.cancelled = false;
-      ctlFollow();
-      ctlJogPump();
+      dro();
       return;
     }
+    if (ev.type === "msg" && /^Homed:/.test(ev.text)) $("home-status").textContent = `FluidNC ${ev.text}.`;
+    if (ev.type === "alarm") { CTL.homed = false; dro(); }
     if (ev.type === "alarm") ctlMsg(`FluidNC ${ev.line}: send $X (Unlock) in the console to carry on.`);
     if (ev.type === "blank" || (ev.type === "text" && ev.line === ctlLastSent)) return;   // the console's echo
     ctlAdd(ev.line, CTL_CLS[ev.type]);
   }
-  // MPos -> the page's pose (mm from the parked pose): anchor.pose + (MPos - anchor.mpos), held inside the travel
-  function ctlPose(mpos) {
-    const a = CTL.anchor;
-    return [0, 1, 2].map((i) => a.pose[i] + mpos[i] - a.mpos[i]);
-  }
-  function ctlFollow() {
-    if (!CTL.sim || !CTL.mpos || !meta) return;
-    const t = meta.travel, p = ctlPose(CTL.mpos), past = [];
+  // the motors -> the page's pose (mm from the parked pose): the pose at boot + each axis' first motor's steps / steps per
+  // mm, held inside the travel (past a hard stop the real machine would stall; a note says so). Once a frame (tick).
+  function ctlTick() {
+    const sim = CTL.sim;
+    if (!sim || !sim.pins || !meta || !CTL.boot) return;
+    const t = meta.travel, past = [];
+    const p = ["x", "y", "z"].map((a, i) => {
+      const m = CTL.cfg.pins.motors.find((q) => q.axis === a);
+      return CTL.boot[i] + (m ? sim.motorSteps(m.step) / CTL.cfg.steps[a].to : 0);
+    });
     const q = p.map((v, i) => {
       const r = t["xyz"[i]], c = Math.min(Math.max(v, r[0]), r[1]);
       if (Math.abs(c - v) > 0.5) past.push(`${"XYZ"[i]} ${Math.abs(c - v).toFixed(1)} mm`);
       return c;
     });
-    move(q);
+    if (!CTL.pose || q.some((v, i) => Math.abs(v - CTL.pose[i]) > 1e-3)) { CTL.pose = q; move(q); }
     const warn = past.length ? `Past the hard stop (${past.join(", ")}): the real machine would hit it there. ` +
       "This config.yaml's soft_limits are off, so FluidNC doesn't stop it." : "";
-    if (warn || /^Past the hard stop/.test($("ctl-msg").textContent)) ctlMsg(warn);
+    if (warn ? $("ctl-msg").textContent !== warn : /^Past the hard stop/.test($("ctl-msg").textContent)) ctlMsg(warn);
+    const pins = sim.pinMask(), on = pins & ~CTL.pins;    // a switch closing flashes it (and its lever)
+    CTL.pins = pins;
+    if (on) for (const m of CTL.cfg.pins.motors) for (const g of Object.values(m.limits)) if (Math.floor(on / 2 ** g) % 2) clickSwitch(m.axis);
   }
-  function ctlJog(el) {                             // only the slider's own axis moves (the others' sliders are rounded)
-    if (!CTL.sim || !meta) return;
-    const t = meta.travel, i = [sx, sy, sz].indexOf(el);
-    CTL.jog = Object.assign(CTL.jog || {}, { [i]: [sx.value * IN + t.x[0], sy.value * IN + t.y[0], sz.value - meta.tip_above_table][i] });
-    ctlJogPump();
-  }
-  function ctlJogPump() {
-    const sim = CTL.sim;
-    if (!sim || !CTL.jog || CTL.jogBusy || !CTL.mpos) return;
-    if (CTL.state === "Jog") {                       // chase the slider: stop this jog, then aim at the new spot
-      if (!CTL.cancelled) { CTL.cancelled = true; sim.realtime(0x85); }
-      return;
+  // the switches: each motor's limit pins trip at its axis' end of the travel (neg: travel[0], pos: travel[1], all: the
+  // homing end); the probe at the tip on the touch plate (the table top + its thickness) while that's ticked
+  function ctlSwitches() {
+    const sim = CTL.sim, tr = CTL.cfg, t = meta.travel, h = Homing.settings(CTL.yaml);
+    for (const m of tr.pins.motors) {
+      const i = "xyz".indexOf(m.axis);
+      sim.addMotor(m.step, m.dir);
+      for (const [kind, g] of Object.entries(m.limits)) {
+        const below = kind === "neg" || (kind === "all" && !h[m.axis].positive);
+        sim.setSwitch(g, m.step, m.dir, (t[m.axis][below ? 0 : 1] - CTL.boot[i]) * tr.steps[m.axis].to, below);
+      }
     }
-    if (CTL.state !== "Idle") return;                // alarm / hold: no jogs
-    const a = CTL.anchor, cur = CTL.mpos, m = {};
-    for (const [i, p] of Object.entries(CTL.jog)) m[i] = a.mpos[i] + p - a.pose[i];
-    CTL.jog = null;
-    const axes = [0, 1, 2].filter((i) => m[i] !== undefined && Math.abs(m[i] - cur[i]) >= 0.05);
-    if (!axes.length) return;
-    const f = Math.min(...axes.map((i) => CTL.cfg.rates["xyz"[i]] || 1000));
-    CTL.jogBusy = true;
-    sim.command(`$J=G53 G21 ${axes.map((i) => "XYZ"[i] + m[i].toFixed(2)).join(" ")} F${f}`)
-      .then((r) => { if (!r.ok) ctlAdd(`jog: error:${r.code}`, "err"); })
-      .catch(() => {})
-      .finally(() => { CTL.jogBusy = false; ctlJogPump(); });
+    ctlProbe();
+  }
+  function ctlProbe() {
+    const sim = CTL.sim, pr = CTL.cfg && CTL.cfg.pins.probe, z = CTL.cfg && CTL.cfg.pins.motors.find((m) => m.axis === "z");
+    if (!sim || !pr || !z) return;
+    if (!$("ctl-plate").checked) { sim.clearSwitch(pr.gpio); return; }
+    const top = TOUCH_PLATE.stock + TOUCH_PLATE.plate;   // the plate's top above the table
+    sim.setSwitch(pr.gpio, z.step, z.dir, (top - meta.tip_above_table - CTL.boot[2]) * CTL.cfg.steps.z.to, true);
+  }
+  function ctlHome() {
+    if (!CTL.sim) return;
+    $("home-status").textContent = "FluidNC is homing ($H)…";
+    ctlLastSent = "$H";
+    ctlAdd("> $H", "in");
+    CTL.sim.command("$H", 600000).then((r) => {
+      if (r.ok) { CTL.homed = true; $("home-status").textContent = "Homed by FluidNC ($H): MPos is mpos_mm at the pulled-off spot."; }
+      else $("home-status").textContent = `Homing failed (error:${r.code}). Send $X to unlock.`;
+    }).catch(() => {});
+  }
+  // the jog pad: $J=G91 by the step at the feed (Z at most its max rate); FluidNC queues them; ■ cancels (0x85)
+  function ctlJogPad(axis, sign) {
+    if (!CTL.sim) return;
+    const step = Number($("jog-step").value), a = axis.toLowerCase();
+    const f = Math.min(Number($("jog-feed").value), CTL.cfg.rates[a] || 1000);
+    CTL.sim.command(`$J=G91 G21 ${axis}${sign * step} F${f}`).then((r) => {
+      if (!r.ok) ctlAdd(`jog ${axis}${sign > 0 ? "+" : "-"}: error:${r.code}${r.code === 15 ? " (past the travel)" : ""}`, "err");
+    }).catch(() => {});
   }
   function ctlStop() {
     if (CTL.sim) CTL.sim.stop();
-    Object.assign(CTL, { sim: null, mpos: null, state: "", jog: null, jogBusy: false, cancelled: false });
+    Object.assign(CTL, { sim: null, mpos: null, state: "", pins: 0, pose: null, homed: false });
     window.LR4FluidNC = null;
     $("ctl-state").textContent = "";
   }
@@ -1962,7 +2024,8 @@ body.vr-on .stage { grid-row: 1; }
     ctlStop();
     ctlMsg("Starting FluidNC…");
     let tr;
-    try { tr = SimConfig.translate((await yamlText()).text); }
+    let yaml;
+    try { yaml = (await yamlText()).text; tr = SimConfig.translate(yaml); }
     catch (e) { if (CTL.booting === me) { CTL.booting = null; ctlMsg(`No config.yaml for FluidNC: ${e.message}`); } return; }
     if (CTL.booting !== me) return;
     ctlAdd(`Starting FluidNC with ${yamlBase && /^From your/.test(yamlBase.note) ? "your" : "V1E's JP3_LR"} config.yaml…`, "dim");
@@ -1974,11 +2037,16 @@ body.vr-on .stage { grid-row: 1; }
     }
     if (CTL.booting !== me || CTL.mode !== "fluidnc") { sim.stop(); return; }
     CTL.booting = null;
-    Object.assign(CTL, { sim, cfg: tr, anchor: { pose: [HOME.pose.x, HOME.pose.y, HOME.pose.z], mpos: [0, 0, 0] } });
+    Object.assign(CTL, { sim, cfg: tr, yaml, boot: [HOME.pose.x, HOME.pose.y, HOME.pose.z] });
     window.LR4FluidNC = sim;
+    if (!sim.pins) ctlAdd("This FluidNC build has no simulated switches (rebuild web/fluidnc).", "err");
+    ctlSwitches();
+    sim.setTimeScale(Number($("ctl-speed").value));
     await sim.command("$RI=50").catch(() => {});
     sim.realtime("?");
-    ctlMsg("FluidNC is running. Not homed: MPos 0 is where the machine was when it started, as on a real one." +
+    $("home-status").textContent = "Not homed: FluidNC doesn't know where the machine is until it homes. Its MPos " +
+      "counts from wherever the machine was when it started.";
+    ctlMsg("FluidNC is running." +
       (tr.dropped.length ? ` Left out of the simulator's copy: ${tr.dropped.join(", ")}.` : ""));
     const i = sim.info, src = $("ctl-src");
     src.innerHTML = "";
@@ -2003,18 +2071,25 @@ body.vr-on .stage { grid-row: 1; }
     CTL.mode = mode;
     const on = mode === "fluidnc";
     for (const b of $("ctl-mode").querySelectorAll("button")) b.setAttribute("aria-pressed", String(b.dataset.v === mode));
-    $("ctl-box").hidden = !on;
-    for (const id of ["home", "v-home", "job-play"]) $(id).disabled = on;
+    $("ctl-box").hidden = $("ctl-opts").hidden = $("pos-jog").hidden = !on;
+    $("pos-play").hidden = $("home-real-l").hidden = on;
+    $("job-play").disabled = on;
+    if (JOB.bits && JOB.bits.size) {                 // the model's bit moves with the router; the job's only in Playback
+      if (on) for (const b of JOB.bits.values()) b.visible = false;
+      jobBit = !on;
+      applyVisibility();
+      if (!on) jobSeek(JOB.t, false);
+    }
     if (on) {
       jobPlaying(false); homeCancel();
       $("ctl-box").open = true;
-      $("home-status").textContent = "FluidNC mode: homing needs its virtual switches, which aren't in yet. Jog with the sliders.";
       ctlBoot();
     } else {
       CTL.booting = null;
       ctlStop();
       ctlMsg("");
       $("home-status").textContent = HOME.home ? "Homed." : "Not homed.";
+      dro();
       move();
     }
   }
@@ -2036,14 +2111,20 @@ body.vr-on .stage { grid-row: 1; }
     for (const b of document.querySelectorAll("#ctl-box [data-rt]"))
       b.addEventListener("click", () => CTL.sim && CTL.sim.realtime(/^\d+$/.test(b.dataset.rt) ? Number(b.dataset.rt) : b.dataset.rt));
     setInterval(() => { if (CTL.sim && !document.hidden) CTL.sim.realtime("?"); }, 500);   // auto reports only come on a change
+    $("ctl-speed").addEventListener("change", () => CTL.sim && CTL.sim.setTimeScale(Number($("ctl-speed").value)));
+    $("ctl-plate").addEventListener("change", ctlProbe);
+    for (const b of document.querySelectorAll("#pos-jog [data-jog]"))
+      b.addEventListener("click", () => ctlJogPad(b.dataset.jog[0], b.dataset.jog[1] === "+" ? 1 : -1));
+    $("jog-stop").addEventListener("click", () => CTL.sim && CTL.sim.realtime(0x85));
   }
   setupController();
   // for tests/test_page_fluidnc.js: the controller's state and the model's pose (mm from the parked pose)
-  window.LR4Ctl = { mode: () => CTL.mode, state: () => CTL.state, mpos: () => CTL.mpos, anchor: () => CTL.anchor,
-    cfg: () => CTL.cfg, pose: () => HOME.pose && [HOME.pose.x, HOME.pose.y, HOME.pose.z], travel: () => meta && meta.travel };
+  window.LR4Ctl = { mode: () => CTL.mode, state: () => CTL.state, mpos: () => CTL.mpos, boot: () => CTL.boot,
+    cfg: () => CTL.cfg, pose: () => HOME.pose && [HOME.pose.x, HOME.pose.y, HOME.pose.z], travel: () => meta && meta.travel,
+    tip: () => meta && meta.tip_above_table, TOUCH_PLATE, sync: () => ctlTick(), homed: () => CTL.homed };
 
   // ---- version + feedback: the issue link carries the size, data date and the loaded files' checksums ----
-  const VERSION = "0.15.0";
+  const VERSION = "0.16.0";
   function setupAbout() {
     const bits = [`lr4-sandbox ${VERSION}`];
     if (cfg.built) bits.push(`model data built ${cfg.built}`);
@@ -2436,7 +2517,7 @@ body.vr-on .stage { grid-row: 1; }
       const b = jobBitMesh(def, toolRgb(tl, n));
       if (b) { b.visible = false; JOB.bits.set(n, b); JOB.group.add(b); }
     }
-    if (JOB.bits.size && !jobBit) { jobBit = true; applyVisibility(); }
+    if (JOB.bits.size && !jobBit && CTL.mode !== "fluidnc") { jobBit = true; applyVisibility(); }
     const mv = jobMoves(tl, at);
     JOB.ahead = mv.ahead; JOB.done = mv.done; JOB.partial = mv.partial; JOB.moveRgb = mv.col;
     JOB.group.add(mv.ahead, mv.done, mv.partial);
@@ -3087,6 +3168,7 @@ body.vr-on .stage { grid-row: 1; }
     if (shop) LR4Shop.cutaway(shop, camera.getWorldPosition(camPos));   // hide walls the camera is outside of
     homeTick();
     jobTick();
+    ctlTick();
     if (vr.active()) vr.tick(dt);
     else { smApply(dt); camStep(); controls.update(); }
     renderer.render(scene, camera);

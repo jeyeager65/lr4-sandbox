@@ -84,6 +84,11 @@
   //   sim.waitFor(fn, ms) -> Promise<event>                 the next parsed line fn(ev) is true for
   //   sim.writeFile(path, data) / sim.readFile(path)        the module's filesystem
   //   sim.info = web/fluidnc/build.json (repo, commit, source link, ...); sim.stop(); sim.stopped
+  // The simulated pins (wasm/VirtualPins.cpp on the wasm-sim branch; sim.pins false in an older build):
+  //   sim.setSwitch(gpio, stepPin, dirPin, tripSteps, activeBelow)   gpio reads high while that motor's step count
+  //                                   is <= tripSteps (activeBelow) / >= tripSteps; sim.clearSwitch(gpio) = no switch
+  //   sim.addMotor(stepPin, dirPin)   count a motor's steps with no switch on it; sim.motorSteps(stepPin)
+  //   sim.pinMask()                   the pin levels (bit n = gpio n); sim.setTimeScale(k) machine time k x real
   async function start(opts = {}) {
     if (!root.crossOriginIsolated) throw new Error("FluidNC needs a cross-origin isolated page (SharedArrayBuffer)");
     const base = new URL(opts.base || "fluidnc/", root.location.href).href;
@@ -95,7 +100,8 @@
     document.body.appendChild(frame);
     const win = frame.contentWindow;
     let stopped = false;
-    const stop = () => { stopped = true; win.fluidncOnOutput = () => {}; frame.remove(); };
+    let pumpId = () => 0;
+    const stop = () => { stopped = true; clearInterval(pumpId()); win.fluidncOnOutput = () => {}; frame.remove(); };
     const listeners = new Map();
     const emit = (ev) => {
       for (const k of ["line", ev.type]) for (const fn of listeners.get(k) || []) fn(ev);
@@ -108,6 +114,14 @@
       Module = await win.FluidNCModule({ locateFile: (f) => base + f, print: () => {}, printErr: () => {} });
     } catch (e) { stop(); throw e; }
     const FS = Module.FS;
+    // queued output (wasm-sim): FluidNC appends, the page takes it on a timer - so a busy page never stalls FluidNC
+    // (its synchronous default waits for this thread, and a stalled main loop lets the step buffer run dry)
+    let pump = 0;
+    if (typeof Module._fluidnc_output_queue === "function") {
+      Module.ccall("fluidnc_output_queue", null, ["number"], [1]);
+      pump = setInterval(() => { const t = Module.ccall("fluidnc_take_output", "string", [], []); if (t) feed(t); }, 4);
+    }
+    pumpId = () => pump;
     const writeFile = (path, data) => {
       FS.mkdirTree(path.slice(0, path.lastIndexOf("/")) || "/");
       FS.writeFile(path, data);
@@ -153,7 +167,15 @@
     Module.ccall("fluidnc_start", null, [], []);
     let greeting;
     try { greeting = await booted; } catch (e) { stop(); throw e; }
-    const sim = { Module, FS, info, greeting: greeting.text, on, waitFor, send, realtime, command, status, writeFile,
+    const pins = typeof Module._fluidnc_set_switch === "function", N = "number";
+    const call = (f, ret, args) => (pins && !stopped ? Module.ccall(f, ret, args.map(() => N), args) : ret ? 0 : undefined);
+    const sim = { Module, FS, info, greeting: greeting.text, on, waitFor, send, realtime, command, status, writeFile, pins,
+      setSwitch: (g, st, d, trip, below) => call("fluidnc_set_switch", null, [g, st, d, Math.round(trip), below ? 1 : 0]),
+      clearSwitch: (g) => call("fluidnc_clear_switch", null, [g]),
+      addMotor: (st, d) => call("fluidnc_add_motor", null, [st, d]),
+      motorSteps: (st) => call("fluidnc_motor_steps", N, [st]),
+      pinMask: () => call("fluidnc_pin_mask", N, []),
+      setTimeScale: (k) => call("fluidnc_set_time_scale", null, [k]),
       readFile: (p, enc) => FS.readFile(p, enc ? { encoding: enc } : undefined),
       stop: () => { stop(); for (const q of queue.splice(0)) clearTimeout(q.timer); } };
     Object.defineProperty(sim, "stopped", { get: () => stopped });

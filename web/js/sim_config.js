@@ -5,12 +5,13 @@
 // What carries over unchanged: each axis' max rate, acceleration, max_travel_mm, soft_limits, the homing block, each
 // motor's hard_limits + pulloff_mm (both Y and both Z motors are kept: each its own switch = squaring), probe
 // check_mode_start, start, macros, kinematics. Everything else (uart, i2so, spindles, coolant, control, user I/O, ...)
-// is dropped and listed. steps_per_mm drops to SIM_STEPS so the step loop stays light (MPos in 0.1 mm steps).
+// is dropped and listed. steps_per_mm is the file's own, at most MAX_STEPS (so the step loop stays light): with
+// too few steps per mm FluidNC stretches its step segments, and a feed hold / probe stop overshoots.
 // The copy is never shown or downloaded: the page's config.yaml download stays the real file.
 // tests/test_sim_config.js checks it (V1E's JP3_LR + a user-style file).
 (function (root) {
   "use strict";
-  const SIM_STEPS = 10;
+  const MAX_STEPS = 200;
   // the simulator's pin layout (Part 16 reads it from translate().pins): ESP32-S3 numbering (the wasm build's
   // capability table): gpio 0-21 and 35-48 are usable
   const AXES = ["x", "y", "z"], MOTORS = ["motor0", "motor1"];
@@ -73,9 +74,10 @@
       if (!an) return;
       axes.push(a);
       L(2, a);
-      steps[a] = { from: Number(val(an, "steps_per_mm")), to: SIM_STEPS };
+      const from = Number(val(an, "steps_per_mm")) || 80;
+      steps[a] = { from, to: Math.min(from, MAX_STEPS) };
       rates[a] = Number(val(an, "max_rate_mm_per_min")) || 1000;
-      L(4, "steps_per_mm", String(SIM_STEPS));
+      L(4, "steps_per_mm", String(steps[a].to));
       for (const k of AXIS_KEYS) if (val(an, k) !== undefined) L(4, k, val(an, k));
       const h = child(an, "homing");
       if (h) { L(4, "homing"); copy(h, 6); }
@@ -117,7 +119,7 @@
     return { text: out.join("\n") + "\n", pins, dropped, steps, rates, axes };
   }
 
-  const api = { SIM_STEPS, parse, translate };
+  const api = { MAX_STEPS, parse, translate };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.SimConfig = api;
 })(typeof self !== "undefined" ? self : this);
