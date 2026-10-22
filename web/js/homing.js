@@ -37,11 +37,12 @@
   }
 
   // the switch trip and the homed (pulled-off) spot of an axis, in pose space
+  const RELEASE_MM = 0.5;   // the lever's travel back before the switch opens (a GUESS; 0.2 tocked too soon - user)
   const trip = (s, tv, a) => (s[a].positive ? tv[a][1] : tv[a][0]);
   const spot = (s, tv, a) => trip(s, tv, a) + (s[a].positive ? -1 : 1) * s[a].pulloff;
 
-  // pose {x, y, z} -> { segs [{start, end, phase, cycle, time}], t (end times, s), total, events [{time, kind: "trip",
-  // axis, phase}], home {x, y, z} (the homed spots; axes with cycle 0 aren't homed and stay put), anim (stub for
+  // pose {x, y, z} -> { segs [{start, end, phase, cycle, time}], t (end times, s), total, events [{time, kind: "trip"
+  // (the switch pressed) | "release" (opening again, RELEASE_MM into the pull-off), axis, phase}], home {x, y, z} (the homed spots; axes with cycle 0 aren't homed and stay put), anim (stub for
   // GcodePlay.at / step) }. speed = FAST (default) or { seek, feed } multipliers.
   function plan(pose, tv, s, speed) {
     const k = Object.assign({}, FAST, speed);
@@ -53,6 +54,7 @@
       const dur = {};
       for (const a in to) dur[a] = Math.abs(to[a] - p[a]) / (rates[a] / 60);
       if (tripping) for (const a in to) events.push({ time: now + dur[a], kind: "trip", axis: a, phase });
+      if (phase === "pulloff") for (const a in to) events.push({ time: now + Math.min(dur[a], RELEASE_MM / (rates[a] / 60)), kind: "release", axis: a, phase });
       const at = (t) => {
         const q = Object.assign({}, p);
         for (const a in to) q[a] = dur[a] > 0 ? p[a] + (to[a] - p[a]) * Math.min(1, t / dur[a]) : to[a];
@@ -100,7 +102,7 @@
   // FluidNC's soft range for an axis: [mpos, mpos + max_travel] (positive_direction: [mpos - max_travel, mpos])
   const softRange = (sa, maxTravel) => (sa.positive ? [sa.mpos - maxTravel, sa.mpos] : [sa.mpos, sa.mpos + maxTravel]);
 
-  const api = { V1E, FAST, settings, plan, trip, spot, mpos, softRange };
+  const api = { V1E, FAST, RELEASE_MM, settings, plan, trip, spot, mpos, softRange };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.Homing = api;
 })(typeof self !== "undefined" ? self : this);

@@ -51,7 +51,9 @@ for (const [name, speed] of [["fast", undefined], ["real", { seek: 1, feed: 1 }]
       && near(g.start.z, pl.segs[i - 1].end.z))), `${tag}: continuous`);
     // clicks: two per axis (seek, feed), at the trip
     for (const a of ["x", "y", "z"]) {
-      const ev = pl.events.filter((e) => e.axis === a);
+      const ev = pl.events.filter((e) => e.axis === a && e.kind === "trip");
+      const rel = pl.events.filter((e) => e.axis === a && e.kind === "release");
+      ok(rel.length === 2 && rel.every((e, i) => e.time > ev[i].time && e.phase === "pulloff"), `${tag}: ${a} releases after each trip`);
       ok(ev.length === 2 && ev[0].phase === "seek" && ev[1].phase === "feed", `${tag}: ${a} clicks ${JSON.stringify(ev)}`);
       for (const e of ev) { const q = GP.at(pl, e.time - 1e-9); ok(near(q[a], H.trip(S, TV, a), 1e-3), `${tag}: ${a} at trip ${q[a]}`); }
     }

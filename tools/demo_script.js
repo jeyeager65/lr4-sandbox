@@ -6,6 +6,7 @@
 //       PAUSE=2 (s each M0 popup shows, then it resumes)  MESSAGES=on MSGTIME=4 (MSG / PRINT lines shown on top, s)
 //       PARK=on (drive the gantry back at the end)  HOLD=3 (s on the result)
 //       PENDANT=on (the FluidTouch pendant on the table, its live screen in a corner of the video; off by default)
+//       MODE=basic|fluidnc (fluidnc: the job runs on the page's FluidNC - its own $H, jogs, $SD/Run, M0 holds)
 //   (Video Shot: VIEW=name TIME=s ORBIT=s DIST=mm)   the camera: blends there over TIME (1.5), then turns once round
 //       it over ORBIT; DIST = how far from what it looks at. VIEW: workshop, machine, stock, tool (close on the bit,
 //       follows it), core (close on the router / core), iso, front, top, side, back, page (mid-job only: the page's own
@@ -30,7 +31,7 @@
 "use strict";
 
 const SETTINGS = { size: "wxh", machine: "wxh", fps: "num", volume: "num", pause: "num", msgtime: "num", hold: "num",
-  sound: "bool", park: "bool", messages: "bool", detail: "word", scenery: "word", voice: "word", pendant: "bool" };
+  sound: "bool", park: "bool", messages: "bool", detail: "word", scenery: "word", voice: "word", pendant: "bool", mode: "word" };
 const KINDS = ["shot", "home", "zero", "title", "text", "wait", "speed", "pendant"];
 const INTRO_ONLY = new Set(["home", "zero"]);
 const SHOTS = new Set(["workshop", "machine", "stock", "tool", "core", "iso", "front", "top", "side", "back", "page", "pendant"]);

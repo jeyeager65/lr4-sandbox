@@ -11,9 +11,16 @@
 //   python tools/serve.py sandbox             (serves the repo on 127.0.0.1:8767; the page loads parts/)
 //   node tools/record_demo.js <file.nc> [out.mp4] [--size 2560x1440] [--fps 30] [--job 75] [--pause 2] [--orbit 10]
 //        [--url http://127.0.0.1:8767/web/index.html?parts=/parts/] [--swiftshader] [--no-sound] [--volume 0.6] [--voice machine|robot] [--pendant] [--no-home] [--real 5]
+//        [--mode basic|fluidnc] [--kmax 5]
 // --job: seconds of video for the job's moves (sets the playback speed; pauses and probes come on top).
 // --real: at the first cut of each section (after a message or an M0), this many seconds at 1x (real time, real
 // sound), then it eases up to the job's speed; a badge shows the speed ("1× real time", "62×"). 0 = off.
+// --mode fluidnc (or (Video: MODE=fluidnc)): the job runs on the page's FluidNC (its real $H, jogs, $SD/Run of the file
+// on its SD card, M0 holds resumed with ~) instead of Basic's playback. FluidNC runs on its own threads in real time, so
+// it keeps running at a scale under the frames' pace, each frame tops it up to the frame's machine time and shows the pose then
+// (LR4Demo.ncUntil; scale at most --kmax, default 5: FluidNC in WASM falls behind above ~5x on rapids - a 300 mm Y jog
+// at 9000 mm/min took 3.0 s of machine time at 1x and 5x, 5.1 at 10x, 8.9 at 20x). Needs the page cross-origin
+// isolated: `python tools/serve.py sandbox --no-open`.
 // Flags given on the command line win over the file's (Video: ...) settings.
 // Needs Chrome (CHROME env or the usual path), ffmpeg on PATH, Node 22+. Uses the page's window.LR4Demo handle.
 "use strict";
@@ -21,13 +28,14 @@ const { spawn } = require("child_process"), fs = require("fs"), os = require("os
 const DS = require("./demo_script.js");
 
 const args = process.argv.slice(2), opt = { size: [2560, 1440], fps: 30, job: 75, pause: 2, orbit: 10,
-  url: "http://127.0.0.1:8767/web/index.html?parts=/parts/", gpu: true, sound: true, volume: 0.6, home: true, real: 5, voice: "machine", pendant: false };
+  url: "http://127.0.0.1:8767/web/index.html?parts=/parts/", gpu: true, sound: true, volume: 0.6, home: true, real: 5, voice: "machine", pendant: false, mode: "basic", kmax: 5 };
 Object.assign(opt, { park: true, hold: 3, detail: "full", scenery: "shop", messages: true, msgtime: 4 });
 const pos = [], given = new Set();
 for (let i = 0; i < args.length; i++) {
   const a = args[i];
   if (a === "--size") opt.size = args[++i].split("x").map(Number);
-  else if (["--fps", "--job", "--pause", "--orbit", "--volume", "--real"].includes(a)) opt[a.slice(2)] = Number(args[++i]);
+  else if (["--fps", "--job", "--pause", "--orbit", "--volume", "--real", "--kmax"].includes(a)) opt[a.slice(2)] = Number(args[++i]);
+  else if (a === "--mode") opt.mode = args[++i].toLowerCase();
   else if (a === "--no-sound") opt.sound = false;
   else if (a === "--no-home") opt.home = false;
   else if (a === "--url") opt.url = args[++i];
@@ -47,6 +55,9 @@ for (const [k, v] of Object.entries(script.settings)) {
   if (k === "machine") opt.url = opt.url.replace(/#.*$/, "") + `#${v[0]}x${v[1]}`;
   else opt[k] = v;
 }
+opt.mode = String(opt.mode).toLowerCase();
+if (!/^(basic|fluidnc)$/.test(opt.mode)) { console.log(`--mode: basic or fluidnc, not ${opt.mode}`); process.exit(1); }
+const NC = opt.mode === "fluidnc";
 const out = path.resolve(pos[1] || path.join(__dirname, "..", "exports", "video", path.basename(gcodePath).replace(/\.\w+$/, "") + "_demo.mp4"));
 fs.mkdirSync(path.dirname(out), { recursive: true });
 const CHROME = process.env.CHROME || [
@@ -63,7 +74,10 @@ const PAGE_REC = `(() => {
   performance.now = () => vt;
   const D = window.LR4Demo;
   window.__rec = {
-    async frame(cam, ms) {
+    async frame(cam, ms, nc) {                       // nc: [machine ms, ms a frame, kmax] (FluidNC mode)
+      // FluidNC to this frame's machine time, then the clock step with no draw between (a draw seeing the new pose
+      // before the clock moved would hear it as a jump, and the frame itself as a stop)
+      if (nc) await D.ncUntil(...nc);
       if (cam) { D.camera.position.set(...cam[0]); D.controls.target.set(...cam[1]); }
       vt += ms;
       await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));   // a tick with the step, then a draw
@@ -134,19 +148,25 @@ const PAGE_REC = `(() => {
     await sleep(1500);
     await val("LR4Demo.recording(true)");
     await sleep(500);
+    const homeCmd = (DS.hasOwnIntro(script) ? script.intro : DS.defaultIntro(opt)).find((q) => q.kind === "home");
+    if (NC) {                                        // FluidNC boots where the machine is: a little way off the switches
+      if (opt.home && homeCmd) await val(`LR4Demo.nearHome(${Number(homeCmd.kv.offset) || 30})`);
+      if (!await val("LR4Demo.fluidnc()")) throw new Error("FluidNC didn't start (is the page cross-origin isolated? serve it with tools/serve.py)");
+      console.log("mode: FluidNC");
+    }
     if (opt.pendant) {                               // FluidTouch on the table, talking to Basic's stand-in; its screen in a corner
       const up = await val("LR4Demo.pendant()");
       if (!up) console.log("pendant: FluidTouch didn't connect (is the page cross-origin isolated? serve it with tools/serve.py)");
       else { await sleep(2500); await val(`LR4Demo.pip({ on: true })`); console.log("pendant: on, its screen at the bottom right"); }
     }
-    const job = await val(`LR4Demo.playFile(${JSON.stringify(path.basename(gcodePath))}, ${JSON.stringify(gcodeText)})`);
+    const job = await val(`LR4Demo.${NC ? "ncFile" : "playFile"}(${JSON.stringify(path.basename(gcodePath))}, ${JSON.stringify(gcodeText)})`);
     console.log(`job: ${(job.total / 60).toFixed(1)} min of moves, ${job.pauses} M0 pauses; script: ${script.intro.length} intro + ${script.at.length} later (Video) lines`);
     const g = await val(`(() => { const D = LR4Demo, b = D.machineBox(), c = b.getCenter(new D.THREE.Vector3()), s = b.getSize(new D.THREE.Vector3());
       return { c: c.toArray(), s: s.toArray(), floor: D.floorZ(), fov: D.camera.fov, aspect: D.camera.aspect,
         cam: D.camera.position.toArray(), tgt: D.controls.target.toArray() }; })()`);
     await val(PAGE_REC);
-    const homeCmd = (DS.hasOwnIntro(script) ? script.intro : DS.defaultIntro(opt)).find((q) => q.kind === "home");
-    if (opt.home && homeCmd) await val(`LR4Demo.nearHome(${Number(homeCmd.kv.offset) || 30})`);   // a little way off the switches from the first frame
+    let ncM = NC ? await val("LR4Demo.ncCrawl()") : 0, ncS = 1;   // FluidNC: the next frame's machine time (ms), machine s per video s
+    if (!NC && opt.home && homeCmd) await val(`LR4Demo.nearHome(${Number(homeCmd.kv.offset) || 30})`);   // a little way off the switches from the first frame
     if (opt.sound) await val(`(() => { const v = document.getElementById("snd-vol"); v.value = ${opt.volume}; v.dispatchEvent(new Event("input")); return LR4Demo.sound(true, ${JSON.stringify(opt.voice)}); })()`);
     const vid = opt.sound ? out.replace(/(\.\w+)?$/, ".video.mp4") : out;   // frames first; the sound is muxed in at the end
 
@@ -155,7 +175,9 @@ const PAGE_REC = `(() => {
     const dt = 1000 / opt.fps;
     let frames = 0, t0 = Date.now();
     const frame = async (cam) => {
-      const st = await val(`window.__rec.frame(${JSON.stringify(cam || null)}, ${dt})`);
+      if (NC) ncM += ncS * dt;
+      const st = await val(`window.__rec.frame(${JSON.stringify(cam || null)}, ${dt}${NC ? `, [${ncM}, ${ncS * dt}, ${opt.kmax}]` : ""})`);
+      if (NC && process.env.LR4_NC_TRACE && frames < 600) console.log("nc", frames, JSON.stringify(await val("LR4Demo.ncTrace()")));
       last = st;
       const { data } = await send("Page.captureScreenshot", { format: "jpeg", quality: 92 });
       if (!ffmpeg.stdin.write(Buffer.from(data, "base64"))) await new Promise((r) => ffmpeg.stdin.once("drain", r));
@@ -228,13 +250,27 @@ const PAGE_REC = `(() => {
       const j = await val(`LR4Demo.zero(${zero[0]}, ${zero[1]})`);
       if (!j) return;
       const dist = Math.hypot(j.to[0] - j.from[0], j.to[1] - j.from[1]);
+      stockView = viewOf(...Object.values(await val("LR4Demo.layout()")));   // the stock where it will be cut, before the jog
       console.log(`jog to work zero (${zero.map((v) => v.toFixed(1)).join(", ")} mm, ${dist.toFixed(0)} mm away)`);
-      for (let i = 0, m = n(Math.max(1, dist / 50)); i <= m; i++) {   // ~3000 mm/min, eased
+      if (NC) await ncJog(`$J=G91 G21 X${(j.to[0] - j.from[0]).toFixed(3)} Y${(j.to[1] - j.from[1]).toFixed(3)} F3000`, 60);
+      else for (let i = 0, m = n(Math.max(1, dist / 50)); i <= m; i++) {   // ~3000 mm/min, eased
         await val(`LR4Demo.movePose(...${JSON.stringify(lerp(j.from, j.to, ease(i / m)))})`);
         await frame(cam);
       }
       const lay = await val("LR4Demo.layout()");
       stockView = viewOf(lay.stock, lay.at);
+    };
+
+    const ncJog = async (cmd, maxSecs) => {          // FluidNC: a jog, frames till it stops (where the camera is)
+      await val(`LR4Demo.ncSend(${JSON.stringify(cmd)})`);
+      await val("LR4Demo.ncMoving()");
+      for (let i = 0, tries = 1; i < n(maxSecs); i++) {
+        await frame(cam);
+        const r = await val("LR4Demo.ncReply()");
+        if (r === 8 && tries++ < 10) { await val(`LR4Demo.ncSend(${JSON.stringify(cmd)})`); continue; }   // not idle yet (a job just ended)
+        if (r !== null && r !== true) { console.log(`${cmd}: error:${r}`); return; }
+        if (i > 2 && r === true && !await val("LR4Demo.ncMoving()")) break;
+      }
     };
 
     // the intro: the file's own (or the default one), in order
@@ -256,6 +292,7 @@ const PAGE_REC = `(() => {
         for (let i = 0; i < n(120) && await val("LR4Demo.homing()"); i++) await frame(cam);
         await hold(0.7, cam);
         homed = true;
+        if (zero) await val(`LR4Demo.zero(${zero[0]}, ${zero[1]})`);   // the stock at its work zero from now on
         const lay = await val("LR4Demo.layout()");   // the job now starts from the homed spot
         stockView = viewOf(lay.stock, lay.at);
         if (zero) await jogToZero();
@@ -272,11 +309,21 @@ const PAGE_REC = `(() => {
       else await paceCmd(cmd);
     }
 
+    if (NC && !homed) {                              // FluidNC runs nothing till it has homed
+      console.log("homing (FluidNC must, before a job)");
+      await val("LR4Demo.home(true)");
+      for (let i = 0; i < n(120) && await val("LR4Demo.homing()"); i++) await frame(cam);
+      await val("LR4Demo.layout()");
+    }
     console.log(`job (at ${(frames / opt.fps).toFixed(1)} s, ${pace.base}x)`);
-    await val("LR4Demo.play()");
+    const ncJob0 = ncM;
+    let ncHeld = 0;                                  // machine ms spent in M0 holds
+    if (!NC) await val("LR4Demo.play()");
+    else if (!await val("LR4Demo.ncPlay()")) throw new Error("FluidNC didn't start the job: " + await val(`document.getElementById("job-status").textContent`));
     let held = 0, endHold = 0, s, rate = 0, badge = "", section = -1, realLeft = 0, ramp = -1, k = 0;
     let shot = null, shotF = 0, titleEnd = 0, msgKey = null, msgEnd = 0;
     const setRate = async (r) => {
+      ncS = r;
       if (Math.abs(r - rate) > 1e-9) { rate = r; await val(`LR4Demo.rate(${r})`); }
       const b = !pace.badge ? "" : pace.wait > 0 ? badge : r < 1.05 ? "1× real time" : `${Math.round(r)}×`;
       if (b !== badge) { badge = b; await val(`LR4Demo.badge(${JSON.stringify(b || null)})`); }
@@ -314,13 +361,24 @@ const PAGE_REC = `(() => {
       else if (ramp >= 0) { const q = Math.min(1, ++ramp / n(1.5)); r = Math.exp(Math.log(pace.base) * ease(q)); if (q >= 1) ramp = -1; }
       else r = pace.base;
       await setRate(r);
+      if (NC && s.paused) ncHeld += ncS * dt;
       if (s.paused) { if (++held >= n(opt.pause)) { await val("LR4Demo.resume()"); held = 0; } }
       else held = 0;
       if (s.t >= s.total && !s.paused && ++endHold > n(1)) break;
     }
     await val("LR4Demo.badge(null)"); await val("LR4Demo.msg(null)");
+    if (NC) console.log(`FluidNC ran the job in ${((ncM - ncJob0) / 60000).toFixed(1)} min of machine time, ${(ncHeld / 60000).toFixed(1)} of it in M0 holds (the G-code estimate: ${(job.total / 60).toFixed(1)} min)`);
     const endCam = shot ? shot.at(Math.min(shotF, shot.frames - 1)) : null;
-    if (opt.park) {                                  // drive the gantry to the back and Z to the top to show the result
+    if (opt.park && NC) {                            // the same, by a jog on FluidNC (~4 s of video)
+      const pk = await val("LR4Demo.ncPark()");
+      if (pk) {
+        console.log("park");
+        ncS = Math.max(1, pk.secs / 4); await val(`LR4Demo.rate(${ncS})`);
+        cam = endCam || await val("LR4Demo.job()").then((q) => q.cam);
+        await ncJog(pk.cmd, 15);
+        ncS = 1;
+      }
+    } else if (opt.park) {                                  // drive the gantry to the back and Z to the top to show the result
       console.log("park");
       const park = await val("LR4Demo.park()");
       for (let i = 0, m = n(4); i <= m; i++) {

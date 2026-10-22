@@ -51,9 +51,14 @@
   const MASTER = 0.25;                 // headroom: the compressor does the rest
   const TC = 0.025;                    // s: how fast the audio params follow each update
   const MIX = { step: 0.55, whir: 0.3, router: 0.5, cut: 1.0, vac: 0.3, click: 0.9 };   // relative loudness (a GUESS: by ear)
-  const WHIR = { x: 650, y: 560, z: 950 };   // Hz: band centre of each axis' mechanical whir (wheels on tube / leadscrew nut)
+  // Hz: band centre of each axis' mechanical whir (wheels on tube / leadscrew nut); low and narrow (user 2026-10-22: the
+  // old 560-950 Hz, Q 1.2-2 bands sounded like wind)
+  const WHIR = { x: 200, y: 170, z: 330 }, WHIR_Q = { x: 5, y: 5, z: 6 };
   // one-off clicks: [ping Hz, ping decay s, burst highpass Hz, thud Hz (0 = none), loudness]
-  const CLICKS = { switch: [4300, 0.018, 2500, 0, 1], tap: [2600, 0.035, 1200, 170, 0.7] };
+  // tap = the bit touching the plate: much quieter (user 2026-10-22; was loudness 0.7, decay 0.035 s)
+  // a microswitch (user 2026-10-22: "a tick when pressed and a tock when released" - the lever pushes a tiny button):
+  // switch = the press, a high tick; release = a lower, softer tock with a little body
+  const CLICKS = { switch: [4300, 0.012, 2500, 0, 1], release: [1800, 0.010, 900, 600, 0.7], tap: [2600, 0.025, 1200, 170, 0.15] };
   const ROUTER = { up: 0.5, down: 1.5, sag: 0.12, whine: 14, rpmRef: 18000 };   // s, s, fraction at full load, x rotation
   const VAC = { up: 0.9, down: 3.0 };                // s
   const MRR_FULL = 150;                // mm^3/s = full cutting load (1/8" bit slotting ~3 mm deep at 1000 mm/min)
@@ -177,6 +182,7 @@
   // the one-offs, on a second mouth: [vowel, start s, length s, Hz from, Hz to, loudness] per note
   const JOKE_EVENTS = {
     switch: [["ih", 0, 0.09, 560, 640, 0.8]],                                        // "bip!"
+    release: [["oo", 0, 0.08, 420, 380, 0.6]],                                       // "bop"
     tap: [["ee", 0, 0.2, 440, 440, 0.8], ["oo", 0.42, 0.32, 320, 470, 0.8]],          // "beep... boop?"
     hold: [["mm", 0, 0.35, 150, 140, 0.6], ["mm", 0.35, 0.55, 140, 185, 0.6]],      // "hmmm?" (M0)
   };
@@ -282,7 +288,7 @@
         oscs.push(o);
       }
       body.connect(air).connect(g).connect(master);
-      const wb = filt("bandpass", WHIR[a], a === "z" ? 2 : 1.2), wg = gain();
+      const wb = filt("bandpass", WHIR[a], WHIR_Q[a]), wg = gain();
       noise(0.2 + AXES.indexOf(a) * 0.5).connect(wb).connect(wg).connect(master);
       voices[a] = { oscs, g, wb, wg };
     }
