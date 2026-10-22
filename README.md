@@ -70,17 +70,20 @@ with `max_travel_mm` set for your size (or your own config.yaml, adjusted the sa
 
 ![Build: the BOM, the cut list and the strut plates](docs/img/build.webp)
 
-### Run: Playback
+### Run: Basic
 
-**Run** > **Runs on Playback** plays G-code on the machine: the strut plate job (V1E's build order: the machine runs
+**Run** > **Runs on Basic** plays G-code on the machine: the strut plate job (V1E's build order: the machine runs
 on its printed temporary struts and cuts its own MDF strut plates; **Use the temporary struts**), or any G-code file
 (**Play a G-code file…**). The bit follows the moves at FluidNC-like speeds, the stock is carved as it goes, M0
 pauses pop up their message, G38.2 probes stop on the touch plate, and Home plays FluidNC's homing. Speeds 1x to
-300x; scrub with the timeline.
+300x; scrub with the timeline. With **FluidTouch pendant** ticked (off by default), the pendant on the table works
+here too: it talks to a small stand-in for
+FluidNC (labelled as such) that homes, jogs, holds / resumes, lists the SD card and plays a file from it; anything
+else answers "not in Basic mode".
 
-![Playback: the strut plate job on the temporary struts](docs/img/playback.webp)
+![Basic: the strut plate job on the temporary struts](docs/img/playback.webp)
 
-### Run: FluidNC (preview)
+### Run: FluidNC
 
 **Run** > **Runs on FluidNC** boots the real FluidNC firmware in the page, with your config.yaml (V1E's JP3_LR until
 you load your own under Build). The browser build has no stepper drivers or real pins, so it runs a translated
@@ -96,7 +99,7 @@ download is always your real file.)
 - **Machine speed** runs it at 1x, 2x, 5x or 10x.
 - MPos is greyed until it has homed: like the real controller, it doesn't know where the machine is until then.
 
-Running a G-code file through FluidNC is next on the list; for now, use Playback for jobs.
+G-code files on the page's SD card run through FluidNC too (`$SD/Run`), from the page or from the FluidTouch pendant.
 
 ![FluidNC mode, homed, with its console](docs/img/fluidnc.webp)
 
@@ -177,7 +180,7 @@ node test_calculator.js                      # the JS and Python calculators agr
 node test_vr.js                              # the VR menu layout, the workshop room
 node test_strut_cam.js                       # the page's strut plate G-code; vs freecad/cam.py if its goldens exist
 node test_gcode_play.js                      # G-code playback: pauses, probe, G20/G21, carving frees the plates
-node test_homing.js                          # Playback's Home: FluidNC's homing order, pull-offs, MPos
+node test_homing.js                          # Basic mode's Home: FluidNC's homing order, pull-offs, MPos
 node test_fluidnc_sim.js                     # parsing FluidNC's output (status reports, ok / error, messages)
 node test_sim_config.js                      # config.yaml -> the browser copy (V1E's JP3_LR + an odd user file)
 node test_page_fluidnc.js                    # headless Chrome: FluidNC in the page - boot, home, probe, jog,
@@ -223,7 +226,7 @@ only data, and it holds no V1E geometry (the page places your downloaded files).
   sizing matches V1E's LowRider 4 calculator; the `config.yaml` is V1E's JP3_LR.
 - **[Vector76](https://github.com/vector76)** wrote the [LR4 strut plate generator](https://vector76.github.io/Web_OpenSCAD_Customizer/strut_plate.html)
   (OpenSCAD) that the strut plate code follows.
-- Playback parses, times and carves with [cnc-gcode-tools](https://github.com/jeyeager65/cnc-gcode-tools) (MIT):
+- Basic mode parses, times and carves with [cnc-gcode-tools](https://github.com/jeyeager65/cnc-gcode-tools) (MIT):
   its parser, expander, animator and stock simulator, copied unmodified into `web/js/lib/cnc-gcode-tools/`.
 - The Run tab's controller is **[FluidNC](https://github.com/bdring/FluidNC)** (GPL-3.0) itself, built for the
   browser with its wasm port, from the `wasm-sim` branch of [a fork](https://github.com/jeyeager65/FluidNC/tree/wasm-sim)

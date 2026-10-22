@@ -10,7 +10,7 @@
 // frame and renders that offline to a WAV at the end; ffmpeg adds it as AAC (--no-sound: a silent video, as before).
 //   python tools/serve.py sandbox             (serves the repo on 127.0.0.1:8767; the page loads parts/)
 //   node tools/record_demo.js <file.nc> [out.mp4] [--size 2560x1440] [--fps 30] [--job 75] [--pause 2] [--orbit 10]
-//        [--url http://127.0.0.1:8767/web/index.html?parts=/parts/] [--swiftshader] [--no-sound] [--volume 0.6] [--voice machine|robot] [--no-home] [--real 5]
+//        [--url http://127.0.0.1:8767/web/index.html?parts=/parts/] [--swiftshader] [--no-sound] [--volume 0.6] [--voice machine|robot] [--pendant] [--no-home] [--real 5]
 // --job: seconds of video for the job's moves (sets the playback speed; pauses and probes come on top).
 // --real: at the first cut of each section (after a message or an M0), this many seconds at 1x (real time, real
 // sound), then it eases up to the job's speed; a badge shows the speed ("1× real time", "62×"). 0 = off.
@@ -21,7 +21,7 @@ const { spawn } = require("child_process"), fs = require("fs"), os = require("os
 const DS = require("./demo_script.js");
 
 const args = process.argv.slice(2), opt = { size: [2560, 1440], fps: 30, job: 75, pause: 2, orbit: 10,
-  url: "http://127.0.0.1:8767/web/index.html?parts=/parts/", gpu: true, sound: true, volume: 0.6, home: true, real: 5, voice: "machine" };
+  url: "http://127.0.0.1:8767/web/index.html?parts=/parts/", gpu: true, sound: true, volume: 0.6, home: true, real: 5, voice: "machine", pendant: false };
 Object.assign(opt, { park: true, hold: 3, detail: "full", scenery: "shop", messages: true, msgtime: 4 });
 const pos = [], given = new Set();
 for (let i = 0; i < args.length; i++) {
@@ -32,6 +32,7 @@ for (let i = 0; i < args.length; i++) {
   else if (a === "--no-home") opt.home = false;
   else if (a === "--url") opt.url = args[++i];
   else if (a === "--voice") opt.voice = args[++i];
+  else if (a === "--pendant") opt.pendant = true;
   else if (a === "--swiftshader") opt.gpu = false;
   else { pos.push(a); continue; }
   given.add(a.replace(/^--(no-)?/, ""));
@@ -133,6 +134,11 @@ const PAGE_REC = `(() => {
     await sleep(1500);
     await val("LR4Demo.recording(true)");
     await sleep(500);
+    if (opt.pendant) {                               // FluidTouch on the table, talking to Basic's stand-in; its screen in a corner
+      const up = await val("LR4Demo.pendant()");
+      if (!up) console.log("pendant: FluidTouch didn't connect (is the page cross-origin isolated? serve it with tools/serve.py)");
+      else { await sleep(2500); await val(`LR4Demo.pip({ on: true })`); console.log("pendant: on, its screen at the bottom right"); }
+    }
     const job = await val(`LR4Demo.playFile(${JSON.stringify(path.basename(gcodePath))}, ${JSON.stringify(gcodeText)})`);
     console.log(`job: ${(job.total / 60).toFixed(1)} min of moves, ${job.pauses} M0 pauses; script: ${script.intro.length} intro + ${script.at.length} later (Video) lines`);
     const g = await val(`(() => { const D = LR4Demo, b = D.machineBox(), c = b.getCenter(new D.THREE.Vector3()), s = b.getSize(new D.THREE.Vector3());
@@ -177,7 +183,9 @@ const PAGE_REC = `(() => {
       const half = st ? Math.hypot(st.xmax - st.xmin, st.ymax - st.ymin) / 2 : 150;
       return { t: sc, dist: half * 1.35 / Math.tan(g.fov * Math.PI / 360) };
     };
-    let stockView = viewOf(job.stock, job.at), last = null, coreAt = null;   // last: the latest frame's job state
+    let stockView = viewOf(job.stock, job.at), last = null, coreAt = null;
+    const pendAt = opt.pendant ? await val("LR4Demo.pendantView()") : null;   // the pendant stays put on the table
+    const pipCmd = (cmd) => val(`LR4Demo.pip(${JSON.stringify({ on: !/^(off|no|0)$/i.test(cmd.kv.show || "on"), corner: (cmd.kv.corner || "br").toLowerCase(), size: Number(cmd.kv.size) || 26 })})`);   // last: the latest frame's job state
     const VIEWS = { iso: [1, -1.15, 0.85], front: [0, -1, 0.18], top: [0, -0.001, 1], side: [1, 0, 0.18], back: [-0.6, 1, 0.55] };
     const shotAt = (sh) => {                         // where a shot looks from / at now
       const d = sh.dist;
@@ -186,6 +194,7 @@ const PAGE_REC = `(() => {
       if (sh.name === "stock") return from(stockView.t, [0.42, -0.78, 0.72], d || stockView.dist);
       if (sh.name === "tool") return from((last && last.tip) || stockView.t, [0.42, -0.78, 0.55], d || 320);
       if (sh.name === "core") return from(coreAt || c, [0.55, -0.85, 0.45], d || 700);
+      if (sh.name === "pendant") return pendAt ? from(pendAt.t, pendAt.n, d || 420) : from(c, [0, -0.95, 0.5], span * 1.07);
       return from(c, VIEWS[sh.name], d || span * 1.3);
     };
     const blend = (A, B, k) => [lerp(A[0], B[0], ease(k)), lerp(A[1], B[1], ease(k))];
@@ -258,6 +267,7 @@ const PAGE_REC = `(() => {
         await hold(DS.secsOf(cmd, 3), cam);
         await val("LR4Demo.title(null)");
       } else if (cmd.kind === "text") await caption(cmd);
+      else if (cmd.kind === "pendant") await pipCmd(cmd);
       else if (cmd.kind === "wait") await hold(DS.secsOf(cmd, 1), cam);
       else await paceCmd(cmd);
     }
@@ -283,6 +293,7 @@ const PAGE_REC = `(() => {
           shot = sh.name === "page" ? null : mkShot(sh, s.cam); shotF = 0;
           if (shot && !sh.orbit) { const keep = shot; shot = { frames: Infinity, at: (f) => keep.at(Math.min(f, keep.frames - 1)) }; }
         } else if (cmd.kind === "text") await caption(cmd);
+        else if (cmd.kind === "pendant") await pipCmd(cmd);
         else if (cmd.kind === "title") { titleEnd = frames + n(DS.secsOf(cmd, 3)); await val(`LR4Demo.title(${JSON.stringify(DS.titleText(cmd))})`); }
         else if (cmd.kind === "wait") pace.wait = n(DS.secsOf(cmd, 1));
         else await paceCmd(cmd);

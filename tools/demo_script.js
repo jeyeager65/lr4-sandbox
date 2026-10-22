@@ -5,10 +5,11 @@
 //       SIZE=2560x1440 FPS=30 VOLUME=0.6 SOUND=on VOICE=machine|robot (robot = the joke voice) DETAIL=full SCENERY=shop MACHINE=26x50 (cut area, in)
 //       PAUSE=2 (s each M0 popup shows, then it resumes)  MESSAGES=on MSGTIME=4 (MSG / PRINT lines shown on top, s)
 //       PARK=on (drive the gantry back at the end)  HOLD=3 (s on the result)
+//       PENDANT=on (the FluidTouch pendant on the table, its live screen in a corner of the video; off by default)
 //   (Video Shot: VIEW=name TIME=s ORBIT=s DIST=mm)   the camera: blends there over TIME (1.5), then turns once round
 //       it over ORBIT; DIST = how far from what it looks at. VIEW: workshop, machine, stock, tool (close on the bit,
 //       follows it), core (close on the router / core), iso, front, top, side, back, page (mid-job only: the page's own
-//       camera again, with its probe close-ups)
+//       camera again, with its probe close-ups), pendant (straight at the pendant's screen; PENDANT=on)
 //   (Video Home: OFFSET=30 DIST=700)  $H in real time, the machine starting OFFSET mm off its switches; the camera
 //       close on the core (DIST mm) and still. Before the first move only.
 //   (Video Zero: X=100 Y=150)         work zero this far from the cutting area's front-left corner (the X / Y home
@@ -18,6 +19,8 @@
 //       the line, as ToolDef's NAME)
 //   (Video Text: TIME=4 TEXT=...)     a caption at the bottom, over what comes next
 //   (Video Wait: TIME=s)              hold (mid-job: the job holds too)
+//   (Video Pendant: SHOW=on CORNER=br SIZE=26)   the pendant's screen in a corner (br, bl, tr, tl; SIZE = % of the
+//       video's width) or SHOW=off; needs PENDANT=on (which shows it at br from the start)
 //   (Video Speed: X=62 | FIT=75 | FOR=8 REAL=5 BADGE=on)   the job's pace: X times, or fit its moves into FIT s of
 //       video; FOR = only for that many s of video, then back; REAL = s at 1x at each section's first cut (after a
 //       message or an M0), then easing up (0 = off); BADGE = the speed badge
@@ -27,10 +30,10 @@
 "use strict";
 
 const SETTINGS = { size: "wxh", machine: "wxh", fps: "num", volume: "num", pause: "num", msgtime: "num", hold: "num",
-  sound: "bool", park: "bool", messages: "bool", detail: "word", scenery: "word", voice: "word" };
-const KINDS = ["shot", "home", "zero", "title", "text", "wait", "speed"];
+  sound: "bool", park: "bool", messages: "bool", detail: "word", scenery: "word", voice: "word", pendant: "bool" };
+const KINDS = ["shot", "home", "zero", "title", "text", "wait", "speed", "pendant"];
 const INTRO_ONLY = new Set(["home", "zero"]);
-const SHOTS = new Set(["workshop", "machine", "stock", "tool", "core", "iso", "front", "top", "side", "back", "page"]);
+const SHOTS = new Set(["workshop", "machine", "stock", "tool", "core", "iso", "front", "top", "side", "back", "page", "pendant"]);
 const MOTION = /(^|[^A-Z])G0*(0|1|2|3|38\.\d)(?![\d.])/;
 const IN = 25.4;
 

@@ -166,7 +166,14 @@ body.rec .stage { position: fixed; inset: 0; }
   font: 700 clamp(28px, 5.2vh, 96px) var(--font-display), system-ui, sans-serif; letter-spacing: 0.02em;
   color: #fff; background: rgb(0 0 0 / 0.55);
 }
-.rec-badge[hidden], .rec-caption[hidden], .rec-title[hidden], .rec-msg[hidden] { display: none; }
+.rec-badge[hidden], .rec-caption[hidden], .rec-title[hidden], .rec-msg[hidden], .rec-pip[hidden] { display: none; }
+.rec-pip {                            /* the pendant's screen in a corner of the demo video (LR4Demo.pip) */
+  position: absolute; width: var(--pip-w, 26%); padding: 0.45%; border-radius: 10px; background: #0b0c0e;
+  box-shadow: 0 6px 30px rgb(0 0 0 / 0.45); pointer-events: none;
+}
+.rec-pip canvas { display: block; width: 100%; height: auto; aspect-ratio: 5 / 3; border-radius: 6px; background: #000; }
+.rec-pip.br { right: 2.2%; bottom: 3.5%; } .rec-pip.bl { left: 2.2%; bottom: 3.5%; }
+.rec-pip.tr { right: 2.2%; top: 3.5%; } .rec-pip.tl { left: 2.2%; top: 3.5%; }
 .rec-msg {                            /* the file's MSG / PRINT lines in the demo video */
   position: absolute; left: 50%; top: 3.5%; transform: translateX(-50%); max-width: 62%; text-align: center;
   padding: 0.35em 0.9em; border-radius: 8px; font: 500 clamp(18px, 3vh, 52px) ui-monospace, Consolas, monospace;
@@ -483,17 +490,21 @@ body.vr-on .stage { grid-row: 1; }
     <section aria-labelledby="h-ctl">
       <h2 id="h-ctl">Controller</h2>
       <div class="variant" id="ctl-mode"><span>Runs on</span>
-        <button type="button" data-v="play" aria-pressed="true">Playback</button>
+        <button type="button" data-v="play" aria-pressed="true">Basic</button>
         <button type="button" data-v="fluidnc" aria-pressed="false">FluidNC</button></div>
-      <p class="foot" id="ctl-note">Playback: the page moves the machine itself. FluidNC (preview): the real firmware,
+      <p class="foot" id="ctl-note">Basic: the page moves the machine itself, fast and always there; the pendant talks to a
+        small stand-in for FluidNC (homing, jogging, hold / resume, the SD card). FluidNC: the real firmware,
         built to run in your browser, drives the machine with the config.yaml in use (V1E's JP3_LR until you load your
         own, under Build): jog it, home it ($H on the machine's switches), send it G-code. It runs a copy with plain
         stepper drivers ($CD shows that copy).</p>
+      <div class="buttons" id="ft-row">
+        <label class="check" title="The FluidTouch touchscreen pendant (github.com/jeyeager65/FluidTouch) on the table's front, running its real firmware in the page"><input type="checkbox" id="ft-on"> FluidTouch pendant</label>
+        <button type="button" id="ft-pop-btn" disabled title="FluidTouch's screen in a window over the view (or click the pendant's screen in the view)">Pendant screen</button>
+      </div>
       <div class="buttons" id="ctl-opts" hidden>
         <label class="check">Machine speed <select id="ctl-speed" aria-label="Machine speed" style="width: auto">
           <option value="1" selected>1×</option><option value="2">2×</option><option value="5">5×</option><option value="10">10×</option></select></label>
         <label class="check"><input type="checkbox" id="ctl-plate"> Touch plate under the bit (<span id="ctl-plate-on">on 1/4" stock</span>)</label>
-        <button type="button" id="ft-pop-btn" disabled title="FluidTouch's screen in a window over the view (or click the pendant's screen in the view)">Pendant screen</button>
       </div>
       <p class="foot" id="ctl-msg" role="status"></p>
       <details class="cam" id="ctl-box" hidden>
@@ -606,7 +617,7 @@ body.vr-on .stage { grid-row: 1; }
       </div>
       <details class="cam" id="sd-box">
         <summary>SD card (<span id="sd-count">0 files</span>)</summary>
-        <p class="foot">G-code files kept in this browser: ▶ plays one (Playback) or runs it on FluidNC, which sees
+        <p class="foot">G-code files kept in this browser: ▶ plays one (Basic) or runs it on FluidNC, which sees
           the same card ($SD/List); the name loads it without starting. Drop files here or add them. The strut plate G-code is kept as /LR4_strut_plates.gcode.</p>
         <div class="sd-list" id="sd-list" role="listbox" aria-label="Files on the SD card"></div>
         <div class="buttons">
@@ -696,6 +707,7 @@ body.vr-on .stage { grid-row: 1; }
   <div class="rec-badge" id="rec-badge" hidden></div>
   <div class="rec-caption" id="rec-caption" hidden></div>
   <div class="rec-title" id="rec-title" hidden><div></div></div>
+  <div class="rec-pip br" id="rec-pip" hidden><canvas id="rec-pip-c" width="800" height="480"></canvas></div>
   <div class="rec-msg" id="rec-msg" hidden></div>
   <div class="job-pop" id="job-pop" role="alertdialog" aria-labelledby="job-pop-h" hidden><b id="job-pop-h">Paused (M0)</b><p id="job-pop-msg"></p><div class="buttons"><button type="button" id="job-resume">Resume (cycle start)</button><button type="button" id="job-pop-def" hidden>Stock and bits…</button></div></div>
   <div class="ft-pop" id="ft-pop" role="dialog" aria-labelledby="ft-pop-h" hidden><div class="ft-head"><b id="ft-pop-h">FluidTouch pendant</b>
@@ -735,6 +747,7 @@ body.vr-on .stage { grid-row: 1; }
 <script src="js/homing.js"></script>
 <script src="js/fluidnc_sim.js"></script>
 <script src="js/fluidtouch_sim.js"></script>
+<script src="js/basic_nc.js"></script>
 <script src="js/sounds.js"></script>
 <script src="js/sim_config.js"></script>
 <script src="js/config_model.js"></script>
@@ -1305,7 +1318,7 @@ body.vr-on .stage { grid-row: 1; }
       pendant.screen.tex.needsUpdate = true;
       return;
     }
-    const fl = CTL.mode === "fluidnc", st = fl ? (CTL.sim ? CTL.state || "…" : "Starting") : "Playback";
+    const fl = CTL.mode === "fluidnc", st = fl ? (CTL.sim ? CTL.state || "…" : "Starting") : "Basic";
     const m = fl ? CTL.mpos : ["mx", "my", "mz"].map((id) => parseFloat(document.getElementById(id).textContent));
     const pos = m && m.every((v) => Number.isFinite(v)) ? m.map((v) => v.toFixed(2)) : ["–", "–", "–"];
     const key = [st, ...pos, fl && CTL.homed].join("|");
@@ -1659,7 +1672,11 @@ body.vr-on .stage { grid-row: 1; }
   // the Jackpot3 lid, its fan and their screws can be hidden on their own to see inside the box
   const isLid = (m) => /^Jackpot3_(Lid|Fan)/.test(m.userData.name);
   let lidHidden = false;
-  const groupOn = (g) => { const el = document.getElementById("g-" + g); return (!el || el.checked) && (g !== "Shoe" || groupOn("Hose")); };   // no hose, no shoe
+  const groupOn = (g) => {                          // no hose, no shoe; the pendant only with its option on
+    if (g === "Pendant" && !pendantOn()) return false;
+    const el = document.getElementById("g-" + g); return (!el || el.checked) && (g !== "Shoe" || groupOn("Hose"));
+  };
+  const pendantOn = () => document.getElementById("ft-on").checked;   // Run > Controller > FluidTouch pendant (kept)
   const hiddenParts = new Set();                     // single parts hidden from VR (by name; kept across sizes)
   // G-code playback: probing = the touch plate is out, so the shoe's bottom (skirt + bristles) is off, as you would
   // take it off (user); jobBit = the file's own bit (from its ToolDef) is drawn instead of the model's Router_Bit
@@ -1695,6 +1712,7 @@ body.vr-on .stage { grid-row: 1; }
     };
     for (const [key] of GROUPS) set(key, groupMeshes[key] || []);
     set("jp3lid", meshes.filter(isLid));
+    if (!pendantOn()) document.getElementById("row-Pendant").hidden = true;
   }
 
   // ---- print colours: the printed parts come in two colours (main, accent); the pickers recolour each set.
@@ -2360,14 +2378,15 @@ body.vr-on .stage { grid-row: 1; }
     }).catch(() => {});
   }
   function ftStart(sim) {
+    if (!pendantOn() || !sim) return;
     if (FT.ft && !FT.ft.stopped) { FT.ft.setFluidNC(sim); return; }
     if (FT.starting || !window.FluidTouchSim) return;
     FT.starting = FluidTouchSim.start({ fluidnc: sim, onCommand: ftCommand, onPrint: (l) => { FT.log.push(l); if (FT.log.length > 300) FT.log.shift(); },
-      onRestart: () => { ftStop(); if (CTL.sim) ftStart(CTL.sim); } })   // ESP.restart from its settings
+      onRestart: () => { ftStop(); if (ftEnd()) ftStart(ftEnd()); } })   // ESP.restart from its settings
       .then((ft) => {
-        if (CTL.mode !== "fluidnc") { ft.stop(); return; }
+        if (!ftEnd()) { ft.stop(); return; }
         FT.ft = ft; FT.frame = FT.popFrame = -1;
-        ft.setFluidNC(CTL.sim);                      // FluidNC may have restarted meanwhile
+        ft.setFluidNC(ftEnd());                      // FluidNC may have restarted meanwhile
         $("ft-pop-btn").disabled = false;
         pendantScreen(true);
       })
@@ -2382,6 +2401,7 @@ body.vr-on .stage { grid-row: 1; }
     pendantScreen(true);
   }
   function ftCommand(text) {                         // what FluidTouch sends, before FluidNC gets it
+    if (CTL.mode !== "fluidnc") return null;         // Basic: the stand-in does it all (BNC)
     const t = text.trim();
     if (/^\$H$/i.test(t)) {                         // Home All: the page follows it in the status reports (ctlLine)
       FT.homing = "sent"; CTL.homed = false;
@@ -2391,6 +2411,133 @@ body.vr-on .stage { grid-row: 1; }
     const m = /^\$SD\/Run=(\S+)/i.exec(t);
     return m ? fjFromPendant(m[1]).catch(() => {}) : null;
   }
+  const ftEnd = () => (CTL.mode === "fluidnc" ? CTL.sim : BNC.nc);   // what the pendant talks to
+
+  // ---- Basic mode's pendant (Part 24): FluidTouch talks to js/basic_nc.js, a small, labelled stand-in for FluidNC that
+  // answers from what the page is doing and drives it: $H = Home, $J jogs (queued, at their feed, inside the travel),
+  // ! / ~ = pause / resume (and the M0 popup's Resume), Ctrl-X stops the job where it is, its Files tab = the SD card
+  // ($SD/Run plays the file), an M0's text goes to it as a MSG. Basic has no work offsets: WPos = MPos. Anything else:
+  // "error: not in Basic mode". Starts a few seconds after the page (it loads FluidTouch) when the page is isolated. ----
+  const BNC = { nc: null, jogs: [], jog: null, aborted: null, lp: null, feed: 0, pop: false };
+  function basicMpos() {                             // MPos once homed, else mm from the parked pose (as FluidNC unhomed)
+    const p = HOME.pose;
+    if (!p) return [0, 0, 0];
+    const m = HOME.home && !HOME.run ? Homing.mpos(HOME.s, HOME.home, p) : null;
+    return ["x", "y", "z"].map((a) => (m && m[a] !== null ? m[a] : p[a]));
+  }
+  const basicMidJob = () => !!JOB.tl && JOB.t > 0 && JOB.t < JOB.tl.total && BNC.aborted !== JOB.t;
+  const basicJogStop = () => { BNC.jogs = []; BNC.jog = null; };
+  const BASIC_PAGE = {
+    status() {
+      const now = performance.now(), m = basicMpos();
+      if (JOB.playing) BNC.aborted = null;
+      if (!BNC.lp || now - BNC.lp.t > 100) {        // feed: how fast the tool moves (the real machine's: / the replay speed)
+        if (BNC.lp) BNC.feed = Math.hypot(...m.map((v, i) => v - BNC.lp.m[i])) / ((now - BNC.lp.t) / 60000) /
+          (JOB.playing ? Number($("job-speed").value) || 1 : 1);
+        BNC.lp = { t: now, m };
+      }
+      const mid = basicMidJob(), j = JOB.playing || mid ? soundJob() : null, path = fjPath();
+      return {
+        state: HOME.run ? "Home" : BNC.jog ? "Jog" : JOB.playing ? "Run" : !$("job-pop").hidden || mid ? "Hold:0" : "Idle",
+        mpos: m, feed: BNC.feed, rpm: j ? j.rpm : 0,
+        sd: (JOB.playing || mid) && JOB.src ? [100 * JOB.t / JOB.tl.total, path ? "/sd" + path : JOB.src.name || "job"] : null,
+      };
+    },
+    home() {
+      if (JOB.playing) return "error: a job is playing - hold it first";
+      basicJogStop();
+      if (!HOME.run) homeStart();
+      return new Promise((done) => {                 // FluidNC says ok once homing is over
+        const t = setInterval(() => { if (!HOME.run) { clearInterval(t); done(HOME.home ? null : "error: homing stopped"); } }, 100);
+      });
+    },
+    jog(o) {
+      if (JOB.playing || HOME.run) return "error: busy (a job or homing is running)";
+      BNC.jogs.push(o);
+      return null;
+    },
+    jogCancel: basicJogStop,
+    hold() { basicJogStop(); if (JOB.playing) jobPlaying(false); return null; },
+    resume() {
+      if (!$("job-pop").hidden) $("job-resume").click();
+      else if (basicMidJob() && !JOB.playing) jobPlaying(true);
+      return null;
+    },
+    reset() {                                        // the job stops where it is (FluidNC aborts it)
+      homeCancel(); basicJogStop();
+      if (JOB.playing || basicMidJob() || !$("job-pop").hidden) { jobPlaying(false); $("job-pop").hidden = true; BNC.aborted = JOB.t; }
+      return null;
+    },
+    async files(dir) {                               // the card's files in dir (sub-folders as size -1)
+      const pre = dir.endsWith("/") ? dir : dir + "/", out = new Map();
+      for (const r of await SdCard.store.all()) {
+        if (!r.path.startsWith(pre)) continue;
+        const rest = r.path.slice(pre.length), k = rest.indexOf("/");
+        if (k < 0) out.set(rest, { name: rest, size: r.bytes.length });
+        else out.set(rest.slice(0, k), { name: rest.slice(0, k), size: -1 });
+      }
+      return [...out.values()];
+    },
+    async run(path) {
+      if (JOB.playing || HOME.run) return "error: busy (a job or homing is running)";
+      if (!(SDC.recs || []).some((r) => r.path === path)) await sdRefresh();
+      if (!(SDC.recs || []).some((r) => r.path === path)) return "error: no such file: /sd" + path;
+      basicJogStop(); BNC.aborted = null;
+      await sdStart(path);
+      return null;
+    },
+    async del(path) {
+      if (!(await SdCard.store.all()).some((r) => r.path === path)) return "error: no such file: /sd" + path;
+      await sdDelete(path);
+      return null;
+    },
+  };
+  function basicTick() {                             // once a frame in Basic: the jogs, the M0 text to the pendant
+    if (CTL.mode === "fluidnc" || !BNC.nc) return;
+    const now = performance.now();
+    if (!BNC.jog && BNC.jogs.length && HOME.pose && meta) {
+      const o = BNC.jogs.shift(), p = HOME.pose, m = basicMpos(), tv = meta.travel, from = [p.x, p.y, p.z], to = from.slice();
+      ["x", "y", "z"].forEach((a, i) => { if (o[a] !== undefined) to[i] += o.rel ? o[a] : o[a] - m[i]; });
+      const tip = meta.tip_above_table, lim = [[sx.min * IN + tv.x[0], sx.max * IN + tv.x[0]], [sy.min * IN + tv.y[0], sy.max * IN + tv.y[0]],
+        [sz.min - tip, sz.max - tip]];
+      to.forEach((v, i) => { to[i] = Math.min(lim[i][1], Math.max(lim[i][0], v)); });
+      const d = Math.hypot(...to.map((v, i) => v - from[i]));
+      if (d > 1e-4) BNC.jog = { from, to, t0: now, ms: d / (o.f / 60) * 1000 };
+    }
+    const J = BNC.jog;
+    if (J) {
+      const k = Math.min(1, (now - J.t0) / J.ms);
+      move(J.from.map((v, i) => v + (J.to[i] - v) * k));
+      if (k >= 1) BNC.jog = null;
+    }
+    const pop = !$("job-pop").hidden;
+    if (pop && !BNC.pop) BNC.nc.message(`${$("job-pop-h").textContent}: ${$("job-pop-msg").textContent}`);
+    BNC.pop = pop;
+  }
+  function basicPendant() {                          // Basic: the stand-in + FluidTouch on it
+    if (CTL.mode === "fluidnc" || !window.crossOriginIsolated || !window.BasicNC || !window.FluidTouchSim) return;
+    if (!BNC.nc || BNC.nc.stopped) BNC.nc = BasicNC.create(BASIC_PAGE);
+    ftStart(BNC.nc);
+  }
+  function basicStop() { if (BNC.nc) BNC.nc.stop(); BNC.nc = null; basicJogStop(); }
+  function pendantSet(on) {                          // the option: the pendant model + FluidTouch, or neither
+    $("ft-on").checked = on;
+    $("ft-pop-btn").hidden = !on;
+    try { localStorage.setItem("lr4-pendant", on ? "1" : "0"); } catch (e) { /* not kept */ }
+    if (on) { if (CTL.mode === "fluidnc") ftStart(CTL.sim); else basicPendant(); }
+    else { ftStop(); basicStop(); }
+    if (meta) { applyVisibility(); updateGroupCounts(); }
+  }
+  {
+    let k = null;
+    try { k = localStorage.getItem("lr4-pendant"); } catch (e) { /* default */ }
+    $("ft-on").checked = k === "1";                   // off unless turned on: most people have no pendant
+    $("ft-pop-btn").hidden = !pendantOn();
+    $("ft-on").addEventListener("change", () => pendantSet(pendantOn()));
+  }
+  // tests/test_page_basic.js: what the pendant is told
+  window.LR4Basic = { pendant: pendantSet, nc: () => BNC.nc, status: () => BASIC_PAGE.status(), homed: () => !!HOME.home && !HOME.run,
+    playing: () => JOB.playing, pop: () => !$("job-pop").hidden, t: () => JOB.t };
   function ctlSetMode(mode) {
     if (mode === CTL.mode) return;
     CTL.mode = mode;
@@ -2407,12 +2554,14 @@ body.vr-on .stage { grid-row: 1; }
     }
     if (on) {
       jobPlaying(false); homeCancel();
+      basicStop(); ftStop();                         // the pendant starts afresh on FluidNC
       $("ctl-box").open = true;
       ctlBoot();
     } else {
       CTL.booting = null;
       ctlStop();
       ftStop();
+      basicPendant();
       ctlMsg("");
       $("home-status").textContent = HOME.home ? "Homed." : "Not homed.";
       dro();
@@ -2450,13 +2599,14 @@ body.vr-on .stage { grid-row: 1; }
     $("jog-stop").addEventListener("click", () => CTL.sim && CTL.sim.realtime(0x85));
   }
   setupController();
+  setTimeout(basicPendant, 3000);                    // Basic's pendant, once the page has settled
   // for tests/test_page_fluidnc.js: the controller's state and the model's pose (mm from the parked pose)
   window.LR4Ctl = { mode: () => CTL.mode, state: () => CTL.state, mpos: () => CTL.mpos, boot: () => CTL.boot,
     cfg: () => CTL.cfg, pose: () => HOME.pose && [HOME.pose.x, HOME.pose.y, HOME.pose.z], travel: () => meta && meta.travel,
     tip: () => meta && meta.tip_above_table, TOUCH_PLATE, sync: () => ctlTick(), homed: () => CTL.homed };
 
   // ---- version + feedback: the issue link carries the size, data date and the loaded files' checksums ----
-  const VERSION = "0.23.0";
+  const VERSION = "0.24.0";
   function setupAbout() {
     const bits = [`lr4-sandbox ${VERSION}`];
     if (cfg.built) bits.push(`model data built ${cfg.built}`);
@@ -3125,7 +3275,7 @@ body.vr-on .stage { grid-row: 1; }
     if (!sim || !JOB.tl || !path) return false;
     if (!CTL.homed) {
       $("job-status").textContent = "Home it first ($H): the job zeroes where the machine is when it starts, and the " +
-        "page lays the stock out from the homed spot, as Playback does.";
+        "page lays the stock out from the homed spot, as Basic mode does.";
       return false;
     }
     const p = ctlRaw(), here = { x: p[0], y: p[1], z: p[2] }, from = jobSpot();   // lay the job out from where it starts
@@ -3718,10 +3868,11 @@ body.vr-on .stage { grid-row: 1; }
     $("ft-pop-btn").addEventListener("click", () => { $("ft-pop").hidden = !$("ft-pop").hidden; FT.popFrame = -1; });
     $("ft-pop-x").addEventListener("click", () => { $("ft-pop").hidden = true; });
   }
-  function ftPopDraw() {
-    if (!FT.ft || $("ft-pop").hidden) return;
+  function ftPopDraw() {                             // the pop-out window, and the video's picture-in-picture
+    if (!FT.ft) return;
     const f = FT.ft.frame();
-    if (f !== FT.popFrame) { FT.popFrame = f; FT.ft.draw($("ft-pop-c").getContext("2d")); }
+    if (!$("ft-pop").hidden && f !== FT.popFrame) { FT.popFrame = f; FT.ft.draw($("ft-pop-c").getContext("2d")); }
+    if (!$("rec-pip").hidden && f !== FT.pipFrame) { FT.pipFrame = f; FT.ft.draw($("rec-pip-c").getContext("2d")); }
   }
   // VR: a controller's tip (p, scene mm; S = rig mm per metre) pressed into the screen touches it there: down within
   // 3 mm in front of the glass (life size), up again past 6 mm or off the screen; one finger at a time.
@@ -4022,6 +4173,28 @@ body.vr-on .stage { grid-row: 1; }
     },
     movePose(x, y, z) { move([x, y, z]); },
     title(text) { const b = $("rec-title"); b.hidden = !text; b.firstChild.textContent = text || ""; },
+    // the pendant in videos (Part 24): on (the option; resolves once FluidTouch is talking to the controller), its screen
+    // in a corner (pip: { on, corner br|bl|tr|tl, size % of the width }), and where to look at it from
+    async pendant(timeout = 40000) {
+      pendantSet(true);
+      for (const t0 = Date.now(); Date.now() - t0 < timeout;) {
+        if (FT.ft && FT.log.some((l) => /First status report|Connection established/.test(l))) return true;
+        await new Promise((r) => setTimeout(r, 250));
+      }
+      return false;
+    },
+    pip(o = {}) {
+      const b = $("rec-pip");
+      b.hidden = !o.on || !FT.ft;
+      b.className = "rec-pip " + (/^(br|bl|tr|tl)$/.test(o.corner) ? o.corner : "br");
+      b.style.setProperty("--pip-w", `${Math.min(60, Math.max(10, Number(o.size) || 26))}%`);
+      FT.pipFrame = -1;
+      return !b.hidden;
+    },
+    pendantView() {                                  // { t: the screen's centre, n: straight out of it } (world mm)
+      const c = LR4Pendant.point(0.5, 0.5, 0), e = LR4Pendant.point(0.5, 0.5, 1);
+      return c && e ? { t: c.toArray(), n: e.sub(c).toArray() } : null;
+    },
   };                             // testing without a headset: page_shot --eval "LR4VR.page.preview('one')"
 
   // ---- machine sounds (Parts 21-23; js/sounds.js; Part 23 = the joke voice), once a frame: the machine's pose (move() sets HOME.pose in every
@@ -4120,6 +4293,7 @@ body.vr-on .stage { grid-row: 1; }
     lastT = now;
     if (shop) LR4Shop.cutaway(shop, camera.getWorldPosition(camPos));   // hide walls the camera is outside of
     homeTick();
+    basicTick();
     jobTick();
     ctlTick();
     soundTick();

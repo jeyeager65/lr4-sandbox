@@ -84,6 +84,7 @@ function savePng(dataUrl, name) {
     // FluidNC mode: FluidTouch starts with it and connects
     const a = await page.val(`(async () => {
       document.getElementById("t-run").click();
+      LR4Basic.pendant(true);                        // the option (off by default)
       document.getElementById("job-temp").click();   // the strut job on the card
       document.querySelector('#ctl-mode [data-v="fluidnc"]').click();
       const sim = await T.booted(null);

@@ -2,6 +2,7 @@
 #   python tools/serve.py sandbox [WxH]        the repo on http://127.0.0.1:8767, opening web/index.html?parts=/parts/
 #                                              (e.g. 48x96 = a 48 x 96 in cutting area): the public page and data,
 #                                              with your part files fetched from parts/
+#   (--no-open: serve only, e.g. for tools/record_demo.js)
 #   python tools/serve.py viewer               exports/web on http://127.0.0.1:8765 (full detail; refresh it with
 #                                              freecad/export_web.py)
 # The viewer's page comes from export_web (web/viewer.html copied next to its data).
@@ -29,7 +30,8 @@ PAGES = {"sandbox": (ROOT, 8767, "web/index.html"),
 
 
 if __name__ == "__main__":
-    args = sys.argv[1:]
+    args = [a for a in sys.argv[1:] if a != "--no-open"]
+    no_open = "--no-open" in sys.argv          # headless: tools/record_demo.js, the page tests
     which = args[0] if args else ""
     which = {"configurator": "sandbox"}.get(which, which)   # the page's old name
     if which not in PAGES:
@@ -41,7 +43,8 @@ if __name__ == "__main__":
     handler = functools.partial(Isolated, directory=folder)
     server = http.server.ThreadingHTTPServer(("127.0.0.1", port), handler)
     print(f"serving {folder} at {url} - Ctrl+C to stop", flush=True)
-    threading.Timer(0.5, webbrowser.open, (url,)).start()
+    if not no_open:
+        threading.Timer(0.5, webbrowser.open, (url,)).start()
     try:
         server.serve_forever()
     except KeyboardInterrupt:
