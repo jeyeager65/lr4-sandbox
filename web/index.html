@@ -1220,19 +1220,21 @@ body.vr-on .stage { grid-row: 1; }
     geo.deleteAttribute("uv");
     return geo.applyMatrix4(new THREE.Matrix4().set(...s.A.flat(), 0, 0, 0, 1));
   }
-  function honeyGeo(t) {                              // the closed cover as a flat honeycomb slab, file coordinates
-    const h = LR4Files.honeycomb(t);
+  function honeyGeo(t) {                              // the closed cover as a honeycomb slab, file coordinates: one
+    const h = LR4Files.honeycomb(t);                  // extrusion per layer, so the screws keep their counterbores
     const v2 = (l) => l.slice(0, -1).map(([x, y]) => new THREE.Vector2(x, y));
-    const shapes = h.faces.map(({ outer, holes }) => {
+    const [a, b] = [[1, 2], [2, 0], [0, 1]][h.axis];  // section points are [a, b]; the slab runs along h.axis
+    const parts = h.layers.map(({ lo, hi, outer, holes }) => {
       const sh = new THREE.Shape(v2(outer));
       sh.holes = holes.map((l) => new THREE.Path(v2(l)));
-      return sh;
+      const g = new THREE.ExtrudeGeometry([sh], { depth: hi - lo, bevelEnabled: false, curveSegments: 1 });
+      const p = g.attributes.position.array, out = new Float32Array(p.length);
+      for (let i = 0; i < p.length; i += 3) { out[i + a] = p[i]; out[i + b] = p[i + 1]; out[i + h.axis] = p[i + 2] + lo; }
+      g.dispose();
+      return out;
     });
-    const g = new THREE.ExtrudeGeometry(shapes, { depth: h.hi - h.lo, bevelEnabled: false, curveSegments: 1 });
-    const p = g.attributes.position.array, out = new Float32Array(p.length);
-    const [a, b] = [[1, 2], [2, 0], [0, 1]][h.axis];  // section points are [a, b]; the slab runs along h.axis
-    for (let i = 0; i < p.length; i += 3) { out[i + a] = p[i]; out[i + b] = p[i + 1]; out[i + h.axis] = p[i + 2] + h.lo; }
-    g.dispose();
+    const out = new Float32Array(parts.reduce((n, p) => n + p.length, 0));
+    parts.reduce((o, p) => (out.set(p, o), o + p.length), 0);
     return out;
   }
   function srcGeometry(rec) {
@@ -1831,7 +1833,7 @@ body.vr-on .stage { grid-row: 1; }
   const asmLabel = (m) => (tree.asms.find((a) => a.id === asmOf(m)) || {}).label || m.userData.group;
   // G-code playback: probing = the touch plate is out, so the shoe's bottom (skirt + bristles) is off, as you would
   // take it off (user); jobBit = the file's own bit (from its ToolDef) is drawn instead of the model's Router_Bit
-  let probing = false, jobBit = false;
+  let probing = false, jobBit = false, bitOK = true;   // bitOK: the job's bit shows where the model's would (Show, inspect)
   const PROBE_OFF = /^(Dust_Skirt|Bristles_TPU)/;
   function applyVisibility() {
     const listed = meshes.filter((m) => m.userData.name && fitted(m) && variantOK(m));
@@ -1846,6 +1848,9 @@ body.vr-on .stage { grid-row: 1; }
     for (const m of meshes) m.visible = inTree.has(m) && LR4ShowTree.on(tree, showOff, partId(m))
       && (!INSPECT || INSPECT.set.has(partId(m)))
       && !(probing && PROBE_OFF.test(m.userData.name)) && !(jobBit && m.userData.name === "Router_Bit");
+    const rb = meshes.find((m) => m.userData.name === "Router_Bit");
+    bitOK = !!rb && inTree.has(rb) && LR4ShowTree.on(tree, showOff, partId(rb)) && (!INSPECT || INSPECT.set.has(partId(rb)));
+    if (!bitOK && JOB.bits) for (const b of JOB.bits.values()) b.visible = false;
     syncShow();
     inspectScene();
     if (selected && !selected.visible) select(null);
@@ -2859,7 +2864,7 @@ body.vr-on .stage { grid-row: 1; }
     tip: () => meta && meta.tip_above_table, TOUCH_PLATE, sync: () => ctlTick(), homed: () => CTL.homed };
 
   // ---- version + feedback: the issue link carries the size, data date and the loaded files' checksums ----
-  const VERSION = "0.31.0";
+  const VERSION = "0.32.0";
   function setupAbout() {
     const bits = [`lr4-sandbox ${VERSION}`];
     if (cfg.built) bits.push(`model data built ${cfg.built}`);
@@ -3375,7 +3380,7 @@ body.vr-on .stage { grid-row: 1; }
     move([mx, my, at[2] + pz - tableZ - meta.tip_above_table]);
     if (JOB.bits) {
       const sg = tl.segs[Math.min(p.index, tl.segs.length - 1)], b = JOB.bits.get(sg.toolNumber) || JOB.bits.values().next().value;
-      for (const q of JOB.bits.values()) q.visible = q === b;
+      for (const q of JOB.bits.values()) q.visible = bitOK && q === b;
       if (b) { b.position.set(at[0] + mx - tv.x[0] - z0[0], at[1] + my - tv.y[0] - z0[1], at[2] + pz); b.rotation.z = JOB.spinning ? JOB.spin : 0; }
     }
     $("wx").textContent = p.x.toFixed(3); $("wy").textContent = p.y.toFixed(3); $("wz").textContent = p.z.toFixed(3);

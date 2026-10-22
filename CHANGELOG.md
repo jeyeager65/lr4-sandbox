@@ -3,6 +3,11 @@
 The version is the sandbox page's (`VERSION` in `web/index.html`, shown in its footer). The footer also shows
 the date the model data was built and the Printables file set it was solved for.
 
+## 0.32.0 - 2026-10-22
+- Honeycomb Peter Plates keep the closed plates' counterbores (the button heads were buried in a flat slab): the
+  screw holes are layered through the thickness as the closed STL has them, and cells keep 1.2 mm from each counterbore.
+- A G-code job's bit shows only where the model's bit would (Show, inspect): no lone bit in "Frame only".
+
 ## 0.31.0 - 2026-10-22
 - The "My machine" tab is now "My LR4".
 - The view toolbar loses Home (Run > Home ($H) is still there); Sound moves into ⚙ with its volume and voice.

@@ -111,20 +111,32 @@ function segDist(p, loops) {
   }
 
   // honeycomb (Peter "Honeycomb" style): every cell inside the cover, >= 0.9 border from its edge, clear of the screw
-  // rings, no two cells overlapping; the slab as thick as the cover
+  // rings and >= 1.2 mm from each counterbore, no two cells overlapping; the layers fill the cover's thickness and
+  // keep its counterbores (the button heads sit in them: a bigger hole at one face than the other)
+  const inPoly = (p, l) => { let c = false; for (let i = 0, j = l.length - 2; i < l.length - 1; j = i++)
+    if ((l[i][1] > p[1]) !== (l[j][1] > p[1]) && p[0] < (l[j][0] - l[i][0]) * (p[1] - l[i][1]) / (l[j][1] - l[i][1]) + l[i][0]) c = !c; return c; };
   for (const file of ["peter/PeterPlateT.stl", "peter/PeterPlateB.stl"]) {
     const t = soup(file), h = F.honeycomb(t), f = h.faces[0];
-    const own = f.holes.slice(0, f.holes.length - h.cells);   // the cover's holes: screws (< 20 mm^2) get a ring
-    const screws = own.filter((l) => Math.abs(F.area(l)) < 20), big = own.filter((l) => Math.abs(F.area(l)) >= 20);
+    const own = f.holes.slice(0, f.holes.length - h.cells);
+    const isScrew = (l) => h.screws.some((s) => inPoly(s, l)), big = own.filter((l) => !isScrew(l));
     const cells = f.holes.slice(f.holes.length - h.cells);
     const ctr = (l) => [l.slice(0, -1).reduce((a, p) => a + p[0], 0) / (l.length - 1), l.slice(0, -1).reduce((a, p) => a + p[1], 0) / (l.length - 1)];
-    let edge = Infinity, ring = Infinity, overlap = 0;
+    let edge = Infinity, ring = Infinity, bore = Infinity, overlap = 0;
     for (const c of cells) for (const p of c) edge = Math.min(edge, segDist([p[0], p[1], 0], [f.outer, ...big]));
-    for (const s of screws) { const q = ctr(s); for (const c of cells) ring = Math.min(ring, segDist([q[0], q[1], 0], [c])); }
+    for (const q of h.screws) for (const c of cells) ring = Math.min(ring, segDist([q[0], q[1], 0], [c]));
+    const screwHoles = (y) => y.holes.slice(0, y.holes.length - h.cells).filter(isScrew);
+    const area = (y) => screwHoles(y).reduce((a, l) => a + Math.abs(F.area(l)), 0);
+    const bores = h.layers.map(screwHoles).reduce((m, hs) => (hs.reduce((a, l) => a + Math.abs(F.area(l)), 0) > m.reduce((a, l) => a + Math.abs(F.area(l)), 0) ? hs : m), []);
+    for (const c of cells) for (const p of c) bore = Math.min(bore, segDist([p[0], p[1], 0], bores));
     const cs = cells.map(ctr);
     for (let i = 0; i < cs.length; i++) for (let j = i + 1; j < cs.length; j++) if (Math.hypot(cs[i][0] - cs[j][0], cs[i][1] - cs[j][1]) < 2.5) overlap++;
-    check(file + " honeycomb", h.cells > 250 && edge >= 3.6 && ring >= 3.8 - 1e-6 && !overlap && own.length >= 5,
-      `${h.cells} cells, ${screws.length} screw + ${big.length} bigger holes, slab ${(h.hi - h.lo).toFixed(2)} mm; cells >= ${edge.toFixed(2)} mm from an edge, >= ${ring.toFixed(2)} from a screw centre, ${overlap} overlapping`);
+    const L = h.layers, filled = L.length && Math.abs(L[0].lo - h.lo) < 1e-6 && Math.abs(L[L.length - 1].hi - h.hi) < 1e-6
+      && L.every((y, i) => !i || Math.abs(y.lo - L[i - 1].hi) < 1e-6);
+    const cb = L.length >= 2 && Math.abs(area(L[0]) - area(L[L.length - 1])) > h.screws.length * 10;   // ~30.7 vs ~6.2 mm^2 each
+    check(file + " honeycomb", h.cells > 250 && edge >= 3.6 && ring >= 3.8 - 1e-6 && bore >= 1.2 - 1e-6 && !overlap && h.screws.length >= 5 && filled && cb,
+      `${h.cells} cells, ${h.screws.length} screws + ${big.length} bigger holes, slab ${(h.hi - h.lo).toFixed(2)} mm in ${L.length} layers ` +
+      `(screw holes ${area(L[0]).toFixed(0)} -> ${area(L[L.length - 1]).toFixed(0)} mm^2: counterbores kept); cells >= ${edge.toFixed(2)} mm from an edge, ` +
+      `>= ${ring.toFixed(2)} from a screw centre, >= ${bore.toFixed(2)} from a counterbore, ${overlap} overlapping`);
   }
   // lite mode: clustering keeps the winding (signed volume within 3 %) and cuts the triangles
   for (const file of ["lr4/Core.stl", "kobalt/Dust_Shoe_Kobalt.stl"]) {

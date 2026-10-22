@@ -278,8 +278,8 @@
 
   // ---- Peter Plates honeycomb: the closed cover (PeterPlateT / B.stl, flat as printed) sectioned across its thin
   // axis -> outline + holes; open hex cells (lr4.peter_variants: 5 mm across flats, 0.8 walls) wherever a whole cell
-  // fits inside a solid `border`, clear of a `ring` round each screw hole. A flat look-alike of the private build's
-  // (which clips cells to the border and keeps the drafted edges / counterbores). peterplateb_dxf.dxf is broken
+  // fits inside a solid `border`, clear of a `ring` round each screw hole; the screw holes keep their counterbores
+  // (`layers`). A look-alike of the private build's (which clips cells to the border and keeps the drafted edges). peterplateb_dxf.dxf is broken
   // (open chains, 56 of the 80.8 mm), so the outline comes from the STL for both plates. ----
   function section(pos, axis, h) {                    // loops in the plane pos[axis] = h, in the other two axes
     const [a, b] = [[1, 2], [2, 0], [0, 1]][axis];
@@ -350,7 +350,7 @@
     return out;
   }
   // -> {axis, lo, hi, faces: [{outer, holes}]} with points in the two other axes ([y, z] / [z, x] / [x, y])
-  function honeycomb(pos, { cell = 5.0, wall = 0.8, border = 4.0, ring = 3.8, screw = 20 } = {}) {
+  function honeycomb(pos, { cell = 5.0, wall = 0.8, border = 4.0, ring = 3.8, screw = 20, cbWall = 1.2 } = {}) {
     const lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity];
     for (let i = 0; i < pos.length; i++) { lo[i % 3] = Math.min(lo[i % 3], pos[i]); hi[i % 3] = Math.max(hi[i % 3], pos[i]); }
     const axis = [0, 1, 2].reduce((m, k) => (hi[k] - lo[k] < hi[m] - lo[m] ? k : m), 0), th = hi[axis] - lo[axis];
@@ -361,9 +361,32 @@
       if (f && (!best || Math.abs(area(f.outer)) > Math.abs(area(best.outer)) + 1)) best = f;
     }
     if (!best) return null;
-    const small = best.holes.filter((h) => Math.abs(area(h)) < screw), big = best.holes.filter((h) => Math.abs(area(h)) >= screw);
     const centre = (l) => { let x = 0, y = 0; for (let i = 0; i + 1 < l.length; i++) { x += l[i][0]; y += l[i][1]; } return [x / (l.length - 1), y / (l.length - 1)]; };
-    const screws = small.map(centre);
+    // screw centres from the through holes (under `screw` mm^2) near either face - at the face the button heads sit on
+    // the hole is a counterbore (6.25 mm), bigger than `screw`
+    const holesAt = (z) => nest(section(pos, axis, z)).flatMap((x) => x.holes);
+    const screws = [];
+    for (const fr of [0.03, 0.97])
+      for (const l of holesAt(lo[axis] + fr * th + 1e-4)) {
+        const c = centre(l);
+        if (Math.abs(area(l)) < screw && !screws.some((s) => Math.hypot(s[0] - c[0], s[1] - c[1]) < 1)) screws.push(c);
+      }
+    const isScrew = (h) => screws.some((s) => insidePt(s, h));
+    const big = best.holes.filter((h) => !isScrew(h) && Math.abs(area(h)) >= screw);
+    // the screw holes through the thickness as layers (counterbore, its taper, the through hole): sectioned every
+    // ~0.2 mm, a new layer wherever they change; the outline and the cells are the same in every layer
+    const n = Math.max(4, Math.round(th / 0.2)), layers = [];
+    for (let k = 0; k < n; k++) {
+      const z0 = lo[axis] + th * k / n, z1 = lo[axis] + th * (k + 1) / n;
+      const hs = holesAt((z0 + z1) / 2 + 1e-4).filter(isScrew);
+      const key = hs.map((l) => Math.round(Math.abs(area(l)))).sort().join();
+      const last = layers[layers.length - 1];
+      if (last && last.key === key) last.hi = z1;
+      else layers.push({ lo: z0, hi: z1, key, holes: hs });
+    }
+    // each screw's biggest hole (its counterbore): cells keep cbWall from it (the 3.8 ring was sized for the through hole)
+    const bores = screws.map((s) => layers.flatMap((y) => y.holes).filter((h) => insidePt(s, h))
+      .reduce((m, h) => (!m || Math.abs(area(h)) > Math.abs(area(m)) ? h : m), null)).filter(Boolean);
     const xs = best.outer.map((p) => p[0]), ys = best.outer.map((p) => p[1]);
     const [x0, x1, y0, y1] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
     const pitch = cell + wall, r = cell / Math.sqrt(3), cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
@@ -377,6 +400,7 @@
         for (let k = 0; k <= 6; k++) hex.push([u + r * Math.cos(Math.PI / 6 + k * Math.PI / 3), v + r * Math.sin(Math.PI / 6 + k * Math.PI / 3)]);
         if (screws.some((s) => insidePt(s, hex) || loopDist(s, hex) < ring)) continue;
         const test = hex.slice(0, 6).concat(hex.slice(0, 6).map((p, k) => [(p[0] + hex[k + 1][0]) / 2, (p[1] + hex[k + 1][1]) / 2]));
+        if (bores.some((h) => test.some((p) => insidePt(p, h) || loopDist(p, h) < cbWall))) continue;
         if (big.some((h) => test.some((p) => insidePt(p, h) || loopDist(p, h) < border))) continue;
         if (!test.every((p) => insidePt(p, inner))) {   // an edge cell: cut to the border's inside edge
           if (!test.some((p) => insidePt(p, outer) && loopDist(p, outer) > border * 0.5)) continue;
@@ -385,7 +409,8 @@
         }
         cells.push(area(hex) > 0 ? hex : hex.reverse());
       }
-    return { axis, lo: lo[axis], hi: hi[axis], cells: cells.length, faces: [{ outer: best.outer, holes: best.holes.concat(cells) }] };
+    return { axis, lo: lo[axis], hi: hi[axis], cells: cells.length, screws, faces: [{ outer: best.outer, holes: best.holes.concat(cells) }],
+      layers: layers.map((y) => ({ lo: y.lo, hi: y.hi, outer: best.outer, holes: big.concat(y.holes, cells) })) };
   }
 
   // ---- files: SHA-256, zips, matching to the manifest, IndexedDB ----
