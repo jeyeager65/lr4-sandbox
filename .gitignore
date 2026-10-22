@@ -17,6 +17,8 @@ vendor/
 tests/golden/
 *.stl
 *.STL
+# ...except meshes the maintainer owns (FluidTouch case + stand, MIT): tools/check_no_parts.py OWNED
+!web/models/pendant/*.stl
 *.step
 *.STEP
 *.stp

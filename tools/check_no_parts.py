@@ -10,6 +10,7 @@ import sys
 BAD_EXT = (".stl", ".step", ".stp", ".dxf", ".3mf", ".obj", ".fcstd", ".fcbak", ".scad")
 BAD_DIRS = ("parts/", "private/", "vendor/", "build/", "exports/", "tests/golden/", "tests/node_modules/")
 ALLOW = ("parts/manifest.json",)    # the list of files (names, sources, checksums) - no geometry
+OWNED = ("web/models/pendant/",)    # meshes the maintainer owns and ships (FluidTouch case + stand, MIT) - not V1E's
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 HOOK = "#!/bin/sh\nexec python tools/check_no_parts.py\n"
 
@@ -25,7 +26,7 @@ if __name__ == "__main__":
             fh.write(HOOK)
         print("installed .git/hooks/pre-commit")
         sys.exit(0)
-    bad = [f for f in files("--all" in sys.argv) if f and f not in ALLOW and (f.lower().endswith(BAD_EXT) or f.startswith(BAD_DIRS))]
+    bad = [f for f in files("--all" in sys.argv) if f and f not in ALLOW and not f.startswith(OWNED) and (f.lower().endswith(BAD_EXT) or f.startswith(BAD_DIRS))]
     if bad:
         print("Not allowed in the repo (part / CAD / private files):\n  " + "\n  ".join(bad))
         sys.exit(1)

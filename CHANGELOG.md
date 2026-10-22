@@ -3,6 +3,25 @@
 The version is the sandbox page's (`VERSION` in `web/index.html`, shown in its footer). The footer also shows
 the date the model data was built and the Printables file set it was solved for.
 
+## 0.18.0 - 2026-10-21
+- The panel tabs are **Config / Build / Run** (were Machine / Build it / Run).
+- G-code files live on a virtual SD card kept in your browser (Run tab > SD card): add or drop files, ▶ to play or
+  run one, download, delete.
+  Playback and FluidNC use the same files; the strut plate G-code is kept there as /LR4_strut_plates.gcode.
+- FluidNC mode runs the picked file from its SD card ($SD/Run): Run / Hold / Resume / Stop, M0 pauses in the popup
+  with their message, the touch plate laid on the stock for the probe and taken off after it. The stock is carved from
+  the machine's real motion (the file's own moves while the machine is on them, its actual path where it isn't).
+  The page sets G54 at the cutting area's front-left corner on the stock top before a run, as Playback assumes.
+- $SD/Delete (and other $SD / $LocalFS commands) in the console update the files kept in the browser.
+- FluidNC's Flash (LocalFS) is kept in the browser too: config.yaml there is the one in use (V1E's, or yours, which now
+  stays after a reload). FluidNC boots a translated copy (sim_config.yaml); a config.yaml changed on its Flash becomes
+  the one in use.
+- A file with no stock or bit definition: say them in Stock and bits (kept per file), at the start or at a pause;
+  Playback stops at a change to a bit the file doesn't define, FluidNC is held there.
+- The FluidTouch pendant: the CrowPanel 7" in its printed case on its stand, screwed with a 5/8" plywood spacer to the
+  table's front near the Min corner, the case's bottom level with the apron's. Its own part group (also in the VR
+  menu); the screen shows a placeholder status (state + MPos) until FluidTouch itself runs in the page.
+
 ## 0.17.0 - 2026-10-21
 - Renamed: the page is **LowRider 4 Sandbox** (was "LowRider 4 Configurator"); `python tools/serve.py sandbox`
   (`configurator` still works).

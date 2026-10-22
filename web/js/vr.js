@@ -77,7 +77,8 @@
       const w = Math.floor((480 - 104) / s.peter.length) - 4;
       s.peter.forEach((p, i) => btn(104 + i * (w + 4), 308, w, 46, p.label, { a: "peter", v: p.v }, p.on));
     }
-    s.groups.slice(0, 10).forEach((g, i) => btn(16 + (i % 2) * 242, 370 + Math.floor(i / 2) * 50, 236, 44, g.label,
+    const gs = s.groups.slice(0, 12), rowH = Math.min(50, Math.floor(262 / Math.max(1, Math.ceil(gs.length / 2))));   // 2 columns above the bottom row
+    gs.forEach((g, i) => btn(16 + (i % 2) * 242, 370 + Math.floor(i / 2) * rowH, 236, rowH - 6, g.label,
       { a: "group", id: g.id }, g.on));
     B.forEach((b) => (b.toggle = b.act.a === "group"));   // on / off chips, not a choice
     btn(16, 634, 92, 54, s.mode === "table" ? "Tabletop" : "1:1", { a: "mode" }, s.mode === "table");
@@ -285,7 +286,7 @@
     const partInfo = (m) => {
       const p = m.userData;
       return { title: p.label || p.name, group: p.group, sub: [p.source === "printed" ? "Printed part" : p.source === "made"
-        ? "Cut part" : "Hardware", api.groupLabel(p.group)].filter(Boolean).join(" · ") };
+        ? "Cut part" : p.source === "pendant" ? "Printed part (FluidTouch)" : "Hardware", api.groupLabel(p.group)].filter(Boolean).join(" · ") };
     };
     function openCard(m, at) {
       cardPart = m;

@@ -7,7 +7,7 @@
   "use strict";
   // V1E's JP3_LR config.yaml (FluidNC_Configs): X / Y 9000 mm/min at 200 mm/s^2, Z 900 at 80
   const V1E = { maxRateX: 9000, maxRateY: 9000, maxRateZ: 900, accelX: 200, accelY: 200, accelZ: 80 };
-  const STOPS = new Set(["pause", "alarm"]);           // playback halts here: M0 and a failed probe
+  const STOPS = new Set(["pause", "alarm", "tool"]);   // playback halts here: M0, a failed probe, a change to an undefined bit
 
   // FluidNC config values (parseFluidNCConfig: {"/axes/x/max_rate_mm_per_min": 9000, ...}) -> Animator rates
   function motion(values) {
@@ -39,8 +39,11 @@
   }
 
   // start = {x, y, z} (work mm), or a function (stock from the header, or null) -> that, as the start can depend on
-  // the stock (the page's work Z is on the stock top): then the file is read twice
-  async function load(text, rates, start) {
+  // the stock (the page's work Z is on the stock top): then the file is read twice.
+  // opts.header: (Stock:) / (ToolDef:) lines the user gave (header()), read before the file; line numbers stay the file's
+  async function load(text, rates, start, opts = {}) {
+    const head = opts.header ? opts.header.replace(/\n$/, "") : "", extra = head ? head.split("\n").length : 0;
+    if (extra) text = head + "\n" + text;
     if (typeof start === "function") {
       const q = parser(), qs = await q.parseString(text), st = q.simMeta.stock;
       const inch = q.simMeta.units ? q.simMeta.units === "inches" : qs.length && qs[0].inch;
@@ -49,6 +52,9 @@
     const p = parser(start);
     let segs = await p.parseString(text);
     if (p.expansion && p.expansion.error) throw new Error(`G-code variables: ${p.expansion.error}`);
+    // line numbers: the source file's (the expander's sourceMap for #<var> files), less the user's header lines
+    const src = (n) => { const m = p.expansion && p.expansion.sourceMap ? p.expansion.sourceMap[n - 1] : n; return m == null ? m : m - extra; };
+    for (const s of segs) s.srcLine = src(s.lineNum);
     const inches = segs.filter((s) => s.inch).length;
     if (inches) {
       const sc = (q) => ({ x: q.x * IN, y: q.y * IN, z: q.z * IN });
@@ -57,7 +63,8 @@
     }
     // the (Stock:) / (ToolDef:) header: in its CNCSIM UNITS=, else the units the file starts moving in
     let stock = p.simMeta.stock, tools = p.simMeta.tools;
-    if (p.simMeta.units ? p.simMeta.units === "inches" : segs.length && segs[0].inch) {
+    const metaInch = !!(p.simMeta.units ? p.simMeta.units === "inches" : segs.length && segs[0].inch);
+    if (metaInch) {
       if (stock) stock = Object.fromEntries(Object.entries(stock).map(([key, v]) => [key, v * IN]));
       const len = (v) => (v > 0 ? v * IN : v);
       tools = new Map([...tools].map(([n, d]) => [n, Object.assign({}, d, { diameter: d.diameter * IN, tip: (d.tip || 0) * IN,
@@ -68,7 +75,21 @@
     anim.setSegments(segs);
     const t = anim.segmentEndTimes, total = anim.totalAnimTime;
     const timeOf = (index) => (index > 0 ? t[Math.min(index, segs.length) - 1] : 0);
-    const events = p.events.map((e) => Object.assign({}, e, { time: timeOf(e.index) }));
+    const events = p.events.map((e) => Object.assign({}, e, { time: timeOf(e.index), lineNum: src(e.lineNum) ?? e.lineNum }));
+    // a change to a bit with no ToolDef stops playback, so the user can say what it is (the first tool: at the start)
+    // (on its M6 / T line: the last one before the move, after the move before it)
+    const source = text.split("\n").slice(extra);
+    segs.forEach((s, i) => {
+      if (i && s.toolNumber !== segs[i - 1].toolNumber && !tools.has(s.toolNumber)) {
+        let line = s.srcLine;
+        for (let n = (s.srcLine || 1) - 1; n >= (segs[i - 1].srcLine || 0) + 1; n--) {
+          if (/^[^;(]*\b(M0*6|T\d+)\b/i.test(source[n - 1] || "")) { line = n; break; }
+        }
+        const k = events.findIndex((e) => e.index > i || (e.index === i && e.lineNum > line));
+        events.splice(k < 0 ? events.length : k, 0, { index: i, lineNum: line, kind: "tool", time: timeOf(i),
+          text: `Tool change to T${s.toolNumber}: the file doesn't say which bit it is.` });
+      }
+    });
     // one per probe (a job re-probes after each tool change): from the pause before it ("attach") to the pause
     // after it ("remove"), only counting pauses with no cutting between them and the probe; without those, the
     // probe + its retract
@@ -80,10 +101,10 @@
       while (c1 < segs.length && segs[c1].type !== "cut") c1++;
       const before = events.filter((e) => e.kind === "pause" && e.index <= i && e.index > c0).pop();
       const after = events.find((e) => e.kind === "pause" && e.index > i && e.index <= c1);
-      plates.push({ x: s.start.x, y: s.start.y, z: s.probe.surface, thick: s.probe.plate, tool: s.toolNumber,
+      plates.push({ index: i, x: s.start.x, y: s.start.y, z: s.probe.surface, thick: s.probe.plate, tool: s.toolNumber,
         t0: before ? before.time : timeOf(i), t1: after ? after.time : timeOf(i + 2) });
     });
-    return { segs, t, total, events, stock, tools, plates, anim, lines: text.split("\n").length,
+    return { segs, t, total, events, stock, tools, plates, anim, lines: text.split("\n").length - extra, metaInch,
       units: !inches ? "mm" : inches === segs.length ? "in" : "mixed" };
   }
 
@@ -125,7 +146,33 @@
     return msg ? msg.text : e.text;
   }
 
-  const api = { V1E, motion, load, at, step, pending, message, pauseText };
+  // what the file leaves out for the stock simulation: { stock (no (Stock:) line), tools: [T numbers used with no
+  // ToolDef] }, and a guess to start the form from: the cut moves' extent (work mm, x / y from 0) and depth
+  function missing(tl) {
+    const used = [...new Set(tl.segs.filter((s) => s.type === "cut").map((s) => s.toolNumber))];
+    const tools = used.filter((n) => !tl.tools.has(n));
+    const b = [Infinity, -Infinity, Infinity, -Infinity, 0];
+    for (const s of tl.segs) {
+      if (s.type !== "cut") continue;
+      for (const q of [s.start, s.end]) { b[0] = Math.min(b[0], q.x); b[1] = Math.max(b[1], q.x); b[2] = Math.min(b[2], q.y); b[3] = Math.max(b[3], q.y); b[4] = Math.min(b[4], q.z); }
+    }
+    const guess = Number.isFinite(b[0]) ? { xmin: Math.min(0, b[0]), xmax: b[1], ymin: Math.min(0, b[2]), ymax: b[3], thick: Math.max(3, -b[4]) } : null;
+    return { stock: !tl.stock, tools, guess };
+  }
+  // the user's stock / bits (mm) -> header lines for load(opts.header). stock: { xmin, xmax, ymin, ymax, thick } (top at
+  // Z0); tools: { n: { shape (flat / ball / vbit), d (mm), angle (vbit, deg) } }. inch (tl.metaInch): written in inches,
+  // as load() reads a header in the units the file's own header / first moves are in
+  function header(stock, tools, inch) {
+    const f = (v) => +(+v / (inch ? IN : 1)).toFixed(5);
+    const L = [];
+    if (stock) L.push(`(Stock: XMIN=${f(stock.xmin)} XMAX=${f(stock.xmax)} YMIN=${f(stock.ymin)} YMAX=${f(stock.ymax)} ZMIN=${f(-stock.thick)} ZMAX=0)`);
+    for (const [n, t] of Object.entries(tools || {})) {
+      L.push(`(ToolDef ${n}: SHAPE=${t.shape} D=${f(t.d)}${t.shape === "vbit" ? ` ANGLE=${+(t.angle || 90)}` : ""} NAME=${t.shape} ${+(+t.d).toFixed(3)} mm)`);
+    }
+    return L.length ? L.join("\n") + "\n" : "";
+  }
+
+  const api = { V1E, motion, load, at, step, pending, message, pauseText, missing, header };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.GcodePlay = api;
 })(typeof self !== "undefined" ? self : this);

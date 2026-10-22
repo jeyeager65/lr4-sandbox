@@ -126,7 +126,7 @@ async function run(mode) {
       const sim = await T.booted(null), out = {};
       if (!sim) return { msg: document.getElementById("ctl-msg").textContent, log: document.getElementById("ctl-log").textContent.slice(-300) };
       out.greeting = sim.greeting;
-      out.ui = { play: document.getElementById("job-play").disabled, home: document.getElementById("home").disabled,
+      out.ui = { play: document.getElementById("job-play").textContent, home: document.getElementById("home").disabled,
         sliders: document.getElementById("pos-play").hidden, jog: document.getElementById("pos-jog").hidden,
         status: document.getElementById("home-status").textContent, grey: document.getElementById("mx").style.opacity };
       const i = await sim.command("$I");
@@ -158,7 +158,7 @@ async function run(mode) {
       return out;
     })()`);
     if (!p1.greeting) { ok(false, "FluidNC mode boots: " + JSON.stringify(p1)); return; }
-    ok(p1.ui.play && !p1.ui.home && p1.ui.sliders && !p1.ui.jog, "FluidNC mode: Play off, Home on, sliders hidden, jog pad shown");
+    ok(/\$SD\/Run/.test(p1.ui.play) && !p1.ui.home && p1.ui.sliders && !p1.ui.jog, `FluidNC mode: Play = ${p1.ui.play}, Home on, sliders hidden, jog pad shown`);
     ok(/^Not homed/.test(p1.ui.status) && p1.ui.grey === "0.55", `not homed: MPos greyed, "${p1.ui.status.slice(0, 60)}…"`);
     ok(p1.machine === "[MSG:Machine: LowRider]", `boots V1E's JP3_LR (${p1.machine})`);
     ok(Math.abs(p1.mt - (p1.span[0] - 4)) < 0.06 && Math.abs(p1.mty - (p1.span[1] - 4)) < 0.06,
@@ -282,7 +282,8 @@ async function run(mode) {
   }
 }
 
-(async () => {
+module.exports = { ROOT, CHROME, FIX, sleep, server, chromePage, HELPERS };
+if (require.main === module) (async () => {
   if (!CHROME) { console.log("Chrome not found (set CHROME)"); process.exit(1); }
   if (!fs.existsSync(path.join(ROOT, "web", "fluidnc", "program.wasm"))) { console.log("web/fluidnc/program.wasm missing - run python tools/build_fluidnc_wasm.py"); process.exit(1); }
   for (const m of MODES) await run(m);
