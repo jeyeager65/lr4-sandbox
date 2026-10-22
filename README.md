@@ -1,45 +1,138 @@
-# LR4 Sandbox
+# LowRider 4 Sandbox
 
-A full 3D model of the [V1 Engineering LowRider 4](https://docs.v1e.com/lowrider/) CNC, built from the real printed
-part files and sized to any cutting area, plus a browser sandbox page, **LowRider 4 Sandbox**, that shows the whole machine, cut list, strut
-plates and bill of materials for your size.
+A full 3D model of the [V1 Engineering LowRider 4](https://docs.v1e.com/lowrider/) CNC that you can size, build and
+run in your browser. Enter your cutting area and **LowRider 4 Sandbox** draws the whole machine from the real printed
+part files, with the cut list, strut plates, bill of materials and a FluidNC `config.yaml` for that size. Then run
+it: play G-code on it and watch the stock get carved, or drive it with the real FluidNC firmware running in the
+page (home, jog, probe, console). Behind the page is a FreeCAD model that places every part by its measured mating
+features and checks every fastener.
 
-> **Status: work in progress, not released.** This is an independent fan project. It is not made, endorsed or
-> supported by V1 Engineering. Questions about the LowRider itself belong on the
-> [V1E forum](https://forum.v1e.com/), not here.
+![The LowRider 4 at 26 x 50 in, in the workshop](docs/img/hero.webp)
+
+> [!WARNING]
+> Still under development. There's no guarantee that the model, measurements, cut list, BOM, G-code or config.yaml
+> are accurate: check them against V1 Engineering's docs before you cut, print or buy anything.
 
 ## What's here
 
 | | |
 |---|---|
-| **LowRider 4 Sandbox** (`web/index.html`) | Enter a cutting area and the page builds the machine in 3D: every printed part, rail, belt, bolt, the strut plates and the vacuum hose. It also gives the cut list, the strut plate outlines and the BOM. |
+| **LowRider 4 Sandbox** (`web/index.html`) | The page. **Machine:** enter a cutting area and it builds the machine in 3D (every printed part, rail, belt, bolt, the strut plates and the vacuum hose); show or hide groups of parts. **Build it:** the cut list (V1E's calculator), the strut plate outlines, DXF / SVG / G-code downloads, the full BOM and a `config.yaml` for your size. **Run:** play G-code on the machine, or drive it with FluidNC in the browser. Plus a workshop round it and VR. |
 | **FreeCAD model** (`freecad/`) | Scripts that assemble the LowRider 4 in [FreeCAD](https://www.freecad.org/) from the official STLs. Every part is placed by its measured mating features (hole patterns, pockets), and every fastener is checked for seat, engagement and collisions. Outputs: an FCStd assembly, a BOM, strut plate DXF/SVG and G-code. |
 | **Pipeline** (`pipeline/`) | Builds the model at many sizes and fits how each part moves with the size. That is how the page can draw any size without FreeCAD. |
+| **FluidNC in the browser** (`web/fluidnc/`) | FluidNC's wasm port, built from a fork's `wasm-sim` branch with simulated limit switches, a touch plate probe and a time scale. |
+
+## The part files
 
 The printed parts are **not** in this repo. They are V1 Engineering's (and other designers') files. You download
-them yourself from Printables, and the model and the page place your copies:
+them yourself from Printables (free), and the page or the FreeCAD scripts place your copies:
 
-| Folder in `parts/` | Source |
+| Download | Folder in `parts/` (FreeCAD only) |
 |---|---|
-| `lr4/` | [LowRider 4](https://www.printables.com/model/1034840) (V1 Engineering), including the XZ plate DXFs |
-| `kobalt/` | [Kobalt tool mount + dust shoe](https://www.printables.com/model/1034828) (V1 Engineering) |
-| `jackpot3/` | [Jackpot3 box](https://www.printables.com/model/1434650) |
-| `peter/` | [Peter Plates](https://www.printables.com/model/1044487) (V1 Engineering) |
+| [LowRider 4](https://www.printables.com/model/1034840) (V1 Engineering), including the XZ plate DXFs | `lr4/` |
+| [Kobalt tool mount + dust shoe](https://www.printables.com/model/1034828) (V1 Engineering) | `kobalt/` |
+| [Jackpot3 box](https://www.printables.com/model/1434650) | `jackpot3/` |
+| [Peter Plates](https://www.printables.com/model/1044487) (V1 Engineering) | `peter/` |
 
-`parts/manifest.json` lists every file with the SHA-256 it was tested with. `python tools/check_parts.py` says
-which are missing or differ (a different version is still used, with a warning).
+On each Printables page, use **Download** to get all of the model's files as one zip. Nothing else is needed: the
+page and the scripts bring their own hardware models (steppers, bearings, rails, bolts, router, hose).
 
-## Two ways to use it
+### Adding them to the page
 
-1. **In the browser (light).** Open the sandbox page (GitHub Pages, once it's published), download the four
-   Printables zips above and drop them on the page. Nothing to install; the files stay in your browser. You get
-   the 3D machine at your size, the cut list, the BOM, strut plate DXF / SVG / G-code and a FluidNC `config.yaml`.
-2. **The FreeCAD scripts (heavy).** Clone the repo, unzip the same downloads into `parts/` (folders as in the
-   table) and build. You get your own FCStd assembly with every fastener checked, the BOM, strut plate DXF and
-   G-code. Needs FreeCAD 1.1+; see below.
+1. Open the page. Until it has the files, it draws only the hardware, and the **Your part files** panel at the top
+   of the side panel lists what's missing, with a Printables link for each download.
+2. Drop the four zips anywhere on the page. You can also drop a folder or loose STL / DXF files, or use
+   **Choose files…** / **Choose a folder…** in the panel.
+3. The panel counts them in ("✓ All 40 part files loaded") and the printed parts appear. **Manage** opens the panel
+   again later; **Forget files** clears them.
 
-Downloads: only the Printables files in the table. Nothing else is needed; the page and the scripts bring our own
-hardware models (steppers, bearings, rails, bolts, router, hose).
+![A first visit: the hardware only, and the missing files listed](docs/img/files.webp)
+
+The files are read in your browser and kept there (IndexedDB) for next time; nothing is uploaded. Each file is
+recognised by its SHA-256, so renamed files are fine. A file that differs from the version the placements were
+solved for is still used, with a warning in the panel. `parts/manifest.json` lists every file with the SHA-256 it
+was tested with.
+
+### Adding them for the FreeCAD scripts
+
+Unzip each download into its folder under `parts/` (the table above), for example `parts/lr4/YZ_Plate_Min_V1.stl`.
+`python tools/check_parts.py` lists what's missing or differs. `parts/` is git-ignored, and a pre-commit check
+(`tools/check_no_parts.py`) stops part files from being committed.
+
+## Using the page
+
+### Machine and Build it
+
+Enter the cutting area (inches or mm) and the page rebuilds the machine: brace count, rails, belts, table, hose
+routing. **Build it** has the cut list from V1E's LowRider 4 calculator, the strut plates (DXF / SVG, or G-code to
+cut them on the machine itself), the full BOM with hardware counts for your size, and V1E's JP3_LR `config.yaml`
+with `max_travel_mm` set for your size (or your own config.yaml, adjusted the same way).
+
+![Build it: the BOM, the cut list and the strut plates](docs/img/build.webp)
+
+### Run: Playback
+
+**Run** > **Runs on Playback** plays G-code on the machine: the strut plate job (V1E's build order: the machine runs
+on its printed temporary struts and cuts its own MDF strut plates; **Use the temporary struts**), or any G-code file
+(**Play a G-code file…**). The bit follows the moves at FluidNC-like speeds, the stock is carved as it goes, M0
+pauses pop up their message, G38.2 probes stop on the touch plate, and Home plays FluidNC's homing. Speeds 1x to
+300x; scrub with the timeline.
+
+![Playback: the strut plate job on the temporary struts](docs/img/playback.webp)
+
+### Run: FluidNC (preview)
+
+**Run** > **Runs on FluidNC** boots the real FluidNC firmware in the page, with your config.yaml (V1E's JP3_LR until
+you load your own under Build it). The browser build has no stepper drivers or real pins, so it runs a translated
+copy: every motor becomes a plain stepper and the limit and probe pins move to known pins; rates, acceleration,
+travel, homing and limits are kept as in your file. (`$CD` in the console shows that copy; the page's config.yaml
+download is always your real file.)
+
+- **Home ($H)** homes on the machine's switches: each switch trips when its motor reaches the stop, so each Y motor
+  stops on its own switch and squares the gantry, as on the real machine.
+- **The jog pad** jogs X / Y / Z by a step (0.1 to 100 mm) at a feed; ■ stops the jog.
+- **Touch plate under the bit** puts the plate on the stock so G38.2 stops on it.
+- **The console** takes any G-code or `$` command and shows FluidNC's replies.
+- **Machine speed** runs it at 1x, 2x, 5x or 10x.
+- MPos is greyed until it has homed: like the real controller, it doesn't know where the machine is until then.
+
+Running a G-code file through FluidNC is next on the list; for now, use Playback for jobs.
+
+![FluidNC mode, homed, with its console](docs/img/fluidnc.webp)
+
+**Browser:** tested in desktop Chrome (and Edge for VR). FluidNC mode needs the page to be cross-origin isolated
+(its threads need SharedArrayBuffer). `tools/serve.py` sends the headers; on GitHub Pages the page reloads itself
+once on the first visit to turn it on (a service worker, `web/coi-serviceworker.js`). Private windows without
+service workers can't run FluidNC mode; everything else works.
+
+### Workshop
+
+**View** (the ⚙ on the canvas) > **Background** shows the machine in a workshop: by default the maintainer's
+16 x 20 ft shop with an 8' 4" ceiling (benches, shelf, an open garage door). Zoom in and the near walls open up;
+zoom far out to see the closed building. Enter your own building's size (X, Y, ceiling) to see how much room the
+machine takes: the page gives the gap to each wall and warns when a side is under 2 ft / 600 mm. The room and the
+table legs are drawn by the page only.
+
+![The workshop from outside](docs/img/outside.webp)
+
+### VR (optional)
+
+With a PC VR headset on SteamVR / OpenXR (PS VR2, Index, Quest Link) and Chrome or Edge, the View panel shows
+**Enter VR** (https or 127.0.0.1 only); the desktop window then shows a small card instead of the side panel. Left
+controller: the menu (tap its grip to hide it). Touch a part - or point at it and pull the trigger - for its name
+and Hide part / Hide group. Trigger also presses menu buttons, grabs the red sphere to move the core and drags the
+corner diamond to resize the table (snaps to 1/2 in, rebuilds when you let go). Hold a grip to drag the machine;
+hold both to zoom and rotate. Thumbstick: left / right turns; at 1:1 push forward to aim a teleport and let go to
+jump; on the tabletop forward / back zooms. Load part files on the desktop first.
+
+## Running it locally
+
+```sh
+python tools/serve.py sandbox 48x96          # the page on 127.0.0.1:8767; optional size in inches
+```
+
+It serves the repo with the cross-origin isolation headers and opens the page with `?parts=/parts/`, so it loads
+the files in your `parts/` folder (if you have one) without dropping them.
 
 ## Running the FreeCAD model
 
@@ -55,40 +148,41 @@ python tools/serve.py viewer                 # look at it in the browser
 top of `freecad/build.py` (`CUT_X_IN`, `CUT_Y_IN`). Output goes to `build/` (FCStd, BOM) and `exports/`
 (strut plates, G-code, web data).
 
-## Running the sandbox page locally
+## Rebuilding FluidNC for the browser
+
+`web/fluidnc/` is committed, so the page works as is. To rebuild it (after a change on the fork's branch):
+
+1. Install the [Emscripten SDK](https://emscripten.org/docs/getting_started/downloads.html) (`emsdk install latest`,
+   `emsdk activate latest`) and [PlatformIO](https://platformio.org/install/cli).
+2. Clone [the fork](https://github.com/jeyeager65/FluidNC) and check out its `wasm-sim` branch at the commit
+   `PIN` in `tools/build_fluidnc_wasm.py`.
+3. Run it, pointing at both:
 
 ```sh
-python tools/serve.py sandbox 48x96          # optional size in inches
+FLUIDNC=/path/to/FluidNC EMSDK=/path/to/emsdk python tools/build_fluidnc_wasm.py
 ```
 
-With the share data the page draws only our hardware until you give it the part files: drop the Printables zips,
-a folder or the STL / DXF files on the page (or use its buttons). They're read in your browser, recognised by
-SHA-256 (renamed files are fine) and kept in its IndexedDB; nothing is uploaded. The panel lists what's missing,
-with the Printables links, and warns about files that differ from the versions the placements were solved for.
-
-**VR (optional):** with a PC VR headset on SteamVR / OpenXR (PS VR2, Index, Quest Link) and Chrome or Edge, the
-View panel shows "Enter VR" (https or 127.0.0.1 only); the desktop window then shows a small card instead of the
-side panel. Left controller: the menu (tap its grip to hide it). Touch a part - or point at it and pull the
-trigger - for its name and Hide part / Hide group. Trigger also presses menu buttons, grabs the red sphere to move
-the core and drags the corner diamond to resize the table (snaps to 1/2 in, rebuilds when you let go). Hold a grip
-to drag the machine; hold both to zoom and rotate. Thumbstick: left / right turns; at 1:1 push forward to aim a
-teleport and let go to jump; on the tabletop forward / back zooms. Load part files on the desktop first.
-
-**Workshop:** View > Background shows the machine in a workshop. Enter your building's size (X, Y, ceiling) to see
-how much room it takes: the page gives the gap from the machine to each wall and warns when a side is under
-2 ft / 600 mm. The table legs and the room are drawn by the page only (not part of the FreeCAD model).
+It runs `pio run -e wasm` and copies `program.js` / `program.wasm`, FluidNC's GPL-3.0 license and `build.json` (the
+exact commit and a source link) into `web/fluidnc/`. `--dirty` builds a checkout with local changes (marked so in
+`build.json`; don't commit that). The defaults are `D:/GitHub/FluidNC` and `D:/emsdk`.
 
 ## Tests
 
 ```sh
 cd tests && npm install                      # once
 npm test                                     # what CI runs (no part files needed)
-npm run test:local                           # all the node tests below
+npm run test:local                           # the node tests below that don't need a browser
 node test_config_model.js                    # the page's machine vs every FreeCAD size build
 node test_calculator.js                      # the JS and Python calculators agree (needs python)
-node test_vr.js                              # the VR menu layout and helpers
+node test_vr.js                              # the VR menu layout, the workshop room
 node test_strut_cam.js                       # the page's strut plate G-code; vs freecad/cam.py if its goldens exist
 node test_gcode_play.js                      # G-code playback: pauses, probe, G20/G21, carving frees the plates
+node test_homing.js                          # Playback's Home: FluidNC's homing order, pull-offs, MPos
+node test_fluidnc_sim.js                     # parsing FluidNC's output (status reports, ok / error, messages)
+node test_sim_config.js                      # config.yaml -> the browser copy (V1E's JP3_LR + an odd user file)
+node test_page_fluidnc.js                    # headless Chrome: FluidNC in the page - boot, home, probe, jog,
+                                             #   speed, restarts; served with headers and as plain files (Pages)
+node test_page_vr.js                         # headless Chrome: the page in VR preview
 node test_strut_plate.js                     # JS strut plates vs Vector76's OpenSCAD generator (maintainer only)
 python ../tools/run.py test_strut_plate.py   # Python strut plates vs the same (maintainer only)
 node test_parts_files.js                     # the page's STL / DXF readers vs the reference build (needs parts/)
@@ -96,7 +190,7 @@ python ../tools/run.py test_share.py         # the share data's placements vs th
 ```
 
 CI (`.github/workflows/ci.yml`) runs the no-part-files guard, a compile of every Python script and `npm test`.
-The rest need `parts/`, the size builds or the OpenSCAD goldens, so they run locally.
+The rest need Chrome, `parts/`, the size builds or the OpenSCAD goldens, so they run locally.
 
 ## Problems and changes
 
@@ -109,25 +203,27 @@ opens a GitHub issue with your size and file checksums filled in. Questions abou
 ```
 freecad/    the model: build.py, lr4.py (measured placements), hardware.py, bom.py, checks, export, CAM
   fclib/    shared FreeCAD helpers (vendored copy)
-web/        the pages: index.html (the sandbox page), viewer.html, js/
+web/        the page (index.html), the viewer (viewer.html), js/
+  data/     the page's data from the pipeline (placements and our own hardware meshes; no V1E geometry)
+  fluidnc/  FluidNC built for the browser (GPL-3.0)
 pipeline/   FreeCAD builds -> the page's data
-tests/      node tests, test_strut_plate.py, test_share.py, test_parts_files.js
-tools/      run.py, serve.py, repo tools (sync_fclib, check_no_parts, check_parts, page_shot = headless screenshots,
-            build_fluidnc_wasm = FluidNC for the browser -> web/fluidnc/)
-docs/       PLAN.md: settings, measurements and decisions behind the model
+tests/      node tests, test_strut_plate.py, test_share.py
+tools/      run.py, serve.py, build_fluidnc_wasm.py, repo tools (sync_fclib, check_no_parts, check_parts,
+            page_shot = headless screenshots, record_demo = a demo video)
+docs/       PLAN.md: settings, measurements and decisions behind the model; img/: the pictures here
 .github/    CI, the Pages workflow (manual), issue template
 ```
 
-`parts/` (except its manifest), `build/`, `exports/` and `web/data/` are git-ignored. A pre-commit check (`tools/check_no_parts.py`)
-stops STL, STEP, DXF and FCStd files from being committed.
+`parts/` (except its manifest), `build/` and `exports/` are git-ignored. `web/data/` is committed: it's the page's
+only data, and it holds no V1E geometry (the page places your downloaded files).
 
 ## Credits
 
 - **[V1 Engineering](https://www.v1e.com/)** designed the LowRider 4 and its parts. The machine
-  sizing matches V1E's LowRider 4 calculator.
+  sizing matches V1E's LowRider 4 calculator; the `config.yaml` is V1E's JP3_LR.
 - **[Vector76](https://github.com/vector76)** wrote the [LR4 strut plate generator](https://vector76.github.io/Web_OpenSCAD_Customizer/strut_plate.html)
   (OpenSCAD) that the strut plate code follows.
-- "Run G-code" parses, times and carves with [cnc-gcode-tools](https://github.com/jeyeager65/cnc-gcode-tools) (MIT):
+- Playback parses, times and carves with [cnc-gcode-tools](https://github.com/jeyeager65/cnc-gcode-tools) (MIT):
   its parser, expander, animator and stock simulator, copied unmodified into `web/js/lib/cnc-gcode-tools/`.
 - The Run tab's controller is **[FluidNC](https://github.com/bdring/FluidNC)** (GPL-3.0) itself, built for the
   browser with its wasm port, from the `wasm-sim` branch of [a fork](https://github.com/jeyeager65/FluidNC/tree/wasm-sim)
