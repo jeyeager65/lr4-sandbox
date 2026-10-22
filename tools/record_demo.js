@@ -29,7 +29,7 @@ const DS = require("./demo_script.js");
 
 const args = process.argv.slice(2), opt = { size: [2560, 1440], fps: 30, job: 75, pause: 2, orbit: 10,
   url: "http://127.0.0.1:8767/web/index.html?parts=/parts/", gpu: true, sound: true, volume: 0.6, home: true, real: 5, voice: "machine", pendant: false, mode: "basic", kmax: 5 };
-Object.assign(opt, { park: true, hold: 3, detail: "full", scenery: "shop", messages: true, msgtime: 4 });
+Object.assign(opt, { park: true, hold: 3, detail: "full", scenery: "shop", messages: true, messagetime: 4 });
 const pos = [], given = new Set();
 for (let i = 0; i < args.length; i++) {
   const a = args[i];
@@ -146,6 +146,12 @@ const PAGE_REC = `(() => {
         if (b && b.getAttribute("aria-pressed") !== "true") { b.click(); return true; } return false; })()`)) await loaded();
     await val(`(() => { const b = document.querySelector('#scenery button[data-v="${opt.scenery}"]'); if (b) b.click(); return true; })()`);
     await sleep(1500);
+    const mach = DS.machineOf(script.settings);      // the file's My machine settings (Part 29): table, room, options ...
+    if (Object.keys(mach).length) {
+      for (const b of await val(`LR4Machine.apply(${JSON.stringify(mach)})`)) console.log("(Video):", b);
+      console.log("machine:", Object.entries(mach).map(([k, v]) => `${k}=${Array.isArray(v) ? v.map((q) => Math.round(q)).join("x") : v}`).join(" "));
+      await loaded();                                // braces / struts / table rebuild the machine
+    }
     await val("LR4Demo.recording(true)");
     await sleep(500);
     const homeCmd = (DS.hasOwnIntro(script) ? script.intro : DS.defaultIntro(opt)).find((q) => q.kind === "home");
@@ -207,6 +213,10 @@ const PAGE_REC = `(() => {
     };
     let stockView = viewOf(job.stock, job.at), last = null, coreAt = null;
     const pendAt = opt.pendant ? await val("LR4Demo.pendantView()") : null;   // the pendant stays put on the table
+    const showCmd = async (cmd) => {                 // (Video Show:) by the Show tree's ids
+      const bad = await val(`LR4Show.apply(${JSON.stringify(DS.showOf(cmd))})`);
+      if (bad.length) console.log(`(Video): line ${cmd.line}: Show doesn't know ${bad.join(", ")}`);
+    };
     const pipCmd = (cmd) => val(`LR4Demo.pip(${JSON.stringify({ on: !/^(off|no|0)$/i.test(cmd.kv.show || "on"), corner: (cmd.kv.corner || "br").toLowerCase(), size: Number(cmd.kv.size) || 26 })})`);   // last: the latest frame's job state
     const VIEWS = { iso: [1, -1.15, 0.85], front: [0, -1, 0.18], top: [0, -0.001, 1], side: [1, 0, 0.18], back: [-0.6, 1, 0.55] };
     const shotAt = (sh) => {                         // where a shot looks from / at now
@@ -305,6 +315,7 @@ const PAGE_REC = `(() => {
         await val("LR4Demo.title(null)");
       } else if (cmd.kind === "text") await caption(cmd);
       else if (cmd.kind === "pendant") await pipCmd(cmd);
+      else if (cmd.kind === "show") await showCmd(cmd);
       else if (cmd.kind === "wait") await hold(DS.secsOf(cmd, 1), cam);
       else await paceCmd(cmd);
     }
@@ -341,6 +352,7 @@ const PAGE_REC = `(() => {
           if (shot && !sh.orbit) { const keep = shot; shot = { frames: Infinity, at: (f) => keep.at(Math.min(f, keep.frames - 1)) }; }
         } else if (cmd.kind === "text") await caption(cmd);
         else if (cmd.kind === "pendant") await pipCmd(cmd);
+        else if (cmd.kind === "show") await showCmd(cmd);
         else if (cmd.kind === "title") { titleEnd = frames + n(DS.secsOf(cmd, 3)); await val(`LR4Demo.title(${JSON.stringify(DS.titleText(cmd))})`); }
         else if (cmd.kind === "wait") pace.wait = n(DS.secsOf(cmd, 1));
         else await paceCmd(cmd);
@@ -349,7 +361,7 @@ const PAGE_REC = `(() => {
       // the file's MSG / PRINT lines on top (not the one an M0 popup is already showing)
       if (opt.messages && s.msg && s.msg.key !== msgKey) {
         msgKey = s.msg.key;
-        if (s.msg.text !== s.popText) { await val(`LR4Demo.msg(${JSON.stringify(s.msg.text)})`); msgEnd = frames + n(opt.msgtime); }
+        if (s.msg.text !== s.popText) { await val(`LR4Demo.msg(${JSON.stringify(s.msg.text)})`); msgEnd = frames + n(opt.messagetime); }
       }
       if (msgEnd && frames >= msgEnd) { msgEnd = 0; await val("LR4Demo.msg(null)"); }
       // real time at each section's first cut, then ease up to the job's speed; the badge says which

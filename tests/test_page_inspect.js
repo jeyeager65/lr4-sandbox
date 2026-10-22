@@ -2,7 +2,8 @@
 // (its set only, no workshop), the parts list counts its fasteners, the Show checkboxes still work in it, double-click
 // inside goes down to the part, Esc / Back return, and an option that takes the set off the machine closes it.
 // Tools (Part 28): explode moves the set along its bolts (the anchor stays) and comes back to 0; the section shows its
-// slider; measure snaps two hole centres on the XZ plate; leaving inspect resets them.
+// slider; measure snaps two hole centres on the XZ plate; leaving inspect resets them. Part 29's script handles:
+// LR4Machine.apply (options, braces = the auto count, table, bad values reported) and LR4Show.apply (preset, patterns).
 //   node tests/test_page_inspect.js   (serves the repo on port 8792 and runs tools/page_shot.js; needs parts/)
 "use strict";
 const { spawn, execFileSync } = require("child_process");
@@ -52,6 +53,14 @@ const steps = [
   // the router's row, then the router taken off the machine: the view closes
   `LR4Inspect.open('router'); const open = LR4Inspect.id(); document.getElementById('opt-router').click();
    const r = { open, after: LR4Inspect.id(), shown: LR4Inspect.shown().length }; document.getElementById('opt-router').click(); return r`,
+  // Part 29: what a video script sets
+  `const bad = LR4Machine.apply({ hose: false, fan: false, braces: document.getElementById('braces').options[0].textContent.match(/(\\d+) braces/)[1],
+     table: 762, peter: 'nope', main: '#225588' });
+   const m = { bad, hose: document.getElementById('opt-hose').checked, table: document.getElementById('table-top').value };
+   const sb = LR4Show.apply({ preset: 'frame', hide: ['Y_Clip_*', 'nope'], show: ['XZ_Plate_Min'] });
+   const shown = LR4Inspect.shown();
+   LR4Show.apply({ preset: 'all' }); LR4Machine.apply({ hose: true, fan: true });
+   return { m, sb, clips: shown.filter((n) => /^Y_Clip_/.test(n)).length, core: shown.includes('Core'), xz: shown.includes('XZ_Plate_Min'), brace: shown.includes('Brace_1') }`,
 ];
 
 const server = spawn("python", ["-m", "http.server", String(PORT)], { cwd: ROOT, stdio: "ignore" });
@@ -69,7 +78,7 @@ ok(!/\[exception\]/.test(out), "page exception: " + (out.match(/\[exception\].*/
 ok(ev.length === steps.length, `${steps.length} results, got ${ev.length}`);
 if (ev.length !== steps.length) console.log(out);
 else {
-  const [a, b, c, d, t, e] = ev;
+  const [a, b, c, d, t, e, f] = ev;
   const has = (list, re) => list.some((n) => re.test(n));
   ok(a.id === "core" && a.overlay && a.head === "Core", "Core's row opens the inspect view: " + JSON.stringify([a.id, a.head]));
   ok(a.shown.length < a.all / 4 && has(a.shown, /^Core$/) && has(a.shown, /^Bearing_Core_Lower/) && has(a.shown, /^X_Stepper$/)
@@ -89,6 +98,8 @@ else {
   ok(t.sec.x === "true" && t.sec.cut, "section X: on, its slider shows");
   ok(t.holes > 1 && / mm \(.* in\).*hole centre → hole centre/.test(t.meas), `measure: hole centre to hole centre (${t.holes} snaps): ${t.meas}`);
   ok(t.after === 0 && t.clip === "true", "Back: explode + section reset");
+  ok(f.m.bad.length === 1 && /^PETER=nope/.test(f.m.bad[0]) && !f.m.hose && f.m.table === "30", "LR4Machine: set what it can, report the rest: " + JSON.stringify(f.m));
+  ok(f.sb.join() === "nope" && f.clips === 0 && !f.core && f.xz && f.brace, "LR4Show: frame preset, Y_Clip_* hidden, a part shown: " + JSON.stringify(f));
   ok(e.open === "router" && e.after === null && e.shown < a.all, "router off the machine closes its inspect view: " + JSON.stringify(e));
 }
 console.log(fails ? `${fails} check(s) failed` : "all inspect checks passed");

@@ -53,5 +53,28 @@ ok(DS.parse(["(Video Shot: VIEW=nowhere)", "(Video Speed: X=0)", "(Video Speed: 
 ok(DS.parse("(Video Shot: VIEW=page)").warnings.length === 1, "Shot VIEW=page: mid-job only");
 ok(DS.parse("( video  shot : view=CORE time=2 )\nG0 X1").intro[0].kv.view === "CORE", "any case and spacing");
 
+// "MSG" anywhere in a comment is a FluidNC message: MSGTIME is read as MESSAGETIME, with a warning
+{
+  const w = DS.parse("(Video: MSGTIME=3)\n(Video: MESSAGETIME=2)\nG0 X1");
+  ok(w.settings.messagetime === 2 && w.warnings.length === 1 && /line 1: .*MESSAGETIME/.test(w.warnings[0]), "MSGTIME warned, MESSAGETIME used: " + JSON.stringify(w));
+}
+// Part 29: the machine settings and (Video Show:)
+{
+  const m = DS.parse(["(Video: TABLE=34in ROOM=16x20x9ft BRACES=6 STRUTS=temp PETER=none ROUTER=off HOSE=no MAIN=#112233)",
+    "(Video: TABLE=tall ROOM=16x20 MAIN=red)",
+    "(Video Show: PRESET=frame HIDE=core.hardware, Y_Clip_* SHOW=XZ_Plate_Min)",
+    "(Video Show: PRESET=nothing)", "(Video Show:)",
+    "G0 X1", "(Video Show: PRESET=All)"].join("\n"));
+  ok(Math.abs(m.settings.table - 863.6) < 1e-9 && m.settings.room.map((v) => +v.toFixed(1)).join() === "4876.8,6096,2743.2",
+    "TABLE 34in, ROOM 16x20x9ft in mm: " + JSON.stringify([m.settings.table, m.settings.room]));
+  ok(JSON.stringify(DS.machineOf(m.settings)) === JSON.stringify({ table: m.settings.table, room: m.settings.room, braces: "6", struts: "temp",
+    peter: "none", router: false, hose: false, main: "#112233" }), "machineOf: " + JSON.stringify(DS.machineOf(m.settings)));
+  ok(m.warnings.filter((w) => /line 2: (TABLE|ROOM|MAIN)/.test(w)).length === 3, "bad TABLE / ROOM / MAIN warned: " + m.warnings);
+  ok(m.warnings.some((w) => /line 4: Show PRESET=/.test(w)) && m.warnings.some((w) => /line 5: Show wants/.test(w)), "bad Show warned");
+  ok(JSON.stringify(DS.showOf(m.intro[0])) === JSON.stringify({ preset: "frame", hide: ["core.hardware", "Y_Clip_*"], show: ["XZ_Plate_Min"] }),
+    "showOf: " + JSON.stringify(DS.showOf(m.intro[0])));
+  ok(m.at.length === 1 && DS.showOf(m.at[0]).preset === "all", "Show mid-job, preset any case");
+  ok(DS.roomOf("5000x6000x2700mm").join() === "5000,6000,2700" && DS.roomOf("16ftx20ftx100in")[2] === 2540, "room units");
+}
 console.log(fails ? `demo_script: ${fails} of ${checks} failed` : `demo_script: all ${checks} passed`);
 process.exit(fails ? 1 : 0);

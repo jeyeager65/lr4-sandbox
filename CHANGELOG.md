@@ -3,6 +3,15 @@
 The version is the sandbox page's (`VERSION` in `web/index.html`, shown in its footer). The footer also shows
 the date the model data was built and the Printables file set it was solved for.
 
+## 0.29.0 - 2026-10-22
+- Video scripts set the machine: `(Video: TABLE=34in ROOM=16x20x9ft BRACES=6 STRUTS=temp PETER=none ROUTER=off
+  SKIRT=off HOSE=off FAN=off MAIN=#rrggbb ACCENT=#rrggbb)` (with MACHINE=26x50 as before), and `(Video Show:
+  PRESET=frame HIDE=core.hardware,Y_Clip_* SHOW=XZ_Plate_Min)` picks what's drawn by the Show tree's ids, in the intro
+  or mid-job. Scripts (and the console) can use `LR4Machine.apply({...})` and `LR4Show.apply({...})`.
+- `MSGTIME=` is now `MESSAGETIME=`: FluidNC (and the page) show any comment containing "MSG" as a message, so the
+  old name put the whole settings line on screen. The old name still works, with a warning.
+- Fixed: the file's own bit was left at the job's start while the router homed and jogged to work zero.
+
 ## 0.28.0 - 2026-10-22
 - Inspect tools: **Explode** (a slider; parts move apart along the bolts that join them, bolts out past their heads),
   **Section** (an X / Y / Z cut through the set, slider to move it, ⇅ to keep the other side) and **Measure** (two

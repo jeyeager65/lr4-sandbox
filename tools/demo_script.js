@@ -3,10 +3,20 @@
 // comments). FluidNC and the page ignore them: one file is the job and the video.
 //   (Video: KEY=VALUE ...)           settings, any line before the first move; the command line's flags win:
 //       SIZE=2560x1440 FPS=30 VOLUME=0.6 SOUND=on VOICE=machine|robot (robot = the joke voice) DETAIL=full SCENERY=shop MACHINE=26x50 (cut area, in)
-//       PAUSE=2 (s each M0 popup shows, then it resumes)  MESSAGES=on MSGTIME=4 (MSG / PRINT lines shown on top, s)
+//       PAUSE=2 (s each M0 popup shows, then it resumes)  MESSAGES=on MESSAGETIME=4 (MSG / PRINT lines shown on top, s;
+//       not MSGTIME: FluidNC - and the page - show any comment with "MSG" in it as a message; still read, with a warning)
 //       PARK=on (drive the gantry back at the end)  HOLD=3 (s on the result)
 //       PENDANT=on (the FluidTouch pendant on the table, its live screen in a corner of the video; off by default)
 //       MODE=basic|fluidnc (fluidnc: the job runs on the page's FluidNC - its own $H, jogs, $SD/Run, M0 holds)
+//     the machine (Part 29; the page's My machine, set before anything is filmed):
+//       TABLE=34in (top of the MDF; mm, in or ft)  ROOM=16x20x9ft (the shop: X x Y x ceiling; a unit at the end covers
+//       the bare numbers, ft if none)  BRACES=auto|6  STRUTS=mdf|temp  PETER=solid|honeycomb|none (the choices the page
+//       shows: with your own files open|closed|honeycomb|none)  ROUTER=off  SKIRT=off  HOSE=off  FAN=off (on by
+//       default)  MAIN=#292a2e ACCENT=#cc1f1a (print colours)
+//   (Video Show: PRESET=frame HIDE=core.hardware,Y_Clip_* SHOW=XZ_Plate_Min)   what's drawn, by the Show tree's ids
+//       (assembly: table yz-min yz-max beam core router hose electronics pendant; "asm.kind" with printed / cut /
+//       hardware / electronics; a part = its name, * matches); PRESET (all, no-hardware, printed, frame) first, then
+//       HIDE, then SHOW (a part shown turns its assembly + kind on). Intro or mid-job; the view only, never the BOM.
 //   (Video Shot: VIEW=name TIME=s ORBIT=s DIST=mm)   the camera: blends there over TIME (1.5), then turns once round
 //       it over ORBIT; DIST = how far from what it looks at. VIEW: workshop, machine, stock, tool (close on the bit,
 //       follows it), core (close on the router / core), iso, front, top, side, back, page (mid-job only: the page's own
@@ -30,9 +40,13 @@
 // (workshop orbit, home, machine orbit, stock).
 "use strict";
 
-const SETTINGS = { size: "wxh", machine: "wxh", fps: "num", volume: "num", pause: "num", msgtime: "num", hold: "num",
-  sound: "bool", park: "bool", messages: "bool", detail: "word", scenery: "word", voice: "word", pendant: "bool", mode: "word" };
-const KINDS = ["shot", "home", "zero", "title", "text", "wait", "speed", "pendant"];
+const SETTINGS = { size: "wxh", machine: "wxh", fps: "num", volume: "num", pause: "num", messagetime: "num", msgtime: "num", hold: "num",
+  sound: "bool", park: "bool", messages: "bool", detail: "word", scenery: "word", voice: "word", pendant: "bool", mode: "word",
+  table: "len", room: "room", braces: "word", struts: "word", peter: "word", router: "bool", skirt: "bool", hose: "bool",
+  fan: "bool", main: "colour", accent: "colour" };
+const MACHINE_KEYS = ["table", "room", "braces", "struts", "peter", "router", "skirt", "hose", "fan", "main", "accent"];
+const PRESETS = ["all", "no-hardware", "printed", "frame"];   // web/js/show_tree.js PRESETS
+const KINDS = ["shot", "home", "zero", "title", "text", "wait", "speed", "pendant", "show"];
 const INTRO_ONLY = new Set(["home", "zero"]);
 const SHOTS = new Set(["workshop", "machine", "stock", "tool", "core", "iso", "front", "top", "side", "back", "page", "pendant"]);
 const MOTION = /(^|[^A-Z])G0*(0|1|2|3|38\.\d)(?![\d.])/;
@@ -56,7 +70,14 @@ function videoOf(line) {
 }
 
 const num = (x) => x !== undefined && x !== "" && Number.isFinite(Number(x));
-const mm = (x) => { const m = /^(-?[\d.]+)\s*(in|mm)?$/i.exec(String(x || "").trim()); return m ? Number(m[1]) * (/in/i.test(m[2] || "") ? IN : 1) : NaN; };
+const UNIT = { mm: 1, in: IN, ft: 12 * IN, m: 1000 };
+const mm = (x, def = "mm") => { const m = /^(-?[\d.]+)\s*(in|mm|ft|m)?$/i.exec(String(x || "").trim()); return m ? Number(m[1]) * UNIT[(m[2] || def).toLowerCase()] : NaN; };
+// "16x20x9ft" / "16ftx20ftx100in" / "5000x6000x2700mm" -> [x, y, ceiling] mm (a unit at the end covers the bare numbers; ft if none)
+function roomOf(v) {
+  const ps = String(v).split(/x/i), tail = (/(in|mm|ft|m)$/i.exec(ps[ps.length - 1] || "") || [])[1] || "ft";
+  const r = ps.map((p) => mm(p, tail));
+  return r.length === 3 && r.every((q) => q > 0) ? r : null;
+}
 
 // text -> { settings, intro: [cmd], at: [cmd], firstMove (line), warnings }; cmd = { kind, kv, line (1-based) }
 function parse(text) {
@@ -69,12 +90,16 @@ function parse(text) {
     const line = n + 1, before = !out.firstMove, warn = (t) => out.warnings.push(`line ${line}: ${t}`);
     if (!v.kind) {
       if (!before) { warn("(Video: ...) settings go before the first move"); continue; }
-      for (const [k, val] of Object.entries(v.kv)) {
-        const t = SETTINGS[k];
+      if (/MSG/.test(l)) warn(`this line has "MSG" in it, so FluidNC (and the page) show it as a message${"msgtime" in v.kv ? ": use MESSAGETIME= for MSGTIME=" : ""}`);
+      for (const [k0, val] of Object.entries(v.kv)) {
+        const k = k0 === "msgtime" ? "messagetime" : k0, t = SETTINGS[k];
         if (!t) { warn(`unknown setting ${k.toUpperCase()}`); continue; }
         if (t === "wxh") { const m = /^(\d+(?:\.\d+)?)x(\d+(?:\.\d+)?)$/i.exec(val); if (m) out.settings[k] = [Number(m[1]), Number(m[2])]; else warn(`${k.toUpperCase()} wants WxH`); }
         else if (t === "num") { if (num(val)) out.settings[k] = Number(val); else warn(`${k.toUpperCase()} wants a number`); }
         else if (t === "bool") out.settings[k] = !/^(off|no|false|0)$/i.test(val);
+        else if (t === "len") { const q = mm(val); if (q > 0) out.settings[k] = q; else warn(`${k.toUpperCase()} wants a length (34in, 860mm)`); }
+        else if (t === "room") { const q = roomOf(val); if (q) out.settings[k] = q; else warn(`${k.toUpperCase()} wants XxYxCEILING (16x20x9ft)`); }
+        else if (t === "colour") { if (/^#[0-9a-f]{6}$/i.test(val)) out.settings[k] = val.toLowerCase(); else warn(`${k.toUpperCase()} wants #rrggbb`); }
         else out.settings[k] = val.toLowerCase();
       }
       continue;
@@ -101,6 +126,9 @@ function check(c, intro) {
     case "zero": return Number.isFinite(mm(kv.x)) && Number.isFinite(mm(kv.y)) ? null : "Zero wants X= and Y= (mm, or 4in)";
     case "title": case "text": return kv.text ? null : `${k[0].toUpperCase() + k.slice(1)} wants TEXT=`;
     case "wait": return num(kv.time) ? null : "Wait wants TIME=";
+    case "show":
+      if (kv.preset === undefined && kv.hide === undefined && kv.show === undefined) return "Show wants PRESET=, HIDE= or SHOW=";
+      return kv.preset === undefined || PRESETS.includes(kv.preset.toLowerCase()) ? null : `Show PRESET= one of ${PRESETS.join(", ")}`;
     case "speed":
       if (kv.x !== undefined && (!num(kv.x) || Number(kv.x) <= 0)) return "Speed X= wants a number > 0";
       if (kv.x === undefined && kv.fit === undefined && kv.real === undefined && kv.badge === undefined) return "Speed wants X=, FIT=, REAL= or BADGE=";
@@ -119,6 +147,11 @@ function shotOf(c, blend = 1.5) {
 const titleText = (c) => c.kv.text.split("|").map((s) => s.trim()).join("\n");
 const secsOf = (c, d) => (num(c.kv.time) ? Number(c.kv.time) : d);
 const zeroOf = (c) => [mm(c.kv.x), mm(c.kv.y)];
+const ids = (v) => String(v || "").split(/[,\s]+/).filter(Boolean);
+// a Show cmd -> { preset, hide: [ids], show: [ids] } (LR4Show.apply's argument)
+const showOf = (c) => ({ preset: c.kv.preset ? c.kv.preset.toLowerCase() : undefined, hide: ids(c.kv.hide), show: ids(c.kv.show) });
+// the settings -> LR4Machine.apply's argument (only what the file set)
+const machineOf = (settings) => Object.fromEntries(MACHINE_KEYS.filter((k) => settings[k] !== undefined).map((k) => [k, settings[k]]));
 
 // the intro when a file has none of its own (record_demo's flags: orbit, home)
 function defaultIntro(o) {
@@ -128,4 +161,5 @@ function defaultIntro(o) {
 }
 const hasOwnIntro = (s) => s.intro.some((c) => ["shot", "home", "title", "text", "wait"].includes(c.kind));
 
-module.exports = { parse, keyvals, videoOf, shotOf, titleText, secsOf, zeroOf, defaultIntro, hasOwnIntro, mm, SHOTS };
+module.exports = { parse, keyvals, videoOf, shotOf, titleText, secsOf, zeroOf, showOf, machineOf, roomOf, defaultIntro, hasOwnIntro, mm,
+  SHOTS, MACHINE_KEYS };

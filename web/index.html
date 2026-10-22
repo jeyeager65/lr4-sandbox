@@ -1990,6 +1990,14 @@ body.vr-on .stage { grid-row: 1; }
       }
     }
     spinNut();
+    if (jobBit && JOB.bits) {                         // the file's own bit rides on the router (homing, jogs, the
+      const rb = meshes.find((m) => m.userData.name === "Router_Bit");   // video's moves), not left at the job's start
+      if (rb) {
+        rb.updateMatrixWorld();
+        const box = new THREE.Box3().setFromObject(rb), c = box.getCenter(new THREE.Vector3());
+        for (const b of JOB.bits.values()) if (b.visible) b.position.set(c.x, c.y, box.min.z);
+      }
+    }
     if (hoseMesh) updateHose(dx, dy, dz);
     readout(X, Y, Z, !!pose);
     HOME.pose = { x: dx, y: dy, z: dz };
@@ -2800,7 +2808,7 @@ body.vr-on .stage { grid-row: 1; }
     tip: () => meta && meta.tip_above_table, TOUCH_PLATE, sync: () => ctlTick(), homed: () => CTL.homed };
 
   // ---- version + feedback: the issue link carries the size, data date and the loaded files' checksums ----
-  const VERSION = "0.28.0";
+  const VERSION = "0.29.0";
   function setupAbout() {
     const bits = [`lr4-sandbox ${VERSION}`];
     if (cfg.built) bits.push(`model data built ${cfg.built}`);
@@ -4576,6 +4584,70 @@ body.vr-on .stage { grid-row: 1; }
       done: () => move(CTL.mode === "fluidnc" ? CTL.pose : null) } });   // back on its stand
   window.LR4VR.page = vr;
   // ---- automation handle for scripted videos (tools/record_demo.js); nothing on the page uses it ----
+  // ---- for scripts (Part 29: the video sets the machine - tools/record_demo.js): My machine and Show by name / id,
+  // through the panel's own controls (so they're kept and drawn as if clicked) ----
+  window.LR4Machine = {
+    // o = { router, skirt, hose, fan (bool), peter, struts (a button's data-v), braces ("auto" or a count the menu has),
+    // table (mm, top of the MDF), room ([x, y, ceiling] mm), main, accent (#rrggbb) } -> problems (strings; the rest is set)
+    apply(o) {
+      const bad = [], el = (id) => document.getElementById(id), fire = (e, t) => e.dispatchEvent(new Event(t));
+      for (const k of ["router", "skirt", "hose", "fan"]) {
+        if (o[k] === undefined) continue;
+        const c = el("opt-" + k);
+        if (c.checked !== !!o[k]) { c.checked = !!o[k]; fire(c, "change"); }
+      }
+      for (const [k, box] of [["peter", "peter-variant"], ["struts", "strut-variant"]]) {
+        if (o[k] === undefined) continue;
+        const bs = el(box).hidden ? [] : [...el(box).querySelectorAll("button")], b = bs.find((x) => x.dataset.v === String(o[k]));
+        if (b) b.click();
+        else bad.push(`${k.toUpperCase()}=${o[k]}: ${bs.length ? "one of " + bs.map((x) => x.dataset.v).join(", ") : "no choice at this size / file set"}`);
+      }
+      if (o.braces !== undefined) {
+        const sel = el("braces"), auto = (/(\d+) braces/.exec(sel.options[0] ? sel.options[0].textContent : "") || [])[1];
+        const v = /^auto$/i.test(String(o.braces)) || String(o.braces) === auto ? "0" : String(o.braces);   // the auto count = Auto
+        if ([...sel.options].some((x) => x.value === v)) { if (sel.value !== v) { sel.value = v; fire(sel, "change"); } }
+        else bad.push(`BRACES=${o.braces}: auto (${auto}) or ${[...sel.options].slice(1).map((x) => x.value).join(", ")}`);
+      }
+      if (o.table !== undefined) {
+        if (!(o.table >= 300 && o.table <= 1500)) bad.push(`TABLE: ${o.table} mm is outside 300 - 1500`);
+        else { const t = el("table-top"); t.value = +(o.table / (U.unit === "in" ? IN : 1)).toFixed(3); fire(t, "change"); }
+      }
+      if (o.room) ["w", "d", "h"].forEach((k, i) => { const r = el("room-" + k); r.value = +(o.room[i] / roomU()).toFixed(2); fire(r, "change"); });
+      for (const role of ["main", "accent"]) {
+        if (o[role] === undefined) continue;
+        if (!/^#[0-9a-f]{6}$/i.test(o[role])) { bad.push(`${role.toUpperCase()}=${o[role]}: #rrggbb`); continue; }
+        pick[role].value = o[role]; fire(pick[role], "input");
+      }
+      return bad;
+    } };
+  window.LR4Show = {
+    tree: () => tree.asms.map((a) => ({ id: a.id, label: a.label, kinds: a.kinds.map((k) => ({ id: k.id, parts: k.parts.map((q) => q.id) })) })),
+    off: () => [...showOff],
+    // { preset, hide: [ids], show: [ids] } -> the ids (and preset) it didn't know. An id: an assembly, "asm.kind", a part
+    // (mesh name) or a part pattern with * (Y_Clip_*). Showing a part also turns on its assembly + kind (as Inspect does).
+    apply({ preset, hide = [], show = [] }) {
+      const bad = [], all = Object.keys(tree.place);
+      const ids = (id) => {
+        if (id.includes("*")) { const re = new RegExp("^" + id.split("*").map((s) => s.replace(/[.+?^${}()|[\]\\]/g, "\\$&")).join(".*") + "$"); return all.filter((p) => re.test(p)); }
+        return isGroupId(id) || tree.place[id] ? [id] : [];
+      };
+      if (preset) {
+        if (LR4ShowTree.PRESETS.some(([p]) => p === preset)) { showOff.clear(); for (const x of LR4ShowTree.preset(tree, preset)) showOff.add(x); }
+        else bad.push("PRESET=" + preset);
+      }
+      for (const id of hide) { const xs = ids(id); if (!xs.length) bad.push(id); for (const x of xs) showOff.add(x); }
+      for (const id of show) {
+        const xs = ids(id);
+        if (!xs.length) bad.push(id);
+        for (const x of xs) {
+          showOff.delete(x);
+          if (tree.place[x]) for (const [a, k] of tree.place[x]) { showOff.delete(a); showOff.delete(a + "." + k); }
+          else if (x.includes(".")) showOff.delete(x.split(".")[0]);
+        }
+      }
+      applyVisibility();
+      return bad;
+    } };
   window.LR4Demo = {
     THREE, camera, controls,
     machineBox() {                                   // the machine (no hose, legs or floor-standing scenery)
