@@ -10,7 +10,7 @@
 // frame and renders that offline to a WAV at the end; ffmpeg adds it as AAC (--no-sound: a silent video, as before).
 //   python tools/serve.py sandbox             (serves the repo on 127.0.0.1:8767; the page loads parts/)
 //   node tools/record_demo.js <file.nc> [out.mp4] [--size 2560x1440] [--fps 30] [--job 75] [--pause 2] [--orbit 10]
-//        [--url http://127.0.0.1:8767/web/index.html?parts=/parts/] [--swiftshader] [--no-sound] [--volume 0.6] [--no-home] [--real 5]
+//        [--url http://127.0.0.1:8767/web/index.html?parts=/parts/] [--swiftshader] [--no-sound] [--volume 0.6] [--voice machine|robot] [--no-home] [--real 5]
 // --job: seconds of video for the job's moves (sets the playback speed; pauses and probes come on top).
 // --real: at the first cut of each section (after a message or an M0), this many seconds at 1x (real time, real
 // sound), then it eases up to the job's speed; a badge shows the speed ("1× real time", "62×"). 0 = off.
@@ -21,7 +21,7 @@ const { spawn } = require("child_process"), fs = require("fs"), os = require("os
 const DS = require("./demo_script.js");
 
 const args = process.argv.slice(2), opt = { size: [2560, 1440], fps: 30, job: 75, pause: 2, orbit: 10,
-  url: "http://127.0.0.1:8767/web/index.html?parts=/parts/", gpu: true, sound: true, volume: 0.6, home: true, real: 5 };
+  url: "http://127.0.0.1:8767/web/index.html?parts=/parts/", gpu: true, sound: true, volume: 0.6, home: true, real: 5, voice: "machine" };
 Object.assign(opt, { park: true, hold: 3, detail: "full", scenery: "shop", messages: true, msgtime: 4 });
 const pos = [], given = new Set();
 for (let i = 0; i < args.length; i++) {
@@ -31,6 +31,7 @@ for (let i = 0; i < args.length; i++) {
   else if (a === "--no-sound") opt.sound = false;
   else if (a === "--no-home") opt.home = false;
   else if (a === "--url") opt.url = args[++i];
+  else if (a === "--voice") opt.voice = args[++i];
   else if (a === "--swiftshader") opt.gpu = false;
   else { pos.push(a); continue; }
   given.add(a.replace(/^--(no-)?/, ""));
@@ -140,7 +141,7 @@ const PAGE_REC = `(() => {
     await val(PAGE_REC);
     const homeCmd = (DS.hasOwnIntro(script) ? script.intro : DS.defaultIntro(opt)).find((q) => q.kind === "home");
     if (opt.home && homeCmd) await val(`LR4Demo.nearHome(${Number(homeCmd.kv.offset) || 30})`);   // a little way off the switches from the first frame
-    if (opt.sound) await val(`(() => { const v = document.getElementById("snd-vol"); v.value = ${opt.volume}; v.dispatchEvent(new Event("input")); return LR4Demo.sound(true); })()`);
+    if (opt.sound) await val(`(() => { const v = document.getElementById("snd-vol"); v.value = ${opt.volume}; v.dispatchEvent(new Event("input")); return LR4Demo.sound(true, ${JSON.stringify(opt.voice)}); })()`);
     const vid = opt.sound ? out.replace(/(\.\w+)?$/, ".video.mp4") : out;   // frames first; the sound is muxed in at the end
 
     ffmpeg = spawn("ffmpeg", ["-y", "-loglevel", "error", "-f", "image2pipe", "-framerate", String(opt.fps), "-c:v", "mjpeg", "-i", "-",

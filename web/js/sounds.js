@@ -22,6 +22,10 @@
 // down ~12% at full load.
 // Shop vac (the user's DeWalt StealthSonic: quieter than most, still loud): muffled airflow noise, a damped motor
 // whine and the hose's whoosh; on with the router (a tool-triggered outlet), ~1 s up, coasts down for ~3 s.
+// Joke mode (Part 23, user: "a person making robot noises", synthesized only - no recordings): the same levels voiced
+// by a mouth (jokeGraph, jokeSay): vwoooop rapids, brrrrr cutting, bzzzt plunges, rrrRRRR spin-up, mmmm while the router
+// runs, bip! at each switch, beep... boop? at the probe, hmmm? at an M0. The trace is the same, so a video can have
+// either voice (wav({ voice })).
 // Clicks (event()): "switch" = an Omron SS-GL13 microswitch snapping (homing trips): a 2 ms burst + a 4.3 kHz ping;
 // "tap" = the bit touching the touch plate (probe trip): a softer, lower metal tap.
 // All the smoothing (spin-up, run-down, load) happens here per update, so the video's trace has it too.
@@ -32,7 +36,8 @@
 //   snd.start()                      on a click (browsers only allow audio after one); false = no Web Audio
 //   snd.setOn(on), snd.setVolume(0..1)
 //   snd.update(pose [x, y, z] mm, dt s, scale, steps { x: { perMm, micro } ... }, { rpm, mrr, flutes })   once a frame
-//   snd.event("switch" | "tap")      a one-off click, now (and in the trace)
+//   snd.event("switch" | "tap" | "hold")   a one-off click, now (and in the trace); "hold" = only the joke voice
+//   snd.setVoice("machine" | "robot")      realistic or the joke mode (Part 23); create({ voice }) too
 //   snd.levels()                     what each voice is set to (tests)
 //   snd.record(on), await snd.wav({ rate }) -> Uint8Array
 (function (root) {
@@ -149,12 +154,35 @@
     return new Uint8Array(b.buffer);
   }
 
-  // the sound graph in a context (live or offline): { master, set(levels, t) }
-  function graph(ctx, motors, modes) {
-    const comp = ctx.createDynamicsCompressor(), master = ctx.createGain();
-    master.gain.value = 0;
-    master.connect(comp).connect(ctx.destination);
-    const wave = (h) => ctx.createPeriodicWave(new Float32Array(h.length), Float32Array.from(h));
+  // ---- joke mode (Part 23; user: "a person making robot noises", synthesized only) ----
+  // What the mouth says this frame, from the same levels the machine voices get. One thing at a time, as a person
+  // would, loudest first: plunging "bzzzz" (then "t"), cutting "brrrrr" (lower and rougher under load), moving
+  // "vwoooo" (higher the faster, then "p"), the router changing speed "rrrRRRR" / "RRRrrr" (pitch = its speed),
+  // a quiet "mmmm" while it runs. prev = the last frame's { rpm, t } (spin-up = the speed changing).
+  const VOWELS = { oo: [300, 870, 2240], er: [490, 1350, 1690], ih: [390, 1990, 2550], ee: [270, 2290, 3010], mm: [250, 1000, 2300] };
+  const SPIN = 1500;                   // RPM/s: faster than this = spinning up / down ("rrrRRRR")
+  function jokeSay(lv, prev, t) {
+    const mv = lv.move || { v: 0, plunge: false }, C = lv.cut, R = lv.router, rk = Math.min(1.5, R.rpm / ROUTER.rpmRef);
+    const spin = prev && t > prev.t ? Math.abs(R.rpm - prev.rpm) / (t - prev.t) : 0;
+    if (C.gain > 0.05 && mv.plunge) return { kind: "z", vowel: "ih", hz: 165, voiced: 0.55 + 0.3 * Math.min(1, C.gain), trill: 0, fric: 0.6, fricHz: 5200 };
+    if (C.gain > 0.05) {
+      const ld = Math.min(1.5, C.load || 0);
+      return { kind: "brr", vowel: "er", hz: 112 * (1 - 0.15 * ld), voiced: 0.55 + 0.45 * Math.min(1, C.gain), trill: 0.85, trillHz: 24 + 6 * ld, fric: 0.05 * ld, fricHz: 1500 };
+    }
+    if (mv.v > 0.4) return { kind: "oo", vowel: "oo", hz: 110 + 170 * Math.min(1, Math.sqrt(mv.v / 150)), voiced: Math.min(1, 0.45 + mv.v / 40), trill: 0, fric: 0 };
+    if (R.gain > 0.02 && spin > SPIN) return { kind: "rrr", vowel: "er", hz: 75 + 120 * rk, voiced: 0.35 + 0.5 * Math.min(1, rk), trill: 0.8, trillHz: 30, fric: 0 };
+    if (R.gain > 0.05) return { kind: "mm", vowel: "mm", hz: 92 + 20 * rk, voiced: 0.22, trill: 0, fric: 0 };
+    return { kind: "", vowel: "", hz: 0, voiced: 0, trill: 0, fric: 0 };
+  }
+  // the one-offs, on a second mouth: [vowel, start s, length s, Hz from, Hz to, loudness] per note
+  const JOKE_EVENTS = {
+    switch: [["ih", 0, 0.09, 560, 640, 0.8]],                                        // "bip!"
+    tap: [["ee", 0, 0.2, 440, 440, 0.8], ["oo", 0.42, 0.32, 320, 470, 0.8]],          // "beep... boop?"
+    hold: [["mm", 0, 0.35, 150, 140, 0.6], ["mm", 0.35, 0.55, 140, 185, 0.6]],      // "hmmm?" (M0)
+  };
+
+  // noise + node helpers shared by both graphs
+  function kit(ctx) {
     const gain = (v = 0) => { const g = ctx.createGain(); g.gain.value = v; return g; };
     const filt = (type, f, q) => { const b = ctx.createBiquadFilter(); b.type = type; b.frequency.value = f; if (q !== undefined) b.Q.value = q; return b; };
     const osc = (type, f) => { const o = ctx.createOscillator(); if (typeof type === "string") o.type = type; else o.setPeriodicWave(type); o.frequency.value = f; o.start(); return o; };
@@ -162,6 +190,84 @@
     const nb = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate), nd = nb.getChannelData(0);
     for (let i = 0; i < nd.length; i++) { seed = (seed * 1664525 + 1013904223) >>> 0; nd[i] = seed / 2147483648 - 1; }
     const noise = (off) => { const s = ctx.createBufferSource(); s.buffer = nb; s.loop = true; s.start(0, off); return s; };
+    const comp = ctx.createDynamicsCompressor(), master = gain(0);
+    master.connect(comp).connect(ctx.destination);
+    return { gain, filt, osc, noise, nb, master };
+  }
+
+  // the joke graph: { master, set(levels, t), play(kind, t) } like graph(). A mouth = a buzzy voice (sawtooth with a
+  // little vibrato) through three formant band-passes (the vowel), pulsed by a trill (the tongue's "rrr"), plus a
+  // fricative (band-passed noise: v, z) and short bursts for the consonants that end a sound (p, t) or start one (b).
+  function jokeGraph(ctx) {
+    const { gain, filt, osc, noise, nb, master } = kit(ctx);
+    const TCM = 0.015;                                 // s: the mouth moves faster than the machine's params
+    const out = gain(1);
+    out.connect(master);
+    const src = osc("sawtooth", 110), vib = osc("sine", 5.3), vibG = gain(14);   // cents
+    vib.connect(vibG).connect(src.detune);
+    const trillAm = gain(1), trillLfo = osc("triangle", 26), trillG = gain(0);
+    trillLfo.connect(trillG).connect(trillAm.gain);
+    const voiced = gain(0);
+    src.connect(trillAm).connect(voiced);
+    const forms = VOWELS.oo.map((f, i) => {
+      const b = filt("bandpass", f, f / (70 + 30 * i)), g = gain([1, 0.55, 0.3][i] * 9);   // makeup: band-passes are quiet
+      voiced.connect(b).connect(g).connect(out);
+      return b;
+    });
+    const fric = filt("bandpass", 1200, 1.2), fricG = gain(0);
+    noise(0.3).connect(fric).connect(fricG).connect(out);
+    const burst = (t, hp, lp, peak, len) => {          // a consonant: a short shaped noise burst
+      const b = ctx.createBufferSource(), h = filt("highpass", hp, 0.7), l = filt("lowpass", lp, 0.7), g = gain(0);
+      b.buffer = nb; b.connect(h).connect(l).connect(g).connect(out);
+      b.start(t, (t * 7.31) % 1.8, len + 0.05);
+      g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(peak, t + 0.003); g.gain.setTargetAtTime(0, t + 0.004, len / 3);
+    };
+    let cur = "", last = jokeSay({ cut: { gain: 0 }, router: { rpm: 0, gain: 0 } }), pend = null, pendT = 0, onset = -1, prev = null;
+    return {
+      master,
+      play(kind, t) {
+        for (const [vw, at, len, h0, h1, loud] of JOKE_EVENTS[kind] || []) {
+          const o = ctx.createOscillator(), g = gain(0), t0 = t + at, t1 = t0 + len;
+          o.type = "sawtooth"; o.frequency.setValueAtTime(h0, t0); o.frequency.linearRampToValueAtTime(h1, t1);
+          VOWELS[vw].forEach((f, i) => { const b = filt("bandpass", f, f / (70 + 30 * i)), fg = gain([1, 0.55, 0.3][i] * 9); o.connect(b).connect(fg).connect(g); });
+          g.connect(out);
+          g.gain.setValueAtTime(0, t0); g.gain.linearRampToValueAtTime(loud, t0 + 0.02);
+          g.gain.setValueAtTime(loud, t1 - 0.04); g.gain.linearRampToValueAtTime(0, t1);
+          o.start(t0); o.stop(t1 + 0.02);
+        }
+      },
+      set(lv, t) {
+        const want = jokeSay(lv, prev, t);
+        prev = { rpm: lv.router.rpm, t };
+        // a new sound once it has been wanted for 60 ms (frames flicker between cutting and moving)
+        if (want.kind === cur) pend = null;
+        else if (want.kind !== pend) { pend = want.kind; pendT = t; }
+        if (pend !== null && t - pendT >= 0.06) {
+          if (cur === "oo") burst(t, 150, 900, 0.5, 0.025);           // "p"
+          if (cur === "z") burst(t, 3000, 9000, 0.35, 0.02);          // "t"
+          if (pend === "brr") burst(t, 100, 600, 0.45, 0.02);         // "b"
+          if (pend === "oo") onset = t;                               // "vw" + the swoop up
+          cur = pend; pend = null;
+        }
+        if (want.kind === cur) last = want;
+        const s = last, go = (p, v) => p.setTargetAtTime(v, t, TCM);
+        const sw = cur === "oo" && onset >= 0 ? Math.min(1, (t - onset) / 0.18) : 1;   // vw: from 60% pitch, a buzz of v
+        if (s.hz) go(src.frequency, s.hz * (0.6 + 0.4 * sw));
+        go(voiced.gain, s.voiced * (cur === "oo" ? 0.4 + 0.6 * sw : 1));
+        go(trillG.gain, s.trill || 0);
+        if (s.trillHz) go(trillLfo.frequency, s.trillHz);
+        if (s.vowel) VOWELS[s.vowel].forEach((f, i) => go(forms[i].frequency, f));
+        const vf = cur === "oo" && sw < 1 ? 0.35 * (1 - sw) : 0;
+        go(fricG.gain, Math.max(s.fric || 0, vf));
+        go(fric.frequency, vf > (s.fric || 0) ? 900 : s.fricHz || 1200);
+      },
+    };
+  }
+
+  // the sound graph in a context (live or offline): { master, set(levels, t) }
+  function graph(ctx, motors, modes) {
+    const { gain, filt, osc, noise, nb, master } = kit(ctx);
+    const wave = (h) => ctx.createPeriodicWave(new Float32Array(h.length), Float32Array.from(h));
 
     // steppers (+ their mechanics' whir)
     const voices = {};
@@ -250,8 +356,9 @@
 
   function create(opts = {}) {
     const motors = Object.assign({ x: 1, y: 2, z: 2 }, opts.motors), modes = Object.assign({}, opts.modes);   // modes: { x: "StealthChop" }
-    let ctx = null, G = null, on = false, vol = opts.volume ?? 0.5;
-    let pose = null, vel = null, trace = null, clock = 0, events = [];
+    let ctx = null, G = null, graphs = {}, on = false, vol = opts.volume ?? 0.5, sayer = opts.voice === "robot" ? "robot" : "machine";
+    let pose = null, vel = null, trace = null, clock = 0, events = [], held = false;
+    const make = (c, v) => (v === "robot" ? jokeGraph(c) : graph(c, motors, modes));
     let rpm = 0, load = 0, vac = 0;                  // the router's actual speed, the cutting load (0..), the vac's spin (0..1)
     let lv = { router: { rpm: 0, hz: 0, gain: 0 }, cut: { gain: 0, hz: 1800, tooth: 1, load: 0 }, vac: { spin: 0, gain: 0 } };
     for (const a of AXES) lv[a] = { hz: MIN_HZ, gain: 0, whir: 0 };
@@ -262,7 +369,7 @@
           const AC = root.AudioContext || root.webkitAudioContext;
           if (!AC) return false;
           ctx = new AC();
-          G = graph(ctx, motors, modes);
+          G = graphs[sayer] = make(ctx, sayer);
         }
         if (ctx.state === "suspended") ctx.resume();
         return true;
@@ -276,7 +383,19 @@
       setVolume(v) { vol = Math.min(1, Math.max(0, v)); if (ctx && on) G.master.gain.setTargetAtTime(vol * MASTER, ctx.currentTime, 0.05); },
       volume: () => vol,
       on: () => on,
-      // o: { rpm (the router's set speed, 0 = off), mrr (mm^3/s the bit is removing, real time), flutes }
+      // "machine" (realistic) or "robot" (the joke mode); each graph is made once and kept, the other one muted
+      setVoice(v) {
+        sayer = v === "robot" ? "robot" : "machine";
+        if (ctx) {
+          if (G) G.master.gain.setTargetAtTime(0, ctx.currentTime, 0.05);
+          G = graphs[sayer] || (graphs[sayer] = make(ctx, sayer));
+          if (on) G.master.gain.setTargetAtTime(vol * MASTER, ctx.currentTime, 0.05);
+        }
+        return sayer;
+      },
+      voice: () => sayer,
+      // o: { rpm (the router's set speed, 0 = off), mrr (mm^3/s the bit is removing, real time), flutes, hold (an M0
+      // popup is up: the joke voice says "hmmm?" as it opens) }
       update(p, dt, scale, steps, o = {}) {
         if (!p) return;
         vel = velocity(pose, p, dt, scale, vel);
@@ -295,13 +414,15 @@
         next.cut = { load, gain: load > 0.01 ? Math.min(1.2, Math.pow(load, 0.6)) : 0,
           hz: (plunge ? 850 : 1800) * Math.sqrt(Math.max(eff, 1) / ROUTER.rpmRef), tooth: hz * (o.flutes || 2) };
         next.vac = { spin: vac, gain: vac < 0.02 ? 0 : Math.pow(vac, 1.5) };
+        next.move = { v: Math.hypot(vel[0], vel[1], vel[2]), plunge };
         lv = next;
+        if (!!o.hold !== held) { held = !!o.hold; if (held) api.event("hold"); }
         if (trace && dt > 0) trace.push([clock, lv]);   // at the frame's start: entry k = video frame k
         clock += dt;
         if (ctx && on) G.set(lv, ctx.currentTime);
       },
       event(kind) {
-        if (!CLICKS[kind]) return;
+        if (!CLICKS[kind] && !JOKE_EVENTS[kind]) return;
         if (trace) events.push([clock, kind]);
         if (ctx && on) G.play(kind, ctx.currentTime);
       },
@@ -334,7 +455,7 @@
         if (!trace || !trace.length) return null;
         const rate = o.rate || 48000, secs = trace[trace.length - 1][0] + 0.5;
         const OAC = root.OfflineAudioContext || root.webkitOfflineAudioContext;
-        const oc = new OAC(1, Math.ceil(secs * rate), rate), g = graph(oc, motors, modes);
+        const oc = new OAC(1, Math.ceil(secs * rate), rate), g = make(oc, o.voice || sayer);
         g.master.gain.value = (o.volume ?? vol) * MASTER;
         for (const [t, l] of trace) g.set(l, t);
         for (const [t, k] of events) g.play(k, t);
@@ -346,7 +467,7 @@
     return api;
   }
 
-  const out = { CLICKS, create, voice, velocity, fullStepHz, stepsFromYaml, dialRpm, routerPlan, routerAt, wavBytes, AXES, KOBALT, DEFAULT_RPM };
+  const out = { CLICKS, JOKE_EVENTS, VOWELS, jokeSay, create, voice, velocity, fullStepHz, stepsFromYaml, dialRpm, routerPlan, routerAt, wavBytes, AXES, KOBALT, DEFAULT_RPM };
   if (typeof module !== "undefined" && module.exports) module.exports = out;
   else root.LR4Sound = out;
 })(typeof self !== "undefined" ? self : this);

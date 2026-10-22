@@ -2,7 +2,7 @@
 // special comments to set settings, display text, etc."; the syntax follows cnc-gcode-tools' CNCSIM / Stock / ToolDef
 // comments). FluidNC and the page ignore them: one file is the job and the video.
 //   (Video: KEY=VALUE ...)           settings, any line before the first move; the command line's flags win:
-//       SIZE=2560x1440 FPS=30 VOLUME=0.6 SOUND=on DETAIL=full SCENERY=shop MACHINE=26x50 (cut area, in)
+//       SIZE=2560x1440 FPS=30 VOLUME=0.6 SOUND=on VOICE=machine|robot (robot = the joke voice) DETAIL=full SCENERY=shop MACHINE=26x50 (cut area, in)
 //       PAUSE=2 (s each M0 popup shows, then it resumes)  MESSAGES=on MSGTIME=4 (MSG / PRINT lines shown on top, s)
 //       PARK=on (drive the gantry back at the end)  HOLD=3 (s on the result)
 //   (Video Shot: VIEW=name TIME=s ORBIT=s DIST=mm)   the camera: blends there over TIME (1.5), then turns once round
@@ -27,7 +27,7 @@
 "use strict";
 
 const SETTINGS = { size: "wxh", machine: "wxh", fps: "num", volume: "num", pause: "num", msgtime: "num", hold: "num",
-  sound: "bool", park: "bool", messages: "bool", detail: "word", scenery: "word" };
+  sound: "bool", park: "bool", messages: "bool", detail: "word", scenery: "word", voice: "word" };
 const KINDS = ["shot", "home", "zero", "title", "text", "wait", "speed"];
 const INTRO_ONLY = new Set(["home", "zero"]);
 const SHOTS = new Set(["workshop", "machine", "stock", "tool", "core", "iso", "front", "top", "side", "back", "page"]);

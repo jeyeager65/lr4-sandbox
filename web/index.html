@@ -681,6 +681,7 @@ body.vr-on .stage { grid-row: 1; }
       <div id="room-warn"></div>
     </div>
     <div class="slider sm-row"><label for="snd-vol" title="Machine sound volume">🔈</label><input id="snd-vol" type="range" min="0" max="1" step="0.05" value="0.5"><output id="snd-vol-out" for="snd-vol">50%</output></div>
+    <div class="slider sm-row"><label for="snd-voice" title="Machine sound: realistic, or a person making robot noises">🗣</label><select id="snd-voice"><option value="machine">Realistic</option><option value="robot">Robot noises (joke)</option></select></div>
     <div class="sm">
       <button id="sm-connect" type="button">Connect SpaceMouse</button>
       <span id="sm-status" class="sm-status">Not connected</span>
@@ -2455,7 +2456,7 @@ body.vr-on .stage { grid-row: 1; }
     tip: () => meta && meta.tip_above_table, TOUCH_PLATE, sync: () => ctlTick(), homed: () => CTL.homed };
 
   // ---- version + feedback: the issue link carries the size, data date and the loaded files' checksums ----
-  const VERSION = "0.22.0";
+  const VERSION = "0.23.0";
   function setupAbout() {
     const bits = [`lr4-sandbox ${VERSION}`];
     if (cfg.built) bits.push(`model data built ${cfg.built}`);
@@ -3925,7 +3926,10 @@ body.vr-on .stage { grid-row: 1; }
     },
     room: () => shopRoom,
     recording(on) { document.body.classList.toggle("rec", on); controls.enableDamping = !on; resize(); },
-    sound(on) { soundEngine().record(on); return true; },   // keep the sound with the frames from now (the frozen clock's dt)
+    sound(on, voice) {                               // voice: "machine" | "robot" (the joke mode); omitted = the page's pick
+      if (voice) { $("snd-voice").value = voice; $("snd-voice").dispatchEvent(new Event("change")); }
+      soundEngine().record(on); return true;
+    },   // keep the sound with the frames from now (the frozen clock's dt)
     async soundWav() {                               // -> number of base64 chunks (soundChunk(i)); 0 = no sound
       const b = SND.s && await SND.s.wav();
       this._wav = [];
@@ -4020,7 +4024,7 @@ body.vr-on .stage { grid-row: 1; }
     title(text) { const b = $("rec-title"); b.hidden = !text; b.firstChild.textContent = text || ""; },
   };                             // testing without a headset: page_shot --eval "LR4VR.page.preview('one')"
 
-  // ---- machine sounds (Parts 21-22; js/sounds.js), once a frame: the machine's pose (move() sets HOME.pose in every
+  // ---- machine sounds (Parts 21-23; js/sounds.js; Part 23 = the joke voice), once a frame: the machine's pose (move() sets HOME.pose in every
   // mode) -> the steppers, at the real machine's speed (the motion / the time scale in use); the router's set speed at
   // the job's line (M3 / M5, or the file's "Turn On Router at Dial N"; only while a job runs or holds) + the shop vac
   // with it; the cutting load = how fast the stock's heightmap loses material; clicks: the switches as they trip
@@ -4035,7 +4039,7 @@ body.vr-on .stage { grid-row: 1; }
   function soundEngine() {
     if (!SND.s) {
       const st = soundSteps();
-      SND.s = LR4Sound.create({ volume: Number($("snd-vol").value), modes: { x: st.x.mode, y: st.y.mode, z: st.z.mode } });
+      SND.s = LR4Sound.create({ volume: Number($("snd-vol").value), voice: $("snd-voice").value, modes: { x: st.x.mode, y: st.y.mode, z: st.z.mode } });
     }
     return SND.s;
   }
@@ -4082,7 +4086,7 @@ body.vr-on .stage { grid-row: 1; }
     }
     SND.seg = j ? j.seg : -1;
     SND.s.update([p.x, p.y, p.z], dt, scale, soundSteps(),
-      { rpm: j ? j.rpm : 0, mrr: dt > 0 ? removed / dt / scale : 0, flutes: j ? j.flutes : 2 });
+      { rpm: j ? j.rpm : 0, mrr: dt > 0 ? removed / dt / scale : 0, flutes: j ? j.flutes : 2, hold: !$("job-pop").hidden });
   }
   function soundToggle() {
     const on = soundEngine().setOn(!SND.s.on());
@@ -4099,6 +4103,12 @@ body.vr-on .stage { grid-row: 1; }
       show();
       if (SND.s) SND.s.setVolume(Number(v.value));
       try { localStorage.setItem("lr4-snd-vol", v.value); } catch (e) { /* not kept */ }
+    });
+    const vc = $("snd-voice");                       // Part 23: realistic or the joke voice (kept)
+    try { const k = localStorage.getItem("lr4-snd-voice"); if (k) vc.value = k; } catch (e) { /* default */ }
+    vc.addEventListener("change", () => {
+      if (SND.s) SND.s.setVoice(vc.value);
+      try { localStorage.setItem("lr4-snd-voice", vc.value); } catch (e) { /* not kept */ }
     });
   }
 

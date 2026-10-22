@@ -98,5 +98,23 @@ L = e.levels();
 ok(L.router.rpm > 4000 && L.router.rpm < 9000 && L.cut.gain === 0 && L.vac.spin > 0.5, `1.5 s after off: ${L.router.rpm.toFixed(0)} RPM, vac still ${L.vac.spin.toFixed(2)} (coasting)`);
 ok(e.events().length === 1 && e.events()[0][1] === "switch" && near(e.events()[0][0], 3, 1e-9) && e.traceLength() === 135, "click kept at its frame's time: " + JSON.stringify(e.events()));
 
+// Part 23: the joke voice says one thing at a time, loudest first; M0 holds become "hold" events
+const lvl = (o) => Object.assign({ cut: { gain: 0, load: 0 }, router: { rpm: 0, gain: 0 }, move: { v: 0, plunge: false } }, o);
+const say = (o, prev, t = 1) => S.jokeSay(lvl(o), prev, t).kind;
+ok(say({}) === "", "idle: silent");
+ok(say({ move: { v: 50, plunge: false } }) === "oo", "rapid: vwoooo");
+ok(S.jokeSay(lvl({ move: { v: 150 } })).hz > S.jokeSay(lvl({ move: { v: 10 } })).hz, "faster = higher");
+ok(say({ move: { v: 15 }, cut: { gain: 0.5, load: 0.5 }, router: { rpm: 18000, gain: 1 } }) === "brr", "cutting beats moving: brrr");
+ok(say({ move: { v: 2, plunge: true }, cut: { gain: 0.3, load: 0.2 }, router: { rpm: 18000, gain: 1 } }) === "z", "plunging: bzzz");
+ok(say({ router: { rpm: 9000, gain: 0.4 } }, { rpm: 5000, t: 0.9 }) === "rrr", "spinning up: rrrRRRR");
+ok(say({ router: { rpm: 18000, gain: 1 } }, { rpm: 18000, t: 0.9 }) === "mm", "running steady: mmmm");
+for (const k of Object.keys(S.JOKE_EVENTS)) for (const n of S.JOKE_EVENTS[k]) ok(S.VOWELS[n[0]], `${k}: vowel ${n[0]}`);
+const r = S.create({ voice: "robot" });
+r.record(true);
+const go = (secs, o) => { for (let i = 0; i < secs * 30; i++) r.update([0, 0, 0], 1 / 30, 1, st, o); };
+go(0.5, {}); go(0.5, { hold: true }); go(0.5, {}); go(0.5, { hold: true });
+ok(r.voice() === "robot" && r.events().filter((ev) => ev[1] === "hold").length === 2, "an M0 popup opening = one hold each: " + JSON.stringify(r.events()));
+ok(r.setVoice("nope") === "machine", "an unknown voice = realistic");
+
 console.log(fails ? `sounds: ${fails} of ${checks} failed` : `sounds: all ${checks} passed`);
 process.exit(fails ? 1 : 0);
