@@ -161,6 +161,30 @@ canvas { display: block; width: 100%; height: 100%; touch-action: none; }
 .ft-pop canvas { display: block; width: 100%; height: auto; aspect-ratio: 5 / 3; background: #000; cursor: pointer; touch-action: none; }
 body.rec .panel, body.rec .hint, body.rec .toolbar, body.rec .view-pop, body.rec .pick { display: none; }  /* recording (LR4Demo.recording): the 3D view, whole window */
 body.rec .stage { position: fixed; inset: 0; }
+.rec-badge {                          /* the demo video's speed (LR4Demo.badge): "1× real time" / "62×" */
+  position: absolute; left: 2.2%; top: 3.5%; padding: 0.3em 0.65em; border-radius: 8px;
+  font: 700 clamp(28px, 5.2vh, 96px) var(--font-display), system-ui, sans-serif; letter-spacing: 0.02em;
+  color: #fff; background: rgb(0 0 0 / 0.55);
+}
+.rec-badge[hidden], .rec-caption[hidden], .rec-title[hidden], .rec-msg[hidden] { display: none; }
+.rec-msg {                            /* the file's MSG / PRINT lines in the demo video */
+  position: absolute; left: 50%; top: 3.5%; transform: translateX(-50%); max-width: 62%; text-align: center;
+  padding: 0.35em 0.9em; border-radius: 8px; font: 500 clamp(18px, 3vh, 52px) ui-monospace, Consolas, monospace;
+  color: #ffe08a; background: rgb(0 0 0 / 0.6);
+}
+body.rec .job-pop { max-width: min(70%, 1500px); padding: 0.7em 1.1em 0.8em; font-size: clamp(22px, 3.6vh, 64px); border-left-width: 0.3em; }
+body.rec .job-pop b { font-size: 0.75em; }
+body.rec .job-pop p { font-size: 1.15em; }
+body.rec .job-pop button { font-size: 0.85em; padding: 0.35em 0.8em; }
+.rec-caption {                        /* the demo video's captions (DEMO text) */
+  position: absolute; left: 50%; bottom: 6%; transform: translateX(-50%); max-width: 80%; text-align: center;
+  padding: 0.4em 0.9em; border-radius: 8px; font: 500 clamp(18px, 3.2vh, 54px) system-ui, sans-serif;
+  color: #fff; background: rgb(0 0 0 / 0.6);
+}
+.rec-title {                          /* a full-screen card (DEMO title) */
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgb(12 13 16 / 0.82);
+}
+.rec-title > div { max-width: 80%; text-align: center; color: #fff; white-space: pre-line; font: 700 clamp(28px, 6vh, 110px) var(--font-display), system-ui, sans-serif; line-height: 1.15; }
 .job-pop button { cursor: pointer; }
 .job-pop b { font-family: var(--font-display); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
 .job-pop p { margin: 4px 0 10px; font-size: 15px; line-height: 1.4; }
@@ -630,6 +654,7 @@ body.vr-on .stage { grid-row: 1; }
     <button id="v-back" type="button">Back</button>
     <button id="v-fit" type="button">Fit all</button>
     <button id="v-home" type="button" title="Home the machine ($H)">⌂ Home</button>
+    <button id="v-sound" type="button" aria-pressed="false" title="Machine sounds (synthesized: the stepper motors as TMC2209s in StealthChop run them)">🔈 Sound</button>
     <button id="v-vr" type="button" hidden title="PC VR headset (SteamVR / OpenXR)">Enter VR</button>
     <button id="v-more" type="button" aria-expanded="false" aria-controls="view-pop" title="View settings" aria-label="View settings">⚙</button>
   </div>
@@ -655,6 +680,7 @@ body.vr-on .stage { grid-row: 1; }
       <p class="foot" id="room-note"></p>
       <div id="room-warn"></div>
     </div>
+    <div class="slider sm-row"><label for="snd-vol" title="Machine sound volume">🔈</label><input id="snd-vol" type="range" min="0" max="1" step="0.05" value="0.5"><output id="snd-vol-out" for="snd-vol">50%</output></div>
     <div class="sm">
       <button id="sm-connect" type="button">Connect SpaceMouse</button>
       <span id="sm-status" class="sm-status">Not connected</span>
@@ -666,6 +692,10 @@ body.vr-on .stage { grid-row: 1; }
   <div class="pick" id="pick" role="status" hidden><div><strong></strong><p></p></div>
     <button type="button" id="pick-clear" aria-label="Clear the selection" title="Clear">✕</button></div>
   <div class="hint">Drag to orbit · right-drag to pan · scroll to zoom</div>
+  <div class="rec-badge" id="rec-badge" hidden></div>
+  <div class="rec-caption" id="rec-caption" hidden></div>
+  <div class="rec-title" id="rec-title" hidden><div></div></div>
+  <div class="rec-msg" id="rec-msg" hidden></div>
   <div class="job-pop" id="job-pop" role="alertdialog" aria-labelledby="job-pop-h" hidden><b id="job-pop-h">Paused (M0)</b><p id="job-pop-msg"></p><div class="buttons"><button type="button" id="job-resume">Resume (cycle start)</button><button type="button" id="job-pop-def" hidden>Stock and bits…</button></div></div>
   <div class="ft-pop" id="ft-pop" role="dialog" aria-labelledby="ft-pop-h" hidden><div class="ft-head"><b id="ft-pop-h">FluidTouch pendant</b>
     <button type="button" id="ft-pop-x" aria-label="Close the pendant screen" title="Close">✕</button></div>
@@ -704,6 +734,7 @@ body.vr-on .stage { grid-row: 1; }
 <script src="js/homing.js"></script>
 <script src="js/fluidnc_sim.js"></script>
 <script src="js/fluidtouch_sim.js"></script>
+<script src="js/sounds.js"></script>
 <script src="js/sim_config.js"></script>
 <script src="js/config_model.js"></script>
 <script src="js/parts_files.js"></script>
@@ -1850,6 +1881,7 @@ body.vr-on .stage { grid-row: 1; }
     jobSetup(JOB.pageJob);                           // the job reloads to start from the homed spot
   }
   function clickSwitch(axis) {                       // the switch + its lever light up for a moment at each trip
+    if (SND.s) SND.s.event("switch");                // and snap (js/sounds.js)
     if (!flashMat) flashMat = new THREE.MeshBasicMaterial({ color: 0xffc400 });
     for (const n of SWITCHES[axis] || []) for (const name of [n, n + "_Lever"]) {
       const m = meshes.find((q) => q.userData.name === name);
@@ -1877,11 +1909,13 @@ body.vr-on .stage { grid-row: 1; }
   // where the job starts: Playback's homed spot; FluidNC mode: where the machine was when Run was pressed (fjRun), else
   // where its $H left it
   const jobSpot = () => (CTL.mode === "fluidnc" ? (CTL.homed && (CTL.runFrom || CTL.homePose)) || null : HOME.home);
+  // work zero's offset from the cutting area's corner (mm; LR4Demo.zero, Playback only): poses = work + corner + this
+  const jobZ0 = () => (CTL.mode !== "fluidnc" && JOB.zero ? JOB.zero : [0, 0]);
   function jobStartAt() {
     const h = jobSpot();
     if (!h) return undefined;
-    const tv = meta.travel;
-    return (stock) => ({ x: h.x - tv.x[0], y: h.y - tv.y[0], z: h.z + meta.tip_above_table + (stock ? stock.zmin : 0) });
+    const tv = meta.travel, z0 = CTL.mode === "fluidnc" ? null : JOB.zero;   // JOB.zero: LR4Demo.zero (videos: jogged there first)
+    return (stock) => ({ x: z0 ? 0 : h.x - tv.x[0], y: z0 ? 0 : h.y - tv.y[0], z: h.z + meta.tip_above_table + (stock ? stock.zmin : 0) });
   }
   for (const id of ["home", "v-home"]) document.getElementById(id).addEventListener("click", () =>
     (CTL.mode === "fluidnc" ? ctlHome() : HOME.run ? homeCancel() : homeStart()));
@@ -2212,6 +2246,8 @@ body.vr-on .stage { grid-row: 1; }
     const pins = sim.pinMask(), on = pins & ~CTL.pins;    // a switch closing flashes it (and its lever)
     CTL.pins = pins;
     if (on) for (const m of CTL.cfg.pins.motors) for (const g of Object.values(m.limits)) if (Math.floor(on / 2 ** g) % 2) clickSwitch(m.axis);
+    const pr = CTL.cfg.pins.probe;                   // the bit touching the plate
+    if (on && pr && Math.floor(on / 2 ** pr.gpio) % 2 && SND.s) SND.s.event("tap");
   }
   // the switches: each motor's limit pins trip at its axis' end of the travel (neg: travel[0], pos: travel[1], all: the
   // homing end); the probe at the tip on the touch plate (the table top + its thickness) while that's ticked
@@ -2419,7 +2455,7 @@ body.vr-on .stage { grid-row: 1; }
     tip: () => meta && meta.tip_above_table, TOUCH_PLATE, sync: () => ctlTick(), homed: () => CTL.homed };
 
   // ---- version + feedback: the issue link carries the size, data date and the loaded files' checksums ----
-  const VERSION = "0.20.0";
+  const VERSION = "0.22.0";
   function setupAbout() {
     const bits = [`lr4-sandbox ${VERSION}`];
     if (cfg.built) bits.push(`model data built ${cfg.built}`);
@@ -2780,7 +2816,7 @@ body.vr-on .stage { grid-row: 1; }
     const def = defLoad(src), head = def ? GcodePlay.header(def.stock, def.tools, def.inch) : "";
     const spot = jobSpot();
     const key = `${src.kind}|${src.name}|${src.text.length}|${src.text.slice(-200)}|${S.cutX},${S.cutY},${S.n},${lite},${tableTop}|` +
-      `${spot ? [spot.x, spot.y, spot.z].map((v) => v.toFixed(3)) : "-"}|${head}`;
+      `${spot ? [spot.x, spot.y, spot.z].map((v) => v.toFixed(3)) : "-"}|${head}|${CTL.mode !== "fluidnc" && JOB.zero ? JOB.zero.join(",") : ""}`;
     if (key === JOB.key) return null;
     return jobLoad(src, key, head);
   }
@@ -2809,6 +2845,7 @@ body.vr-on .stage { grid-row: 1; }
       at[1] = (g.boundingBox.min.y + g.boundingBox.max.y) / 2 * mb.scale.y + mb.position.y;
       JOB.tipErr = g.boundingBox.min.z * mb.scale.z + mb.position.z - (bb.max.z + meta.tip_above_table);   // model tip vs tip_above_table
     }
+    if (CTL.mode !== "fluidnc" && JOB.zero) { at[0] += JOB.zero[0]; at[1] += JOB.zero[1]; }   // work zero off the corner (LR4Demo.zero)
     Object.assign(JOB, { tl, at, src, key, group: new THREE.Group() });
     if (tl.stock && tl.tools.size) {
       JOB.cells = lite ? 1.2e5 : 4e5;
@@ -2831,7 +2868,8 @@ body.vr-on .stage { grid-row: 1; }
     scene.add(JOB.group);
     const tv = meta.travel, b = tl.segs.reduce((r, sg) => [Math.min(r[0], sg.end.x), Math.max(r[1], sg.end.x), Math.min(r[2], sg.end.y),
       Math.max(r[3], sg.end.y)], [Infinity, -Infinity, Infinity, -Infinity]);
-    JOB.fits = b[0] >= -0.01 && b[2] >= -0.01 && b[1] <= tv.x[1] - tv.x[0] + 0.01 && b[3] <= tv.y[1] - tv.y[0] + 0.01;
+    const z0 = jobZ0();
+    JOB.fits = b[0] + z0[0] >= -0.01 && b[2] + z0[1] >= -0.01 && b[1] + z0[0] <= tv.x[1] - tv.x[0] + 0.01 && b[3] + z0[1] <= tv.y[1] - tv.y[0] + 0.01;
     const units = { mm: "mm (G21)", in: "inches (G20), shown in mm", mixed: "G20 + G21, shown in mm" }[tl.units];
     $("job-src").textContent = `${src.name}: ${tl.lines} lines, ${tl.segs.length} moves, ${units}; ~${clock(tl.total)} at ` +
       `${jobRates() === GcodePlay.V1E ? "V1E's JP3_LR" : "your config.yaml's"} speeds. ` +
@@ -2922,8 +2960,8 @@ body.vr-on .stage { grid-row: 1; }
     jobTouch(pw);
     jobCloseUp(pw);
     const clamp = (v, r) => Math.min(Math.max(v, r[0]), r[1]);
-    // work zero is the cutting area's corner = slider 0; the tip's height above the table = stock + work Z
-    const mx = clamp(p.x + tv.x[0], tv.x), my = clamp(p.y + tv.y[0], tv.y);
+    // work zero is the cutting area's corner = slider 0 (+ jobZ0); the tip's height above the table = stock + work Z
+    const z0 = jobZ0(), mx = clamp(p.x + tv.x[0] + z0[0], tv.x), my = clamp(p.y + tv.y[0] + z0[1], tv.y);
     // the bit turns while the job runs, but not with the touch plate out (the router is off for the probe)
     JOB.spinning = JOB.playing && !probing;
     // Z too stops at its bottom stop (the Z nut on the couplers): a job asking for more is cut short there - the bit
@@ -2934,7 +2972,7 @@ body.vr-on .stage { grid-row: 1; }
     if (JOB.bits) {
       const sg = tl.segs[Math.min(p.index, tl.segs.length - 1)], b = JOB.bits.get(sg.toolNumber) || JOB.bits.values().next().value;
       for (const q of JOB.bits.values()) q.visible = q === b;
-      if (b) { b.position.set(at[0] + mx - tv.x[0], at[1] + my - tv.y[0], at[2] + pz); b.rotation.z = JOB.spinning ? JOB.spin : 0; }
+      if (b) { b.position.set(at[0] + mx - tv.x[0] - z0[0], at[1] + my - tv.y[0] - z0[1], at[2] + pz); b.rotation.z = JOB.spinning ? JOB.spin : 0; }
     }
     $("wx").textContent = p.x.toFixed(1); $("wy").textContent = p.y.toFixed(1); $("wz").textContent = p.z.toFixed(2);
     $("job-t").value = Math.round(JOB.t / tl.total * 1000);
@@ -2975,7 +3013,7 @@ body.vr-on .stage { grid-row: 1; }
     if (!JOB.tl) return;
     if (JOB.playing) {
       JOB.spin = ((JOB.spin || 0) - dt * 2 * Math.PI) % (2 * Math.PI);   // clockwise from above, 1 turn/s, as cnc-gcode-tools
-      const r = GcodePlay.step(JOB.tl, JOB.t, dt, +$("job-speed").value, JOB.k);
+      const r = GcodePlay.step(JOB.tl, JOB.t, dt, JOB.rate || +$("job-speed").value, JOB.k);   // rate: LR4Demo.rate (videos)
       JOB.k = r.k;
       jobSeek(r.t);
       if (r.stop) jobStop(r.stop);
@@ -3887,6 +3925,26 @@ body.vr-on .stage { grid-row: 1; }
     },
     room: () => shopRoom,
     recording(on) { document.body.classList.toggle("rec", on); controls.enableDamping = !on; resize(); },
+    sound(on) { soundEngine().record(on); return true; },   // keep the sound with the frames from now (the frozen clock's dt)
+    async soundWav() {                               // -> number of base64 chunks (soundChunk(i)); 0 = no sound
+      const b = SND.s && await SND.s.wav();
+      this._wav = [];
+      if (!b) return 0;
+      for (let i = 0; i < b.length; i += 3 << 20) {
+        let t = "";
+        const part = b.subarray(i, i + (3 << 20));
+        for (let j = 0; j < part.length; j += 0x8000) t += String.fromCharCode.apply(null, part.subarray(j, j + 0x8000));
+        this._wav.push(btoa(t));
+      }
+      return this._wav.length;
+    },
+    soundChunk(i) { return this._wav[i]; },
+    soundStats: () => (SND.s ? SND.s.stats() : null),
+    soundTimeline: () => (SND.s ? SND.s.timeline() : ""),
+    soundLevels: () => (SND.s ? SND.s.levels() : null),
+    soundVel: () => (SND.s ? SND.s.velocity() : null),
+    poseNow: () => HOME.pose && [HOME.pose.x, HOME.pose.y, HOME.pose.z],
+    soundState: () => (SND.s && SND.s.context() ? SND.s.context().state : "none"),
     async playFile(name, text) {                     // as "Play a G-code file...": resolves once it is loaded
       JOB.file = { kind: "file", name, text };
       jobSetup(JOB.pageJob);
@@ -3900,22 +3958,149 @@ body.vr-on .stage { grid-row: 1; }
       sel.value = String(x);
     },
     play() { if (!JOB.playing) $("job-play").click(); },
+    home(real) {                                     // Playback homing ($H): the switches flash and click; real = V1E's speeds
+      const c = $("home-real"), was = c.checked;
+      if (real) c.checked = true;
+      homeStart();
+      c.checked = was;
+      return !!HOME.run;
+    },
+    homing: () => !!HOME.run,
+    nearHome(mm = 30) {                              // the machine mm off each home switch: a short $H, in real time
+      const t = meta.travel, s = Homing.settings(yamlBase ? yamlBase.text : null);
+      move(["x", "y", "z"].map((a) => (s[a].positive ? t[a][1] - mm : t[a][0] + mm)));
+      return true;
+    },
+    async layout() {                                 // after homing: the job laid out again from the homed spot
+      await jobSetup(JOB.pageJob);
+      return { stock: JOB.tl && JOB.tl.stock, at: JOB.at };
+    },
     resume() { $("job-resume").click(); },
     pose(x, y, z) {                                  // the machine at work X, Y, Z (mm), the job's bit with it
       const tv = meta.travel, at = JOB.at, st = JOB.tl.stock, tableZ = at[2] + (st ? st.zmin : 0);
-      const clamp = (v, r) => Math.min(Math.max(v, r[0]), r[1]), mx = clamp(x + tv.x[0], tv.x), my = clamp(y + tv.y[0], tv.y);
+      const z0 = jobZ0(), clamp = (v, r) => Math.min(Math.max(v, r[0]), r[1]), mx = clamp(x + tv.x[0] + z0[0], tv.x), my = clamp(y + tv.y[0] + z0[1], tv.y);
       const tip = Math.min(at[2] + z - tableZ, meta.tip_above_table + tv.z[1]);   // no higher than Z can go
       move([mx, my, tip - meta.tip_above_table]);
-      for (const b of JOB.bits ? JOB.bits.values() : []) if (b.visible) b.position.set(at[0] + mx - tv.x[0], at[1] + my - tv.y[0], tableZ + tip);
+      for (const b of JOB.bits ? JOB.bits.values() : []) if (b.visible) b.position.set(at[0] + mx - tv.x[0] - z0[0], at[1] + my - tv.y[0] - z0[1], tableZ + tip);
     },
     park() {                                         // where the job ended -> gantry at the back, Z at the top
       const p = GcodePlay.at(JOB.tl, JOB.tl.total), tv = meta.travel, at = JOB.at, st = JOB.tl.stock;
       const tableZ = at[2] + (st ? st.zmin : 0);
-      return { from: [p.x, p.y, p.z], to: [p.x, tv.y[1] - tv.y[0], meta.tip_above_table + tv.z[1] - (at[2] - tableZ)] };
+      return { from: [p.x, p.y, p.z], to: [p.x, tv.y[1] - tv.y[0] - jobZ0()[1], meta.tip_above_table + tv.z[1] - (at[2] - tableZ)] };
     },
-    job: () => ({ t: JOB.t, total: JOB.tl ? JOB.tl.total : 0, playing: JOB.playing, paused: !$("job-pop").hidden,
-      closeUp: !!JOB.camSaved || !!camTween }),
+    job() {                                          // + cut: the bit on a cutting move; section: messages / pauses passed
+      const tl = JOB.tl, p = tl ? GcodePlay.at(tl, JOB.t) : null, i = tl ? Math.min(p.index, tl.segs.length - 1) : -1, sg = tl && tl.segs[i];
+      return { t: JOB.t, total: tl ? tl.total : 0, playing: JOB.playing, paused: !$("job-pop").hidden,
+        closeUp: !!JOB.camSaved || !!camTween, cut: !!sg && sg.type === "cut", line: sg ? sg.srcLine || 0 : 0,
+        tip: p && JOB.at ? [JOB.at[0] + p.x, JOB.at[1] + p.y, JOB.at[2] + p.z] : null,
+        cam: [camera.position.toArray(), controls.target.toArray()],
+        msg: (() => {                                // the latest MSG / PRINT line played
+          let m = null;
+          for (const e of tl ? tl.events : []) { if (e.time > JOB.t) break; if (e.kind === "msg" || e.kind === "print") m = e; }
+          return m && { key: `${m.index}:${m.lineNum}`, text: m.text };
+        })(),
+        popText: $("job-pop").hidden ? "" : $("job-pop-msg").textContent,
+        section: tl ? tl.events.filter((e) => (e.kind === "msg" || e.kind === "pause") && e.index <= i).length : 0 };
+    },
+    rate(x) { JOB.rate = x || null; },               // playback speed without touching the menu (null = the menu's)
+    badge(text) { const b = $("rec-badge"); b.hidden = !text; b.textContent = text || ""; },
+    caption(text) { const b = $("rec-caption"); b.hidden = !text; b.textContent = text || ""; },
+    msg(text) { const b = $("rec-msg"); b.hidden = !text; b.textContent = text || ""; },
+    coreCenter() {                                   // the router + core's box centre (world mm)
+      const b = new THREE.Box3();
+      for (const m of meshes) if (m.visible && m.userData.motion === "core") { m.updateMatrixWorld(); b.expandByObject(m); }
+      return b.isEmpty() ? null : b.getCenter(new THREE.Vector3()).toArray();
+    },
+    zero(x, y) {                                     // work zero x, y mm from the cut area's front-left corner (null = there)
+      JOB.zero = x === null || x === undefined ? null : [x, y];
+      const h = HOME.home, tv = meta.travel;         // -> the jog from the homed spot to it (move() poses)
+      return h ? { from: [h.x, h.y, h.z], to: [tv.x[0] + (JOB.zero ? x : 0), tv.y[0] + (JOB.zero ? y : 0), h.z] } : null;
+    },
+    movePose(x, y, z) { move([x, y, z]); },
+    title(text) { const b = $("rec-title"); b.hidden = !text; b.firstChild.textContent = text || ""; },
   };                             // testing without a headset: page_shot --eval "LR4VR.page.preview('one')"
+
+  // ---- machine sounds (Parts 21-22; js/sounds.js), once a frame: the machine's pose (move() sets HOME.pose in every
+  // mode) -> the steppers, at the real machine's speed (the motion / the time scale in use); the router's set speed at
+  // the job's line (M3 / M5, or the file's "Turn On Router at Dial N"; only while a job runs or holds) + the shop vac
+  // with it; the cutting load = how fast the stock's heightmap loses material; clicks: the switches as they trip
+  // (clickSwitch), the probe touching the plate (a probe move ending in Playback, the probe pin in FluidNC mode).
+  // The engine exists once Sound is turned on, or a video records (LR4Demo.sound). ----
+  const SND = { s: null, yaml: undefined, steps: null, planSrc: null, plan: null, vol: null, sim: null, seg: -1 };
+  function soundSteps() {                            // steps/mm, microsteps, run_mode per axis of the config.yaml in use
+    const y = CTL.mode === "fluidnc" && CTL.yaml ? CTL.yaml : yamlBase && yamlBase.text;
+    if (y !== SND.yaml || !SND.steps) { SND.yaml = y; SND.steps = LR4Sound.stepsFromYaml(y); }
+    return SND.steps;
+  }
+  function soundEngine() {
+    if (!SND.s) {
+      const st = soundSteps();
+      SND.s = LR4Sound.create({ volume: Number($("snd-vol").value), modes: { x: st.x.mode, y: st.y.mode, z: st.z.mode } });
+    }
+    return SND.s;
+  }
+  // machine seconds per wall second: FluidNC's speed; Playback as it really ran (probes play slower than the speed set);
+  // the page's quick homing at its phase's multiplier (seek x4, feed x10); else 1
+  function soundScale(dt) {
+    if (CTL.mode === "fluidnc") return Number($("ctl-speed").value);
+    const r = HOME.run;
+    if (r) {
+      const sg = r.segs[Math.min(GcodePlay.at(r, HOME.t).index, r.segs.length - 1)], k = r.speed || { seek: 1, feed: 1 };
+      return !sg ? 1 : sg.phase === "seek" ? k.seek : sg.phase === "feed" || sg.phase === "pulloff" ? k.feed : 1;
+    }
+    if (JOB.playing && dt > 0 && SND.jt !== undefined && JOB.t > SND.jt) return (JOB.t - SND.jt) / dt;
+    return JOB.playing ? Number($("job-speed").value) : 1;
+  }
+  function soundJob() {                              // { rpm (set speed now), seg (the job's move index), flutes } or null
+    const tl = JOB.tl, active = tl && (JOB.playing || FJ.job || !$("job-pop").hidden);
+    if (!active) return null;
+    const text = JOB.src && JOB.src.text;
+    if (text !== SND.planSrc) { SND.planSrc = text; SND.plan = LR4Sound.routerPlan(text); }
+    const i = Math.min(FJ.job ? FJ.job.T.i : GcodePlay.at(tl, JOB.t).index, tl.segs.length - 1), sg = tl.segs[Math.max(0, i)];
+    const def = sg && tl.tools && tl.tools.get(sg.toolNumber);
+    return { rpm: LR4Sound.routerAt(SND.plan, sg ? sg.srcLine || 0 : 0), seg: i, flutes: (def && def.flutes) || 2 };
+  }
+  function soundRemoved() {                          // mm^3 the stock lost since the last frame (0 after a reset)
+    const sim = JOB.sim;
+    if (!sim || !sim.heights) { SND.vol = null; return 0; }
+    let sum = 0;
+    const h = sim.heights;
+    for (let i = 0; i < h.length; i++) sum += h[i];
+    const v = sum * sim.dx * sim.dy, prev = SND.sim === sim ? SND.vol : null;
+    SND.vol = v; SND.sim = sim;
+    return prev === null ? 0 : Math.max(0, prev - v);
+  }
+  function soundTick() {                             // its own wall time: tick's dt is capped (a slow frame would sound fast)
+    const p = HOME.pose, now = performance.now(), dt = SND.t ? Math.min((now - SND.t) / 1000, 1) : 0;
+    SND.t = now;
+    if (!SND.s || !p) return;
+    const j = soundJob(), scale = soundScale(dt), removed = soundRemoved();
+    SND.jt = JOB.t;
+    if (j && CTL.mode !== "fluidnc") {               // Playback: a probe move just ended = the bit touched the plate
+      const sg = JOB.tl.segs[SND.seg];
+      if (SND.seg >= 0 && j.seg > SND.seg && sg && sg.type === "probe") SND.s.event("tap");
+    }
+    SND.seg = j ? j.seg : -1;
+    SND.s.update([p.x, p.y, p.z], dt, scale, soundSteps(),
+      { rpm: j ? j.rpm : 0, mrr: dt > 0 ? removed / dt / scale : 0, flutes: j ? j.flutes : 2 });
+  }
+  function soundToggle() {
+    const on = soundEngine().setOn(!SND.s.on());
+    $("v-sound").setAttribute("aria-pressed", String(on));
+    $("v-sound").textContent = on ? "🔊 Sound" : "🔈 Sound";
+  }
+  $("v-sound").addEventListener("click", soundToggle);
+  {
+    const v = $("snd-vol"), out = $("snd-vol-out");
+    try { const k = localStorage.getItem("lr4-snd-vol"); if (k !== null) v.value = k; } catch (e) { /* default */ }
+    const show = () => { out.textContent = `${Math.round(v.value * 100)}%`; };
+    show();
+    v.addEventListener("input", () => {
+      show();
+      if (SND.s) SND.s.setVolume(Number(v.value));
+      try { localStorage.setItem("lr4-snd-vol", v.value); } catch (e) { /* not kept */ }
+    });
+  }
 
   let lastT = performance.now();
   const camPos = new THREE.Vector3();
@@ -3927,6 +4112,7 @@ body.vr-on .stage { grid-row: 1; }
     homeTick();
     jobTick();
     ctlTick();
+    soundTick();
     if (pendant && groupOn("Pendant") && (FT.ft || ++frameN % 8 === 0)) pendantScreen();
     ftPopDraw();
     if (vr.active()) vr.tick(dt);

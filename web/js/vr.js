@@ -83,12 +83,14 @@
     gs.forEach((g, i) => btn(16 + (i % 2) * 242, 370 + Math.floor(i / 2) * rowH, 236, rowH - 6, g.label,
       { a: "group", id: g.id }, g.on));
     B.forEach((b) => (b.toggle = b.act.a === "group"));   // on / off chips, not a choice
-    btn(16, 634, 92, 54, s.mode === "table" ? "Tabletop" : "1:1", { a: "mode" }, s.mode === "table");
-    btn(112, 634, 92, 54, "Re-center", { a: "recenter" });
-    btn(208, 634, 92, 54, `Unhide ${s.hidden || 0}`, { a: "unhide" });
+    btn(16, 634, 78, 54, s.mode === "table" ? "Tabletop" : "1:1", { a: "mode" }, s.mode === "table");
+    btn(97, 634, 78, 54, "Re-center", { a: "recenter" });
+    btn(178, 634, 78, 54, `Unhide ${s.hidden || 0}`, { a: "unhide" });
     B[B.length - 1].dim = !s.hidden;
-    btn(304, 634, 92, 54, s.homing ? "Stop" : "Home", { a: "home" }, s.homing);
-    btn(400, 634, 96, 54, "Exit VR", { a: "exit" });
+    btn(259, 634, 74, 54, s.homing ? "Stop" : "Home", { a: "home" }, s.homing);
+    btn(336, 634, 74, 54, "Sound", { a: "sound" }, s.sound);
+    B[B.length - 1].toggle = true;
+    btn(413, 634, 83, 54, "Exit VR", { a: "exit" });
     return { buttons: B, texts: T };
   }
 
@@ -215,7 +217,8 @@
         id: l.querySelector("input").id, label: l.querySelector("span").textContent, on: l.querySelector("input").checked }));
       const [cutX, cutY] = cut();
       return { unit: unit(), cutX, cutY, mode: mode === "table" ? "table" : "one", peter, groups, hidden: api.hiddenCount(),
-        braces: { label: opt ? opt.textContent : "" }, homing: !!$("home") && /^Stop/.test($("home").textContent) };
+        braces: { label: opt ? opt.textContent : "" }, homing: !!$("home") && /^Stop/.test($("home").textContent),
+        sound: !!$("v-sound") && $("v-sound").getAttribute("aria-pressed") === "true" };
     }
     function act(a) {
       if (a.a === "cut") { const [x, y] = cut(); setCut(x + (a.axis === "x" ? a.d * IN : 0), y + (a.axis === "y" ? a.d * IN : 0)); }
@@ -230,6 +233,7 @@
       else if (a.a === "recenter") place(true);
       else if (a.a === "unhide") api.showHidden();
       else if (a.a === "home") $("home").click();      // the Run tab's Home ($H) button
+      else if (a.a === "sound") $("v-sound").click();  // the toolbar's Sound toggle (a trigger press counts as the click audio needs)
       else if (a.a === "hide") { if (cardPart) api.hidePart(cardPart); closeCard(); }
       else if (a.a === "hidegroup") {
         const g = cardPart && $("g-" + cardPart.userData.group);

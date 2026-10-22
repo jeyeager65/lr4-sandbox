@@ -87,7 +87,7 @@
       advanceTime(x, dt) { return x + dt * this.speed; },
     };
     events.sort((m, n) => m.time - n.time);
-    return { segs, t, total, events, home, anim, settings: s };
+    return { segs, t, total, events, home, anim, settings: s, speed: k };   // speed: the multipliers it was planned at
   }
 
   // machine position after homing: mpos_mm at the homed spot, + the pose's distance from it (machine axes = pose
