@@ -3,7 +3,7 @@
 The version is the sandbox page's (`VERSION` in `web/index.html`, shown in its footer). The footer also shows
 the date the model data was built and the Printables file set it was solved for.
 
-## Unreleased
+## 0.31.0 - 2026-10-22
 - The "My machine" tab is now "My LR4".
 - The view toolbar loses Home (Run > Home ($H) is still there); Sound moves into ⚙ with its volume and voice.
 - Units: building numbers follow Inches / mm (the braces menu and the strut plate drawing too - inches with the mm
