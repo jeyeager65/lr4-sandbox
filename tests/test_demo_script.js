@@ -71,6 +71,9 @@ ok(DS.parse("( video  shot : view=CORE time=2 )\nG0 X1").intro[0].kv.view === "C
   ok(b.explode === 0.6 && b.secs === 2 && !b.id, "explode: " + JSON.stringify(b));
   ok(c.section.axis === "x" && c.section.at === 0.5 && c.flip === true, "section: " + JSON.stringify(c));
   ok(d.id === "off" && DS.inspectOf(q.at[0]).section === "off", "off / section off");
+  const x = DS.parse("(Video Inspect: XRAY=on)\n(Video Inspect: XRAY=off)\n(Video Inspect: VIEW=Lines)\n(Video Inspect: VIEW=wire)\nG0 X1");
+  ok(x.warnings.length === 1 && /VIEW= wants/.test(x.warnings[0]) && x.intro.map((c) => DS.inspectOf(c).view).join() === "xray,solid,lines"
+    && a.view === undefined, "VIEW solid / xray / lines (XRAY=on|off too): " + JSON.stringify(x));
 }
 // Part 29: the machine settings and (Video Show:)
 {

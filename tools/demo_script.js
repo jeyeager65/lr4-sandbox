@@ -17,10 +17,11 @@
 //       (assembly: table yz-min yz-max beam core router hose electronics pendant; "asm.kind" with printed / cut /
 //       hardware / electronics; a part = its name, * matches); PRESET (all, no-hardware, printed, frame) first, then
 //       HIDE, then SHOW (a part shown turns its assembly + kind on). Intro or mid-job; the view only, never the BOM.
-//   (Video Inspect: ID=core TIME=1.5 ORBIT=8 DIST=mm EXPLODE=0.6 SECTION=x@0.5 FLIP=on)   the page's inspect view: ID =
+//   (Video Inspect: ID=core TIME=1.5 ORBIT=8 DIST=mm EXPLODE=0.6 SECTION=x@0.5 FLIP=on VIEW=lines)   the inspect view: ID =
 //       a Show tree id (the camera blends to its framing over TIME, DIST overrides the distance; ID=off back to the
 //       machine and the camera from before); EXPLODE (0-1) and SECTION (x|y|z@0-1 across the set, or off; FLIP keeps
-//       the other side) animate over TIME; ORBIT turns once round it. Each line runs its own TIME + ORBIT with the job
+//       the other side) animate over TIME; VIEW=solid|xray|lines (xray: printed + cut parts see-through; lines: edges
+//       only; XRAY=on|off still works); ORBIT turns once round it. Each line runs its own TIME + ORBIT with the job
 //       held; lines in a row run one after the other. Only the set is drawn until ID=off (a Shot moves the camera).
 //   (Video Shot: VIEW=name TIME=s ORBIT=s DIST=mm)   the camera: blends there over TIME (1.5), then turns once round
 //       it over ORBIT; DIST = how far from what it looks at. VIEW: workshop, machine, stock, tool (close on the bit,
@@ -132,7 +133,9 @@ function check(c, intro) {
     case "title": case "text": return kv.text ? null : `${k[0].toUpperCase() + k.slice(1)} wants TEXT=`;
     case "wait": return num(kv.time) ? null : "Wait wants TIME=";
     case "inspect":
-      if (kv.id === undefined && kv.explode === undefined && kv.section === undefined) return "Inspect wants ID=, EXPLODE= or SECTION=";
+      if (kv.id === undefined && kv.explode === undefined && kv.section === undefined && kv.xray === undefined && kv.view === undefined)
+        return "Inspect wants ID=, EXPLODE=, SECTION= or VIEW=";
+      if (kv.view !== undefined && !/^(solid|xray|lines)$/i.test(kv.view)) return "Inspect VIEW= wants solid, xray or lines";
       if (kv.explode !== undefined && !(num(kv.explode) && +kv.explode >= 0 && +kv.explode <= 1)) return "Inspect EXPLODE= wants 0 - 1";
       if (kv.section !== undefined && !/^(off|[xyz]@(0|1|0?\.\d+|1\.0+))$/i.test(kv.section)) return "Inspect SECTION= wants x@0.5 (x, y or z @ 0 - 1) or off";
       return null;
@@ -166,7 +169,8 @@ function inspectOf(c, blend = 1.5) {
   return { id: kv.id, secs: num(kv.time) ? Number(kv.time) : blend, orbit: num(kv.orbit) ? Number(kv.orbit) : 0,
     dist: num(kv.dist) ? Number(kv.dist) : null, explode: kv.explode !== undefined ? Number(kv.explode) : undefined,
     section: !sec ? undefined : sec === "off" ? "off" : { axis: sec[0], at: Number(sec.slice(2)) },
-    flip: kv.flip !== undefined && !/^(off|no|0)$/i.test(kv.flip) };
+    flip: kv.flip !== undefined && !/^(off|no|0)$/i.test(kv.flip),
+    view: kv.view ? kv.view.toLowerCase() : kv.xray === undefined ? undefined : /^(off|no|0)$/i.test(kv.xray) ? "solid" : "xray" };
 }
 // the settings -> LR4Machine.apply's argument (only what the file set)
 const machineOf = (settings) => Object.fromEntries(MACHINE_KEYS.filter((k) => settings[k] !== undefined).map((k) => [k, settings[k]]));

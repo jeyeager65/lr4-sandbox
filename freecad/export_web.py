@@ -31,6 +31,12 @@ def pretty(name):
     return s.replace("YZ ", "YZ ").replace("Kobalt", "(Kobalt)").strip()
 
 
+def own_label(o):
+    """The object's label without the "001" FreeCAD adds when a label is already taken (Core -> Core001)."""
+    lb = o.Label
+    return o.Name if lb.startswith(o.Name) and lb[len(o.Name):].isdigit() and len(lb) - len(o.Name) == 3 else lb
+
+
 B = {"__file__": os.path.join(HERE, "build.py"), "__name__": "lr4_params"}
 src = open(B["__file__"], encoding="utf-8").read()
 block = src.split("# ---- parameters", 1)[1].split("# ----------", 1)[0]
@@ -173,7 +179,7 @@ for o in doc.Objects:
     if len(blob) % 4:
         blob += b"\0" * (4 - len(blob) % 4)
     tris_total += len(facets)
-    parts.append(dict(name=o.Name, label=pretty(o.Label), group=group_of.get(o.Name, ""), motion=lr4.motion(o.Name),
+    parts.append(dict(name=o.Name, label=pretty(own_label(o)), group=group_of.get(o.Name, ""), motion=lr4.motion(o.Name),
                       source=source, color=[round(c, 3) for c in col], pos=[off, len(pts)],
                       idx=[ioff, len(facets) * 3, 32 if wide else 16]))
     # surface finish for the page's materials (metals reflect an environment map), from the part's colour

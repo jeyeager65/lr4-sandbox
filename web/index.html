@@ -773,6 +773,10 @@ body.vr-on .stage { grid-row: 1; }
         <button type="button" data-v="y" aria-pressed="false">Y</button><button type="button" data-v="z" aria-pressed="false">Z</button>
         <button type="button" data-v="flip" aria-pressed="false" title="Keep the other side" aria-label="Flip the cut">⇅</button></div>
       <input type="range" class="tool" id="insp-cut" min="0" max="1" step="0.002" value="0.5" aria-label="Section position" hidden>
+      <div class="tool seg" id="insp-look" role="group" aria-label="How the parts are drawn"><span>View</span>
+        <button type="button" data-v="solid" aria-pressed="true">Solid</button>
+        <button type="button" data-v="xray" aria-pressed="false" title="Printed and cut parts see-through; bolts, bearings and the rest of the hardware solid">X-ray</button>
+        <button type="button" data-v="lines" aria-pressed="false" title="Every part as its edges, front and back - no surfaces">Lines</button></div>
       <button type="button" class="tool" id="insp-meas" aria-pressed="false" title="Two clicks; snaps to corners and hole centres">📏 Measure</button>
       <p class="tool" id="meas-out" role="status" hidden></p>
     </div>
@@ -2000,6 +2004,7 @@ body.vr-on .stage { grid-row: 1; }
       }
     }
     if (hoseMesh) updateHose(dx, dy, dz);
+    if (CAPS.list.length) placeSection();             // inspect's section cut follows the set
     readout(X, Y, Z, !!pose);
     HOME.pose = { x: dx, y: dy, z: dz };
     dro();
@@ -4081,6 +4086,7 @@ body.vr-on .stage { grid-row: 1; }
       host.append(h, t);
     }
     document.getElementById("insp-n").textContent = `${n} part${n === 1 ? "" : "s"}`;
+    if (LOOK.v !== "solid") setLook(LOOK.v);          // new meshes (size / options) drawn the same way
     if (INSPECT.step) setExplode();
   }
   document.getElementById("insp-back").addEventListener("click", inspectEnd);
@@ -4228,21 +4234,83 @@ body.vr-on .stage { grid-row: 1; }
     for (const m of meshes) if (m.visible) { m.updateMatrixWorld(); box.expandByObject(m); }
     return box;
   }
+  // View (user 2026-10-22): Solid; X-ray = the set's printed and cut parts see-through, the hardware (bolts, bearings,
+  // rails, motors) solid, so what's inside shows; Lines = every part as its edges (EdgesGeometry, 25 deg; front and
+  // back, no surfaces). Materials change in place and come back on Solid / Back; the section caps skip see-through or
+  // line-only parts. Edges are made once per geometry (geometry.userData.edges).
+  const LOOK = { v: "solid", saved: new Map(), lines: [] };
+  function setLook(v) {
+    LOOK.v = INSPECT && ["xray", "lines"].includes(v) ? v : "solid";
+    document.querySelectorAll("#insp-look button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.v === LOOK.v)));
+    for (const [mat, o] of LOOK.saved) Object.assign(mat, o, { needsUpdate: true });
+    LOOK.saved.clear();
+    for (const l of LOOK.lines) { l.parent.remove(l); l.material.dispose(); }
+    LOOK.lines = [];
+    const save = (mat, o) => { if (!LOOK.saved.has(mat)) LOOK.saved.set(mat, Object.fromEntries(Object.keys(o).map((k) => [k, mat[k]]))); Object.assign(mat, o, { needsUpdate: true }); };
+    const ink = new THREE.Color(css("--ink") || "#e6e9ec").convertSRGBToLinear();
+    if (LOOK.v !== "solid") for (const m of meshes) {
+      const id = partId(m), k = tree.kind[id];
+      if (!INSPECT.set.has(id)) continue;
+      if (LOOK.v === "xray") { if (k === "printed" || k === "cut") save(m.material, { transparent: true, opacity: 0.22, depthWrite: false }); continue; }
+      for (const o of [m, m.userData.nut].filter(Boolean)) {   // lines: the part's edges in its colour, toward the ink
+        const g = o.geometry;
+        if (!g.userData.edges) g.userData.edges = new THREE.EdgesGeometry(g, 25);
+        const l = new THREE.LineSegments(g.userData.edges, new THREE.LineBasicMaterial({ color: m.material.color.clone().lerp(ink, 0.45) }));
+        o.add(l); LOOK.lines.push(l);
+      }
+      save(m.material, { visible: false });
+    }
+    setSection();
+  }
   function setSection() {
     const on = !!(INSPECT && SEC.axis), cut = document.getElementById("insp-cut");
     cut.hidden = !on;
     document.querySelectorAll("#insp-sec button").forEach((b) => b.setAttribute("aria-pressed",
       String(b.dataset.v === "flip" ? SEC.flip : b.dataset.v === (on ? SEC.axis : ""))));
     renderer.clippingPlanes = on ? [SEC.plane] : [];
-    for (const m of meshes) {                         // two-sided while cut: the inside shows through the opening
-      const want = on && m.visible ? THREE.DoubleSide : m.userData.side0 ?? m.material.side;
-      if (m.userData.side0 === undefined) m.userData.side0 = m.material.side;
-      if (m.material.side !== want) { m.material.side = want; m.material.needsUpdate = true; }
-    }
-    if (!on) return;
+    capsSync(on);
+    if (on) placeSection();
+  }
+  function placeSection() {                           // the plane across the set as it's drawn now, and the caps on it
     const i = "xyz".indexOf(SEC.axis), box = setBox(), lo = box.min.getComponent(i), hi = box.max.getComponent(i);
-    const v = lo + (hi - lo) * +cut.value, n = new THREE.Vector3().setComponent(i, SEC.flip ? 1 : -1);
+    const v = lo + (hi - lo) * +document.getElementById("insp-cut").value, n = new THREE.Vector3().setComponent(i, SEC.flip ? 1 : -1);
     SEC.plane.set(n, SEC.flip ? -v : v);              // keeps n . p + c >= 0: below the cut, or above it flipped
+    // the caps: a square on the plane over the set (0.05 mm into the kept side, so the clipping doesn't eat it)
+    const size = box.getSize(new THREE.Vector3()).length() * 1.2 || 1;
+    const c = SEC.plane.projectPoint(box.getCenter(new THREE.Vector3()), new THREE.Vector3()).addScaledVector(n, 0.05);   // not in place: r147 overwrites
+    const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), n);
+    for (const k of CAPS.list) { k.cap.position.copy(c); k.cap.quaternion.copy(q); k.cap.scale.set(size, size, 1); }
+  }
+  // section caps (the stencil way, as three.js' webgl_clipping_stencil): for each cut part, its back faces add 1 and
+  // its front faces take 1 off the stencil, so the plane's pixels inside the solid are left non-zero; a square on the
+  // plane in the part's colour is drawn only there (and resets them). Before the parts (renderOrder < 0), so the parts
+  // in front still hide it. Open meshes (threads, the hose, belts) aren't capped.
+  const CAPS = { list: [], key: "", group: new THREE.Group(), geo: new THREE.PlaneGeometry(1, 1) };
+  scene.add(CAPS.group);
+  const stencilMat = (side, op) => new THREE.MeshBasicMaterial({ side, depthWrite: false, depthTest: false, colorWrite: false,
+    stencilWrite: true, stencilFunc: THREE.AlwaysStencilFunc, stencilFail: op, stencilZFail: op, stencilZPass: op });
+  function capsSync(on) {
+    const ms = on ? meshes.filter((m) => m.visible && !/~thread$/.test(m.userData.name || "") && m.userData.motion !== "hose"
+      && !/^Belt_/.test(m.userData.name || "") && !m.material.transparent && m.material.visible) : [];
+    const key = ms.map((m) => m.userData.name).join();
+    if (key === CAPS.key) return;
+    CAPS.key = key;
+    for (const k of CAPS.list) {
+      k.m.remove(k.back, k.front); CAPS.group.remove(k.cap);
+      k.back.material.dispose(); k.front.material.dispose(); k.cap.material.dispose();
+    }
+    CAPS.list = ms.map((m, i) => {
+      const o = -10000 + i * 3, back = new THREE.Mesh(m.geometry, stencilMat(THREE.BackSide, THREE.IncrementWrapStencilOp));
+      const front = new THREE.Mesh(m.geometry, stencilMat(THREE.FrontSide, THREE.DecrementWrapStencilOp));
+      back.renderOrder = o; front.renderOrder = o + 1;
+      m.add(back, front);                             // they ride with the part (motion, explode)
+      const cap = new THREE.Mesh(CAPS.geo, new THREE.MeshStandardMaterial({ color: m.material.color.clone().lerp(new THREE.Color(1, 1, 1), 0.3),   // a lighter cut face
+        roughness: 0.9, metalness: 0, side: THREE.DoubleSide, stencilWrite: true, stencilRef: 0, stencilFunc: THREE.NotEqualStencilFunc,
+        stencilFail: THREE.ReplaceStencilOp, stencilZFail: THREE.ReplaceStencilOp, stencilZPass: THREE.ReplaceStencilOp }));
+      cap.renderOrder = o + 2;
+      CAPS.group.add(cap);
+      return { m, back, front, cap };
+    });
   }
   // ---- measure ----
   function measureClear() {
@@ -4304,6 +4372,7 @@ body.vr-on .stage { grid-row: 1; }
   function setupInspectTools() {                      // once
     document.getElementById("insp-ex").addEventListener("input", setExplode);
     document.getElementById("insp-cut").addEventListener("input", setSection);
+    document.getElementById("insp-look").addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) setLook(b.dataset.v); });
     document.getElementById("insp-sec").addEventListener("click", (e) => {
       const b = e.target.closest("button");
       if (!b) return;
@@ -4322,6 +4391,7 @@ body.vr-on .stage { grid-row: 1; }
   function inspectToolsReset() {                      // leaving inspect: everything back
     document.getElementById("insp-ex").value = 0;
     SEC.axis = ""; SEC.flip = false;
+    setLook("solid");
     MEAS.on = false;
     document.getElementById("insp-meas").setAttribute("aria-pressed", "false");
     document.getElementById("meas-out").hidden = true;
@@ -4334,7 +4404,9 @@ body.vr-on .stage { grid-row: 1; }
     measure: (on) => { if (MEAS.on !== !!on) document.getElementById("insp-meas").click(); },
     snap: (x, y) => measureSnap({ clientX: x, clientY: y }), click: (x, y) => measureClick({ clientX: x, clientY: y }),
     result: () => document.getElementById("meas-out").textContent,
-    state: () => ({ explode: +document.getElementById("insp-ex").value, axis: SEC.axis, at: +document.getElementById("insp-cut").value, flip: SEC.flip }),
+    state: () => ({ explode: +document.getElementById("insp-ex").value, axis: SEC.axis, at: +document.getElementById("insp-cut").value, flip: SEC.flip,
+      caps: CAPS.list.length, look: LOOK.v, xray: LOOK.v === "xray" }),
+    look: (v) => setLook(v), xray: (on) => setLook(on ? "xray" : "solid"),
     offsets: () => Object.fromEntries(meshes.filter((m) => m.userData.ex).map((m) => [m.userData.name, m.userData.ex])),
     nuts: () => meshes.filter((m) => m.userData.nuts).map((m) => [m.userData.name, !!m.userData.nut, m.userData.nut ? +m.userData.nut.position.length().toFixed(2) : null]) };
 

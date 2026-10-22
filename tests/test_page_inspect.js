@@ -39,7 +39,10 @@ const steps = [
    T.explode(0); const ex0 = Object.keys(T.offsets()).length; T.explode(0.6);
    const stepper = [T.offsets().Y_Stepper_Min, T.offsets().Y_Stepper_Min_Shaft, T.offsets().Y_Stepper_Min_Lead_Red].map(String);
    LR4Inspect.open('Core'); T.explode(0.6); const nuts = T.nuts().filter((x) => x[1] && x[2] > 1).map((x) => x[0]); LR4Inspect.open('yz-min');
-   T.section('x', 0.5); const sec = { x: document.querySelector('#insp-sec [data-v=x]').getAttribute('aria-pressed'), cut: !document.getElementById('insp-cut').hidden };
+   T.section('x', 0.5); const sec = { x: document.querySelector('#insp-sec [data-v=x]').getAttribute('aria-pressed'), cut: !document.getElementById('insp-cut').hidden,
+     caps: T.state().caps };
+   T.xray(true); sec.xrayCaps = T.state().caps; sec.xray = T.state().xray;
+   T.look('lines'); sec.lineCaps = T.state().caps; sec.look = T.state().look; T.look('solid'); sec.capsBack = T.state().caps;
    T.section('');
    LR4Inspect.open('XZ_Plate_Min'); T.measure(true);
    const c = document.querySelector('canvas').getBoundingClientRect(), holes = [];
@@ -96,6 +99,8 @@ else {
   ok(t.stepper[0] && t.stepper.every((v) => v === t.stepper[0]), "the stepper moves as one (shaft, leads with the body): " + t.stepper.join(" | "));
   ok(["Bearing_Core__M8", "Tool_Mount_T_Kobalt__M5_to_Core", "Core__M5_to_X_Idler_1"].every((n) => t.nuts.includes(n)), "nuts come off their bolts: " + t.nuts);
   ok(t.sec.x === "true" && t.sec.cut, "section X: on, its slider shows");
+  ok(t.sec.caps > 10 && t.sec.xray && t.sec.xrayCaps < t.sec.caps && t.sec.look === "lines" && t.sec.lineCaps === 0 && t.sec.capsBack === t.sec.caps,
+    "caps on the cut parts; X-ray / Lines: see-through or line-only parts lose their caps, back after: " + JSON.stringify(t.sec));
   ok(t.holes > 1 && / mm \(.* in\).*hole centre → hole centre/.test(t.meas), `measure: hole centre to hole centre (${t.holes} snaps): ${t.meas}`);
   ok(t.after === 0 && t.clip === "true", "Back: explode + section reset");
   ok(f.m.bad.length === 1 && /^PETER=nope/.test(f.m.bad[0]) && !f.m.hose && f.m.table === "30", "LR4Machine: set what it can, report the rest: " + JSON.stringify(f.m));

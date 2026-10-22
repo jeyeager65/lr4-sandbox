@@ -121,6 +121,9 @@ def main():
         rec = dict(rec)
         if name in fmeta:
             rec["meta"] = dict(rec["meta"], **fmeta[name])
+        lb = rec["meta"].get("label", "")              # "Core001": FreeCAD's suffix for a taken label (export_web
+        if lb[:-3] == name.replace("_", " ") and lb[-3:].isdigit():   # drops it too since 2026-10-22; for older builds)
+            rec["meta"] = dict(rec["meta"], label=lb[:-3])
         src = src_of(name, frames_t if rec.get("from_temp") else frames) if "mesh" in rec else None   # Y_Clip_last:
                                                                                                         # Y_Clip_first's mesh
         if src:

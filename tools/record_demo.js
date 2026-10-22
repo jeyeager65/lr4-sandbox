@@ -259,6 +259,7 @@ const PAGE_REC = `(() => {
       const st0 = await val("LR4Inspect.tools.state()"), sec = q.section;
       const secFrom = sec && sec !== "off" ? (st0.axis === sec.axis && st0.flip === q.flip ? st0.at : q.flip ? 0 : 1) : null;   // from uncut
       if (sec === "off") await val("LR4Inspect.tools.section('')");
+      if (q.view) await val(`LR4Inspect.tools.look(${JSON.stringify(q.view)})`);
       console.log(`inspect ${q.id || ""}${q.explode !== undefined ? ` explode ${q.explode}` : ""}${sec ? ` section ${sec === "off" ? "off" : sec.axis + "@" + sec.at}` : ""}`);
       for (let f = 0, bf = n(q.secs); f < bf; f++) {
         const k = ease((f + 1) / bf);
