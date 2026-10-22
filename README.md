@@ -17,7 +17,7 @@ features and checks every fastener.
 
 | | |
 |---|---|
-| **LowRider 4 Sandbox** (`web/index.html`) | The page. **Config:** enter a cutting area and it builds the machine in 3D (every printed part, rail, belt, bolt, the strut plates and the vacuum hose); show or hide groups of parts. **Build it:** the cut list (V1E's calculator), the strut plate outlines, DXF / SVG / G-code downloads, the full BOM and a `config.yaml` for your size. **Run:** play G-code on the machine, or drive it with FluidNC in the browser. Plus a workshop round it and VR. |
+| **LowRider 4 Sandbox** (`web/index.html`) | The page. **My machine:** enter a cutting area and it builds the machine in 3D (every printed part, rail, belt, bolt, the strut plates and the vacuum hose); choose what's on it (router + shoe, hose, lid fan, pendant, Peter Plates, strut plates). **Show:** a tree of every part by assembly and kind, with presets, to hide parts from the view. **Build it:** the cut list (V1E's calculator), the strut plate outlines, DXF / SVG / G-code downloads, the full BOM and a `config.yaml` for your size. **Run:** play G-code on the machine, or drive it with FluidNC in the browser. Plus a workshop round it and VR. |
 | **FreeCAD model** (`freecad/`) | Scripts that assemble the LowRider 4 in [FreeCAD](https://www.freecad.org/) from the official STLs. Every part is placed by its measured mating features (hole patterns, pockets), and every fastener is checked for seat, engagement and collisions. Outputs: an FCStd assembly, a BOM, strut plate DXF/SVG and G-code. |
 | **Pipeline** (`pipeline/`) | Builds the model at many sizes and fits how each part moves with the size. That is how the page can draw any size without FreeCAD. |
 | **FluidNC in the browser** (`web/fluidnc/`) | FluidNC's wasm port, built from a fork's `wasm-sim` branch with simulated limit switches, a touch plate probe and a time scale. |
@@ -61,10 +61,12 @@ Unzip each download into its folder under `parts/` (the table above), for exampl
 
 ## Using the page
 
-### Config and Build
+### My machine, Show and Build
 
 Enter the cutting area (inches or mm) and the page rebuilds the machine: brace count, rails, belts, table, hose
-routing. **Build** has the cut list from V1E's LowRider 4 calculator, the strut plates (DXF / SVG, or G-code to
+routing. Options take parts off the machine and the BOM (router + dust shoe, skirt, hose, lid fan, pendant); **Show**
+only hides parts from the view (assembly > printed / cut / hardware / electronics > part; a bolt is listed under both
+assemblies it joins). **Build** has the cut list from V1E's LowRider 4 calculator, the strut plates (DXF / SVG, or G-code to
 cut them on the machine itself), the full BOM with hardware counts for your size, and V1E's JP3_LR `config.yaml`
 with `max_travel_mm` set for your size (or your own config.yaml, adjusted the same way).
 

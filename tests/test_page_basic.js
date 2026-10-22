@@ -62,7 +62,7 @@ function savePng(dataUrl, name) {
 
     const off = await page.val(`(async () => { await T.sleep(4000);   // past Basic's 3 s start
       return { on: document.getElementById("ft-on").checked, ft: !!LR4Pendant.ft(), btn: document.getElementById("ft-pop-btn").hidden,
-        row: document.getElementById("row-Pendant").hidden }; })()`);
+        row: !document.querySelector('#show-tree input[data-id="pendant"]') }; })()`);
     ok(!off.on && !off.ft && off.btn && off.row, "pendant off by default: no FluidTouch, no model, no button: " + JSON.stringify(off));
     const a = await page.val(`(async () => {
       document.getElementById("t-run").click();

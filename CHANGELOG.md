@@ -3,6 +3,15 @@
 The version is the sandbox page's (`VERSION` in `web/index.html`, shown in its footer). The footer also shows
 the date the model data was built and the Printables file set it was solved for.
 
+## 0.26.0 - 2026-10-22
+- Tabs are **My machine / Show / Build / Run**. My machine: the size, what's on the machine (router + dust shoe,
+  dust skirt + bristles, vacuum hose + cables, Jackpot3 lid fan, FluidTouch pendant, strut plates, Peter Plates; off =
+  gone from the model and the BOM), table height + workshop size, print colours.
+- **Show** (view only): a tree of every part, assembly > printed / cut / hardware / electronics > part, with presets
+  (All, No hardware, Printed parts only, Frame only). A bolt joining two assemblies is listed under both and shown with
+  either; belts go with what they ride on; the router is its own assembly. Detail and Background moved here from ⚙.
+  Not kept between loads.
+
 ## 0.18.0 - 2026-10-21
 - The panel tabs are **Config / Build / Run** (were Machine / Build it / Run).
 - G-code files live on a virtual SD card kept in your browser (Run tab > SD card): add or drop files, ▶ to play or

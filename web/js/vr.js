@@ -106,7 +106,7 @@
   }
 
   // ---- the page side: api = { THREE, scene, renderer, camera, controls, meshes(), select(mesh | null), background(),
-  //      resize(), hidePart(mesh), showHidden(), hiddenCount(), groupLabel(key) } ----
+  //      resize(), hidePart(mesh), showHidden(), hiddenCount(), asmOf(mesh), groupLabel(mesh) } ----
   function setup(api) {
     const THREE = api.THREE, { scene, renderer, camera, controls } = api, xr = renderer.xr;
     const $ = (id) => document.getElementById(id);
@@ -213,7 +213,7 @@
       const pv = $("peter-variant");
       const peter = pv && !pv.hidden ? [...pv.querySelectorAll("button")].map((b) => ({ v: b.dataset.v, label: b.textContent,
         on: b.getAttribute("aria-pressed") === "true" })) : [];
-      const groups = [...document.querySelectorAll("#groups > label")].filter((l) => !l.hidden).map((l) => ({
+      const groups = [...document.querySelectorAll("#show-tree .row.a")].map((l) => ({   // the Show tree's assemblies
         id: l.querySelector("input").id, label: l.querySelector("span").textContent, on: l.querySelector("input").checked }));
       const [cutX, cutY] = cut();
       return { unit: unit(), cutX, cutY, mode: mode === "table" ? "table" : "one", peter, groups, hidden: api.hiddenCount(),
@@ -236,7 +236,7 @@
       else if (a.a === "sound") $("v-sound").click();  // the toolbar's Sound toggle (a trigger press counts as the click audio needs)
       else if (a.a === "hide") { if (cardPart) api.hidePart(cardPart); closeCard(); }
       else if (a.a === "hidegroup") {
-        const g = cardPart && $("g-" + cardPart.userData.group);
+        const g = cardPart && $("g-" + api.asmOf(cardPart));
         if (g && g.checked) g.click();
         closeCard();
       } else if (a.a === "close") closeCard();
@@ -296,7 +296,7 @@
     const partInfo = (m) => {
       const p = m.userData;
       return { title: p.label || p.name, group: p.group, sub: [p.source === "printed" ? "Printed part" : p.source === "made"
-        ? "Cut part" : p.source === "pendant" ? "Printed part (FluidTouch)" : "Hardware", api.groupLabel(p.group)].filter(Boolean).join(" · ") };
+        ? "Cut part" : p.source === "pendant" ? "Printed part (FluidTouch)" : "Hardware", api.groupLabel(m)].filter(Boolean).join(" · ") };
     };
     function openCard(m, at) {
       cardPart = m;

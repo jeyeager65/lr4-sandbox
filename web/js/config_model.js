@@ -7,6 +7,7 @@
 //   hose(cfg, S)                   -> the hose / cord anchors (lr4.json "hose") at this size
 //   travel(cfg, S)                 -> {x: [lo, hi], y: [...], z: [...]} from the parked pose
 //   plateFrame(cfg, which, S)      -> 4x4 (row-major 3x4) matrix: generator 2D (x, y, z = thickness) -> machine
+//   bom(cfg, S, names) / bomOptions(secs, opt) -> the BOM at this size / with the My machine options (Part 26)
 (function (root) {
   "use strict";
   const IN = 25.4, XZ = 6.5;
@@ -238,6 +239,50 @@
     return secs;
   }
 
+  // ---- My machine options (Part 26) on a BOM from bom(): off = gone from the BOM too. opt = { router, skirt, hose, fan,
+  // pendant } (true = fitted; skirt = dust skirt + bristles, fan = the Jackpot3 lid fan). Printed parts drawn only with an
+  // option (hose holders) already follow bom()'s names; this drops the rest by row, takes the dropped fasteners off the
+  // kit table, and adds the pendant (not in the reference BOM). ----
+  const OPT_ROWS = {                                   // [section title start, column, row regex]
+    router: [["Printed parts", 1, /^(Dust_Shoe|Dust_Skirt|Tool_Mount|TPU_Bristles)/], ["Buy: specialty", 1, /trim router/i],
+      ["Hardware: where", 2, /^Tool Mount/]],
+    skirt: [["Printed parts", 1, /^(Dust_Skirt|TPU_Bristles)/]],
+    hose: [["Buy: specialty", 1, /^Fulton|^Wire sleeve/]],
+    fan: [["Buy: specialty", 1, /blower fan/i], ["Hardware: where", 2, /^Jackpot3 Fan/]],
+  };
+  function bomOptions(secs, opt) {
+    const sec = (t) => secs.find((q) => q.title.startsWith(t));
+    const gone = [];                                    // dropped "where" rows
+    for (const [k, rules] of Object.entries(OPT_ROWS)) {
+      if (opt[k] !== false && !(k === "skirt" && opt.router === false)) continue;
+      for (const [t, col, re] of rules) {
+        const q = sec(t);
+        if (!q) continue;
+        q.rows = q.rows.filter((r) => !(re.test(String(r[col])) && (t !== "Hardware: where" || gone.push(r))));
+      }
+    }
+    const kit = sec("Hardware: V1E kit"), where = sec("Hardware: where");
+    if (kit && gone.length) {
+      for (const r of gone) {
+        const item = kit.rows.find((x) => x[3] === r[1]), nut = /^nylock/.test(r[4]) &&
+          kit.rows.find((x) => x[3] === `${String(r[1]).split(" ")[0]} nylock nut`);
+        for (const x of [item, nut]) if (x) { x[1] -= r[0]; x[2] -= r[0]; }
+      }
+      kit.rows = kit.rows.filter((x) => x[0] || x[1] || x[2]);
+    }
+    if (where && where.note) where.note = where.note.replace(/^\d+ fasteners/, `${where.rows.reduce((a, r) => a + (Number(r[0]) || 0), 0)} fasteners`);
+    if (opt.pendant) {
+      const src = "FluidTouch (github.com/jeyeager65/FluidTouch, MIT)";
+      let q = sec("Buy: specialty");
+      if (q) q.rows.push([1, 'Elecrow CrowPanel Advance 7" (ESP32-S3)', `FluidTouch pendant: ${src} firmware; on the table's front`]);
+      q = sec("Printed parts");
+      if (q) q.rows.push([1, "case_top", "", src], [1, "case_bottom", "", src], [1, "stand", "", src]);
+      q = sec("Buy / cut: stock");
+      if (q) q.rows.push([1, "Pendant spacer block", '5/8" plywood', "stand length", "holds the stand out from the apron"]);
+    }
+    return secs;
+  }
+
   // FluidNC config.yaml (V1E's FluidNC_Configs "LowRider CNC/Jackpot3/JP3_LR", or the user's own) with axes x / y
   // max_travel_mm set to this travel less the axis' pulloff_mm (home trip -> the far stop, lr4.STOPS: a little over
   // the cutting area; V1E's 4 x 8 file has 1220 x 2440). FluidNC's soft range starts at the pulled-off spot, so the
@@ -278,7 +323,7 @@
     return { text: head.concat(lines).join("\n"), x: got.x, y: got.y, pulloff };
   }
 
-  const api = { size, instances, hose, travel, plateFrame, bom, jp3Fits, fluidncConfig, braceOffsets, IN };
+  const api = { size, instances, hose, travel, plateFrame, bom, bomOptions, jp3Fits, fluidncConfig, braceOffsets, IN };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.LR4Model = api;
 })(typeof self !== "undefined" ? self : this);
