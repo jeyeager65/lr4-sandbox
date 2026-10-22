@@ -24,7 +24,7 @@ const steps = [
    v.act({ a: 'unit', u: 'mm' }); v.act({ a: 'peter', v: 'none' }); v.act({ a: 'group', id: 'g-table' }); v.act({ a: 'group', id: 'g-pendant' });
    const s = v.state();
    return { unit: s.unit, peterNone: s.peter.some((p) => p.v === 'none' && p.on), table: document.getElementById('g-table').checked,
-     readout: document.getElementById('ux').textContent, pendant: Object.values(LR4Demo.boxes('^Pendant_')).filter((b) => b[2]).length }`,
+     readout: document.querySelector('#rx + small').textContent, pendant: Object.values(LR4Demo.boxes('^Pendant_')).filter((b) => b[2]).length }`,
   `LR4VR.page.preview(null); return { vr: document.body.classList.contains('vr-on'),
      toolbar: getComputedStyle(document.querySelector('.toolbar')).display !== 'none' }`,
 ];

@@ -3,6 +3,23 @@
 The version is the sandbox page's (`VERSION` in `web/index.html`, shown in its footer). The footer also shows
 the date the model data was built and the Printables file set it was solved for.
 
+## Unreleased
+- The "My machine" tab is now "My LR4".
+- The view toolbar loses Home (Run > Home ($H) is still there); Sound moves into ⚙ with its volume and voice.
+- Units: building numbers follow Inches / mm (the braces menu and the strut plate drawing too - inches with the mm
+  beside them, as the DXF is mm); running numbers are always mm with 3 decimals, as FluidNC reports (Run's tool
+  position was inches for X / Y and mm for Z). Fractions round to the nearest 1/8 (7.99 in was "7 2/2").
+- Run: Run G-code above Tool position, the SD card open, a one-line controller note (the rest under "More about the
+  two"), Flash only in FluidNC mode.
+- Choice rows (strut plates, Peter Plates, Detail, Background, Runs on) are joined button groups under their label.
+- The room size moves to Show > Scene, under Background (it's only drawn with the workshop); My LR4's section is "Table".
+- **Copy a link to this build** (footer): size, braces, plate choices, options, pendant, table, room, colours, units in
+  the URL (`#26x50&braces=6&hose=0&main=225588&units=mm`); opening it sets them.
+- **📏 Measure** on the whole machine (toolbar, M), as in inspect. **📷** saves the view as a PNG (P).
+- Keyboard: 1-5 views, F fit, M measure, P picture, Space play / pause (Basic), H panel, ? the list ("? keys" in the hint).
+- **Reset settings** (footer): every setting back to the default; part files and the SD card stay.
+- Phones: the five views fold into one View menu so the toolbar is one row; the hint says pinch / two fingers.
+
 ## 0.30.0 - 2026-10-22
 - `(Video Inspect: ID=core TIME=1.5 ORBIT=8 EXPLODE=0.6 SECTION=x@0.5 FLIP=on)`: the inspect view in a video - the
   camera blends to its framing, explode and section animate over TIME, ORBIT turns round it, `ID=off` goes back.

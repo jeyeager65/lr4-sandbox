@@ -127,6 +127,9 @@ dialog.about p { margin: 0 0 10px; color: var(--muted); font-size: 13px; }
 .toolbar { position: absolute; left: 12px; top: 12px; right: 12px; display: flex; flex-wrap: wrap; gap: 4px; pointer-events: none; }
 .toolbar button, .pick, .view-pop { background: color-mix(in srgb, var(--panel) 90%, transparent); backdrop-filter: blur(4px); }
 .toolbar button { pointer-events: auto; padding: 5px 9px; }
+.toolbar select { pointer-events: auto; width: auto; display: none; }
+p.foot:empty { display: none; }
+#room-box { margin-top: 10px; }
 #v-more { font-size: 15px; line-height: 1; padding: 4px 8px; }
 #v-more[aria-expanded="true"] { border-color: var(--accent); }
 .view-pop { position: absolute; left: 12px; top: 52px; width: min(330px, calc(100% - 24px)); max-height: calc(100% - 64px); overflow-y: auto;
@@ -194,7 +197,7 @@ canvas { display: block; width: 100%; height: 100%; touch-action: none; }
 .ft-pop b { font-family: var(--font-display); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
 .ft-pop button { cursor: pointer; }
 .ft-pop canvas { display: block; width: 100%; height: auto; aspect-ratio: 5 / 3; background: #000; cursor: pointer; touch-action: none; }
-body.rec .panel, body.rec .hint, body.rec .toolbar, body.rec .view-pop, body.rec .pick, body.rec .insp { display: none; }  /* recording (LR4Demo.recording): the 3D view, whole window */
+body.rec .meas-main, body.rec .panel, body.rec .hint, body.rec .toolbar, body.rec .view-pop, body.rec .pick, body.rec .insp { display: none; }  /* recording (LR4Demo.recording): the 3D view, whole window */
 body.inspecting .job-pop, body.inspecting .rec-msg, body.inspecting .rec-badge { display: none !important; }  /* inspect: no M0 popup / message bar / speed badge (back with Back) */
 body.rec .stage { position: fixed; inset: 0; }
 .rec-badge {                          /* the demo video's speed (LR4Demo.badge): "1× real time" / "62×" */
@@ -237,8 +240,21 @@ label.check { display: flex; align-items: center; gap: 6px; font-size: 13px; mar
   font-size: 12px; color: var(--muted); background: color-mix(in srgb, var(--panel) 80%, transparent);
   padding: 4px 8px; border-radius: 4px;
 }
-.variant { display: flex; align-items: center; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
-.variant span { font-size: 13px; }
+.hint .link { font-size: 12px; }
+.hint .h-touch { display: none; }
+@media (pointer: coarse) { .hint .h-mouse { display: none; } .hint .h-touch { display: inline; } }
+.meas-main { position: absolute; left: 12px; bottom: 10px; margin: 0; max-width: calc(100% - 24px); font: 12px var(--font-data);
+  background: color-mix(in srgb, var(--panel) 90%, transparent); padding: 6px 10px; border-radius: 4px; }
+.meas-main:not([hidden]) ~ .hint { display: none; }
+#v-meas[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+dl.keys { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; margin: 0 0 12px; }
+dl.keys dt { font-family: var(--font-data); font-weight: 600; }
+dl.keys dd { margin: 0; }
+.variant { display: flex; align-items: center; margin-top: 10px; flex-wrap: wrap; }
+.variant span { font-size: 13px; flex-basis: 100%; margin-bottom: 4px; }
+.variant button { border-radius: 0; margin-left: -1px; padding-left: 10px; padding-right: 10px; }
+.variant span + button { border-radius: 4px 0 0 4px; margin-left: 0; }
+.variant button:last-child { border-radius: 0 4px 4px 0; }
 .variant button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
 .bom-open { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .bom-open span { color: var(--muted); font-size: 13px; line-height: 1.4; }
@@ -340,6 +356,8 @@ label.btn:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; 
   h1 { font-size: 24px; }
   .toolbar { left: 8px; top: 8px; right: 8px; }
   .toolbar button { padding: 4px 7px; font-size: 12px; }
+  .toolbar select { display: block; padding: 4px 7px; font-size: 12px; }   /* the five views in one menu */
+  #v-iso, #v-front, #v-top, #v-side, #v-back { display: none; }
   /* view settings: a sheet over the panel's half of the screen */
   .view-pop { position: fixed; left: 0; right: 0; top: auto; bottom: 0; width: auto; max-height: 60dvh; border-radius: 10px 10px 0 0;
     padding-bottom: max(14px, env(safe-area-inset-bottom, 0px)); background: var(--panel); z-index: 5; }
@@ -353,7 +371,7 @@ body.panel-off { grid-template-columns: 1fr; grid-template-rows: 1fr; }
 body.panel-off .panel { display: none; }
 body.panel-off .stage { grid-row: 1; }
 #v-panel[aria-pressed="true"] { border-color: var(--accent); }
-body.vr-on .panel, body.vr-on .hint, body.vr-on .toolbar, body.vr-on .view-pop, body.vr-on .pick, body.vr-on .insp { display: none; }
+body.vr-on .meas-main, body.vr-on .panel, body.vr-on .hint, body.vr-on .toolbar, body.vr-on .view-pop, body.vr-on .pick, body.vr-on .insp { display: none; }
 body.vr-on .stage { grid-row: 1; }
 .vr-pop {
   position: absolute; right: 16px; top: 16px; width: min(400px, calc(100% - 32px));
@@ -404,7 +422,7 @@ body.vr-on .stage { grid-row: 1; }
   </section>
 
   <div class="tabs" role="tablist" aria-label="Panel">
-    <button type="button" role="tab" id="t-machine" aria-controls="tab-machine" aria-selected="true">My machine</button>
+    <button type="button" role="tab" id="t-machine" aria-controls="tab-machine" aria-selected="true">My LR4</button>
     <button type="button" role="tab" id="t-show" aria-controls="tab-show" aria-selected="false" tabindex="-1">Show</button>
     <button type="button" role="tab" id="t-build" aria-controls="tab-build" aria-selected="false" tabindex="-1">Build</button>
     <button type="button" role="tab" id="t-run" aria-controls="tab-run" aria-selected="false" tabindex="-1">Run</button>
@@ -415,8 +433,8 @@ body.vr-on .stage { grid-row: 1; }
     <section aria-labelledby="h-size">
       <h2 id="h-size">Cutting area</h2>
       <div class="seg" role="group" aria-label="Units">
-        <button type="button" id="u-in" aria-pressed="true">INCHES</button>
-        <button type="button" id="u-mm" aria-pressed="false">MM</button>
+        <button type="button" id="u-in" aria-pressed="true">Inches</button>
+        <button type="button" id="u-mm" aria-pressed="false">mm</button>
       </div>
       <div class="pair">
         <div class="field"><label for="cut-x">X, along the beam</label>
@@ -448,21 +466,9 @@ body.vr-on .stage { grid-row: 1; }
     </section>
 
     <section aria-labelledby="h-shop">
-      <h2 id="h-shop">Table + workshop</h2>
+      <h2 id="h-shop">Table</h2>
       <div class="field"><label for="table-top">Table height (top of the MDF; legs are drawn only)</label>
         <div class="unit-input"><input id="table-top" type="number" step="any" min="1"><span class="u">in</span></div></div>
-      <div id="room-box">
-        <div class="trio">
-          <div class="field"><label for="room-w">Building X</label>
-            <div class="unit-input"><input id="room-w" type="number" step="any" min="0" placeholder="–"><span class="ru">ft</span></div></div>
-          <div class="field"><label for="room-d">Building Y</label>
-            <div class="unit-input"><input id="room-d" type="number" step="any" min="0" placeholder="–"><span class="ru">ft</span></div></div>
-          <div class="field"><label for="room-h">Ceiling</label>
-            <div class="unit-input"><input id="room-h" type="number" step="any" min="0" placeholder="–"><span class="ru">ft</span></div></div>
-        </div>
-        <p class="foot" id="room-note"></p>
-        <div id="room-warn"></div>
-      </div>
     </section>
 
     <section aria-labelledby="h-colours">
@@ -492,6 +498,18 @@ body.vr-on .stage { grid-row: 1; }
       <div class="variant" id="scenery"><span>Background</span>
         <button type="button" data-v="shop" aria-pressed="true">Workshop</button>
         <button type="button" data-v="plain" aria-pressed="false">Plain</button></div>
+      <div id="room-box">
+        <div class="trio">
+          <div class="field"><label for="room-w">Building X</label>
+            <div class="unit-input"><input id="room-w" type="number" step="any" min="0" placeholder="–"><span class="ru">ft</span></div></div>
+          <div class="field"><label for="room-d">Building Y</label>
+            <div class="unit-input"><input id="room-d" type="number" step="any" min="0" placeholder="–"><span class="ru">ft</span></div></div>
+          <div class="field"><label for="room-h">Ceiling</label>
+            <div class="unit-input"><input id="room-h" type="number" step="any" min="0" placeholder="–"><span class="ru">ft</span></div></div>
+        </div>
+        <p class="foot" id="room-note"></p>
+        <div id="room-warn"></div>
+      </div>
     </section>
   </div>
 
@@ -574,11 +592,14 @@ body.vr-on .stage { grid-row: 1; }
       <div class="variant" id="ctl-mode"><span>Runs on</span>
         <button type="button" data-v="play" aria-pressed="true">Basic</button>
         <button type="button" data-v="fluidnc" aria-pressed="false">FluidNC</button></div>
-      <p class="foot" id="ctl-note">Basic: the page moves the machine itself, fast and always there; the pendant talks to a
-        small stand-in for FluidNC (homing, jogging, hold / resume, the SD card). FluidNC: the real firmware,
-        built to run in your browser, drives the machine with the config.yaml in use (V1E's JP3_LR until you load your
-        own, under Build): jog it, home it ($H on the machine's switches), send it G-code. It runs a copy with plain
+      <p class="foot" id="ctl-note"><b>Basic</b>: the page moves the machine itself. <b>FluidNC</b>: the real firmware, running in your browser.</p>
+      <details class="cam more">
+        <summary>More about the two</summary>
+        <p class="foot">Basic is fast and always there; the pendant talks to a small stand-in for FluidNC (homing, jogging,
+        hold / resume, the SD card). FluidNC drives the machine with the config.yaml in use (V1E's JP3_LR until you load
+        your own, under Build): jog it, home it ($H on the machine's switches), send it G-code. It runs a copy with plain
         stepper drivers ($CD shows that copy).</p>
+      </details>
       <div class="buttons" id="ft-row">
         <button type="button" id="ft-pop-btn" disabled title="FluidTouch's screen in a window over the view (or click the pendant's screen in the view)">Pendant screen</button>
       </div>
@@ -605,7 +626,7 @@ body.vr-on .stage { grid-row: 1; }
           <button type="button" data-rt="24" title="Soft reset (Ctrl-X)">Reset</button>
         </div>
       </details>
-      <details class="cam" id="flash-box">
+      <details class="cam" id="flash-box" hidden>
         <summary>Flash (LocalFS)</summary>
         <p class="foot">FluidNC's Flash, kept in this browser: config.yaml is the one in use (V1E's, or yours from Build,
           which comes back after a reload). FluidNC boots a translated copy, sim_config.yaml, with plain stepper drivers;
@@ -616,13 +637,67 @@ body.vr-on .stage { grid-row: 1; }
       <p class="foot" id="ctl-src"></p>
     </section>
 
+    <section aria-labelledby="h-job">
+      <h2 id="h-job">Run G-code</h2>
+      <div id="job-off">
+        <p class="foot">V1E's build order: the machine runs on the printed temporary struts first and cuts its own MDF
+          strut plates. Switch to the temporary struts to run that job here, or play a G-code file.</p>
+        <div class="buttons"><button type="button" id="job-temp">Use the temporary struts</button></div>
+      </div>
+      <p class="foot" id="job-src"></p>
+      <div id="job-on" hidden>
+        <div class="buttons">
+          <button type="button" id="job-play">Play</button>
+          <button type="button" id="job-reset">Start over</button>
+          <select id="job-speed" aria-label="Playback speed" style="width: auto">
+            <option value="1">1×</option><option value="2">2×</option><option value="5">5×</option><option value="10" selected>10×</option>
+            <option value="20">20×</option><option value="50">50×</option><option value="100">100×</option></select>
+        </div>
+        <div class="slider"><label for="job-t" title="Job time">⏱</label><input id="job-t" type="range" min="0" max="1000" step="1" value="0"><output id="job-o" for="job-t"></output></div>
+        <div class="readout" aria-label="Work position, mm">
+          <div><b>Work X</b><span id="wx">0.000</span> <small>mm</small></div>
+          <div><b>Work Y</b><span id="wy">0.000</span> <small>mm</small></div>
+          <div><b>Work Z</b><span id="wz">0.000</span> <small>mm</small></div>
+        </div>
+        <label class="check"><input type="checkbox" id="job-moves"> Show the moves</label>
+        <label class="check"><input type="checkbox" id="job-closeup" checked> Close-up while probing</label>
+        <p class="foot" id="job-status" role="status"></p>
+      </div>
+      <details class="cam" id="job-def" hidden>
+        <summary>Stock and bits</summary>
+        <p class="foot" id="job-def-note">This file doesn't say what it cuts or with which bit, so nothing is carved. Say
+          here (mm, work coordinates, top of the stock at Z0) and it carves as it runs.</p>
+        <div class="trio" id="job-def-stock">
+          <label>Stock X from<input id="def-x0" type="number" step="any"></label><label>to<input id="def-x1" type="number" step="any"></label>
+          <label>Stock Y from<input id="def-y0" type="number" step="any"></label><label>to<input id="def-y1" type="number" step="any"></label>
+          <label>Thickness<input id="def-t" type="number" step="any" min="0.1"></label>
+        </div>
+        <div id="job-def-tools"></div>
+        <div class="buttons"><button type="button" id="job-def-use">Use these</button><button type="button" id="job-def-clear">Forget them</button></div>
+      </details>
+      <div class="buttons">
+        <button type="button" id="job-back" hidden>Back to the strut plate job</button>
+        <button type="button" id="job-install" hidden>Install the plates (Permanent)</button>
+      </div>
+      <details class="cam" id="sd-box" open>
+        <summary>SD card (<span id="sd-count">0 files</span>)</summary>
+        <p class="foot">G-code files kept in this browser: ▶ plays one (Basic) or runs it on FluidNC, which sees
+          the same card ($SD/List); the name loads it without starting. Drop files here or add them. The strut plate G-code is kept as /LR4_strut_plates.gcode.</p>
+        <div class="sd-list" id="sd-list" role="listbox" aria-label="Files on the SD card"></div>
+        <div class="buttons">
+          <label class="btn">Add G-code files…<input type="file" id="job-file" accept=".gcode,.nc,.ngc,.tap,.gc,.txt" multiple hidden></label>
+        </div>
+        <p class="foot" id="sd-status" role="status"></p>
+      </details>
+    </section>
+
     <section aria-labelledby="h-pos">
-      <h2 id="h-pos">Tool position</h2>
+      <h2 id="h-pos">Tool position (mm, as FluidNC reports)</h2>
       <div id="pos-play">
         <div class="readout" title="X, Y from the home switches; Z from Z's homed spot (0 there, negative below)">
-          <div><b>X</b><span id="rx">13.00</span> <small id="ux">in</small></div>
-          <div><b>Y</b><span id="ry">17.50</span> <small id="uy">in</small></div>
-          <div><b>Z</b><span id="rz">0</span> <small>mm</small></div>
+          <div><b>X</b><span id="rx">330.200</span> <small>mm</small></div>
+          <div><b>Y</b><span id="ry">444.500</span> <small>mm</small></div>
+          <div><b>Z</b><span id="rz">0.000</span> <small>mm</small></div>
         </div>
         <div class="slider"><label for="sx">X</label><input id="sx" type="range" step="0.1"><output id="ox" for="sx"></output></div>
         <div class="slider"><label for="sy">Y</label><input id="sy" type="range" step="0.1"><output id="oy" for="sy"></output></div>
@@ -654,66 +729,14 @@ body.vr-on .stage { grid-row: 1; }
       <p class="foot" id="home-status" role="status">Not homed. Home runs FluidNC's $H: Z up to its switch, then X and Y
         together to theirs (each Y motor stops on its own switch, squaring the gantry).</p>
     </section>
-
-    <section aria-labelledby="h-job">
-      <h2 id="h-job">Run G-code</h2>
-      <div id="job-off">
-        <p class="foot">V1E's build order: the machine runs on the printed temporary struts first and cuts its own MDF
-          strut plates. Switch to the temporary struts to run that job here, or play a G-code file.</p>
-        <div class="buttons"><button type="button" id="job-temp">Use the temporary struts</button></div>
-      </div>
-      <p class="foot" id="job-src"></p>
-      <div id="job-on" hidden>
-        <div class="buttons">
-          <button type="button" id="job-play">Play</button>
-          <button type="button" id="job-reset">Start over</button>
-          <select id="job-speed" aria-label="Playback speed" style="width: auto">
-            <option value="1">1×</option><option value="2">2×</option><option value="5">5×</option><option value="10" selected>10×</option>
-            <option value="20">20×</option><option value="50">50×</option><option value="100">100×</option></select>
-        </div>
-        <div class="slider"><label for="job-t" title="Job time">⏱</label><input id="job-t" type="range" min="0" max="1000" step="1" value="0"><output id="job-o" for="job-t"></output></div>
-        <div class="readout" aria-label="Work position, mm">
-          <div><b>Work X</b><span id="wx">0.0</span> <small>mm</small></div>
-          <div><b>Work Y</b><span id="wy">0.0</span> <small>mm</small></div>
-          <div><b>Work Z</b><span id="wz">0.0</span> <small>mm</small></div>
-        </div>
-        <label class="check"><input type="checkbox" id="job-moves"> Show the moves</label>
-        <label class="check"><input type="checkbox" id="job-closeup" checked> Close-up while probing</label>
-        <p class="foot" id="job-status" role="status"></p>
-      </div>
-      <details class="cam" id="job-def" hidden>
-        <summary>Stock and bits</summary>
-        <p class="foot" id="job-def-note">This file doesn't say what it cuts or with which bit, so nothing is carved. Say
-          here (mm, work coordinates, top of the stock at Z0) and it carves as it runs.</p>
-        <div class="trio" id="job-def-stock">
-          <label>Stock X from<input id="def-x0" type="number" step="any"></label><label>to<input id="def-x1" type="number" step="any"></label>
-          <label>Stock Y from<input id="def-y0" type="number" step="any"></label><label>to<input id="def-y1" type="number" step="any"></label>
-          <label>Thickness<input id="def-t" type="number" step="any" min="0.1"></label>
-        </div>
-        <div id="job-def-tools"></div>
-        <div class="buttons"><button type="button" id="job-def-use">Use these</button><button type="button" id="job-def-clear">Forget them</button></div>
-      </details>
-      <div class="buttons">
-        <button type="button" id="job-back" hidden>Back to the strut plate job</button>
-        <button type="button" id="job-install" hidden>Install the plates (Permanent)</button>
-      </div>
-      <details class="cam" id="sd-box">
-        <summary>SD card (<span id="sd-count">0 files</span>)</summary>
-        <p class="foot">G-code files kept in this browser: ▶ plays one (Basic) or runs it on FluidNC, which sees
-          the same card ($SD/List); the name loads it without starting. Drop files here or add them. The strut plate G-code is kept as /LR4_strut_plates.gcode.</p>
-        <div class="sd-list" id="sd-list" role="listbox" aria-label="Files on the SD card"></div>
-        <div class="buttons">
-          <label class="btn">Add G-code files…<input type="file" id="job-file" accept=".gcode,.nc,.ngc,.tap,.gc,.txt" multiple hidden></label>
-        </div>
-        <p class="foot" id="sd-status" role="status"></p>
-      </details>
-    </section>
   </div>
 
   <footer class="foot about-line" id="about"><span id="version"></span><br>
     <a id="fb-issue" href="https://github.com/jeyeager65/lr4-sandbox/issues/new" target="_blank" rel="noopener">Report a problem</a>
     · <a href="https://forum.v1e.com/" target="_blank" rel="noopener">V1E forum</a>
-    · <button type="button" class="link" id="about-btn">About this model</button></footer>
+    · <button type="button" class="link" id="about-btn">About this model</button><br>
+    <button type="button" class="link" id="copy-link" title="A link to this machine: size, braces, options, table, room, colours">Copy a link to this build</button>
+    · <button type="button" class="link" id="reset-all" title="Settings back to the defaults (your part files and SD card stay)">Reset settings</button></footer>
 </aside>
 
 <dialog class="about" id="about-dlg" aria-labelledby="about-h">
@@ -729,6 +752,21 @@ body.vr-on .stage { grid-row: 1; }
   <form method="dialog" class="buttons"><button>Close</button></form>
 </dialog>
 
+<dialog class="about" id="keys-dlg" aria-labelledby="keys-h">
+  <h2 id="keys-h">Keyboard shortcuts</h2>
+  <dl class="keys">
+    <dt>1 – 5</dt><dd>Iso, Front, Top, Side, Back</dd>
+    <dt>F</dt><dd>Fit all</dd>
+    <dt>M</dt><dd>Measure (Esc ends it)</dd>
+    <dt>P</dt><dd>Save the view as a picture</dd>
+    <dt>Space</dt><dd>Play / pause the G-code job (Basic)</dd>
+    <dt>H</dt><dd>Hide / show the panel</dd>
+    <dt>Double-click</dt><dd>Inspect an assembly (Esc goes back)</dd>
+    <dt>?</dt><dd>This list</dd>
+  </dl>
+  <form method="dialog" class="buttons"><button>Close</button></form>
+</dialog>
+
 <dialog class="bom" id="bom" aria-labelledby="bom-title">
   <div class="bom-head"><h2 id="bom-title">Bill of materials</h2>
     <div class="bom-tools"><button id="bom-all" type="button">Expand all</button><button id="bom-close" type="button">Close</button></div></div>
@@ -740,18 +778,21 @@ body.vr-on .stage { grid-row: 1; }
   <div class="status" id="status" role="status" aria-live="polite"><div id="status-title">Loading model…</div><div class="bar"><div id="status-bar"></div></div><div class="detail" id="status-detail">&nbsp;</div></div>
   <div class="toolbar" role="toolbar" aria-label="View">
     <button id="v-panel" type="button" aria-pressed="false" aria-label="Hide the panel" title="Hide the panel">☰</button>
+    <select id="v-views" aria-label="View"><option value="" hidden selected>View</option><option value="v-iso">Iso</option>
+      <option value="v-front">Front</option><option value="v-top">Top</option><option value="v-side">Side</option><option value="v-back">Back</option></select>
     <button id="v-iso" type="button">Iso</button>
     <button id="v-front" type="button">Front</button>
     <button id="v-top" type="button">Top</button>
     <button id="v-side" type="button" title="Y-rail side">Side</button>
     <button id="v-back" type="button">Back</button>
     <button id="v-fit" type="button">Fit all</button>
-    <button id="v-home" type="button" title="Home the machine ($H)">⌂ Home</button>
-    <button id="v-sound" type="button" aria-pressed="false" title="Machine sounds (synthesized: the stepper motors as TMC2209s in StealthChop run them)">🔈 Sound</button>
+    <button id="v-meas" type="button" aria-pressed="false" title="Measure (M): two clicks; snaps to corners and hole centres" aria-label="Measure">📏</button>
+    <button id="v-shot" type="button" title="Save the view as a PNG (P)" aria-label="Save the view as a picture">📷</button>
     <button id="v-vr" type="button" hidden title="PC VR headset (SteamVR / OpenXR)">Enter VR</button>
     <button id="v-more" type="button" aria-expanded="false" aria-controls="view-pop" title="View settings" aria-label="View settings">⚙</button>
   </div>
   <div class="view-pop" id="view-pop" role="dialog" aria-label="View settings" hidden>
+    <div class="sm" style="margin-top: 0"><button id="v-sound" type="button" aria-pressed="false" title="Machine sounds (synthesized: the stepper motors as TMC2209s in StealthChop run them)">🔈 Sound off</button></div>
     <div class="slider sm-row"><label for="snd-vol" title="Machine sound volume">🔈</label><input id="snd-vol" type="range" min="0" max="1" step="0.05" value="0.5"><output id="snd-vol-out" for="snd-vol">50%</output></div>
     <div class="slider sm-row"><label for="snd-voice" title="Machine sound: realistic, or a person making robot noises">🗣</label><select id="snd-voice"><option value="machine">Realistic</option><option value="robot">Robot noises (joke)</option></select></div>
     <div class="sm">
@@ -783,7 +824,8 @@ body.vr-on .stage { grid-row: 1; }
     <details class="insp-card" id="insp-card" open><summary><strong id="insp-h"></strong><em id="insp-n"></em></summary>
       <div id="insp-list"></div></details>
   </div>
-  <div class="hint">Drag to orbit · right-drag to pan · scroll to zoom</div>
+  <div class="hint"><span class="h-mouse">Drag to orbit · right-drag to pan · scroll to zoom · <button type="button" class="link" id="keys-btn">? keys</button></span><span class="h-touch">Drag to orbit · two fingers to pan · pinch to zoom</span></div>
+  <p class="meas-main" id="meas-main" role="status" hidden></p>
   <div class="rec-badge" id="rec-badge" hidden></div>
   <div class="rec-caption" id="rec-caption" hidden></div>
   <div class="rec-title" id="rec-title" hidden><div></div></div>
@@ -1568,6 +1610,7 @@ body.vr-on .stage { grid-row: 1; }
     const dev = cfg.files && new URLSearchParams(location.search).get("parts");   // testing: fetch the files from a folder URL
     if (dev) await addFiles([...needed.keys()].map((p) => ({ name: p,
       read: () => fetch(dev + p).then((q) => q.ok ? q.arrayBuffer() : Promise.reject(new Error(p + " " + q.status))) })));
+    applyLink();
   }
 
   // ---- Peter Plates: solid (stepper openings filled) or open honeycomb in a solid border - one shown at a time ----
@@ -1703,6 +1746,7 @@ body.vr-on .stage { grid-row: 1; }
       await nextFrame();
       dropSrcGeometry();
       rebuild();
+      if (applyLink.left) applyLink(applyLink.left);  // a link's Peter Plates / struts waited for the files
     } catch (e) {
       console.error(e);
       document.getElementById("files-list").insertAdjacentHTML("afterbegin", `<p class="warn">Could not read the files: ${e.message}</p>`);
@@ -2017,17 +2061,16 @@ body.vr-on .stage { grid-row: 1; }
         v: meta.tip_above_table + meta.travel.z[1] - Homing.settings(yamlBase ? yamlBase.text : null).z.pulloff };
     return zHomeMemo.v;
   }
-  function readout(X, Y, Z, playing) {                // X, Y in inches (the sliders); shown in the page's units
+  function readout(X, Y, Z, playing) {                // X, Y in inches (the sliders); shown in mm, as FluidNC reports
     if (X === undefined) { if (!lastPos) return; [X, Y, Z, playing] = lastPos; }
     lastPos = [X, Y, Z, playing];
-    const mm = playing || U.unit === "mm", u = (v) => (mm ? v * IN : v);  // G-code playback: always mm
-    document.getElementById("ux").textContent = document.getElementById("uy").textContent = mm ? "mm" : "in";
-    document.getElementById("rx").textContent = u(X).toFixed(mm ? 1 : 2);
-    document.getElementById("ry").textContent = u(Y).toFixed(mm ? 1 : 2);
+    const u = (v) => v * IN;
+    document.getElementById("rx").textContent = u(X).toFixed(3);
+    document.getElementById("ry").textContent = u(Y).toFixed(3);
     const zr = Z - zHomeTip();                       // Z from its homed spot
-    document.getElementById("rz").textContent = zr.toFixed(playing ? 1 : 0);
-    document.getElementById("ox").textContent = `${u(X).toFixed(mm ? 0 : 1)} / ${+u(Number(sx.max)).toFixed(mm ? 0 : 1)}`;
-    document.getElementById("oy").textContent = `${u(Y).toFixed(mm ? 0 : 1)} / ${+u(Number(sy.max)).toFixed(mm ? 0 : 1)}`;
+    document.getElementById("rz").textContent = zr.toFixed(3);
+    document.getElementById("ox").textContent = `${u(X).toFixed(0)} / ${u(Number(sx.max)).toFixed(0)}`;
+    document.getElementById("oy").textContent = `${u(Y).toFixed(0)} / ${u(Number(sy.max)).toFixed(0)}`;
     document.getElementById("oz").textContent = `${zr.toFixed(playing ? 1 : 0)} mm`;
   }
 
@@ -2105,14 +2148,14 @@ body.vr-on .stage { grid-row: 1; }
   function dro() {                                   // MPos once homed, else dashes (FluidNC mode: its MPos)
     if (CTL.mode === "fluidnc") {                   // its own MPos; greyed until homed (it doesn't know where it is)
       for (const [i, a] of ["x", "y", "z"].entries()) {
-        $("m" + a).textContent = CTL.mpos ? CTL.mpos[i].toFixed(1) : "–";
+        $("m" + a).textContent = CTL.mpos ? CTL.mpos[i].toFixed(3) : "–";
         $("m" + a).style.opacity = CTL.homed ? "" : "0.55";
       }
       return;
     }
     for (const a of ["x", "y", "z"]) $("m" + a).style.opacity = "";
     const m = HOME.home && HOME.pose && !HOME.run ? Homing.mpos(HOME.s, HOME.home, HOME.pose) : null;
-    for (const a of ["x", "y", "z"]) $("m" + a).textContent = m && m[a] !== null ? m[a].toFixed(1) : "–";
+    for (const a of ["x", "y", "z"]) $("m" + a).textContent = m && m[a] !== null ? m[a].toFixed(3) : "–";
   }
   // the homed spot in the job's work mm (work zero = the cutting area's corner = the X / Y trips, Z on the stock
   // top), for GcodePlay.load's start; undefined when not homed
@@ -2127,7 +2170,7 @@ body.vr-on .stage { grid-row: 1; }
     const tv = meta.travel, z0 = JOB.zero;   // JOB.zero: LR4Demo.zero (videos: jogged there first)
     return (stock) => ({ x: z0 ? 0 : h.x - tv.x[0], y: z0 ? 0 : h.y - tv.y[0], z: h.z + meta.tip_above_table + (stock ? stock.zmin : 0) });
   }
-  for (const id of ["home", "v-home"]) document.getElementById(id).addEventListener("click", () =>
+  document.getElementById("home").addEventListener("click", () =>
     (CTL.mode === "fluidnc" ? ctlHome() : HOME.run ? homeCancel() : homeStart()));
 
   // ---- size inputs, V1E calculator, cut list, strut plate drawing + downloads ----
@@ -2136,7 +2179,7 @@ body.vr-on .stage { grid-row: 1; }
   const $ = (id) => document.getElementById(id);
   const disp = (mm) => U.unit === "in" ? mm / IN : mm;
   function frac(v) {                                  // 32.625 -> 32 5/8
-    const w = Math.floor(v + 1e-9), e = Math.round((v - w) * 8);
+    const t = Math.round(v * 8), w = Math.floor(t / 8), e = t - w * 8;
     if (!e) return `${w}`;
     const g = e % 4 === 0 ? 4 : e % 2 === 0 ? 2 : 1;
     return `${w} ${e / g}/${8 / g}`;
@@ -2182,10 +2225,11 @@ body.vr-on .stage { grid-row: 1; }
       y = yTop + w + gapY;
     }
     const yp = y + 6, yd = y + 58, x0 = padX, x1 = padX + L, h0 = padX + 9, h1 = padX + 9 + S.pitch;
+    const dim = (mm, d) => U.unit === "in" ? `${frac(mm / IN)}" (${mm.toFixed(d)} mm)` : `${mm.toFixed(d)} mm`;
     parts.push(`<path class="dim" d="M${h0},${yp - 8}V${yp + 8}M${h1},${yp - 8}V${yp + 8}M${h0},${yp}H${h1}"/>`,
-      `<text class="dim-text" x="${h1 + 10}" y="${yp + 10}">${S.pitch.toFixed(2)} mm pitch</text>`,
+      `<text class="dim-text" x="${h1 + 10}" y="${yp + 10}">${dim(S.pitch, 2)} pitch</text>`,
       `<path class="dim" d="M${x0},${yd - 8}V${yd + 8}M${x1},${yd - 8}V${yd + 8}M${x0},${yd}H${x1}"/>`,
-      `<text class="dim-text" x="${(x0 + x1) / 2}" y="${yd + 34}" text-anchor="middle">${L} mm</text>`);
+      `<text class="dim-text" x="${(x0 + x1) / 2}" y="${yd + 34}" text-anchor="middle">${dim(L, 0)}</text>`);
     $("plate-draw").innerHTML = `<svg viewBox="0 0 ${L + 2 * padX} ${yd + 42}" role="img" ` +
       `aria-label="Front and bottom strut plates, ${L} mm long, ${S.n} braces">${parts.join("")}</svg>`;
   }
@@ -2193,9 +2237,10 @@ body.vr-on .stage { grid-row: 1; }
     $("sub").textContent = `V1E LowRider 4 for a ${+(S.cutX / IN).toFixed(2)} × ${+(S.cutY / IN).toFixed(2)} in cutting area, ` +
       `on a ${frac(S.TW / IN)} × ${frac(S.TL / IN)} in MDF sheet. Every printed part is the official STL, placed from its holes.`;
     const sel = $("braces"), want = String(U.braces);
-    sel.innerHTML = `<option value="0">Auto: ${S.auto} braces, ${((S.strut - 18) / (S.auto - 1)).toFixed(1)} mm pitch</option>` +
+    const pitch = (n) => { const mm = (S.strut - 18) / (n - 1); return U.unit === "in" ? `${frac(mm / IN)}"` : `${mm.toFixed(1)} mm`; };
+    sel.innerHTML = `<option value="0">Auto: ${S.auto} braces, ${pitch(S.auto)} pitch</option>` +
       [S.auto - 1, S.auto + 1, S.auto + 2].filter((n) => n >= 3).map((n) =>
-        `<option value="${n}">${n} braces, ${((S.strut - 18) / (n - 1)).toFixed(1)} mm pitch</option>`).join("");
+        `<option value="${n}">${n} braces, ${pitch(n)} pitch</option>`).join("");
     sel.value = [...sel.options].some((o) => o.value === want) ? want : "0";
     const v = cfg.verified, warn = [];
     if (S.strut < v.strut[0] || S.strut > v.strut[1] || S.n < v.braces[0] || S.n > v.braces[1])
@@ -2236,7 +2281,7 @@ body.vr-on .stage { grid-row: 1; }
       const saved = JSON.parse(localStorage.getItem("lr4-config-size") || "null");
       if (saved && saved.cutX > 0 && saved.cutY > 0) Object.assign(U, saved);
     } catch (e) { /* defaults */ }
-    const hm = /^#(\d+(?:\.\d+)?)x(\d+(?:\.\d+)?)$/.exec(location.hash);   // deep link: #48x96 = 48 x 96 in
+    const hm = /^#(\d+(?:\.\d+)?)x(\d+(?:\.\d+)?)(?:&|$)/.exec(location.hash);   // deep link: #48x96 = 48 x 96 in (+ applyLink)
     if (hm) Object.assign(U, { cutX: +hm[1] * IN, cutY: +hm[2] * IN, braces: 0 });
     const keep = () => { try { localStorage.setItem("lr4-config-size", JSON.stringify(U)); } catch (e) { /* not kept */ } };
     for (const [id, k] of Object.entries(lenFields)) $(id).addEventListener("input", (e) => {
@@ -2258,8 +2303,8 @@ body.vr-on .stage { grid-row: 1; }
       U.struts = b.dataset.v; keep(); markStruts(); applySize(true);
     }));
     markStruts();
-    $("u-in").addEventListener("click", () => { U.unit = "in"; keep(); fillInputs(); updateCalc(); readout(); });
-    $("u-mm").addEventListener("click", () => { U.unit = "mm"; keep(); fillInputs(); updateCalc(); readout(); });
+    $("u-in").addEventListener("click", () => { U.unit = "in"; keep(); fillInputs(); updateCalc(); updateText(); drawPlates(); });
+    $("u-mm").addEventListener("click", () => { U.unit = "mm"; keep(); fillInputs(); updateCalc(); updateText(); drawPlates(); });
     fillInputs();
     applySize(true);
   }
@@ -2751,7 +2796,7 @@ body.vr-on .stage { grid-row: 1; }
     CTL.mode = mode;
     const on = mode === "fluidnc";
     for (const b of $("ctl-mode").querySelectorAll("button")) b.setAttribute("aria-pressed", String(b.dataset.v === mode));
-    $("ctl-box").hidden = $("ctl-opts").hidden = $("pos-jog").hidden = !on;
+    $("ctl-box").hidden = $("ctl-opts").hidden = $("pos-jog").hidden = $("flash-box").hidden = !on;
     $("pos-play").hidden = $("home-real-l").hidden = on;
     fjButtons();
     if (JOB.bits && JOB.bits.size) {                 // the model's bit moves with the router; the job's only in Playback
@@ -3333,7 +3378,7 @@ body.vr-on .stage { grid-row: 1; }
       for (const q of JOB.bits.values()) q.visible = q === b;
       if (b) { b.position.set(at[0] + mx - tv.x[0] - z0[0], at[1] + my - tv.y[0] - z0[1], at[2] + pz); b.rotation.z = JOB.spinning ? JOB.spin : 0; }
     }
-    $("wx").textContent = p.x.toFixed(1); $("wy").textContent = p.y.toFixed(1); $("wz").textContent = p.z.toFixed(2);
+    $("wx").textContent = p.x.toFixed(3); $("wy").textContent = p.y.toFixed(3); $("wz").textContent = p.z.toFixed(3);
     $("job-t").value = Math.round(JOB.t / tl.total * 1000);
     $("job-o").textContent = clock(JOB.t);
     const m = GcodePlay.message(tl, JOB.t), done = JOB.t >= tl.total;
@@ -3533,7 +3578,7 @@ body.vr-on .stage { grid-row: 1; }
     JOB.done.geometry.setDrawRange(0, 2 * J.T.carved);
     JOB.partial.geometry.setDrawRange(0, 0);
     const w = J.T.last;
-    if (w) { $("wx").textContent = w.x.toFixed(1); $("wy").textContent = w.y.toFixed(1); $("wz").textContent = w.z.toFixed(2); }
+    if (w) { $("wx").textContent = w.x.toFixed(3); $("wy").textContent = w.y.toFixed(3); $("wz").textContent = w.z.toFixed(3); }
     for (; J.k < tl.events.length && tl.events[J.k].index <= J.T.i; J.k++) {
       const e = tl.events[J.k];                      // a change to a bit the file doesn't define: hold it there
       if (e.kind === "tool" && !J.held && JOB.defMissing) { CTL.sim.realtime("!"); J.toolStop = e; }
@@ -4002,7 +4047,7 @@ body.vr-on .stage { grid-row: 1; }
   canvas.addEventListener("pointerdown", (e) => (down = [e.clientX, e.clientY]));
   canvas.addEventListener("pointerup", (e) => {
     if (!down || Math.hypot(e.clientX - down[0], e.clientY - down[1]) > 5) return;
-    if (INSPECT && MEAS.on) return measureClick(e);
+    if (MEAS.on) return measureClick(e);         // inspect's Measure or the toolbar's
     const r = canvas.getBoundingClientRect();
     ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
     ray.setFromCamera(ndc, camera);
@@ -4038,6 +4083,7 @@ body.vr-on .stage { grid-row: 1; }
   }
   function inspect(id) {
     if (!id || !LR4ShowTree.members(tree, id).length) return;
+    if (MEAS.main) mainMeasure(false);               // inspect has its own Measure
     const saved = INSPECT ? INSPECT.saved
       : { pos: camera.position.clone(), target: controls.target.clone(), center: center.clone(), radius };
     const up = tree.place[id] ? tree.place[id].flatMap(([a, k]) => [a, a + "." + k]) : [id.split(".")[0]];
@@ -4098,7 +4144,7 @@ body.vr-on .stage { grid-row: 1; }
     ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
     ray.setFromCamera(ndc, camera);
     const hit = ray.intersectObjects(meshes.filter((m) => m.visible), false)[0];
-    if (hit && !(INSPECT && MEAS.on)) inspect(INSPECT ? partId(hit.object) : asmOf(hit.object));
+    if (hit && !MEAS.on) inspect(INSPECT ? partId(hit.object) : asmOf(hit.object));
   });
   window.LR4Inspect = { open: inspect, close: inspectEnd, id: () => INSPECT && INSPECT.id,
     shown: () => meshes.filter((m) => m.visible).map((m) => m.userData.name) };
@@ -4316,7 +4362,7 @@ body.vr-on .stage { grid-row: 1; }
   function measureClear() {
     MEAS.pts = [];
     for (const c of [...MEAS.group.children]) { MEAS.group.remove(c); c.geometry.dispose(); c.material.dispose(); }
-    document.getElementById("meas-out").textContent = MEAS.on ? "Click a point (snaps to corners and hole centres)." : "";
+    document.getElementById(MEAS.main ? "meas-main" : "meas-out").textContent = MEAS.on ? "Click a point (snaps to corners and hole centres)." : "";
   }
   function measureSnap(e) {                           // -> { p: world point, what } or null
     const r = canvas.getBoundingClientRect(), px = [e.clientX - r.left, e.clientY - r.top];
@@ -4358,7 +4404,7 @@ body.vr-on .stage { grid-row: 1; }
       new THREE.MeshBasicMaterial({ color: css("--accent") || "#c8241b", depthTest: false }));
     dot.position.copy(s.p); dot.renderOrder = 10;
     MEAS.group.add(dot);
-    const out = document.getElementById("meas-out");
+    const out = document.getElementById(MEAS.main ? "meas-main" : "meas-out");
     if (MEAS.pts.length === 1) { out.textContent = `First point (${s.what}). Click the second.`; return; }
     const [a, b] = MEAS.pts.map((q) => q.p), d = b.clone().sub(a), L = d.length();
     const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints([a, b]),
@@ -4658,6 +4704,111 @@ body.vr-on .stage { grid-row: 1; }
       done: () => move(CTL.mode === "fluidnc" ? CTL.pose : null) } });   // back on its stand
   window.LR4VR.page = vr;
   // ---- automation handle for scripted videos (tools/record_demo.js); nothing on the page uses it ----
+  // ---- share link, picture, measure in the main view, reset, keyboard ----
+  // The link: #26x50&braces=6&struts=temp&peter=honeycomb&hose=0&pendant=1&table=762&room=6096,7315,3048&main=292a2e&units=mm
+  // (size in inches as before; only what's set - options are on unless =0). Applied through LR4Machine, as a video does.
+  const COL0 = { main: "#292a2e", accent: "#cc1f1a" };
+  function shareLink() {
+    const q = [`${+(S.cutX / IN).toFixed(3)}x${+(S.cutY / IN).toFixed(3)}`], add = (k, v) => q.push(`${k}=${encodeURIComponent(v)}`);
+    if ($("braces").value !== "0") add("braces", $("braces").value);
+    for (const [box, k] of [["strut-variant", "struts"], ["peter-variant", "peter"]]) {
+      const b = !$(box).hidden && $(box).querySelector('button[aria-pressed="true"]');
+      if (b) add(k, b.dataset.v);
+    }
+    for (const k of ["router", "skirt", "hose", "fan"]) if (!$("opt-" + k).checked) add(k, 0);
+    if ($("ft-on").checked) add("pendant", 1);
+    const t = parseFloat($("table-top").value);
+    if (t > 0) add("table", +(t * (U.unit === "in" ? IN : 1)).toFixed(1));
+    const room = ["w", "d", "h"].map((k) => parseFloat($("room-" + k).value));
+    if (room.every((v) => v > 0)) add("room", room.map((v) => Math.round(v * roomU())).join(","));
+    for (const role of ["main", "accent"]) if (pick[role].value.toLowerCase() !== COL0[role]) add(role, pick[role].value.slice(1));
+    if (U.unit === "mm") add("units", "mm");
+    return q.join("&");
+  }
+  function applyLink(o) {                             // o: the hash's settings (default) or what waited for the files
+    if (!o) {
+      const m = /^#\d+(?:\.\d+)?x\d+(?:\.\d+)?&(.+)$/.exec(location.hash);
+      if (!m) return;
+      o = Object.fromEntries(new URLSearchParams(m[1]));
+    }
+    applyLink.left = null;
+    if (o.units === "mm" && U.unit !== "mm") $("u-mm").click();
+    if (o.pendant !== undefined && $("ft-on").checked !== (o.pendant !== "0")) $("ft-on").click();
+    const set = {};
+    for (const k of ["router", "skirt", "hose", "fan"]) if (o[k] !== undefined) set[k] = o[k] !== "0";
+    for (const k of ["braces", "struts", "peter"]) if (o[k] !== undefined) set[k] = o[k];
+    if (o.table !== undefined) set.table = Number(o.table);
+    if (o.room) { const r = o.room.split(",").map(Number); if (r.length === 3 && r.every((v) => v > 0)) set.room = r; }
+    for (const role of ["main", "accent"]) if (o[role]) set[role] = "#" + o[role];
+    const bad = LR4Machine.apply(set), left = {};
+    for (const b of bad) {
+      const k = b.split("=")[0].toLowerCase();
+      if (k === "peter" || k === "struts") left[k] = o[k];
+      else console.warn("link: " + b);
+    }
+    if (Object.keys(left).length) applyLink.left = left;
+  }
+  const flashText = (b, text) => { const was = b.dataset.was || (b.dataset.was = b.textContent); b.textContent = text;
+    clearTimeout(b._t); b._t = setTimeout(() => (b.textContent = was), 2000); };
+  $("copy-link").addEventListener("click", async (e) => {
+    const url = location.href.split("#")[0] + "#" + shareLink();
+    history.replaceState(null, "", url);
+    let ok = true;
+    try { await navigator.clipboard.writeText(url); } catch (err) { ok = false; }
+    flashText(e.target, ok ? "Link copied" : "The link is in the address bar");
+  });
+  $("reset-all").addEventListener("click", () => {
+    if (!confirm("Put every setting back to the default? Your part files and SD card stay.")) return;
+    try {
+      for (const k of Object.keys(localStorage))
+        if (/^(lr4-|print-|peter-style|detail$)/.test(k) && !/^lr4-(sd-sel)$/.test(k)) localStorage.removeItem(k);
+    } catch (e) { /* storage blocked: nothing kept anyway */ }
+    location.replace(location.href.split("#")[0]);
+  });
+
+  function saveImage() {                              // preserveDrawingBuffer: the canvas holds the last frame
+    canvas.toBlob((b) => {
+      if (!b) return;
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(b);
+      a.download = `LR4_${+(S.cutX / IN).toFixed(2)}x${+(S.cutY / IN).toFixed(2)}.png`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+    }, "image/png");
+  }
+  $("v-shot").addEventListener("click", saveImage);
+  $("v-views").addEventListener("change", (e) => { $(e.target.value).click(); e.target.value = ""; });   // narrow screens
+
+  function mainMeasure(on) {                          // the toolbar's 📏: Measure on the whole machine
+    MEAS.on = MEAS.main = on;
+    $("v-meas").setAttribute("aria-pressed", String(on));
+    $("meas-main").hidden = !on;
+    canvas.classList.toggle("measuring", on);
+    measureClear();
+  }
+  $("v-meas").addEventListener("click", () => (INSPECT ? $("insp-meas").click() : mainMeasure(!MEAS.main)));
+
+  $("keys-btn").addEventListener("click", () => $("keys-dlg").showModal());
+  document.addEventListener("keydown", (e) => {
+    if (e.ctrlKey || e.metaKey || e.altKey || document.querySelector("dialog[open]")) return;
+    if (e.target.closest && e.target.closest("input, select, textarea, button, summary, [contenteditable]")) {
+      if (e.key !== "Escape") return;
+    }
+    const click = (id) => { const b = $(id); if (b && !b.hidden && !b.disabled) b.click(); };
+    const views = { 1: "v-iso", 2: "v-front", 3: "v-top", 4: "v-side", 5: "v-back" };
+    const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+    if (views[k]) click(views[k]);
+    else if (k === "f") click("v-fit");
+    else if (k === "m") click("v-meas");
+    else if (k === "p") saveImage();
+    else if (k === "h") click("v-panel");
+    else if (k === "?") $("keys-dlg").showModal();
+    else if (k === " " && CTL.mode !== "fluidnc" && !$("job-on").hidden) click("job-play");
+    else if (k === "Escape" && MEAS.main) mainMeasure(false);
+    else return;
+    e.preventDefault();
+  });
+
   // ---- for scripts (Part 29: the video sets the machine - tools/record_demo.js): My machine and Show by name / id,
   // through the panel's own controls (so they're kept and drawn as if clicked) ----
   window.LR4Machine = {
@@ -4993,7 +5144,7 @@ body.vr-on .stage { grid-row: 1; }
   function soundToggle() {
     const on = soundEngine().setOn(!SND.s.on());
     $("v-sound").setAttribute("aria-pressed", String(on));
-    $("v-sound").textContent = on ? "🔊 Sound" : "🔈 Sound";
+    $("v-sound").textContent = on ? "🔊 Sound on" : "🔈 Sound off";
   }
   $("v-sound").addEventListener("click", soundToggle);
   {

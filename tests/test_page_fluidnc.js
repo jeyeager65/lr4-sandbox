@@ -166,7 +166,7 @@ async function run(mode) {
     ok(p1.mpos0.every((v) => v === 0) && p1.boot.every((v, k) => Math.abs(v - p1.pose0[k]) < 0.01), "MPos 0 = where it started");
     const d1 = p1.pose1.map((v, k) => v - p1.boot[k]);
     ok(Math.abs(d1[0] - 100) < 0.01 && Math.abs(d1[1] - 200) < 0.01 && Math.abs(d1[2]) < 0.01, `G0 X100 Y200 moves the model by ${d1.map((v) => v.toFixed(2))}`);
-    ok(p1.dro[0] === "100.0" && p1.dro[1] === "200.0", `MPos DRO ${p1.dro}`);
+    ok(p1.dro[0] === "100.000" && p1.dro[1] === "200.000", `MPos DRO ${p1.dro}`);
     const d2 = p1.pose2.map((v, k) => v - p1.boot[k]);
     ok(Math.abs(d2[0] - 120) < 0.01 && Math.abs(d2[1] - 200) < 0.01 && Math.abs(d2[2] + 10) < 0.01,
       `jog pad X+ X+ Z- (10 mm): MPos ${p1.mpos2}, the model by ${d2.map((v) => v.toFixed(2))}`);
@@ -225,13 +225,17 @@ async function run(mode) {
     ok(h.mpos.every((v) => Math.abs(v - 3) < 1e-6), `homed: MPos = mpos_mm (${h.mpos})`);
     const spot = [tv.x[0] + 4, tv.y[0] + 4, tv.z[1] - 4];
     ok(h.pose.every((v, k) => Math.abs(v - spot[k]) < 0.15), `homed at Part 13's spot (trip + pulloff): ${h.pose.map((v) => v.toFixed(2))} vs ${spot.map((v) => v.toFixed(2))}`);
-    ok(h.steps.y0 === h.steps.y1 && h.steps.z0 === h.steps.z1, `each Y / Z motor on its own switch, level: ${JSON.stringify(h.steps)}`);
+    // level within a few steps: where each motor stops past its switch varies a step or three from run to run in the
+    // browser build (0.004 mm at 800 steps/mm), on the committed page too
+    ok(Math.abs(h.steps.y0 - h.steps.y1) <= 5 && Math.abs(h.steps.z0 - h.steps.z1) <= 5, `each Y / Z motor on its own switch, level: ${JSON.stringify(h.steps)}`);
     ok(h.probe.ok && h.probe.lines.some((l) => /^\[PRB:.*:1\]$/.test(l)), `G38.2 stops on the plate: ${h.probe.lines.join(" ")}`);
     ok(Math.abs(h.tripZ - h.plateTop) < 0.15, `G38.2 trips with the bit's end on the plate: ${h.tripZ.toFixed(2)} mm above the table ` +
       `(plate top ${h.plateTop}); comes to rest ${(h.tripZ - h.endZ).toFixed(2)} mm further down`);
     for (const [k, d, secs, want] of h.timing) {
-      const real = want / k;     // 30%: headless software rendering competes for the CPU (short 10x moves ran up to ~25% long)
-      ok(Math.abs(secs - real) < Math.max(0.3 * real, 0.12), `${k}x: G1 X${d} F600 (${want} s machine time) took ${secs.toFixed(2)} s (want ${real.toFixed(2)})`);
+      // fast is the bug (the time scale ignored): 30%. Slow is headless software rendering competing for the CPU (short
+      // 10x moves ran up to ~25% long, a 1x move once 61%): 75%
+      const real = want / k, tol = Math.max(0.3 * real, 0.12);
+      ok(secs > real - tol && secs < real + Math.max(0.75 * real, 0.12),`${k}x: G1 X${d} F600 (${want} s machine time) took ${secs.toFixed(2)} s (want ${real.toFixed(2)})`);
     }
     ok(h.unplug.alarm && /^ALARM:(8|9)$/.test(h.unplug.alarm) && !h.unplug.homed, `X switch unplugged: $HX -> ${h.unplug.alarm}, not homed`);
 

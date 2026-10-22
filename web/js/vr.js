@@ -233,7 +233,7 @@
       else if (a.a === "recenter") place(true);
       else if (a.a === "unhide") api.showHidden();
       else if (a.a === "home") $("home").click();      // the Run tab's Home ($H) button
-      else if (a.a === "sound") $("v-sound").click();  // the toolbar's Sound toggle (a trigger press counts as the click audio needs)
+      else if (a.a === "sound") $("v-sound").click();  // the Sound toggle under ⚙ (a trigger press counts as the click audio needs)
       else if (a.a === "hide") { if (cardPart) api.hidePart(cardPart); closeCard(); }
       else if (a.a === "hidegroup") {
         const g = cardPart && $("g-" + api.asmOf(cardPart));

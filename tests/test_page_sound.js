@@ -23,7 +23,7 @@ const ok = (cond, msg) => { checks++; console.log((cond ? "  ok   " : "  FAIL ")
     ok(up, "page loaded");
     if (!up) return;
     await page.val(HELPERS);
-    const r = await page.val(`(() => { const b = document.getElementById("v-sound").getBoundingClientRect(); return [b.left + b.width / 2, b.top + b.height / 2]; })()`);
+    const r = await page.val(`(() => { document.getElementById("v-more").click(); const b = document.getElementById("v-sound").getBoundingClientRect(); return [b.left + b.width / 2, b.top + b.height / 2]; })()`);
     for (const type of ["mousePressed", "mouseReleased"])
       await page.send("Input.dispatchMouseEvent", { type, x: r[0], y: r[1], button: "left", buttons: type === "mousePressed" ? 1 : 0, clickCount: 1 });
     await sleep(500);
