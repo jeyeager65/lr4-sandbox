@@ -6,6 +6,7 @@
 // "beam.hardware", part = the mesh name (a thread "X~thread" follows X). Visibility = a set of ids turned off.
 // Inspect (Part 27): a row's parts + every bolt joining one of them + the bearings / idlers / rails those bolts hold
 // (inspectSet), and its parts list with the fastener counts from the data (meta.fast, share_data.py) - partsList.
+// Exploded view (Part 28): explode() - unit offsets along the bolt lines (meta.axis / chain from share_data.py).
 // Pure (no THREE / DOM): tests/test_show_tree.js.
 (function (root) {
   "use strict";
@@ -19,6 +20,9 @@
   const ROUTER = /^(Router_|Tool_Mount_|Dust_Shoe|Dust_Skirt|Bristles_TPU)/;
   const ELEC = /(^|_)(Stepper|Endstop)|^PSU|^Jackpot3_(Fan|Board)|^TouchPlate_Wire|^Pendant_screen/;
   const FRAME = ["table", "yz-min", "yz-max", "beam"];
+  // how a part comes off in the exploded view when that isn't along its screws (user 2026-10-22): the X motor lifts out
+  // of the core, the Y / Z motors slide out to their own side (Min -X, Max +X)
+  const SLIDE = [[/^X_Stepper$/, [0, 0, 1]], [/^[YZ]_Stepper_Min$/, [-1, 0, 0]], [/^[YZ]_Stepper_Max$/, [1, 0, 0]]];
   const PRESETS = [["all", "All"], ["no-hardware", "No hardware"], ["printed", "Printed parts only"], ["frame", "Frame only"]];
 
   const isBolt = (p) => p.name.includes("__");
@@ -167,7 +171,72 @@
     return "";
   }
 
-  const api = { build, on, preset, presetOf, members, inspectSet, partsList, ASM, KINDS, PRESETS };
+  // exploded view: set = part ids; info = { bolts: { id: { axis: [x, y, z] head -> nut, chain: [part ids along it] } },
+  // centre: { id: [x, y, z] }, size: { id: n }, anchor } -> { id: [x, y, z] } in steps (the page scales them). From the
+  // anchor (given, else the biggest part) along each bolt it shares: the parts on it one step apart along its axis (head
+  // side -axis, nut side +axis), the bolt one step out past its head; a part no bolt reaches from there moves one step
+  // straight out from the anchor's centre and the parts bolted to it follow along their bolts (biggest first); bolts
+  // without an axis move straight out. A bolt's `held` parts (bearings on an axle) come off it sideways: the bolt pulls
+  // out two steps, each held part one step out of its slot: info.slide[id] (the page: up, square to the axle), else
+  // square to the axle, away from the part it's in. A part in SLIDE (or info.slide) goes that way instead of along its
+  // screws.
+  // one component drawn as several meshes moves as one: X_Stepper_Face / _Shaft / _Lead_Red ... with X_Stepper,
+  // Endstop_X_Lever with Endstop_X, the router's pieces with Router_Kobalt (not numbered copies: Y_Clip_2 has no parent)
+  function unitOf(set, isBolt) {
+    const ids = [...set].filter((id) => !isBolt(id)), up = {};
+    for (const id of ids) {
+      const p = ids.filter((q) => q !== id && id.startsWith(q + "_") && !/^\d+$/.test(id.slice(q.length + 1)))
+        .sort((a, b) => b.length - a.length)[0] || (/^Router_/.test(id) && id !== "Router_Kobalt" && set.has("Router_Kobalt") ? "Router_Kobalt" : null);
+      if (p) up[id] = p;
+    }
+    const top = (id) => { let q = id; while (up[q]) q = up[q]; return q; };
+    return Object.fromEntries(Object.keys(up).map((id) => [id, top(id)]));
+  }
+  function explode(set, info) {
+    const unit = unitOf(set, (id) => !!info.bolts[id] || id.includes("__"));
+    const slide = (id) => (info.slide && info.slide[id]) || (SLIDE.find(([re]) => re.test(id)) || [])[1];
+    const bolts = Object.entries(info.bolts || {}).filter(([b]) => set.has(b))
+      .map(([b, v]) => [b, { axis: v.axis, chain: v.chain.map((p) => unit[p] || p), held: (v.held || []).filter((p) => set.has(p)) }]);
+    const parts = [...set].filter((id) => !info.bolts[id] && info.centre[id] && !unit[id]);
+    const size = (id) => (info.size && info.size[id]) || 0;
+    const anchor = set.has(info.anchor) && !info.bolts[info.anchor] ? info.anchor : parts.sort((a, b) => size(b) - size(a))[0];
+    if (!anchor) return {};
+    const off = { [anchor]: [0, 0, 0] }, ac = info.centre[anchor];
+    const out = (id) => {                             // one step straight out from the anchor
+      const v = info.centre[id].map((x, i) => x - ac[i]), n = Math.hypot(...v);
+      return n > 1e-6 ? v.map((x) => x / n) : [0, 0, 1];
+    };
+    for (;;) {                                        // along the bolts from what's placed; then the biggest part left
+      for (let changed = true; changed;) {            // goes straight out and its own bolts carry on from it
+        changed = false;
+        for (const [b, { axis: d, chain, held }] of bolts) {
+          if (off[b]) continue;
+          const k = chain.findIndex((p) => off[p]);
+          if (k < 0) continue;
+          const O = off[chain[k]], at = (j) => O.map((v, i) => v + (j - k) * d[i]);
+          off[b] = at(held.length ? -2 : -1);
+          const host = info.centre[chain[k]];
+          for (const h of held) {                     // square to the axle, away from the host part's centre
+            if (off[h] || !info.centre[h]) continue;
+            if (slide(h)) { off[h] = O.map((x, i) => x + slide(h)[i]); continue; }
+            const v = info.centre[h].map((x, i) => x - host[i]), along = v.reduce((a, x, i) => a + x * d[i], 0);
+            const w = v.map((x, i) => x - along * d[i]), n = Math.hypot(...w);
+            off[h] = O.map((x, i) => x + (n > 1e-6 ? w[i] / n : 0));
+          }
+          chain.forEach((p, j) => { if (set.has(p) && !off[p]) off[p] = slide(p) ? O.map((x, i) => x + slide(p)[i]) : at(j); });
+          changed = true;
+        }
+      }
+      const next = parts.find((id) => !off[id]);     // parts is biggest first
+      if (!next) break;
+      off[next] = out(next);
+    }
+    for (const id of set) if (!off[id] && info.centre[id] && !unit[id]) off[id] = out(id);
+    for (const [id, p] of Object.entries(unit)) if (off[p]) off[id] = off[p];
+    return off;
+  }
+
+  const api = { SLIDE, explode, build, on, preset, presetOf, members, inspectSet, partsList, ASM, KINDS, PRESETS };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.LR4ShowTree = api;
 })(typeof window !== "undefined" ? window : this);

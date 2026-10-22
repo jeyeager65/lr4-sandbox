@@ -79,6 +79,57 @@ ok(row("Fasteners", "M8 x 40 mm hex head bolt") === 8 && row("Fasteners", "M8 ny
 const yl = T.partsList(parts.filter((p) => T.members(tree, "yz-min").includes(p.name.replace(/~thread$/, ""))));
 ok(yl.find((q) => q.title === "Hardware").rows.some((r) => r[1] === "MGN12 Rail Min 85"), "rail lengths not merged");
 
+// exploded view (Part 28): along the bolt lines from the anchor; bolts out past their heads; the rest straight out
+{
+  const set = new Set(["Plate", "Brace", "Wheel", "Bolt", "Bearing"]);
+  const info = { bolts: { Bolt: { axis: [1, 0, 0], chain: ["Plate", "Brace"] } },
+    centre: { Plate: [0, 0, 0], Brace: [10, 0, 0], Wheel: [0, 50, 0], Bolt: [5, 0, 0], Bearing: [0, 0, 0] },
+    size: { Plate: 100, Brace: 50, Wheel: 40, Bearing: 5 } };
+  const e = T.explode(set, info);
+  ok(e.Plate.join() === "0,0,0" && e.Brace.join() === "1,0,0" && e.Bolt.join() === "-1,0,0", "chain from the plate: " + JSON.stringify(e));
+  ok(e.Wheel.join() === "0,1,0" && e.Bearing.join() === "0,0,1", "no bolt: straight out (or up): " + JSON.stringify(e));
+  const e2 = T.explode(set, Object.assign({ anchor: "Brace" }, info));
+  ok(e2.Brace.join() === "0,0,0" && e2.Plate.join() === "-1,0,0" && e2.Bolt.join() === "-2,0,0", "anchored on the nut side: " + JSON.stringify(e2));
+  ok(Object.keys(T.explode(new Set(), info)).length === 0, "empty set");
+  const set3 = new Set([...set, "Rail", "Bolt2"]);
+  const info3 = Object.assign({}, info, { bolts: Object.assign({ Bolt2: { axis: [0, 0, 1], chain: ["Wheel", "Rail"] } }, info.bolts),
+    centre: Object.assign({ Rail: [0, 50, 5], Bolt2: [0, 50, 2] }, info.centre), size: Object.assign({ Rail: 30 }, info.size) });
+  const e3 = T.explode(set3, info3);
+  ok(e3.Wheel.join() === "0,1,0" && e3.Rail.join() === "0,1,1" && e3.Bolt2.join() === "0,1,-1", "an unreached part's bolts carry on from it: " + JSON.stringify(e3));
+}
+// a component's meshes stay together (the stepper isn't taken apart); numbered copies are not one component
+{
+  const set = new Set(["Plate", "Y_Stepper_Min", "Y_Stepper_Min_Shaft", "Y_Stepper_Min_Lead_Red", "Y_Clip", "Y_Clip_2",
+    "Router_Kobalt", "Router_Cap", "Bolt"]);
+  const c = (x) => [x, 1, 0];
+  const info = { bolts: { Bolt: { axis: [0, 0, 1], chain: ["Y_Stepper_Min_Shaft", "Plate"] } }, size: { Plate: 100 },
+    centre: { Plate: [0, 0, 0], Y_Stepper_Min: c(1), Y_Stepper_Min_Shaft: c(2), Y_Stepper_Min_Lead_Red: c(3), Y_Clip: c(4),
+      Y_Clip_2: c(5), Router_Kobalt: [0, 0, 9], Router_Cap: [9, 9, 9], Bolt: c(0) } };
+  const e = T.explode(set, info);
+  ok(e.Y_Stepper_Min.join() === "-1,0,0" && e.Y_Stepper_Min_Shaft.join() === "-1,0,0" && e.Y_Stepper_Min_Lead_Red.join() === "-1,0,0",
+    "stepper pieces move with the stepper (its bolt chain names the shaft; it slides out -X): " + JSON.stringify(e));
+  ok(e.Router_Cap.join() === e.Router_Kobalt.join() && e.Y_Clip_2.join() !== e.Y_Clip.join(), "router pieces together, numbered copies apart");
+}
+// an axle bolt's bearings come off sideways (square to the axle, away from the host), the bolt two steps out
+{
+  const set = new Set(["Core", "Axle", "Bearing_1"]);
+  const e = T.explode(set, { bolts: { Axle: { axis: [1, 0, 0], chain: ["Core"], held: ["Bearing_1"] } }, size: { Core: 100 },
+    centre: { Core: [0, 0, 0], Axle: [0, 0, 20], Bearing_1: [3, 0, 20] } });
+  ok(e.Axle.join() === "-2,0,0" && e.Bearing_1.join() === "0,0,1", "axle out two steps, bearing out of its slot: " + JSON.stringify(e));
+}
+// SLIDE: the motors come off their way, not along their screws; info.slide steers a held bearing
+{
+  const set = new Set(["YZ_Plate_Min", "Y_Stepper_Min", "Y_Stepper_Min_Face", "Bolt", "Core", "Axle", "Bearing_1"]);
+  const e = T.explode(set, { bolts: { Bolt: { axis: [0, 0, 1], chain: ["YZ_Plate_Min", "Y_Stepper_Min_Face", "Y_Stepper_Min"] },
+    Axle: { axis: [1, 0, 0], chain: ["YZ_Plate_Min"], held: ["Bearing_1"] } }, size: { YZ_Plate_Min: 100 },
+    centre: { YZ_Plate_Min: [0, 0, 0], Y_Stepper_Min: [0, 0, 30], Y_Stepper_Min_Face: [0, 0, 20], Bolt: [0, 0, 10], Axle: [0, 0, -9], Bearing_1: [0, 5, -9] },
+    slide: { Bearing_1: [0, 0.6, 0.8] } });
+  ok(e.Y_Stepper_Min.join() === "-1,0,0" && e.Y_Stepper_Min_Face.join() === "-1,0,0", "Y motor (Min) slides out -X: " + JSON.stringify(e));
+  ok(e.Bearing_1.join() === "0,0.6,0.8", "bearing out of its slot's opening");
+}
+// real data: every bolt with an axis has it as a unit vector and a chain
+for (const p of parts) if (p.axis) ok(Math.abs(Math.hypot(...p.axis) - 1) < 1e-3 && p.chain.length && p.holes.length, "axis + chain + holes: " + p.name);
+
 // My machine options on the BOM (config_model.js bomOptions, on the reference BOM)
 const M = require("../web/js/config_model.js");
 const bomWith = (opt) => M.bomOptions(JSON.parse(JSON.stringify(cfg.bom_ref)), opt);

@@ -3,6 +3,11 @@
 The version is the sandbox page's (`VERSION` in `web/index.html`, shown in its footer). The footer also shows
 the date the model data was built and the Printables file set it was solved for.
 
+## 0.28.0 - 2026-10-22
+- Inspect tools: **Explode** (a slider; parts move apart along the bolts that join them, bolts out past their heads),
+  **Section** (an X / Y / Z cut through the set, slider to move it, ⇅ to keep the other side) and **Measure** (two
+  clicks; snaps to corners and to hole centres, gives the distance in mm and inches plus ΔX / ΔY / ΔZ).
+
 ## 0.27.0 - 2026-10-22
 - **Inspect view**: ⤢ on any Show row (an assembly, a kind or one part), or double-click a part (its assembly; inside
   the view, the part) - that set alone in place of the machine: its parts, every bolt joining them and the bearings /

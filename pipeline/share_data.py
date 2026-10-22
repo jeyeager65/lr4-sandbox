@@ -7,7 +7,11 @@
 # in : build/config/lr4_config.json + lr4_config_geometry.bin.gz (fit_config.py), private/sizes/source_frames.json
 #      (source_frames.py), parts/manifest.json, build/fasteners.json (the reference build's hardware.py: each bolt mesh
 #      gets meta.fast = [[qty, item], ...] incl. nuts and meta.joins = the parts it passes through - the page's inspect
-#      view lists and pulls in from them, Part 27)
+#      view lists and pulls in from them, Part 27; meta.axis + meta.chain = the first screw's direction (head -> nut) and
+#      the parts along it, for the exploded view; meta.holes = [[part, x, y, z]] each screw's axis where it enters / leaves
+#      each part, for the measure snaps; meta.nuts = [[x, y, z, across flats]] each nut's centre, so the exploded view
+#      can take the nut off its bolt; meta.axes = [[seat x, y, z, dx, dy, dz]] every screw's line, for the bearings an
+#      axle holds - Part 28)
 # out: web/data/lr4_config.json + lr4_config_geometry.bin.gz (what the page loads; same layout as the private data) - the
 #      tests/test_share.py check rebuilds every src part from parts/ and compares it with the private meshes.
 # src kinds: stl {file, sha256, A}; dxf {.., depth: extrusion along the DXF's z, before A}; peter {open: {.., piece:
@@ -55,14 +59,29 @@ def fastener_meta(path, recs):
 
     out = {}
     for f in json.load(open(path)) if os.path.exists(path) else []:
-        o = out.setdefault(piece(f), {"items": {}, "joins": []})
+        o = out.setdefault(piece(f), {"items": {}, "joins": [], "holes": [], "nuts": [], "axes": []})
+        if "axis" not in o and f.get("chain"):
+            o["axis"] = [round(v, 5) for v in f["d"]]
+            o["chain"] = [c[0] for c in f["chain"]]
+        sd, d = np.array(f["seat"]), np.array(f["d"])
+        o["axes"].append([round(float(v), 2) for v in sd] + [round(float(v), 5) for v in d])
+        if f.get("nut"):
+            n = f["nut"]
+            o["nuts"].append([round(float(v), 2) for v in sd + d * (n["t"] + n["h"] / 2)] + [n.get("af", 8.0)])
+        for nm, t0, t1 in f.get("chain", []):
+            for t in (t0, t1):
+                q = [nm] + [round(float(v), 2) for v in sd + d * t]
+                if q not in o["holes"]:
+                    o["holes"].append(q)
         for it in (f.get("item"), f.get("nut_item")):
             if it:
                 o["items"][it] = o["items"].get(it, 0) + 1
         for nm in [c[0] for c in f.get("chain", [])] + [f.get("head_part"), f.get("nut_part")]:
             if nm and nm not in o["joins"]:
                 o["joins"].append(nm)
-    return {k: {"fast": [[n, it] for it, n in v["items"].items()], "joins": v["joins"]} for k, v in out.items()}
+    return {k: dict({"fast": [[n, it] for it, n in v["items"].items()], "joins": v["joins"], "holes": v["holes"]},
+                    **({"nuts": v["nuts"]} if v["nuts"] else {}), **({"axes": v["axes"]} if len(v["axes"]) > 1 else {}),
+                    **({"axis": v["axis"], "chain": v["chain"]} if "axis" in v else {})) for k, v in out.items()}
 
 
 def load_geometry(path):

@@ -67,7 +67,8 @@ Enter the cutting area (inches or mm) and the page rebuilds the machine: brace c
 routing. Options take parts off the machine and the BOM (router + dust shoe, skirt, hose, lid fan, pendant); **Show**
 only hides parts from the view (assembly > printed / cut / hardware / electronics > part; a bolt is listed under both
 assemblies it joins). **Inspect** (⤢ on a row, or double-click a part) shows one assembly or part alone with the
-bolts and bearings that hold it and its parts list, screw and nut counts included. **Build** has the cut list from V1E's LowRider 4 calculator, the strut plates (DXF / SVG, or G-code to
+bolts and bearings that hold it and its parts list, screw and nut counts included, with an exploded view, a section
+cut and a measuring tool that snaps to corners and hole centres. **Build** has the cut list from V1E's LowRider 4 calculator, the strut plates (DXF / SVG, or G-code to
 cut them on the machine itself), the full BOM with hardware counts for your size, and V1E's JP3_LR `config.yaml`
 with `max_travel_mm` set for your size (or your own config.yaml, adjusted the same way).
 

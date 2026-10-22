@@ -141,6 +141,17 @@ dialog.about p { margin: 0 0 10px; color: var(--muted); font-size: 13px; }
   display: flex; flex-direction: column; align-items: flex-end; gap: 6px; pointer-events: none; }
 .insp > * { pointer-events: auto; }
 #insp-back { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.insp-tools { width: 100%; display: flex; flex-direction: column; gap: 6px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 6px;
+  background: color-mix(in srgb, var(--panel) 92%, transparent); backdrop-filter: blur(4px); font-size: 13px; }
+.insp-tools label.tool { display: grid; grid-template-columns: auto 1fr; gap: 8px; align-items: center; }
+.insp-tools input[type=range] { width: 100%; accent-color: var(--accent); }
+.insp-tools .seg { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; }
+.insp-tools .seg span { margin-right: 4px; }
+.insp-tools .seg button { padding: 2px 8px; }
+.insp-tools button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+#insp-meas { align-self: flex-start; }
+#meas-out { margin: 0; font-family: var(--font-data); font-size: 12px; }
+canvas.measuring { cursor: crosshair; }
 .insp-card { width: 100%; min-height: 0; overflow-y: auto; border: 1px solid var(--line); border-radius: 6px; padding: 6px 12px 10px;
   background: color-mix(in srgb, var(--panel) 92%, transparent); backdrop-filter: blur(4px); }
 .insp-card summary { cursor: pointer; display: flex; gap: 8px; align-items: baseline; }
@@ -754,6 +765,16 @@ body.vr-on .stage { grid-row: 1; }
     <button type="button" id="pick-clear" aria-label="Clear the selection" title="Clear">✕</button></div>
   <div class="insp" id="insp" hidden>
     <button type="button" id="insp-back">← Back to the machine</button>
+    <div class="insp-tools" id="insp-tools">
+      <label class="tool">Explode <input type="range" id="insp-ex" min="0" max="1" step="0.01" value="0" aria-label="Exploded view"></label>
+      <div class="tool seg" id="insp-sec" role="group" aria-label="Section cut"><span>Section</span>
+        <button type="button" data-v="" aria-pressed="true">Off</button><button type="button" data-v="x" aria-pressed="false">X</button>
+        <button type="button" data-v="y" aria-pressed="false">Y</button><button type="button" data-v="z" aria-pressed="false">Z</button>
+        <button type="button" data-v="flip" aria-pressed="false" title="Keep the other side" aria-label="Flip the cut">⇅</button></div>
+      <input type="range" class="tool" id="insp-cut" min="0" max="1" step="0.002" value="0.5" aria-label="Section position" hidden>
+      <button type="button" class="tool" id="insp-meas" aria-pressed="false" title="Two clicks; snaps to corners and hole centres">📏 Measure</button>
+      <p class="tool" id="meas-out" role="status" hidden></p>
+    </div>
     <details class="insp-card" id="insp-card" open><summary><strong id="insp-h"></strong><em id="insp-n"></em></summary>
       <div id="insp-list"></div></details>
   </div>
@@ -1405,7 +1426,7 @@ body.vr-on .stage { grid-row: 1; }
       const ud = Object.assign({}, o.rec.meta, { name: o.name, base: { t: o.t, s: o.s } });
       if (DUST_PARTS.test(o.name)) ud.group = "Shoe";   // own toggle, so the bit shows with the hose on (user 2026-10-20)
       if (o.rec.src) delete ud.variant;              // Peter Plates from files: the style picks the geometry
-      if (o.name !== o.rec.meta.name) ud.label = pretty(o.name);
+      if (o.name !== o.rec.meta.name) { ud.label = pretty(o.name); ud.ref = o.rec.meta.name; }
       const mat = material(ud.color, fin, hasUV);
       if (ud.clip) { ud.clip = Object.assign({}, ud.clip, { p: o.clipP }); mat.clippingPlanes = [new THREE.Plane()]; }
       addMesh(geo, mat, ud);
@@ -1769,6 +1790,7 @@ body.vr-on .stage { grid-row: 1; }
     if (key !== treeKey) { treeKey = key; tree = LR4ShowTree.build(listed.map((m) => m.userData)); renderShow(); }
     if (INSPECT) {                                     // its set, again (the parts change with the size / options)
       INSPECT.set = LR4ShowTree.inspectSet(tree, INSPECT.id);
+      INSPECT.ex = null;                              // the explode follows the set
       if (!INSPECT.set.size) return inspectEnd();
     }
     const inTree = new Set(listed);
@@ -1958,6 +1980,7 @@ body.vr-on .stage { grid-row: 1; }
       const b = m.userData.base || { t: [0, 0, 0], s: [1, 1, 1] };
       m.scale.set(b.s[0], b.s[1], b.s[2]);
       m.position.set(b.t[0] + (k === "core" ? dx : 0), b.t[1] + (k === "table" ? 0 : dy), b.t[2] + (k === "core" || k === "beam" ? dz : 0));
+      if (m.userData.ex) m.position.add(new THREE.Vector3(...m.userData.ex));   // inspect's exploded view
       if (m.userData.name === "Router_Nut") m.quaternion.identity();
       const c = m.userData.clip;
       if (c) {                          // straight belt run (exported at full reach): cut where it meets the moving
@@ -2777,7 +2800,7 @@ body.vr-on .stage { grid-row: 1; }
     tip: () => meta && meta.tip_above_table, TOUCH_PLATE, sync: () => ctlTick(), homed: () => CTL.homed };
 
   // ---- version + feedback: the issue link carries the size, data date and the loaded files' checksums ----
-  const VERSION = "0.27.0";
+  const VERSION = "0.28.0";
   function setupAbout() {
     const bits = [`lr4-sandbox ${VERSION}`];
     if (cfg.built) bits.push(`model data built ${cfg.built}`);
@@ -3965,6 +3988,7 @@ body.vr-on .stage { grid-row: 1; }
   canvas.addEventListener("pointerdown", (e) => (down = [e.clientX, e.clientY]));
   canvas.addEventListener("pointerup", (e) => {
     if (!down || Math.hypot(e.clientX - down[0], e.clientY - down[1]) > 5) return;
+    if (INSPECT && MEAS.on) return measureClick(e);
     const r = canvas.getBoundingClientRect();
     ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
     ray.setFromCamera(ndc, camera);
@@ -4011,11 +4035,14 @@ body.vr-on .stage { grid-row: 1; }
     applyVisibility();
     const d = camera.position.clone().sub(controls.target);
     fitView([d.x, d.y, d.z]);
+    INSPECT.step = radius * 0.35;                     // explode: the slider's full travel moves a part this far per step
+    setExplode();
   }
   function inspectEnd() {
     if (!INSPECT) return;
     const s = INSPECT.saved;
     INSPECT = null;
+    inspectToolsReset();
     document.body.classList.remove("inspecting");
     document.getElementById("insp").hidden = true;
     applyVisibility();
@@ -4045,6 +4072,7 @@ body.vr-on .stage { grid-row: 1; }
       host.append(h, t);
     }
     document.getElementById("insp-n").textContent = `${n} part${n === 1 ? "" : "s"}`;
+    if (INSPECT.step) setExplode();
   }
   document.getElementById("insp-back").addEventListener("click", inspectEnd);
   document.addEventListener("keydown", (e) => {
@@ -4055,10 +4083,250 @@ body.vr-on .stage { grid-row: 1; }
     ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
     ray.setFromCamera(ndc, camera);
     const hit = ray.intersectObjects(meshes.filter((m) => m.visible), false)[0];
-    if (hit) inspect(INSPECT ? partId(hit.object) : asmOf(hit.object));
+    if (hit && !(INSPECT && MEAS.on)) inspect(INSPECT ? partId(hit.object) : asmOf(hit.object));
   });
   window.LR4Inspect = { open: inspect, close: inspectEnd, id: () => INSPECT && INSPECT.id,
     shown: () => meshes.filter((m) => m.visible).map((m) => m.userData.name) };
+
+  // ---- Inspect tools (Part 28): exploded slider, section cut, measure. Explode: LR4ShowTree.explode's unit steps along
+  // the bolt lines (meta.axis / chain; a family bolt's chain names mapped to this size's names) times the slider; the
+  // offsets ride on top of the machine's motion (userData.ex, added in move()). Section: one global clipping plane across
+  // the set's box (the parts drawn two-sided while cut, so you see into them; no caps). Measure: two clicks, snapped to the
+  // nearest vertex of the triangle hit or a hole centre (meta.holes: each screw's axis where it enters / leaves a part)
+  // within SNAP_PX. ----
+  const SNAP_PX = 14;
+  const SEC = { axis: "", flip: false, plane: new THREE.Plane() };
+  const MEAS = { on: false, pts: [], group: new THREE.Group() };
+  MEAS.group.renderOrder = 10;
+  scene.add(MEAS.group);
+  const jointOf = (n) => { const a = n.split("__")[0], b = (/_to_(.+)$/.exec(n.slice(a.length + 2)) || [])[1]; return [a, b]; };
+  function chainNames(ud) {                           // a bolt's chain / hole parts in this size's names
+    const [ra, rb] = jointOf(ud.ref || ud.name), [a, b] = jointOf(ud.name);
+    return (n) => (n === ra ? a : n === rb && b ? b : n);
+  }
+  const exVec = (m) => new THREE.Vector3(...(m.userData.ex || [0, 0, 0]));
+  function centreOf(m) {                              // world centre of a mesh, without its explode offset
+    if (!m.geometry.boundingBox) m.geometry.computeBoundingBox();
+    m.updateMatrixWorld();
+    return m.localToWorld(m.geometry.boundingBox.getCenter(new THREE.Vector3())).sub(exVec(m));
+  }
+  function explodeUnits() {
+    const info = { bolts: {}, centre: {}, size: {}, anchor: INSPECT.id, slide: {} };
+    const byName = new Map(meshes.map((m) => [m.userData.name, m]));
+    for (const m of meshes) {
+      const id = partId(m), ud = m.userData;
+      if (!INSPECT.set.has(id) || /~thread$/.test(ud.name) || ud.motion === "hose" || info.centre[id]) continue;
+      info.centre[id] = centreOf(m).toArray();
+      info.size[id] = m.geometry.boundingBox.getSize(new THREE.Vector3()).length();
+      if (ud.axis && ud.chain) {                      // held: the bearings / idlers on it that its chain doesn't name
+        const nm = chainNames(ud), chain = ud.chain.map(nm);
+        const held = (tree.joins[id] || []).filter((p) => tree.kind[p] === "hardware" && !chain.includes(p));
+        info.bolts[id] = { axis: ud.axis, chain, held };
+        const host = byName.get(chain[0]);
+        for (const h of held) {                       // each bearing on the screw line through it (meta.axes)
+          const hm = byName.get(h);
+          if (!hm || !host || info.slide[h]) continue;
+          let axis = ud.axis;
+          if (ud.axes) {
+            const c = m.worldToLocal(centreOf(hm).add(exVec(m)));
+            const dist = (a) => { const p = c.clone().sub(new THREE.Vector3(a[0], a[1], a[2])), d = new THREE.Vector3(a[3], a[4], a[5]);
+              return p.addScaledVector(d, -p.dot(d)).length(); };
+            axis = ud.axes.reduce((b, a) => (dist(a) < dist(b) ? a : b)).slice(3);
+          }
+          info.slide[h] = slotOpening(hm, host, axis);
+        }
+      }
+    }
+    return LR4ShowTree.explode(INSPECT.set, info);
+  }
+  function nutOf(m) {                                 // a bolt mesh's nuts as a child mesh, split off once: the mesh's
+    const ud = m.userData;                            // connected pieces centred on a nut centre (meta.nuts)
+    if (ud.nut !== undefined) return ud.nut;
+    ud.nut = null;
+    const g = m.geometry;
+    if (!ud.nuts) return null;
+    if (!g.userData.split) {                          // per geometry (a family's instances share it)
+      const P = g.attributes.position, n = P.count, key = new Map(), canon = new Int32Array(n);
+      const I = g.index ? g.index.array : Uint32Array.from({ length: n }, (_, i) => i);   // non-indexed: 3 per triangle
+      for (let i = 0; i < n; i++) {                   // same point = same vertex (STL-style meshes repeat them per face)
+        const k = `${Math.round(P.getX(i) * 100)},${Math.round(P.getY(i) * 100)},${Math.round(P.getZ(i) * 100)}`;
+        if (!key.has(k)) key.set(k, i);
+        canon[i] = key.get(k);
+      }
+      const par = Int32Array.from({ length: n }, (_, i) => i);
+      const root = (i) => { while (par[i] !== i) i = par[i] = par[par[i]]; return i; };
+      for (let t = 0; t < I.length; t += 3) {
+        const a = root(canon[I[t]]);
+        par[root(canon[I[t + 1]])] = a; par[root(canon[I[t + 2]])] = a;
+      }
+      const sum = new Map();                          // piece -> [x, y, z, count] over its vertices
+      for (let i = 0; i < n; i++) {
+        if (canon[i] !== i) continue;
+        const r = root(i), q = sum.get(r) || [0, 0, 0, 0];
+        q[0] += P.getX(i); q[1] += P.getY(i); q[2] += P.getZ(i); q[3]++;
+        sum.set(r, q);
+      }
+      const isNut = new Set([...sum].filter(([, q]) => ud.nuts.some(([x, y, z, af]) =>
+        Math.hypot(q[0] / q[3] - x, q[1] / q[3] - y, q[2] / q[3] - z) < 0.45 * af)).map(([r]) => r));
+      const keep = [], nut = [];
+      for (let t = 0; t < I.length; t += 3) (isNut.has(root(canon[I[t]])) ? nut : keep).push(I[t], I[t + 1], I[t + 2]);
+      const part = (idx) => {
+        const q = new THREE.BufferGeometry();
+        if (g.index) { for (const [k, v] of Object.entries(g.attributes)) q.setAttribute(k, v); q.setIndex(idx); return q; }
+        for (const [k, v] of Object.entries(g.attributes)) {   // non-indexed: copy the triangles' vertices
+          const a = new v.array.constructor(idx.length * v.itemSize);
+          idx.forEach((i, j) => { for (let c = 0; c < v.itemSize; c++) a[j * v.itemSize + c] = v.array[i * v.itemSize + c]; });
+          q.setAttribute(k, new THREE.BufferAttribute(a, v.itemSize, v.normalized));
+        }
+        return q;
+      };
+      g.userData.split = nut.length && keep.length ? { bolt: part(keep), nut: part(nut) } : null;
+    }
+    const sp = g.userData.split;
+    if (!sp) return null;
+    m.geometry = sp.bolt;
+    ud.nut = new THREE.Mesh(sp.nut, m.material);
+    m.add(ud.nut);
+    return ud.nut;
+  }
+  // which way a bearing comes out of its slot (user 2026-10-22): up, at the angle it sits in the slot - world up made
+  // square to its axle (the slot is square to the axle); an upright axle: straight out from the host's centre
+  function slotOpening(m, host, axis) {
+    const d = new THREE.Vector3(...axis).normalize(), u = new THREE.Vector3(0, 0, 1);
+    u.addScaledVector(d, -u.dot(d));
+    if (u.lengthSq() < 1e-4) { u.copy(centreOf(m).sub(centreOf(host))); u.addScaledVector(d, -u.dot(d)); }
+    return u.lengthSq() > 1e-9 ? u.normalize().toArray() : [0, 0, 1];
+  }
+  function setExplode() {
+    const k = INSPECT ? +document.getElementById("insp-ex").value * INSPECT.step : 0;
+    const u = k ? INSPECT.ex || (INSPECT.ex = explodeUnits()) : {};
+    for (const m of meshes) {
+      if (m.userData.motion === "hose") continue;
+      const o = u[partId(m)], nx = o ? o.map((v) => v * k) : null;
+      if (m.userData.nuts && m.userData.axis && (o || m.userData.nut)) {   // the nut off the end of its bolt, past the last part
+        const nut = nutOf(m);
+        if (nut) nut.position.set(...m.userData.axis).multiplyScalar(o ? k * (m.userData.chain.length + 1) : 0);
+      }
+      if (!m.userData.ex && !nx) continue;
+      m.position.sub(exVec(m));
+      m.userData.ex = nx;
+      m.position.add(exVec(m));
+    }
+    setSection();
+  }
+  function setBox() {                                 // the set's box as drawn (with the explode)
+    const box = new THREE.Box3();
+    for (const m of meshes) if (m.visible) { m.updateMatrixWorld(); box.expandByObject(m); }
+    return box;
+  }
+  function setSection() {
+    const on = !!(INSPECT && SEC.axis), cut = document.getElementById("insp-cut");
+    cut.hidden = !on;
+    document.querySelectorAll("#insp-sec button").forEach((b) => b.setAttribute("aria-pressed",
+      String(b.dataset.v === "flip" ? SEC.flip : b.dataset.v === (on ? SEC.axis : ""))));
+    renderer.clippingPlanes = on ? [SEC.plane] : [];
+    for (const m of meshes) {                         // two-sided while cut: the inside shows through the opening
+      const want = on && m.visible ? THREE.DoubleSide : m.userData.side0 ?? m.material.side;
+      if (m.userData.side0 === undefined) m.userData.side0 = m.material.side;
+      if (m.material.side !== want) { m.material.side = want; m.material.needsUpdate = true; }
+    }
+    if (!on) return;
+    const i = "xyz".indexOf(SEC.axis), box = setBox(), lo = box.min.getComponent(i), hi = box.max.getComponent(i);
+    const v = lo + (hi - lo) * +cut.value, n = new THREE.Vector3().setComponent(i, SEC.flip ? 1 : -1);
+    SEC.plane.set(n, SEC.flip ? -v : v);              // keeps n . p + c >= 0: below the cut, or above it flipped
+  }
+  // ---- measure ----
+  function measureClear() {
+    MEAS.pts = [];
+    for (const c of [...MEAS.group.children]) { MEAS.group.remove(c); c.geometry.dispose(); c.material.dispose(); }
+    document.getElementById("meas-out").textContent = MEAS.on ? "Click a point (snaps to corners and hole centres)." : "";
+  }
+  function measureSnap(e) {                           // -> { p: world point, what } or null
+    const r = canvas.getBoundingClientRect(), px = [e.clientX - r.left, e.clientY - r.top];
+    ndc.set((px[0] / r.width) * 2 - 1, -(px[1] / r.height) * 2 + 1);
+    ray.setFromCamera(ndc, camera);
+    const keep = (p) => !renderer.clippingPlanes.length || SEC.plane.distanceToPoint(p) >= 0;
+    const hit = ray.intersectObjects(meshes.filter((m) => m.visible), false).find((h) => keep(h.point));
+    const scr = (p) => { const q = p.clone().project(camera); return [(q.x + 1) / 2 * r.width, (1 - q.y) / 2 * r.height, q.z]; };
+    let best = null;
+    const offer = (p, what) => {
+      if (!keep(p)) return;
+      const s = scr(p), d = Math.hypot(s[0] - px[0], s[1] - px[1]);
+      if (s[2] < 1 && d <= SNAP_PX && (!best || d < best.d)) best = { p, what, d };
+    };
+    if (hit && hit.face) {
+      const pos = hit.object.geometry.attributes.position;
+      for (const k of ["a", "b", "c"]) offer(hit.object.localToWorld(new THREE.Vector3().fromBufferAttribute(pos, hit.face[k])), "corner");
+    }
+    const byName = new Map(meshes.map((m) => [m.userData.name, m]));
+    for (const m of meshes) {                         // hole centres, on the parts as they sit (exploded too)
+      const ud = m.userData;
+      if (!m.visible || !ud.holes) continue;
+      const nm = chainNames(ud), bx = exVec(m);
+      m.updateMatrixWorld();
+      for (const [part, x, y, z] of ud.holes) {
+        const pm = byName.get(nm(part));
+        if (pm && !pm.visible) continue;
+        offer(m.localToWorld(new THREE.Vector3(x, y, z)).sub(bx).add(pm ? exVec(pm) : bx), "hole centre");
+      }
+    }
+    return best || (hit ? { p: hit.point.clone(), what: "surface" } : null);
+  }
+  function measureClick(e) {
+    const s = measureSnap(e);
+    if (!s) return;
+    if (MEAS.pts.length === 2) measureClear();
+    MEAS.pts.push(s);
+    const dot = new THREE.Mesh(new THREE.SphereGeometry(Math.max(0.6, radius * 0.006), 16, 12),
+      new THREE.MeshBasicMaterial({ color: css("--accent") || "#c8241b", depthTest: false }));
+    dot.position.copy(s.p); dot.renderOrder = 10;
+    MEAS.group.add(dot);
+    const out = document.getElementById("meas-out");
+    if (MEAS.pts.length === 1) { out.textContent = `First point (${s.what}). Click the second.`; return; }
+    const [a, b] = MEAS.pts.map((q) => q.p), d = b.clone().sub(a), L = d.length();
+    const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints([a, b]),
+      new THREE.LineBasicMaterial({ color: css("--accent") || "#c8241b", depthTest: false }));
+    line.renderOrder = 10;
+    MEAS.group.add(line);
+    const f = (v) => v.toFixed(2);
+    out.textContent = `${f(L)} mm (${(L / IN).toFixed(3)} in) · ΔX ${f(Math.abs(d.x))} ΔY ${f(Math.abs(d.y))} ΔZ ${f(Math.abs(d.z))}`
+      + ` · ${MEAS.pts[0].what} → ${MEAS.pts[1].what}`;
+  }
+  function setupInspectTools() {                      // once
+    document.getElementById("insp-ex").addEventListener("input", setExplode);
+    document.getElementById("insp-cut").addEventListener("input", setSection);
+    document.getElementById("insp-sec").addEventListener("click", (e) => {
+      const b = e.target.closest("button");
+      if (!b) return;
+      if (b.dataset.v === "flip") SEC.flip = !SEC.flip; else SEC.axis = b.dataset.v;
+      setSection();
+    });
+    document.getElementById("insp-meas").addEventListener("click", (e) => {
+      MEAS.on = !MEAS.on;
+      e.target.setAttribute("aria-pressed", String(MEAS.on));
+      document.getElementById("meas-out").hidden = !MEAS.on;
+      canvas.classList.toggle("measuring", MEAS.on);
+      measureClear();
+    });
+  }
+  setupInspectTools();
+  function inspectToolsReset() {                      // leaving inspect: everything back
+    document.getElementById("insp-ex").value = 0;
+    SEC.axis = ""; SEC.flip = false;
+    MEAS.on = false;
+    document.getElementById("insp-meas").setAttribute("aria-pressed", "false");
+    document.getElementById("meas-out").hidden = true;
+    canvas.classList.remove("measuring");
+    measureClear();
+    setExplode();
+  }
+  window.LR4Inspect.tools = { explode: (v) => { document.getElementById("insp-ex").value = v; setExplode(); },
+    section: (axis, at, flip) => { SEC.axis = axis || ""; SEC.flip = !!flip; document.getElementById("insp-cut").value = at ?? 0.5; setSection(); },
+    measure: (on) => { if (MEAS.on !== !!on) document.getElementById("insp-meas").click(); },
+    snap: (x, y) => measureSnap({ clientX: x, clientY: y }), click: (x, y) => measureClick({ clientX: x, clientY: y }),
+    result: () => document.getElementById("meas-out").textContent,
+    offsets: () => Object.fromEntries(meshes.filter((m) => m.userData.ex).map((m) => [m.userData.name, m.userData.ex])),
+    nuts: () => meshes.filter((m) => m.userData.nuts).map((m) => [m.userData.name, !!m.userData.nut, m.userData.nut ? +m.userData.nut.position.length().toFixed(2) : null]) };
 
   // ---- touching the pendant's screen (FluidTouch): a press on it in the view wins over orbiting and picking ----
   const ftScreen = () => { const m = FT.ft && meshes.find((q) => q.userData.name === "Pendant_screen"); return m && m.visible ? m : null; };
