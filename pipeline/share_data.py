@@ -5,7 +5,9 @@
 # stay. Plain Python (numpy).
 #   python pipeline/share_data.py
 # in : build/config/lr4_config.json + lr4_config_geometry.bin.gz (fit_config.py), private/sizes/source_frames.json
-#      (source_frames.py), parts/manifest.json
+#      (source_frames.py), parts/manifest.json, build/fasteners.json (the reference build's hardware.py: each bolt mesh
+#      gets meta.fast = [[qty, item], ...] incl. nuts and meta.joins = the parts it passes through - the page's inspect
+#      view lists and pulls in from them, Part 27)
 # out: web/data/lr4_config.json + lr4_config_geometry.bin.gz (what the page loads; same layout as the private data) - the
 #      tests/test_share.py check rebuilds every src part from parts/ and compares it with the private meshes.
 # src kinds: stl {file, sha256, A}; dxf {.., depth: extrusion along the DXF's z, before A}; peter {open: {.., piece:
@@ -25,6 +27,42 @@ OUT = os.path.join(PROJ, "web", "data")         # the page data (local and publi
 FRAMES = os.path.join(PROJ, "private", "sizes", "source_frames.json")
 FRAMES_TEMP = os.path.join(PROJ, "private", "sizes", "source_frames_temp.json")   # source_frames.py LR4_TEMP=1
 MANIFEST = os.path.join(PROJ, "parts", "manifest.json")
+FASTENERS = os.path.join(PROJ, "build", "fasteners.json")
+
+
+def fastener_meta(path, recs):
+    """bolt mesh name -> {fast: [[qty, item], ...] (screws then nuts, by count), joins: [part names, chain order]}.
+    A screw set the export split into pieces (Belt_X_Loops__M3 -> Brace_1__XLoop1 + X_Belt__XLoop1; their threads'
+    `of` names the set) gives each fastener to the piece whose box holds its seat."""
+    pieces = {}                                   # set name -> [(piece name, lo, hi)]
+    box = {r["meta"]["name"]: (r.get("lo_ref"), r.get("hi_ref")) for r in recs}
+    for r in recs:
+        m = r["meta"]
+        if m.get("of") and m["name"].endswith("~thread") and m["of"] != m["name"][:-7]:
+            pc = m["name"][:-7]
+            pieces.setdefault(m["of"], []).append((pc,) + box.get(pc, (None, None)))
+
+    def piece(f):
+        obj = f["obj"].replace(".", "_")          # Endstop_X__M2.5_to_Core -> the mesh's Endstop_X__M2_5_to_Core
+        if obj not in pieces:
+            return obj
+        sd = np.array(f["seat"])
+
+        def dist(pc):                             # 0 inside the piece's box, else how far outside
+            lo, hi = np.array(pc[1] or sd), np.array(pc[2] or sd)
+            return float(np.linalg.norm(np.maximum(lo - sd, 0) + np.maximum(sd - hi, 0)))
+        return min(pieces[obj], key=dist)[0]
+
+    out = {}
+    for f in json.load(open(path)) if os.path.exists(path) else []:
+        o = out.setdefault(piece(f), {"items": {}, "joins": []})
+        for it in (f.get("item"), f.get("nut_item")):
+            if it:
+                o["items"][it] = o["items"].get(it, 0) + 1
+        for nm in [c[0] for c in f.get("chain", [])] + [f.get("head_part"), f.get("nut_part")]:
+            if nm and nm not in o["joins"]:
+                o["joins"].append(nm)
+    return {k: {"fast": [[n, it] for it, n in v["items"].items()], "joins": v["joins"]} for k, v in out.items()}
 
 
 def load_geometry(path):
@@ -54,6 +92,7 @@ def main():
     frames = json.load(open(FRAMES))
     frames_t = json.load(open(FRAMES_TEMP)) if os.path.exists(FRAMES_TEMP) else {}
     man = json.load(open(MANIFEST))
+    fmeta = fastener_meta(FASTENERS, cfg["parts"])
     out_blob, parts, dropped, by_kind = bytearray(), [], [], {}
     for rec in cfg["parts"]:
         name = rec["meta"]["name"]
@@ -61,6 +100,8 @@ def main():
             dropped.append(name)
             continue
         rec = dict(rec)
+        if name in fmeta:
+            rec["meta"] = dict(rec["meta"], **fmeta[name])
         src = src_of(name, frames_t if rec.get("from_temp") else frames) if "mesh" in rec else None   # Y_Clip_last:
                                                                                                         # Y_Clip_first's mesh
         if src:
@@ -79,7 +120,7 @@ def main():
                 q["uv"] = m["uv"] + off
             rec["mesh"] = q
         parts.append(rec)
-    gz = gzip.compress(bytes(out_blob), 9)
+    gz = gzip.compress(bytes(out_blob), 9, mtime=0)   # same bytes for the same data (git)
     share = dict(cfg, parts=parts, geometry_bytes=len(gz),
                  triangles=sum(p["mesh"]["idx"][1] // 3 for p in parts if "mesh" in p),
                  files=dict(tested=man["tested"], sources=man["sources"],

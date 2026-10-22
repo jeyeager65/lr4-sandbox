@@ -61,6 +61,24 @@ ok(T.on(tree, fr, "Brace_1") && T.on(tree, fr, "Y_Rail") && !T.on(tree, fr, "Cor
 ok(T.on(tree, fr, "XZ_Plate_Min__M5_to_Brace_1"), "Frame only keeps the frame's bolts");
 ok(T.presetOf(tree, offOf("printed")) === "printed" && T.presetOf(tree, new Set(["core"])) === "", "presetOf");
 
+// inspect (Part 27): a part pulls in the bolts joining it and the bearings / idlers they hold; an assembly is itself
+const ins = T.inspectSet(tree, "Core");
+ok(["Bearing_Core__M8", "Bearing_Core_Lower_1", "X_Idler_2", "Core__M3_to_X_Stepper", "Tool_Mount_T_Kobalt__M5_to_Core",
+  "Endstop_X__M2_5_to_Core"].every((x) => ins.has(x)), "Core: bolts + bearings + idlers");
+ok(!ins.has("X_Stepper") && !ins.has("Router_Kobalt") && !ins.has("Tool_Mount_T_Kobalt"), "Core: not the parts on the far side");
+ok(T.inspectSet(tree, "core").size === T.members(tree, "core").length, "an assembly = its members");
+const xz = T.inspectSet(tree, "XZ_Plate_Min");
+ok(xz.has("XZ_Plate_Min__M5_to_Brace_1") && xz.has("MGN12H_Min_177") && !xz.has("Brace_1"), "XZ plate: its bolts + rail blocks, not the brace");
+ok(T.inspectSet(tree, "Bearing_Core__M8").size === 1, "a bolt's own row: just it");
+const list = T.partsList(parts.filter((p) => ins.has(p.name.replace(/~thread$/, ""))));
+const row = (t, l) => ((list.find((q) => q.title === t) || { rows: [] }).rows.find((r) => r[1] === l) || [])[0];
+ok(row("Hardware", "Bearing Core Lower") === 4 && row("Hardware", "X Idler") === 2, "copies counted: " + JSON.stringify(list));
+ok(row("Fasteners", "M8 x 40 mm hex head bolt") === 8 && row("Fasteners", "M8 nylock nut") === 8
+  && row("Fasteners", "M5 x 30 mm button head screw") === 6 && row("Fasteners", "M3 x 10 mm button head screw") === 4,
+  "Core's fasteners from meta.fast");
+const yl = T.partsList(parts.filter((p) => T.members(tree, "yz-min").includes(p.name.replace(/~thread$/, ""))));
+ok(yl.find((q) => q.title === "Hardware").rows.some((r) => r[1] === "MGN12 Rail Min 85"), "rail lengths not merged");
+
 // My machine options on the BOM (config_model.js bomOptions, on the reference BOM)
 const M = require("../web/js/config_model.js");
 const bomWith = (opt) => M.bomOptions(JSON.parse(JSON.stringify(cfg.bom_ref)), opt);

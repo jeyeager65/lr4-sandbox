@@ -3,6 +3,12 @@
 The version is the sandbox page's (`VERSION` in `web/index.html`, shown in its footer). The footer also shows
 the date the model data was built and the Printables file set it was solved for.
 
+## 0.27.0 - 2026-10-22
+- **Inspect view**: ⤢ on any Show row (an assembly, a kind or one part), or double-click a part (its assembly; inside
+  the view, the part) - that set alone in place of the machine: its parts, every bolt joining them and the bearings /
+  idlers / rail blocks those bolts hold, where they sit on the machine now, framed, no workshop. A parts list with the
+  fastener counts (screws and nuts by size). Show's checkboxes and the pick chip work in it; Back or Esc returns.
+
 ## 0.26.0 - 2026-10-22
 - Tabs are **My machine / Show / Build / Run**. My machine: the size, what's on the machine (router + dust shoe,
   dust skirt + bristles, vacuum hose + cables, Jackpot3 lid fan, FluidTouch pendant, strut plates, Peter Plates; off =

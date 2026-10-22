@@ -96,9 +96,9 @@ label.check:has(input:disabled) { color: var(--muted); }
 .presets { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
 .presets button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
 .tree { display: flex; flex-direction: column; }
-.tree .row { display: grid; grid-template-columns: 22px 18px 1fr auto; gap: 6px; align-items: center; padding: 3px 0; }
+.tree .row { display: grid; grid-template-columns: 22px 18px 1fr auto 24px; gap: 6px; align-items: center; padding: 3px 0; }
 .tree .row.k { padding-left: 22px; }
-.tree .row.p { padding-left: 44px; grid-template-columns: 18px 1fr auto; font-size: 13px; }
+.tree .row.p { padding-left: 44px; grid-template-columns: 18px 1fr auto 24px; font-size: 13px; }
 .tree .row.dim span { color: var(--muted); }
 .tree .tw { border: 0; background: none; padding: 0; width: 22px; color: var(--muted); cursor: pointer; font-size: 12px; }
 .tree input { accent-color: var(--accent); margin: 0; cursor: pointer; }
@@ -137,6 +137,20 @@ dialog.about p { margin: 0 0 10px; color: var(--muted); font-size: 13px; }
 .pick p { margin: 1px 0 0; color: var(--muted); font-size: 12px; line-height: 1.4; }
 .pick button { border: 0; padding: 2px 6px; color: var(--muted); }
 .pick:not([hidden]) ~ .hint { display: none; }
+.insp { position: absolute; right: 12px; top: 52px; width: min(340px, calc(100% - 24px)); max-height: calc(100% - 110px);
+  display: flex; flex-direction: column; align-items: flex-end; gap: 6px; pointer-events: none; }
+.insp > * { pointer-events: auto; }
+#insp-back { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.insp-card { width: 100%; min-height: 0; overflow-y: auto; border: 1px solid var(--line); border-radius: 6px; padding: 6px 12px 10px;
+  background: color-mix(in srgb, var(--panel) 92%, transparent); backdrop-filter: blur(4px); }
+.insp-card summary { cursor: pointer; display: flex; gap: 8px; align-items: baseline; }
+.insp-card summary strong { font-family: var(--font-display); font-weight: 600; font-size: 16px; flex: 1; }
+.insp-card summary em { font-style: normal; font-size: 12px; color: var(--muted); }
+.insp-card h3 { margin: 10px 0 2px; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.insp-card td, .insp-card td:last-child { padding: 1px 0; vertical-align: top; text-align: left; font-family: var(--font-body); font-size: 13px; }
+.insp-card td.num { width: 2.5em; text-align: right; padding-right: 8px; font-family: var(--font-data); }
+.tree .ins { border: 0; background: none; padding: 0 4px; color: var(--muted); cursor: pointer; font-size: 13px; }
+.tree .ins:hover { color: var(--accent); }
 table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
 td { padding: 4px 0; border-bottom: 1px solid var(--line); }
 td:last-child { text-align: right; font-family: var(--font-data); font-size: 12px; }
@@ -169,7 +183,7 @@ canvas { display: block; width: 100%; height: 100%; touch-action: none; }
 .ft-pop b { font-family: var(--font-display); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
 .ft-pop button { cursor: pointer; }
 .ft-pop canvas { display: block; width: 100%; height: auto; aspect-ratio: 5 / 3; background: #000; cursor: pointer; touch-action: none; }
-body.rec .panel, body.rec .hint, body.rec .toolbar, body.rec .view-pop, body.rec .pick { display: none; }  /* recording (LR4Demo.recording): the 3D view, whole window */
+body.rec .panel, body.rec .hint, body.rec .toolbar, body.rec .view-pop, body.rec .pick, body.rec .insp { display: none; }  /* recording (LR4Demo.recording): the 3D view, whole window */
 body.rec .stage { position: fixed; inset: 0; }
 .rec-badge {                          /* the demo video's speed (LR4Demo.badge): "1× real time" / "62×" */
   position: absolute; left: 2.2%; top: 3.5%; padding: 0.3em 0.65em; border-radius: 8px;
@@ -318,6 +332,7 @@ label.btn:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; 
   .view-pop { position: fixed; left: 0; right: 0; top: auto; bottom: 0; width: auto; max-height: 60dvh; border-radius: 10px 10px 0 0;
     padding-bottom: max(14px, env(safe-area-inset-bottom, 0px)); background: var(--panel); z-index: 5; }
   .pick { left: 8px; bottom: 8px; }
+  .insp { right: 8px; top: 74px; max-height: calc(100% - 140px); }
 }
 /* VR on: no side panel, the stage fills the window, a popup card instead (js/vr.js toggles body.vr-on) */
 body.vr-on { grid-template-columns: 1fr; grid-template-rows: 1fr; }
@@ -326,7 +341,7 @@ body.panel-off { grid-template-columns: 1fr; grid-template-rows: 1fr; }
 body.panel-off .panel { display: none; }
 body.panel-off .stage { grid-row: 1; }
 #v-panel[aria-pressed="true"] { border-color: var(--accent); }
-body.vr-on .panel, body.vr-on .hint, body.vr-on .toolbar, body.vr-on .view-pop, body.vr-on .pick { display: none; }
+body.vr-on .panel, body.vr-on .hint, body.vr-on .toolbar, body.vr-on .view-pop, body.vr-on .pick, body.vr-on .insp { display: none; }
 body.vr-on .stage { grid-row: 1; }
 .vr-pop {
   position: absolute; right: 16px; top: 16px; width: min(400px, calc(100% - 32px));
@@ -737,6 +752,11 @@ body.vr-on .stage { grid-row: 1; }
   </div>
   <div class="pick" id="pick" role="status" hidden><div><strong></strong><p></p></div>
     <button type="button" id="pick-clear" aria-label="Clear the selection" title="Clear">✕</button></div>
+  <div class="insp" id="insp" hidden>
+    <button type="button" id="insp-back">← Back to the machine</button>
+    <details class="insp-card" id="insp-card" open><summary><strong id="insp-h"></strong><em id="insp-n"></em></summary>
+      <div id="insp-list"></div></details>
+  </div>
   <div class="hint">Drag to orbit · right-drag to pan · scroll to zoom</div>
   <div class="rec-badge" id="rec-badge" hidden></div>
   <div class="rec-caption" id="rec-caption" hidden></div>
@@ -1467,7 +1487,7 @@ body.vr-on .stage { grid-row: 1; }
     const machine = { x0: mb.min.x, x1: mb.max.x, y0: mb.min.y, y1: mb.max.y, z1: mb.max.z - floor };
     const R = LR4Shop.room(table, machine, ROOM), g = R.gaps, auto = !(ROOM.w && ROOM.d && ROOM.h);
     shopRoom = R;
-    if (shopVR) { shop = LR4Shop.build(THREE, { room: R, table, machine, floor }); scene.add(shop); }
+    if (shopVR) { shop = LR4Shop.build(THREE, { room: R, table, machine, floor }); scene.add(shop); shop.visible = !INSPECT; }
     note.textContent = `Room ${roomLen(R.x1 - R.x0)} \u00d7 ${roomLen(R.y1 - R.y0)}, ${roomLen(R.h)} walls${auto ? " (blank = a 16 × 20 ft shop, 8′ 4″ ceiling)" : ""}, ` +
       `machine centered. To the walls: X sides ${roomLen(g.left)} / ${roomLen(g.right)}, front ${roomLen(g.front)}, ` +
       `back ${roomLen(g.back)}; ${roomLen(g.top)} above it.`;
@@ -1482,10 +1502,13 @@ body.vr-on .stage { grid-row: 1; }
 
   function fitView(dir) {
     const box = new THREE.Box3();
-    for (const m of meshes) if (m.visible && m.userData.motion !== "hose") { m.updateMatrixWorld(); box.expandByObject(m); }
+    for (const m of meshes) if (m.visible && (INSPECT || m.userData.motion !== "hose")) { m.updateMatrixWorld(); box.expandByObject(m); }
+    if (box.isEmpty()) return;
     box.getCenter(center);
     radius = box.getSize(new THREE.Vector3()).length() / 2;
-    frame(dir);
+    // inspect: the whole set in view (its bounding sphere in the narrower of the two angles), the machine's own framing otherwise
+    const half = Math.atan(Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * Math.min(1, camera.aspect));
+    frame(dir, INSPECT ? (radius / Math.sin(half)) * 1.05 : undefined);
   }
 
   async function load() {
@@ -1744,10 +1767,16 @@ body.vr-on .stage { grid-row: 1; }
     const listed = meshes.filter((m) => m.userData.name && fitted(m) && variantOK(m));
     const key = listed.map((m) => m.userData.name).join();
     if (key !== treeKey) { treeKey = key; tree = LR4ShowTree.build(listed.map((m) => m.userData)); renderShow(); }
+    if (INSPECT) {                                     // its set, again (the parts change with the size / options)
+      INSPECT.set = LR4ShowTree.inspectSet(tree, INSPECT.id);
+      if (!INSPECT.set.size) return inspectEnd();
+    }
     const inTree = new Set(listed);
     for (const m of meshes) m.visible = inTree.has(m) && LR4ShowTree.on(tree, showOff, partId(m))
+      && (!INSPECT || INSPECT.set.has(partId(m)))
       && !(probing && PROBE_OFF.test(m.userData.name)) && !(jobBit && m.userData.name === "Router_Bit");
     syncShow();
+    inspectScene();
     if (selected && !selected.visible) select(null);
   }
   function setupShow() {                              // once: presets, the tree's clicks
@@ -1761,6 +1790,8 @@ body.vr-on .stage { grid-row: 1; }
     const host = document.getElementById("show-tree");
     host.addEventListener("change", (e) => { const id = e.target.dataset.id; if (id) showSet(id, e.target.checked); });
     host.addEventListener("click", (e) => {
+      const ins = e.target.closest(".ins");
+      if (ins) return inspect(ins.dataset.id);
       const tw = e.target.closest(".tw");
       if (!tw) return;
       const id = tw.dataset.id, open = !treeOpen.has(id);
@@ -1779,12 +1810,17 @@ body.vr-on .stage { grid-row: 1; }
     const row = (into, cls, id, label, n, kids) => {
       const r = document.createElement("div");
       r.className = "row " + cls;
-      r.innerHTML = (kids ? `<button type="button" class="tw"></button>` : "") + `<label><input type="checkbox"><span></span></label><em></em>`;
+      r.innerHTML = (kids ? `<button type="button" class="tw"></button>` : "") + `<label><input type="checkbox"><span></span></label><em></em>`
+        + `<button type="button" class="ins">⤢</button>`;
       const i = r.querySelector("input");
       i.dataset.id = id;
       if (cls === "a") i.id = "g-" + id;              // vr.js: the assembly toggles
       r.querySelector("span").textContent = label;
       r.querySelector("em").textContent = n;
+      const ins = r.querySelector(".ins");
+      ins.dataset.id = id;
+      ins.title = "Inspect: " + label;
+      ins.setAttribute("aria-label", "Inspect " + label);
       into.appendChild(r);
       if (!kids) return null;
       const tw = r.querySelector(".tw");
@@ -2741,7 +2777,7 @@ body.vr-on .stage { grid-row: 1; }
     tip: () => meta && meta.tip_above_table, TOUCH_PLATE, sync: () => ctlTick(), homed: () => CTL.homed };
 
   // ---- version + feedback: the issue link carries the size, data date and the loaded files' checksums ----
-  const VERSION = "0.26.0";
+  const VERSION = "0.27.0";
   function setupAbout() {
     const bits = [`lr4-sandbox ${VERSION}`];
     if (cfg.built) bits.push(`model data built ${cfg.built}`);
@@ -3947,6 +3983,82 @@ body.vr-on .stage { grid-row: 1; }
     box.querySelector("strong").textContent = p.label;
     box.querySelector("p").textContent = `${SOURCE[p.source] || p.source} · ${grp}`;
   }
+
+  // ---- Inspect (Part 27): one tree row's set (LR4ShowTree.inspectSet: its parts + the bolts joining them + the
+  // bearings / idlers those bolts hold) in place of the machine: no workshop, no job, framed, orbiting the set's centre,
+  // the parts where they are on the machine now. From a row's ⤢ or a double-click (its assembly; inside, the part).
+  // The Show checkboxes and the pick chip still work in it; Back (or Esc) puts the camera back. ----
+  let INSPECT = null;                                 // { id, label, saved: { pos, target, center, radius }, set }
+  function rowLabel(id) {
+    for (const a of tree.asms) {
+      if (a.id === id) return a.label;
+      const k = a.kinds.find((x) => x.id === id);
+      if (k) return `${a.label} › ${k.label}`;
+      for (const kk of a.kinds) { const q = kk.parts.find((x) => x.id === id); if (q) return q.label; }
+    }
+    return id;
+  }
+  function inspect(id) {
+    if (!id || !LR4ShowTree.members(tree, id).length) return;
+    const saved = INSPECT ? INSPECT.saved
+      : { pos: camera.position.clone(), target: controls.target.clone(), center: center.clone(), radius };
+    const up = tree.place[id] ? tree.place[id].flatMap(([a, k]) => [a, a + "." + k]) : [id.split(".")[0]];
+    for (const x of [id, ...up]) showOff.delete(x);   // what you inspect is shown
+    if (!INSPECT) document.getElementById("insp-card").open = !matchMedia("(max-width: 760px)").matches;   // phones: list closed
+    INSPECT = { id, label: rowLabel(id), saved, set: null };
+    document.body.classList.add("inspecting");
+    document.getElementById("insp").hidden = false;
+    applyVisibility();
+    const d = camera.position.clone().sub(controls.target);
+    fitView([d.x, d.y, d.z]);
+  }
+  function inspectEnd() {
+    if (!INSPECT) return;
+    const s = INSPECT.saved;
+    INSPECT = null;
+    document.body.classList.remove("inspecting");
+    document.getElementById("insp").hidden = true;
+    applyVisibility();
+    center.copy(s.center); radius = s.radius;
+    camera.position.copy(s.pos); controls.target.copy(s.target); controls.update();
+  }
+  function inspectScene() {                           // the set (after applyVisibility's tree), scenery, the parts list
+    if (shop) shop.visible = !INSPECT;
+    if (JOB.group) JOB.group.visible = !INSPECT;
+    if (!INSPECT) return;
+    document.getElementById("insp-h").textContent = INSPECT.label;
+    const ud = meshes.filter((m) => INSPECT.set.has(partId(m)) && fitted(m) && variantOK(m)).map((m) => m.userData);
+    const host = document.getElementById("insp-list");
+    host.textContent = "";
+    let n = 0;
+    for (const s of LR4ShowTree.partsList(ud)) {
+      const h = document.createElement("h3"), t = document.createElement("table");
+      h.textContent = s.title;
+      for (const [q, l] of s.rows) {
+        const r = t.insertRow();
+        r.insertCell().textContent = q === null ? "?" : q;
+        r.cells[0].className = "num";
+        r.insertCell().textContent = l;
+        if (q === null) r.title = "Count not in the data (the reference build has none of these)";
+        if (s.title !== "Fasteners") n += q || 0;
+      }
+      host.append(h, t);
+    }
+    document.getElementById("insp-n").textContent = `${n} part${n === 1 ? "" : "s"}`;
+  }
+  document.getElementById("insp-back").addEventListener("click", inspectEnd);
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && INSPECT && !(e.target.closest && e.target.closest("input, select, textarea, dialog"))) inspectEnd();
+  });
+  canvas.addEventListener("dblclick", (e) => {
+    const r = canvas.getBoundingClientRect();
+    ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+    ray.setFromCamera(ndc, camera);
+    const hit = ray.intersectObjects(meshes.filter((m) => m.visible), false)[0];
+    if (hit) inspect(INSPECT ? partId(hit.object) : asmOf(hit.object));
+  });
+  window.LR4Inspect = { open: inspect, close: inspectEnd, id: () => INSPECT && INSPECT.id,
+    shown: () => meshes.filter((m) => m.visible).map((m) => m.userData.name) };
 
   // ---- touching the pendant's screen (FluidTouch): a press on it in the view wins over orbiting and picking ----
   const ftScreen = () => { const m = FT.ft && meshes.find((q) => q.userData.name === "Pendant_screen"); return m && m.visible ? m : null; };
