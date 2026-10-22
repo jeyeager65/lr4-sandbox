@@ -1,0 +1,9 @@
+{
+ "repo": "https://github.com/jeyeager65/FluidTouch",
+ "branch": "feature/wasm-sim",
+ "commit": "53f23cff60f29870b7247207843d0550a38058a3",
+ "source": "https://github.com/jeyeager65/FluidTouch/tree/53f23cff60f29870b7247207843d0550a38058a3",
+ "dirty": false,
+ "built": "2026-10-21",
+ "license": "MIT (LICENSE)"
+}

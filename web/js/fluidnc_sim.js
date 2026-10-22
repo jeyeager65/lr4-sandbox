@@ -89,6 +89,9 @@
   //                                   is <= tripSteps (activeBelow) / >= tripSteps; sim.clearSwitch(gpio) = no switch
   //   sim.addMotor(stepPin, dirPin)   count a motor's steps with no switch on it; sim.motorSteps(stepPin)
   //   sim.pinMask()                   the pin levels (bit n = gpio n); sim.setTimeScale(k) machine time k x real
+  // Raw TCP into FluidNC's own web server (BrowserAsyncTCP's fluidnc_vconn_*; FluidTouch's WebSocket rides on it):
+  //   sim.vconn.open(port, onData(Uint8Array), onClose()) -> id (0 = nothing listening yet)
+  //   sim.vconn.send(id, bytes); sim.vconn.close(id)
   async function start(opts = {}) {
     if (!root.crossOriginIsolated) throw new Error("FluidNC needs a cross-origin isolated page (SharedArrayBuffer)");
     const base = new URL(opts.base || "fluidnc/", root.location.href).href;
@@ -101,7 +104,14 @@
     const win = frame.contentWindow;
     let stopped = false;
     let pumpId = () => 0;
-    const stop = () => { stopped = true; clearInterval(pumpId()); win.fluidncOnOutput = () => {}; frame.remove(); };
+    const stop = () => {
+      stopped = true; clearInterval(pumpId()); win.fluidncOnOutput = () => {};
+      for (const c of vconns.values()) c.onClose();
+      vconns.clear(); frame.remove();
+    };
+    const vconns = new Map();   // id -> { onData, onClose }
+    win.fluidncOnVconnData = (id, bytes) => { const c = vconns.get(id); if (c) c.onData(bytes); };
+    win.fluidncOnVconnClose = (id) => { const c = vconns.get(id); if (c) { vconns.delete(id); c.onClose(); } };
     const listeners = new Map();
     const emit = (ev) => {
       for (const k of ["line", ev.type]) for (const fn of listeners.get(k) || []) fn(ev);
@@ -177,6 +187,21 @@
       pinMask: () => call("fluidnc_pin_mask", N, []),
       setTimeScale: (k) => call("fluidnc_set_time_scale", null, [k]),
       readFile: (p, enc) => FS.readFile(p, enc ? { encoding: enc } : undefined),
+      vconn: {
+        open(port, onData, onClose) {
+          // registered in the same tick as the open: FluidNC's output reaches this thread only after we yield
+          const id = stopped || typeof Module._fluidnc_vconn_open !== "function" ? 0 : Module.ccall("fluidnc_vconn_open", N, [N], [port]);
+          if (id) vconns.set(id, { onData, onClose });
+          return id;
+        },
+        send(id, bytes) {
+          for (let o = 0; !stopped && vconns.has(id) && o < bytes.length; o += 8192) {   // ccall copies via the stack
+            const part = bytes.subarray(o, o + 8192);
+            Module.ccall("fluidnc_vconn_send", null, [N, "array", N], [id, part, part.length]);
+          }
+        },
+        close(id) { if (vconns.delete(id) && !stopped) Module.ccall("fluidnc_vconn_close", null, [N], [id]); },
+      },
       stop: () => { stop(); for (const q of queue.splice(0)) clearTimeout(q.timer); } };
     Object.defineProperty(sim, "stopped", { get: () => stopped });
     return sim;
