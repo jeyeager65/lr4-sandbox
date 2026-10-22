@@ -11,6 +11,9 @@
 //   ft.stop(); ft.info = web/fluidtouch/build.json; ft.width / ft.height
 // The FluidNC end may be swapped (setFluidNC(sim)) after FluidNC restarts: FluidTouch sees its socket close and
 // reconnects by itself, as on a real machine.
+// opts.onCommand(text): each WebSocket text frame FluidTouch sends ("$SD/Run=/sd/x.gcode", "?", "!" ...), before
+// FluidNC gets it; a promise back holds that frame (and the rest of that connection) until it settles, so the page
+// can get ready for a job the pendant starts.
 (function (root) {
   "use strict";
 
@@ -22,6 +25,32 @@
       s.onerror = () => rej(new Error("could not load " + src));
       doc.head.appendChild(s);
     });
+  }
+
+  // FluidTouch -> FluidNC on one connection: its HTTP upgrade request, then masked WebSocket client frames.
+  // frames(buf) -> { frames: [[bytes, text | null]], rest } (text for whole text frames; anything else passes as is)
+  const dec = typeof TextDecoder !== "undefined" ? new TextDecoder() : null;
+  function frames(buf) {
+    const out = [];
+    let i = 0;
+    while (buf.length - i >= 2) {
+      const op = buf[i] & 15, masked = buf[i + 1] & 128;
+      let len = buf[i + 1] & 127, h = 2;
+      if (len === 126) { if (buf.length - i < 4) break; len = (buf[i + 2] << 8) | buf[i + 3]; h = 4; }
+      else if (len === 127) { if (buf.length - i < 10) break; len = ((buf[i + 6] << 24) | (buf[i + 7] << 16) | (buf[i + 8] << 8) | buf[i + 9]) >>> 0; h = 10; }
+      const k = masked ? 4 : 0;
+      if (buf.length - i < h + k + len) break;
+      const f = buf.slice(i, i + h + k + len);
+      let text = null;
+      if (op === 1 && (buf[i] & 128) && dec) {
+        const pl = f.slice(h + k);
+        if (masked) for (let j = 0; j < pl.length; j++) pl[j] ^= f[h + (j & 3)];
+        text = dec.decode(pl);
+      }
+      out.push([f, text]);
+      i += h + k + len;
+    }
+    return { frames: out, rest: buf.slice(i) };
   }
 
   // RGB565 (little-endian words) -> RGBA bytes
@@ -48,7 +77,7 @@
     document.body.appendChild(frameEl);
     const win = frameEl.contentWindow;
     let stopped = false, M = null;
-    const conns = new Map();   // FluidTouch's id = FluidNC's vconn id -> the FluidNC sim it belongs to
+    const conns = new Map();   // FluidTouch's id = FluidNC's vconn id -> { sim, buf, head, wait, queue }
 
     const toFluidTouch = (id, bytes) => {
       if (stopped || !M) return;
@@ -63,12 +92,41 @@
         if (!fluidnc || fluidnc.stopped || !fluidnc.vconn) return 0;
         const sim = fluidnc;
         const id = sim.vconn.open(port, (b) => toFluidTouch(id, b), () => closed(id));
-        if (id) conns.set(id, sim);
+        if (id) conns.set(id, { id, sim, buf: new Uint8Array(0), head: true, wait: null, queue: [] });
         return id;
       },
-      ftNetSend(id, bytes) { const sim = conns.get(id); if (sim) sim.vconn.send(id, bytes); },
-      ftNetClose(id) { const sim = conns.get(id); conns.delete(id); if (sim) sim.vconn.close(id); },
+      ftNetSend(id, bytes) {
+        const c = conns.get(id);
+        if (!c) return;
+        const b = new Uint8Array(c.buf.length + bytes.length);
+        b.set(c.buf); b.set(bytes, c.buf.length);
+        c.buf = b;
+        if (c.head) {                                  // the upgrade request goes as it is
+          let e = -1;
+          for (let i = 3; i < b.length; i++) if (b[i] === 10 && b[i - 1] === 13 && b[i - 2] === 10 && b[i - 3] === 13) { e = i + 1; break; }
+          if (e < 0) return;
+          c.head = false;
+          pass(c, b.slice(0, e), null);
+          c.buf = b.slice(e);
+        }
+        const r = frames(c.buf);
+        c.buf = r.rest;
+        for (const [f, t] of r.frames) pass(c, f, t);
+      },
+      ftNetClose(id) { const c = conns.get(id); conns.delete(id); if (c) c.sim.vconn.close(id); },
     };
+    const fwd = (c, bytes) => { if (!stopped && conns.get(c.id) === c) c.sim.vconn.send(c.id, bytes); };
+    function pass(c, bytes, text) {                  // in order; a promise from onCommand holds the rest back
+      if (c.wait) { c.queue.push([bytes, text]); return; }
+      let r = null;
+      if (text !== null && opts.onCommand) { try { r = opts.onCommand(text); } catch (e) { r = null; } }
+      if (!r || typeof r.then !== "function") { fwd(c, bytes); return; }
+      c.wait = Promise.resolve(r).catch(() => {}).then(() => {
+        c.wait = null;
+        fwd(c, bytes);
+        for (const [b, t] of c.queue.splice(0)) pass(c, b, t);
+      });
+    }
     const print = (t) => opts.onPrint && opts.onPrint(String(t));
     try {
       await loadScript(win.document, base + "fluidtouch.js");
@@ -100,7 +158,7 @@
       stop() {
         if (stopped) return;
         stopped = true;
-        for (const [id, sim] of conns) sim.vconn.close(id);
+        for (const [id, c] of conns) c.sim.vconn.close(id);
         conns.clear();
         frameEl.remove();
       },
@@ -109,7 +167,7 @@
     return ft;
   }
 
-  const api = { start, rgb565ToRgba };
+  const api = { start, rgb565ToRgba, frames };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.FluidTouchSim = api;
 })(typeof self !== "undefined" ? self : this);

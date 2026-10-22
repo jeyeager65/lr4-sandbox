@@ -149,6 +149,16 @@ canvas { display: block; width: 100%; height: 100%; touch-action: none; }
   border-radius: 4px; padding: 10px 14px 12px; box-shadow: 0 6px 24px rgb(0 0 0 / 0.18); font-size: 14px;
 }
 .job-pop[hidden] { display: none; }
+.ft-pop {
+  position: absolute; right: 12px; top: 56px; width: min(640px, calc(100% - 24px)); touch-action: none; user-select: none;
+  background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 4px; padding: 4px 6px 6px;
+  box-shadow: 0 6px 24px rgb(0 0 0 / 0.18); cursor: move;
+}
+.ft-pop[hidden] { display: none; }
+.ft-pop .ft-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 2px 4px; }
+.ft-pop b { font-family: var(--font-display); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.ft-pop button { cursor: pointer; }
+.ft-pop canvas { display: block; width: 100%; height: auto; aspect-ratio: 5 / 3; background: #000; cursor: pointer; touch-action: none; }
 body.rec .panel, body.rec .hint, body.rec .toolbar, body.rec .view-pop, body.rec .pick { display: none; }  /* recording (LR4Demo.recording): the 3D view, whole window */
 body.rec .stage { position: fixed; inset: 0; }
 .job-pop button { cursor: pointer; }
@@ -459,6 +469,7 @@ body.vr-on .stage { grid-row: 1; }
         <label class="check">Machine speed <select id="ctl-speed" aria-label="Machine speed" style="width: auto">
           <option value="1" selected>1×</option><option value="2">2×</option><option value="5">5×</option><option value="10">10×</option></select></label>
         <label class="check"><input type="checkbox" id="ctl-plate"> Touch plate under the bit (<span id="ctl-plate-on">on 1/4" stock</span>)</label>
+        <button type="button" id="ft-pop-btn" disabled title="FluidTouch's screen in a window over the view (or click the pendant's screen in the view)">Pendant screen</button>
       </div>
       <p class="foot" id="ctl-msg" role="status"></p>
       <details class="cam" id="ctl-box" hidden>
@@ -656,6 +667,9 @@ body.vr-on .stage { grid-row: 1; }
     <button type="button" id="pick-clear" aria-label="Clear the selection" title="Clear">✕</button></div>
   <div class="hint">Drag to orbit · right-drag to pan · scroll to zoom</div>
   <div class="job-pop" id="job-pop" role="alertdialog" aria-labelledby="job-pop-h" hidden><b id="job-pop-h">Paused (M0)</b><p id="job-pop-msg"></p><div class="buttons"><button type="button" id="job-resume">Resume (cycle start)</button><button type="button" id="job-pop-def" hidden>Stock and bits…</button></div></div>
+  <div class="ft-pop" id="ft-pop" role="dialog" aria-labelledby="ft-pop-h" hidden><div class="ft-head"><b id="ft-pop-h">FluidTouch pendant</b>
+    <button type="button" id="ft-pop-x" aria-label="Close the pendant screen" title="Close">✕</button></div>
+    <canvas id="ft-pop-c" width="800" height="480" aria-label="FluidTouch's screen: click or drag to touch it"></canvas></div>
   <div class="vr-pop" id="vr-pop" role="dialog" aria-labelledby="vr-pop-h" hidden>
     <div class="vr-head"><h2 id="vr-pop-h">Viewing in VR</h2>
       <div class="seg"><button type="button" id="vr-u-in" aria-pressed="true">Inches</button><button type="button" id="vr-u-mm" aria-pressed="false">mm</button></div>
@@ -689,6 +703,7 @@ body.vr-on .stage { grid-row: 1; }
 <script src="js/sd_card.js"></script>
 <script src="js/homing.js"></script>
 <script src="js/fluidnc_sim.js"></script>
+<script src="js/fluidtouch_sim.js"></script>
 <script src="js/sim_config.js"></script>
 <script src="js/config_model.js"></script>
 <script src="js/parts_files.js"></script>
@@ -1194,6 +1209,11 @@ body.vr-on .stage { grid-row: 1; }
   // apron's (user 2026-10-21). The case leans back 15 deg and reaches 11.25 mm behind the stand, so a spacer block
   // (5/8" plywood) holds the stand out from the apron. The screen is a canvas texture: a placeholder status screen
   // (state + MPos) until FluidTouch itself runs in the page (Parts 19-20). ----
+  // FluidTouch on the pendant (Part 20): the pendant's own firmware (js/fluidtouch_sim.js) runs while FluidNC does,
+  // talking to it through FluidNC's web server. Its screen is the pendant screen's texture and the pop-out's canvas;
+  // touches come from a click on the screen in the view, the pop-out, or a VR controller's tip (ftPoke). A $SD/Run from
+  // its Files tab is held back until the page is ready to follow the job, as with the Run button (fjFromPendant).
+  const FT = { ft: null, starting: null, frame: -1, popFrame: -1, drag: null, last: null, poker: null, log: [], homing: null };
   const PENDANT = { dir: "models/pendant/", x: 130, spacer: 15.9, parts: [["stand", "Pendant stand", "accent"], ["case_bottom", "Pendant case (back)", "main"],
     ["case_top", "Pendant case (bezel)", "main"]] };
   let pendant = null;                                 // { info, geos: { part: geometry }, screen: { geo, canvas, tex, key } }
@@ -1239,12 +1259,20 @@ body.vr-on .stage { grid-row: 1; }
         motion: "table", source: "made", color: [0.84, 0.70, 0.50], ownGeo: true }]);
     pendantScreen(true);
     out.push([pendant.screen.geo, new THREE.MeshBasicMaterial({ map: pendant.screen.tex, toneMapped: false }),
-      ud("Pendant_screen", "Pendant screen (placeholder until FluidTouch runs here)", { color: [0, 0, 0] })]);
+      ud("Pendant_screen", "Pendant screen (FluidTouch, when the Run tab's controller is FluidNC)", { color: [0, 0, 0] })]);
     return out;
   }
   // the placeholder screen: what FluidTouch's status bar + DRO would show; redrawn when the text changes
   function pendantScreen(force) {
     if (!pendant) return;
+    if (FT.ft && !FT.ft.stopped) {                   // FluidTouch's own screen, copied when it redraws
+      const f = FT.ft.frame();
+      if (!force && f === FT.frame) return;
+      FT.frame = f; pendant.screen.key = "";
+      FT.ft.draw(pendant.screen.canvas.getContext("2d"));
+      pendant.screen.tex.needsUpdate = true;
+      return;
+    }
     const fl = CTL.mode === "fluidnc", st = fl ? (CTL.sim ? CTL.state || "…" : "Starting") : "Playback";
     const m = fl ? CTL.mpos : ["mx", "my", "mz"].map((id) => parseFloat(document.getElementById(id).textContent));
     const pos = m && m.every((v) => Number.isFinite(v)) ? m.map((v) => v.toFixed(2)) : ["–", "–", "–"];
@@ -1268,7 +1296,7 @@ body.vr-on .stage { grid-row: 1; }
       g.fillStyle = fl && !CTL.homed ? "#9aa0a8" : "#f2f2f2"; g.textAlign = "right"; g.fillText(pos[i], 520, y); g.textAlign = "left";
     });
     g.font = "400 18px system-ui, sans-serif"; g.fillStyle = "#6b7079";
-    g.fillText("Simulated pendant - FluidTouch's own screens come in a later version", 40, H - 24);
+    g.fillText(fl ? "Starting FluidTouch…" : "FluidTouch runs on this screen when the Run tab's controller is FluidNC", 40, H - 24);
     tex.needsUpdate = true;
   }
   loadPendant();
@@ -2141,6 +2169,9 @@ body.vr-on .stage { grid-row: 1; }
       const m = ev.MPos || (ev.WPos && ev.WCO ? ev.WPos.map((v, i) => v + ev.WCO[i]) : null);
       if (m) CTL.mpos = m;
       CTL.state = ev.state;
+      if (FT.homing && ev.state === "Home") FT.homing = "on";
+      else if (FT.homing === "on" && ev.state === "Idle") { FT.homing = null; ctlHomed(" on the pendant"); }
+      else if (FT.homing && ev.state === "Alarm") FT.homing = null;
       dro();
       if (FJ.job) fjStatus(ev);
       return;
@@ -2209,16 +2240,18 @@ body.vr-on .stage { grid-row: 1; }
     ctlLastSent = "$H";
     ctlAdd("> $H", "in");
     CTL.sim.command("$H", 600000).then((r) => {
-      if (r.ok) {
-        CTL.homed = true;
-        ctlTick();
-        CTL.homePose = { x: CTL.pose[0], y: CTL.pose[1], z: CTL.pose[2] };   // the job's start (jobStartAt)
-        CTL.runFrom = null;
-        $("home-status").textContent = "Homed by FluidNC ($H): MPos is mpos_mm at the pulled-off spot.";
-        jobSetup(JOB.pageJob);
-      }
+      if (r.ok) ctlHomed("");
       else $("home-status").textContent = `Homing failed (error:${r.code}). Send $X to unlock.`;
     }).catch(() => {});
+  }
+  function ctlHomed(by) {                            // $H finished (from here, or from the pendant: by = " on the pendant")
+    CTL.homed = true;
+    ctlTick();
+    CTL.homePose = { x: CTL.pose[0], y: CTL.pose[1], z: CTL.pose[2] };   // the job's start (jobStartAt)
+    CTL.runFrom = null;
+    $("home-status").textContent = `Homed by FluidNC ($H${by}): MPos is mpos_mm at the pulled-off spot.`;
+    dro();
+    jobSetup(JOB.pageJob);
   }
   // the jog pad: $J=G91 by the step at the feed (Z at most its max rate); FluidNC queues them; ■ cancels (0x85)
   function ctlJogPad(axis, sign) {
@@ -2261,6 +2294,7 @@ body.vr-on .stage { grid-row: 1; }
     CTL.booting = null;
     Object.assign(CTL, { sim, cfg: tr, yaml, boot: [HOME.pose.x, HOME.pose.y, HOME.pose.z] });
     window.LR4FluidNC = sim;
+    ftStart(sim);                                    // the pendant (re)connects to this FluidNC
     if (!sim.pins) ctlAdd("This FluidNC build has no simulated switches (rebuild web/fluidnc).", "err");
     ctlSwitches();
     sim.setTimeScale(Number($("ctl-speed").value));
@@ -2288,6 +2322,38 @@ body.vr-on .stage { grid-row: 1; }
       }
     }).catch(() => {});
   }
+  function ftStart(sim) {
+    if (FT.ft && !FT.ft.stopped) { FT.ft.setFluidNC(sim); return; }
+    if (FT.starting || !window.FluidTouchSim) return;
+    FT.starting = FluidTouchSim.start({ fluidnc: sim, onCommand: ftCommand, onPrint: (l) => { FT.log.push(l); if (FT.log.length > 300) FT.log.shift(); },
+      onRestart: () => { ftStop(); if (CTL.sim) ftStart(CTL.sim); } })   // ESP.restart from its settings
+      .then((ft) => {
+        if (CTL.mode !== "fluidnc") { ft.stop(); return; }
+        FT.ft = ft; FT.frame = FT.popFrame = -1;
+        ft.setFluidNC(CTL.sim);                      // FluidNC may have restarted meanwhile
+        $("ft-pop-btn").disabled = false;
+        pendantScreen(true);
+      })
+      .catch((e) => ctlAdd("FluidTouch (the pendant) didn't start: " + e.message, "err"))
+      .finally(() => { FT.starting = null; });
+  }
+  function ftStop() {
+    if (FT.ft) FT.ft.stop();
+    Object.assign(FT, { ft: null, drag: null, poker: null });
+    $("ft-pop-btn").disabled = true;
+    $("ft-pop").hidden = true;
+    pendantScreen(true);
+  }
+  function ftCommand(text) {                         // what FluidTouch sends, before FluidNC gets it
+    const t = text.trim();
+    if (/^\$H$/i.test(t)) {                         // Home All: the page follows it in the status reports (ctlLine)
+      FT.homing = "sent"; CTL.homed = false;
+      $("home-status").textContent = "FluidNC is homing ($H from the pendant)…";
+      return null;
+    }
+    const m = /^\$SD\/Run=(\S+)/i.exec(t);
+    return m ? fjFromPendant(m[1]).catch(() => {}) : null;
+  }
   function ctlSetMode(mode) {
     if (mode === CTL.mode) return;
     CTL.mode = mode;
@@ -2309,6 +2375,7 @@ body.vr-on .stage { grid-row: 1; }
     } else {
       CTL.booting = null;
       ctlStop();
+      ftStop();
       ctlMsg("");
       $("home-status").textContent = HOME.home ? "Homed." : "Not homed.";
       dro();
@@ -2352,7 +2419,7 @@ body.vr-on .stage { grid-row: 1; }
     tip: () => meta && meta.tip_above_table, TOUCH_PLATE, sync: () => ctlTick(), homed: () => CTL.homed };
 
   // ---- version + feedback: the issue link carries the size, data date and the loaded files' checksums ----
-  const VERSION = "0.18.0";
+  const VERSION = "0.20.0";
   function setupAbout() {
     const bits = [`lr4-sandbox ${VERSION}`];
     if (cfg.built) bits.push(`model data built ${cfg.built}`);
@@ -2940,10 +3007,10 @@ body.vr-on .stage { grid-row: 1; }
     $("job-def").scrollIntoView({ block: "center", behavior: "smooth" });
   });
   {                                                  // drag the pause popup anywhere over the view (kept till reload)
-    const pop = $("job-pop");
+    for (const pop of [$("job-pop"), $("ft-pop")]) {
     let grab = null;
     pop.addEventListener("pointerdown", (e) => {
-      if (e.target.closest("button")) return;
+      if (e.target.closest("button, canvas")) return;
       const r = pop.getBoundingClientRect(), host = pop.parentElement.getBoundingClientRect();
       grab = { dx: e.clientX - r.left, dy: e.clientY - r.top, host };
       pop.setPointerCapture(e.pointerId);
@@ -2959,6 +3026,7 @@ body.vr-on .stage { grid-row: 1; }
     const drop = () => { grab = null; };
     pop.addEventListener("pointerup", drop);
     pop.addEventListener("pointercancel", drop);
+    }
   }
   $("job-reset").addEventListener("click", () => {
     if (CTL.mode === "fluidnc") {                    // Stop = soft reset: FluidNC drops the job (ALARM:3 if it was moving)
@@ -2993,19 +3061,40 @@ body.vr-on .stage { grid-row: 1; }
     FJ.job.at = now;
   }
   async function fjRun() {
+    if (!(await fjPrepare())) return;
+    ctlLastSent = `$SD/Run=${FJ.job.path}`;
+    ctlAdd("> " + ctlLastSent, "in");
+    CTL.sim.send(ctlLastSent);                       // its ok comes when the file ends; an error ends the job (ctlLine)
+  }
+  // a $SD/Run from the pendant (FluidTouch's Files tab, held back until this settles): the same set-up as Run, for the
+  // file it names (picked here first if it's another one on the card); FluidNC runs it either way
+  async function fjFromPendant(file) {
+    const path = file.replace(/^\/sd(?=\/)/i, "");
+    if (CTL.mode !== "fluidnc" || !CTL.sim || FJ.job) return;
+    if (fjPath() !== path) {
+      if (!SDC.recs.some((r) => r.path === path)) { $("job-status").textContent = `The pendant runs ${path}: not on this card's list, so the page can't follow it.`; return; }
+      await sdSelect(path);
+    }
+    if (fjPath() !== path) return;
+    if (await fjPrepare()) {
+      ctlAdd(`> $SD/Run=${file} (from the pendant)`, "in");
+      $("job-status").textContent = `Running ${path} on FluidNC (started on the pendant)…`;
+    }
+  }
+  async function fjPrepare() {                       // get the page ready to follow the picked file; false = it can't
     const sim = CTL.sim, path = fjPath();
-    if (!sim || !JOB.tl || !path) return;
+    if (!sim || !JOB.tl || !path) return false;
     if (!CTL.homed) {
       $("job-status").textContent = "Home it first ($H): the job zeroes where the machine is when it starts, and the " +
         "page lays the stock out from the homed spot, as Playback does.";
-      return;
+      return false;
     }
     const p = ctlRaw(), here = { x: p[0], y: p[1], z: p[2] }, from = jobSpot();   // lay the job out from where it starts
     if (!from || ["x", "y", "z"].some((a) => Math.abs(here[a] - from[a]) > 0.005)) {
       CTL.runFrom = here;
       $("job-status").textContent = "Reading the job from where the machine is…";
       await jobSetup(JOB.pageJob);
-      if (!JOB.tl || FJ.job) return;
+      if (!JOB.tl || FJ.job) return false;
     }
     if (JOB.src.kind === "page") {                   // make sure the card has this very file
       try { await SdCard.store.put(PAGE_SD, JOB.src.text); SDC.saved = JOB.src.text; } catch (e) { /* the live card is enough */ }
@@ -3026,9 +3115,7 @@ body.vr-on .stage { grid-row: 1; }
     const tv = meta.travel, hp = CTL.homePose, hs = Homing.settings(CTL.yaml), st = JOB.tl.stock;
     const wz = [hs.x.mpos + tv.x[0] - hp.x, hs.y.mpos + tv.y[0] - hp.y, hs.z.mpos - meta.tip_above_table - (st ? st.zmin : 0) - hp.z];
     await sim.command(`G10 L2 P1 X${wz[0].toFixed(3)} Y${wz[1].toFixed(3)} Z${wz[2].toFixed(3)}`).catch(() => {});
-    ctlLastSent = `$SD/Run=${path}`;
-    ctlAdd("> " + ctlLastSent, "in");
-    sim.send(ctlLastSent);                           // its ok comes when the file ends; an error ends the job (ctlLine)
+    return true;
   }
   function fjReload() {                              // the job reloaded mid-run (stock / bits given): carve on from here
     if (JOB.sim) JOB.sim.reset();
@@ -3538,6 +3625,95 @@ body.vr-on .stage { grid-row: 1; }
     box.querySelector("p").textContent = `${SOURCE[p.source] || p.source} · ${grp}`;
   }
 
+  // ---- touching the pendant's screen (FluidTouch): a press on it in the view wins over orbiting and picking ----
+  const ftScreen = () => { const m = FT.ft && meshes.find((q) => q.userData.name === "Pendant_screen"); return m && m.visible ? m : null; };
+  function ftViewHit(e, all) {                       // -> [x, y] in FluidTouch's pixels, or null (all: blocked by parts in front)
+    const m = ftScreen();
+    if (!m) return null;
+    const r = canvas.getBoundingClientRect();
+    ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+    ray.setFromCamera(ndc, camera);
+    const h = ray.intersectObjects(all ? meshes.filter((q) => q.visible) : [m], false)[0];
+    return h && h.object === m && h.uv ? [h.uv.x * FT.ft.width, (1 - h.uv.y) * FT.ft.height] : null;
+  }
+  {
+    const stage = canvas.parentElement;
+    stage.addEventListener("pointerdown", (e) => {
+      if (e.target !== canvas || e.button !== 0) return;
+      const p = ftViewHit(e, true);
+      if (!p) return;
+      e.stopPropagation(); e.preventDefault();       // OrbitControls and the picker never see it
+      FT.drag = e.pointerId; FT.last = p;
+      canvas.setPointerCapture(e.pointerId);
+      FT.ft.touch(p[0], p[1], true);
+    }, true);
+    stage.addEventListener("pointermove", (e) => {
+      if (FT.drag === e.pointerId) {
+        e.stopPropagation();
+        const p = ftViewHit(e, false);
+        if (p && FT.ft) { FT.last = p; FT.ft.touch(p[0], p[1], true); }
+      } else if (e.target === canvas && !e.buttons && FT.ft) canvas.style.cursor = ftViewHit(e, false) ? "pointer" : "";
+    }, true);
+    const up = (e) => {
+      if (FT.drag !== e.pointerId) return;
+      e.stopPropagation();
+      FT.drag = null;
+      if (FT.ft) FT.ft.touch(FT.last[0], FT.last[1], false);
+    };
+    stage.addEventListener("pointerup", up, true);
+    stage.addEventListener("pointercancel", up, true);
+  }
+  {                                                  // the pop-out: FluidTouch's 800 x 480 screen over the view
+    const pc = $("ft-pop-c");
+    let held = null;
+    const at = (e) => { const r = pc.getBoundingClientRect(); return [(e.clientX - r.left) / r.width * pc.width, (e.clientY - r.top) / r.height * pc.height]; };
+    pc.addEventListener("pointerdown", (e) => {
+      if (!FT.ft || e.button !== 0) return;
+      held = e.pointerId; pc.setPointerCapture(e.pointerId); e.preventDefault();
+      FT.ft.touch(...at(e), true);
+    });
+    pc.addEventListener("pointermove", (e) => { if (held === e.pointerId && FT.ft) FT.ft.touch(...at(e), true); });
+    const lift = (e) => { if (held !== e.pointerId) return; held = null; if (FT.ft) FT.ft.touch(...at(e), false); };
+    pc.addEventListener("pointerup", lift);
+    pc.addEventListener("pointercancel", lift);
+    $("ft-pop-btn").addEventListener("click", () => { $("ft-pop").hidden = !$("ft-pop").hidden; FT.popFrame = -1; });
+    $("ft-pop-x").addEventListener("click", () => { $("ft-pop").hidden = true; });
+  }
+  function ftPopDraw() {
+    if (!FT.ft || $("ft-pop").hidden) return;
+    const f = FT.ft.frame();
+    if (f !== FT.popFrame) { FT.popFrame = f; FT.ft.draw($("ft-pop-c").getContext("2d")); }
+  }
+  // VR: a controller's tip (p, scene mm; S = rig mm per metre) pressed into the screen touches it there: down within
+  // 3 mm in front of the glass (life size), up again past 6 mm or off the screen; one finger at a time.
+  // -> "down" (just touched: vr.js buzzes), "on", or false
+  const ftV = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()];
+  function ftPoke(who, p, S) {
+    const m = ftScreen();
+    const lift = () => { if (FT.poker === who) { FT.poker = null; if (FT.ft) FT.ft.touch(FT.last[0], FT.last[1], false); } return false; };
+    if (!m || !p || (FT.poker !== null && FT.poker !== who)) return lift();
+    const c = pendant.info.screen.corners, k = S / 1000;
+    const [l, ex, ey, n] = ftV;
+    m.worldToLocal(l.copy(p)).sub(n.set(...c[0]));
+    ex.set(...c[1]).sub(n); ey.set(...c[3]).sub(n);
+    const u = l.dot(ex) / ex.lengthSq(), v = l.dot(ey) / ey.lengthSq(), d = l.dot(n.crossVectors(ex, ey).normalize());
+    const was = FT.poker === who;
+    if (u < 0 || u > 1 || v < 0 || v > 1 || d > (was ? 6 : 3) * k || d < -25 * k) return lift();
+    FT.poker = who; FT.last = [u * FT.ft.width, (1 - v) * FT.ft.height];
+    FT.ft.touch(FT.last[0], FT.last[1], true);
+    return was ? "on" : "down";
+  }
+  // for tests: the pendant's FluidTouch; a screen point (u, v from its bottom-left; d mm out of the glass) in scene mm
+  window.LR4Pendant = { ft: () => FT.ft, log: () => FT.log, poke: ftPoke, popOpen: () => !$("ft-pop").hidden,
+    point(u, v, d) {
+      const m = ftScreen();
+      if (!m) return null;
+      const c = pendant.info.screen.corners.map((q) => new THREE.Vector3(...q));
+      const ex = c[1].clone().sub(c[0]), ey = c[3].clone().sub(c[0]), n = ex.clone().cross(ey).normalize();
+      m.updateMatrixWorld();
+      return m.localToWorld(c[0].clone().addScaledVector(ex, u).addScaledVector(ey, v).addScaledVector(n, d || 0));
+    } };
+
   // ---- views ----
   const views = { iso: [1, -1.15, 0.85], front: [0, -1, 0.18], top: [0, -0.001, 1], side: [1, 0, 0.18], back: [-0.6, 1, 0.55] };
   for (const [k, d] of Object.entries(views)) document.getElementById("v-" + k).addEventListener("click", () => frame(d));
@@ -3690,7 +3866,10 @@ body.vr-on .stage { grid-row: 1; }
     hiddenCount: () => hiddenParts.size,
     groupLabel: (k) => (GROUPS.find((g) => g[0] === k) || [0, k])[1],
     scenery: (on) => { shopVR = on; updateShop(); return !!shop; },
-    room: () => (shop ? shopRoom : null) });   // the workshop at 1:1, not on the tabletop
+    room: () => (shop ? shopRoom : null),       // the workshop at 1:1, not on the tabletop
+    poke: ftPoke,
+    carry: { meshes: () => meshes.filter((m) => m.userData.group === "Pendant" && /^Pendant_(case|screen)/.test(m.userData.name)),
+      done: () => move(CTL.mode === "fluidnc" ? CTL.pose : null) } });   // back on its stand
   window.LR4VR.page = vr;
   // ---- automation handle for scripted videos (tools/record_demo.js); nothing on the page uses it ----
   window.LR4Demo = {
@@ -3748,7 +3927,8 @@ body.vr-on .stage { grid-row: 1; }
     homeTick();
     jobTick();
     ctlTick();
-    if (pendant && groupOn("Pendant") && ++frameN % 8 === 0) pendantScreen();
+    if (pendant && groupOn("Pendant") && (FT.ft || ++frameN % 8 === 0)) pendantScreen();
+    ftPopDraw();
     if (vr.active()) vr.tick(dt);
     else { smApply(dt); camStep(); controls.update(); }
     renderer.render(scene, camera);

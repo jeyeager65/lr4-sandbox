@@ -9,8 +9,10 @@
 // Controls:
 //   trigger   press a menu / card button, grab a handle (red sphere = the core, diamond = the table corner), or point
 //             at a part to open its card (name, Hide part, Hide group)
-//   touch     put a controller into a part: its card opens (a buzz says which)
+//   touch     put a controller into a part: its card opens (a buzz says which); into the pendant's screen: a finger
+//             on FluidTouch (api.poke)
 //   grip      hold one: drag the machine around; hold both: pull apart / together to zoom, twist to rotate;
+//             near the pendant (api.carry): pick it up in that hand, poke its screen with the other, let go = back on its stand;
 //             a quick tap of the menu hand's grip shows / hides the menu
 //   stick     left / right = snap turn; 1:1 - forward aims a teleport, let go to jump; tabletop - forward / back zooms
 (function (root) {
@@ -171,11 +173,15 @@
       rig.add(c, grip);
       const st = { c, grip, line, src: null, grab: null, turned: false, aim: null, squeeze: null, touching: null, touchAt: 0 };
       c.addEventListener("connected", (e) => { st.src = e.data; placeMenu(); });
-      c.addEventListener("disconnected", () => { st.src = null; st.squeeze = null; placeMenu(); regrab(); });
+      c.addEventListener("disconnected", () => { putDown(st); st.src = null; st.squeeze = null; placeMenu(); regrab(); });
       c.addEventListener("selectstart", () => press(st));
       c.addEventListener("selectend", () => release(st));
-      c.addEventListener("squeezestart", () => { st.squeeze = { t: performance.now(), p: local(st) }; regrab(); });
+      c.addEventListener("squeezestart", () => {
+        if (pickUp(st)) return;
+        st.squeeze = { t: performance.now(), p: local(st) }; regrab();
+      });
       c.addEventListener("squeezeend", () => {
+        if (putDown(st)) return;
         const q = st.squeeze;
         st.squeeze = null;
         regrab();
@@ -387,6 +393,39 @@
     const pivot = () => mode === "table" ? modelBox().getCenter(new THREE.Vector3()) : head();
 
     // grab the world with the grips: anchors are the world points the hands held when the set of hands changed
+    // carrying the pendant: its meshes (api.carry.meshes(), marked userData.held so the page's move() leaves them) follow
+    // the grip hand, each kept at its offset from the hand when picked up; api.carry.done() puts them back on the stand
+    function pickUp(st, p) {
+      const c = api.carry;
+      if (!c || st.carry || ctrls.some((o) => o.carry)) return false;
+      const ms = c.meshes().filter((m) => m.visible);
+      if (!ms.length) return false;
+      const b = new THREE.Box3();
+      for (const m of ms) { m.updateMatrixWorld(); b.expandByObject(m); }
+      if (!b.expandByScalar(0.04 * S).containsPoint(p || world(st))) return false;
+      st.grip.updateMatrixWorld();
+      const inv = st.grip.matrixWorld.clone().invert();
+      st.carry = ms.map((m) => [m, inv.clone().multiply(m.matrixWorld)]);
+      for (const m of ms) m.userData.held = true;
+      pulse(st, 0.5);
+      return true;
+    }
+    function carryTick(st) {
+      st.grip.updateMatrixWorld();
+      for (const [m, off] of st.carry) {
+        tmpM.multiplyMatrices(st.grip.matrixWorld, off);
+        if (m.parent) tmpM.premultiply(m.parent.matrixWorld.clone().invert());
+        tmpM.decompose(m.position, m.quaternion, m.scale);
+      }
+    }
+    function putDown(st) {
+      if (!st.carry) return false;
+      for (const [m] of st.carry) { m.userData.held = false; m.quaternion.identity(); }
+      st.carry = null;
+      if (api.carry) api.carry.done();
+      return true;
+    }
+
     function regrab() {
       const hands = ctrls.filter((s) => s.squeeze && s.src);
       wgrab = hands.length ? { hands, A: hands.map(world) } : null;
@@ -492,14 +531,17 @@
       let hov = null, chov = null;
       const hovH = new Set(ctrls.filter((s) => s.grab).map((s) => (s.grab.kind === "core" ? coreH : cornerH)));
       for (const st of ctrls) {
-        if (!st.src) { st.line.visible = false; continue; }
+        if (!st.src) { st.line.visible = false; if (api.poke) api.poke(st, null, S); continue; }
         st.line.visible = true;
         let len = 3;
         if (st.grab) drag(st);
         const ph = panelHit(st), hh = !ph && handleHit(st);
         if (ph) { len = ph.d / S; if (ph.b) { if (ph.p === menu) hov = ph.b.id; else chov = ph.b.id; } }
         else if (hh) { len = hh.d / S; hovH.add(hh.o); }
-        if (!st.grab && !st.squeeze && now - st.touchAt > 100) {          // touch, 10 times a second
+        if (st.carry) carryTick(st);
+        const poke = !st.grab && api.poke ? api.poke(st, st.carry ? null : world(st), S) : false;   // the pendant's screen: a finger
+        if (poke === "down") pulse(st, 0.3);
+        if (!poke && !st.grab && !st.squeeze && !st.carry && now - st.touchAt > 100) {          // touch, 10 times a second
           st.touchAt = now;
           const tip = world(st), m = touched(tip);
           if (m && m !== st.touching && m !== cardPart) { pulse(st, 0.6); openCard(m, tip); }
@@ -615,6 +657,12 @@
       zoom: (k) => { zoomAbout(pivot(), k); tick(0); return S; },
       turn: (deg) => { turnAbout(pivot(), deg * Math.PI / 180); tick(0); },
       card: () => cardPart && cardPart.userData.name,
+      poke: (p) => (api.poke ? api.poke("probe", p, S) : false),   // a stand-in finger at p (scene mm)
+      pickUp: (p) => { const ok = pickUp(ctrls[0], p); if (ok) carryTick(ctrls[0]); return ok; },   // the stand-in hand at p
+      carryTick: () => { if (ctrls[0].carry) carryTick(ctrls[0]); },
+      putDown: () => putDown(ctrls[0]),
+      hand: () => ctrls[0].grip.getWorldPosition(new THREE.Vector3()),   // the stand-in hand (scene mm)
+      menu: (on) => { menu.mesh.visible = !!on; },
     };
 
     return { active: () => active, tick, preview, act, probe, rig, state };   // state: what the menu reads from the page
