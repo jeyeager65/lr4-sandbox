@@ -1,8 +1,9 @@
-# Publishes the LowRider 4 Sandbox page to GitHub Pages (jeyeager65.github.io/lr4-sandbox). Manual only, and not enabled:
-# it needs Pages turned on in the repo settings (Source: GitHub Actions) and the share data committed - web/data/
-# is git-ignored until V1E OKs shipping the placements (.gitignore has the line to uncomment).
-# The site is web/index.html + web/js/ + web/data/ (the share data): no V1E geometry,
-# visitors load their own part files.
+# Publishes the LowRider 4 Sandbox page to GitHub Pages (jeyeager65.github.io/lr4-sandbox). Manual only: it needs
+# Pages turned on in the repo settings (Source: GitHub Actions).
+# The site is web/ as committed: index.html, js/, data/ (the share data: no V1E geometry - visitors load their own
+# part files), fluidnc/ + fluidtouch/ (the firmware builds, with their licenses), models/ (the pendant meshes) and
+# coi-serviceworker.js (cross-origin isolation for FluidNC's threads; Pages can't send the headers). viewer.html is
+# left out: it's the FreeCAD model's viewer and needs local exports.
 name: Pages
 
 on:
@@ -26,17 +27,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Check the share data is there
+      - name: Check the site's files are there
         run: |
-          test -f web/data/lr4_config.json || { echo "web/data/ is not committed (see .gitignore)"; exit 1; }
+          for f in web/data/lr4_config.json web/fluidnc/program.wasm web/fluidtouch/fluidtouch.wasm web/coi-serviceworker.js; do
+            test -f "$f" || { echo "$f is missing"; exit 1; }
+          done
           python tools/check_no_parts.py --all
 
       - name: Assemble the site
         run: |
-          mkdir -p _site/data
-          cp web/index.html _site/index.html
-          cp -r web/js _site/
-          cp -r web/data/. _site/data/
+          mkdir -p _site
+          cp -r web/. _site/
+          rm -f _site/viewer.html
 
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3

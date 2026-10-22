@@ -1,4 +1,4 @@
-// Machine sounds in headless Chrome (Parts 21-22): a real click on the toolbar's Sound starts Web Audio; moving X
+// Machine sounds in headless Chrome (Parts 21-22): a real click on the Sound toggle (under ⚙) starts Web Audio; moving X
 // makes its stepper voice sound at the real speed's pitch; Playback homing clicks the switches; a short trace renders
 // to a WAV that isn't silent.
 //   node tests/test_page_sound.js   (not in npm test: needs Chrome + Python)

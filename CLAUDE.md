@@ -20,15 +20,17 @@ across many FreeCAD builds. See README.md for the layout. FreeCAD 1.1, Python 3,
 - **`freecad/fclib/` is a vendored copy.** Don't edit it here. Change the source (the maintainer's FreeCAD workspace,
   `D:/FreeCAD/lib/fclib`), then `python tools/sync_fclib.py`.
 - **No part files in git.** STL / STEP / DXF / OBJ / 3MF / FCStd, and `parts/`, `private/`, `vendor/`, `build/`,
-  `exports/`, `web/data/` are git-ignored, and `tools/check_no_parts.py` is the pre-commit hook. The V1E files are
-  V1E's; users download their own.
-- **Commit or push only when the maintainer asks.** Nothing goes to GitHub until V1E has approved the public version.
+  `exports/` are git-ignored, and `tools/check_no_parts.py` is the pre-commit hook. The V1E files are V1E's; users
+  download their own. `web/data/` is committed: the page's data from `pipeline/share_data.py`, with no V1E geometry.
+- **Commit or push only when the maintainer asks.** V1E has approved the public version; pushing and GitHub Pages
+  still wait for the maintainer's go.
 - **Keep JS and Python rules in step.** The page mirrors several Python rules (`lr4.hose_route` / `cord_route` /
   `jp3_shift` in `web/js/config_model.js`; `calculator.py` / `calculator.js`; `strut_plate.py` / `strut_plate.js`).
   Change both and run the tests.
 - Units: mm inside; the cutting area and table are in inches. Axes: X along the beam, Y along the table (front 0),
   Z up.
-- **Versions:** a user-visible page change bumps `VERSION` in `web/index.html` and gets a CHANGELOG.md entry.
+- **Versions:** a user-visible page change bumps `VERSION` in `web/index.html` and gets a CHANGELOG.md entry; a new
+  feature or a moved control also gets its README.md line (and a new screenshot in `docs/img/` if one shows it).
   CI (`.github/workflows/ci.yml`) runs only what works without part files: the guard, a Python compile, `npm test`.
 
 ## Running
@@ -43,6 +45,12 @@ across many FreeCAD builds. See README.md for the layout. FreeCAD 1.1, Python 3,
   it fails when there are no size builds to compare).
 - Pages: `python tools/serve.py sandbox` / `python tools/serve.py viewer`. Edit the viewer in
   `web/viewer.html` (export_web copies it into exports/web).
+- Page tests: `tests/test_page_*.js` drive headless Chrome (several need `parts/`; the FluidNC ones take minutes).
+  Screenshots: `node tools/page_shot.js <url> <out.png> [--eval js --shot out2.png]...`.
+- Videos: `python tools/serve.py sandbox --no-open`, then `node tools/record_demo.js <file.gcode> [out.mp4]` in the
+  background (~6 min for 2 min of 1080p). The `(Video ...)` comment spec is the header of `tools/demo_script.js`;
+  README's table follows it, so update both. Example: `docs/examples/feature_demo.gcode`. Send the video to the
+  maintainer rather than analysing it; over 30 MB, send a CRF 30 copy.
 
 ## Keeping context small
 
