@@ -1,4 +1,4 @@
-// Screenshot a page in headless Chrome over CDP (the configurator stalls under --virtual-time-budget, so no
+// Screenshot a page in headless Chrome over CDP (the sandbox page stalls under --virtual-time-budget, so no
 // --screenshot): waits for #status to hide (and for files loaded by ?parts= to settle), runs optional JS, saves PNGs.
 //   node tools/page_shot.js <url> <out.png> [--size 1500x1000] [--eval "js" --shot out2.png]... [--mobile]
 // Each --eval runs (awaited) after the load; a --shot after it takes another picture. Logs console errors.

@@ -1,8 +1,8 @@
 {
   "name": "lr4-sandbox-tests",
-  "version": "0.16.0",
+  "version": "0.17.0",
   "private": true,
-  "description": "Tests for the LR4 Sandbox configurator (web/js) and its Python twins",
+  "description": "Tests for the LowRider 4 Sandbox page (web/js) and its Python twins",
   "license": "MIT",
   "type": "commonjs",
   "scripts": {

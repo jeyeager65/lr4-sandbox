@@ -1,4 +1,4 @@
-# Publishes the configurator to GitHub Pages (jeyeager65.github.io/lr4-sandbox). Manual only, and not enabled:
+# Publishes the LowRider 4 Sandbox page to GitHub Pages (jeyeager65.github.io/lr4-sandbox). Manual only, and not enabled:
 # it needs Pages turned on in the repo settings (Source: GitHub Actions) and the share data committed - web/data/
 # is git-ignored until V1E OKs shipping the placements (.gitignore has the line to uncomment).
 # The site is web/index.html + web/js/ + web/data/ (the share data): no V1E geometry,

@@ -1,7 +1,33 @@
 # Changelog
 
-The version is the configurator page's (`VERSION` in `web/index.html`, shown in its footer). The footer also shows
+The version is the sandbox page's (`VERSION` in `web/index.html`, shown in its footer). The footer also shows
 the date the model data was built and the Printables file set it was solved for.
+
+## 0.17.0 - 2026-10-21
+- Renamed: the page is **LowRider 4 Sandbox** (was "LowRider 4 Configurator"); `python tools/serve.py sandbox`
+  (`configurator` still works).
+- Z's bottom stop: the Z coupler now sits where V1E's YZ plate guide puts it (it was 5 mm high, which stopped Z
+  early). The bit sticks out 20 mm (a default). Z travel -32.31 .. 71.01 mm; the bit reaches 2.5 mm below the table
+  top, so the strut job's cut into the spoil board is in reach. Playback holds Z at its bottom stop and says how far
+  short a job is.
+- The workshop is the maintainer's shop: 16 x 20 ft, 8' 4" ceiling, gable roof with architectural shingles, grey-green
+  siding, benches at the machine's home end (tools on one pegboard, a computer on the other bench), a high window
+  between them, the front wall's windows and entry door, an open 8 x 7 ft sectional door on its ceiling tracks, OSB
+  inside. From far away it's the closed building. Blank building size = this shop.
+
+## 0.16.0 - 2026-10-21
+- FluidNC mode homes ($H) and probes (G38.2, a touch plate under the bit) on simulated switches that trip on each
+  motor's own step count; speed 1x / 2x / 5x / 10x. The model follows the motors; a jog pad replaces the sliders;
+  MPos is greyed until homed.
+- The Playback readout's "Tip" is now "Z", 0 at Z's homed spot.
+
+## 0.15.0 - 2026-10-21
+- Run tab: "Runs on Playback | FluidNC". FluidNC mode boots FluidNC with a copy of the config.yaml in use (plain
+  stepper drivers, pins renumbered; rates, travel and homing as in yours). A new size or config.yaml restarts it.
+
+## 0.14.0 - 2026-10-21
+- FluidNC itself runs in the page (its wasm port, from a fork's `wasm-sim` branch; GPL-3.0, `web/fluidnc/`), with a
+  console in the Run tab. The page is cross-origin isolated (COOP / COEP; on GitHub Pages via coi-serviceworker).
 
 ## 0.13.0 - 2026-10-20
 - Home ($H): a Home button (Run tab, the canvas toolbar and the VR menu) homes the machine as FluidNC does with V1E's

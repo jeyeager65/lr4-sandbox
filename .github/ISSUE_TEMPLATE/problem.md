@@ -5,7 +5,7 @@ title: "[size] "
 labels: bug
 ---
 
-<!-- The configurator's "Report a problem" link fills in the details below for you. -->
+<!-- The sandbox page's "Report a problem" link fills in the details below for you. -->
 
 **What happened:**
 

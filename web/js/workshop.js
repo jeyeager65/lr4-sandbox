@@ -12,7 +12,7 @@
 // Inside walls and the ceiling are one-sided, facing in; each wall has an outside skin WALL_T further out, facing out.
 // cutaway(): from close by (the desktop orbit view) the walls the camera is outside of vanish with the roof, dollhouse
 // style; from far away (past CLOSE_AT x the building's diagonal) it's the closed building; standing inside (VR at 1:1)
-// it's a room. Not in the configurator's parts: no picking, fit or touch.
+// it's a room. Not in the page's parts: no picking, fit or touch.
 // The room is the user's building size (centered on the machine), blank = DEFAULT.
 //   LR4Shop.room(table, machine, size) -> { x0, x1, y0, y1, h, gaps: { left, right, front, back, top } }
 //   LR4Shop.build(THREE, { room, table, machine, floor }) -> THREE.Group; LR4Shop.dispose(group); LR4Shop.cutaway(group, cam)

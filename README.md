@@ -1,7 +1,7 @@
 # LR4 Sandbox
 
 A full 3D model of the [V1 Engineering LowRider 4](https://docs.v1e.com/lowrider/) CNC, built from the real printed
-part files and sized to any cutting area, plus a browser configurator that shows the whole machine, cut list, strut
+part files and sized to any cutting area, plus a browser sandbox page, **LowRider 4 Sandbox**, that shows the whole machine, cut list, strut
 plates and bill of materials for your size.
 
 > **Status: work in progress, not released.** This is an independent fan project. It is not made, endorsed or
@@ -12,12 +12,12 @@ plates and bill of materials for your size.
 
 | | |
 |---|---|
-| **Configurator** (`web/index.html`) | Enter a cutting area and the page builds the machine in 3D: every printed part, rail, belt, bolt, the strut plates and the vacuum hose. It also gives the cut list, the strut plate outlines and the BOM. |
+| **LowRider 4 Sandbox** (`web/index.html`) | Enter a cutting area and the page builds the machine in 3D: every printed part, rail, belt, bolt, the strut plates and the vacuum hose. It also gives the cut list, the strut plate outlines and the BOM. |
 | **FreeCAD model** (`freecad/`) | Scripts that assemble the LowRider 4 in [FreeCAD](https://www.freecad.org/) from the official STLs. Every part is placed by its measured mating features (hole patterns, pockets), and every fastener is checked for seat, engagement and collisions. Outputs: an FCStd assembly, a BOM, strut plate DXF/SVG and G-code. |
-| **Pipeline** (`pipeline/`) | Builds the model at many sizes and fits how each part moves with the size. That is how the configurator can draw any size without FreeCAD. |
+| **Pipeline** (`pipeline/`) | Builds the model at many sizes and fits how each part moves with the size. That is how the page can draw any size without FreeCAD. |
 
 The printed parts are **not** in this repo. They are V1 Engineering's (and other designers') files. You download
-them yourself from Printables, and the model and configurator place your copies:
+them yourself from Printables, and the model and the page place your copies:
 
 | Folder in `parts/` | Source |
 |---|---|
@@ -31,7 +31,7 @@ which are missing or differ (a different version is still used, with a warning).
 
 ## Two ways to use it
 
-1. **In the browser (light).** Open the configurator (GitHub Pages, once it's published), download the four
+1. **In the browser (light).** Open the sandbox page (GitHub Pages, once it's published), download the four
    Printables zips above and drop them on the page. Nothing to install; the files stay in your browser. You get
    the 3D machine at your size, the cut list, the BOM, strut plate DXF / SVG / G-code and a FluidNC `config.yaml`.
 2. **The FreeCAD scripts (heavy).** Clone the repo, unzip the same downloads into `parts/` (folders as in the
@@ -55,10 +55,10 @@ python tools/serve.py viewer                 # look at it in the browser
 top of `freecad/build.py` (`CUT_X_IN`, `CUT_Y_IN`). Output goes to `build/` (FCStd, BOM) and `exports/`
 (strut plates, G-code, web data).
 
-## Running the configurator locally
+## Running the sandbox page locally
 
 ```sh
-python tools/serve.py configurator 48x96     # optional size in inches
+python tools/serve.py sandbox 48x96          # optional size in inches
 ```
 
 With the share data the page draws only our hardware until you give it the part files: drop the Printables zips,
@@ -84,7 +84,7 @@ how much room it takes: the page gives the gap from the machine to each wall and
 cd tests && npm install                      # once
 npm test                                     # what CI runs (no part files needed)
 npm run test:local                           # all the node tests below
-node test_config_model.js                    # the configurator's machine vs every FreeCAD size build
+node test_config_model.js                    # the page's machine vs every FreeCAD size build
 node test_calculator.js                      # the JS and Python calculators agree (needs python)
 node test_vr.js                              # the VR menu layout and helpers
 node test_strut_cam.js                       # the page's strut plate G-code; vs freecad/cam.py if its goldens exist
@@ -109,8 +109,8 @@ opens a GitHub issue with your size and file checksums filled in. Questions abou
 ```
 freecad/    the model: build.py, lr4.py (measured placements), hardware.py, bom.py, checks, export, CAM
   fclib/    shared FreeCAD helpers (vendored copy)
-web/        the pages: index.html (configurator), viewer.html, js/
-pipeline/   FreeCAD builds -> configurator data
+web/        the pages: index.html (the sandbox page), viewer.html, js/
+pipeline/   FreeCAD builds -> the page's data
 tests/      node tests, test_strut_plate.py, test_share.py, test_parts_files.js
 tools/      run.py, serve.py, repo tools (sync_fclib, check_no_parts, check_parts, page_shot = headless screenshots,
             build_fluidnc_wasm = FluidNC for the browser -> web/fluidnc/)
@@ -138,7 +138,7 @@ stops STL, STEP, DXF and FCStd files from being committed.
 ### Built with Claude
 
 Most of this repo was written with [Claude Code](https://claude.com/claude-code) (Anthropic), working with the
-maintainer. That includes the FreeCAD scripts, the part placement solving, the configurator and its tests. The
+maintainer. That includes the FreeCAD scripts, the part placement solving, the sandbox page and its tests. The
 maintainer checked the model against V1E's build photos and real measurements. [`CLAUDE.md`](CLAUDE.md) holds the
 instructions Claude follows when working in this repo.
 

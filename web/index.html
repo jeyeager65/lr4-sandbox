@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>LowRider 4 Configurator</title>
+<title>LowRider 4 Sandbox</title>
 <!-- cross-origin isolation for FluidNC in the browser (SharedArrayBuffer) on a host that can't send COOP / COEP
      (GitHub Pages): the service worker adds them, after one reload on the first visit. credentialless keeps the
      CDN scripts and fonts loading. tools/serve.py sends the headers itself, and then the worker stays out. -->
@@ -190,7 +190,7 @@ dialog.bom::backdrop { background: rgb(0 0 0 / 0.45); }
 .bom-body td.num { font-family: var(--font-data); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .bom-body td.ok { color: var(--muted); }
 .bom-body td.bad { color: var(--accent); font-weight: 500; }
-/* configurator: size inputs, cut list, strut plate drawing */
+/* the size inputs, cut list, strut plate drawing */
 h1 span { color: var(--accent); }
 .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 4px; overflow: hidden; align-self: flex-start; }
 .seg button { border: 0; border-radius: 0; padding: 5px 12px; font: 600 12px var(--font-display); letter-spacing: 0.06em; }
@@ -294,7 +294,7 @@ body.vr-on .stage { grid-row: 1; }
 
 <aside class="panel">
   <header>
-    <h1>LowRider 4 <span>Configurator</span></h1>
+    <h1>LowRider 4 <span>Sandbox</span></h1>
     <div class="sub" id="sub">V1E LowRider 4, built to your cutting area. Every printed part is the official STL, placed from its holes.</div>
   </header>
 
@@ -884,7 +884,7 @@ body.vr-on .stage { grid-row: 1; }
     return out.buffer;
   }
 
-  // ---- configurator: the machine at the chosen size. lr4_config.json (fit_config.py) holds each part's mesh once,
+  // ---- the machine at the chosen size. lr4_config.json (fit_config.py) holds each part's mesh once,
   // at the 26 x 50 in reference build, and how its position follows the size; config_model.js turns a size into
   // instances (offset + per-axis scale). The strut plates are drawn from the JS generator. ----
   const WING = 11.5, DOGBONE = 3.5, STRUT_T = 6.35;   // build.py: 1" EMT wings, 1/8" bit, 1/4" MDF
@@ -2124,7 +2124,7 @@ body.vr-on .stage { grid-row: 1; }
     tip: () => meta && meta.tip_above_table, TOUCH_PLATE, sync: () => ctlTick(), homed: () => CTL.homed };
 
   // ---- version + feedback: the issue link carries the size, data date and the loaded files' checksums ----
-  const VERSION = "0.16.0";
+  const VERSION = "0.17.0";
   function setupAbout() {
     const bits = [`lr4-sandbox ${VERSION}`];
     if (cfg.built) bits.push(`model data built ${cfg.built}`);

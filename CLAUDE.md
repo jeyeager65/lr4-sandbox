@@ -1,6 +1,6 @@
 # LR4 Sandbox - notes for Claude
 
-A V1 Engineering LowRider 4 modelled in FreeCAD from the official STLs, plus a browser configurator fed by fits
+A V1 Engineering LowRider 4 modelled in FreeCAD from the official STLs, plus a browser sandbox page (LowRider 4 Sandbox) fed by fits
 across many FreeCAD builds. See README.md for the layout. FreeCAD 1.1, Python 3, Node for tests.
 
 ## Start here
@@ -38,10 +38,10 @@ across many FreeCAD builds. See README.md for the layout. FreeCAD 1.1, Python 3,
   `LR4_CHECK=0` skips the overlap check while iterating.
 - Heavy work (builds, CAM, section sweeps, size builds) runs headless, never in the FreeCAD GUI: a long GUI call
   freezes it. Headless FCStd files carry no colours; open them in the GUI with `fclib.view.open_build`.
-- After a model change that the configurator shows: `python pipeline/size_builds.py` (~55 min) ->
+- After a model change that the sandbox page shows: `python pipeline/size_builds.py` (~55 min) ->
   `python pipeline/fit_config.py` -> `node tests/test_config_model.js` (must print "all N sizes match";
   it fails when there are no size builds to compare).
-- Pages: `python tools/serve.py configurator` / `python tools/serve.py viewer`. Edit the viewer in
+- Pages: `python tools/serve.py sandbox` / `python tools/serve.py viewer`. Edit the viewer in
   `web/viewer.html` (export_web copies it into exports/web).
 
 ## Keeping context small

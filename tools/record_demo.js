@@ -1,9 +1,9 @@
-// Record a demo video of the configurator: a turn round the workshop, a turn round the LR4, then a G-code file
+// Record a demo video of the sandbox page: a turn round the workshop, a turn round the LR4, then a G-code file
 // running on it (the view framed on its stock; probe close-ups as the page does them; each M0 popup shown, then
 // resumed after --pause seconds), and at the end the gantry driven to the back to show the result. QHD by default. The page's clock (performance.now) is taken over and stepped one
 // frame at a time, so the video runs at true speed however long each frame takes to render. Frames are JPEGs piped
 // into ffmpeg (H.264 MP4).
-//   python tools/serve.py configurator        (serves the repo on 127.0.0.1:8767; the page loads parts/)
+//   python tools/serve.py sandbox             (serves the repo on 127.0.0.1:8767; the page loads parts/)
 //   node tools/record_demo.js <file.nc> [out.mp4] [--size 2560x1440] [--fps 30] [--job 75] [--pause 2] [--orbit 10]
 //        [--url http://127.0.0.1:8767/web/index.html?parts=/parts/] [--swiftshader]
 // --job: seconds of video for the job's moves (sets the playback speed; pauses and probes come on top).

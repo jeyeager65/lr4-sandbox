@@ -1,4 +1,4 @@
-// VR mode for the configurator: WebXR in three r147, PC VR through SteamVR / OpenXR (PS VR2, Index, Quest Link).
+// VR mode for the sandbox page: WebXR in three r147, PC VR through SteamVR / OpenXR (PS VR2, Index, Quest Link).
 // Opt-in: the "Enter VR" button shows only when the browser offers immersive-vr (https or 127.0.0.1). One scene, two UIs:
 // the in-world menu drives the page's own controls (units, size inputs, braces, part groups, Peter Plates, travel
 // sliders), so the desktop page keeps the same state and leaving VR finds it as VR left it. While VR is on the desktop
