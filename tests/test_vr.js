@@ -65,17 +65,18 @@ for (const s of [state(), state({ unit: "mm", mode: "table", peter: [] }), state
   ok(V.twoHand([0, 0, 0], [1, 0, 0], [0, 0, 0], [1e9, 0, 0]).s === 40000, "scale clamped");
 }
 ok(V.fmtScale(1000) === "1:1" && V.fmtScale(3000) === "1:3.0" && V.fmtScale(500) === "2.0:1", "scale label");
-{ // the workshop room: auto margins round the table, or the building size centered on the machine; gaps to the walls
+{ // the workshop room: the user's 16 x 20 ft shop by default, or the building size, centered on the machine; gaps to the walls
   const table = { x0: 0, x1: 1500, y0: 0, y1: 2800 }, machine = { x0: -100, x1: 1650, y0: -20, y1: 2800, z1: 1100 };
   const a = Shop.room(table, machine, null);
-  ok(a.x0 === -Shop.MARGIN.x && a.y1 === 2800 + Shop.MARGIN.back && a.h === Shop.HEIGHT, "auto room");
+  ok(Math.abs(a.x1 - a.x0 - Shop.DEFAULT.w) < 1e-9 && Math.abs(a.y1 - a.y0 - Shop.DEFAULT.d) < 1e-9 && a.h === Shop.DEFAULT.h &&
+    Math.abs(a.gaps.left - a.gaps.right) < 1e-9 && Math.abs(a.gaps.front - a.gaps.back) < 1e-9, "default room: 16 x 20 ft, 8 ft, centered");
   const r = Shop.room(table, machine, { w: 3048, d: 4267.2, h: 2743.2 });
   ok(Math.abs(r.x1 - r.x0 - 3048) < 1e-9 && Math.abs(r.gaps.left - r.gaps.right) < 1e-9, "building centered in X");
   ok(Math.abs(r.gaps.front - r.gaps.back) < 1e-9 && Math.abs(r.gaps.top - (2743.2 - 1100)) < 1e-9, "centered in Y, headroom");
   ok(Math.abs(r.gaps.left - (3048 - 1750) / 2) < 1e-9, "X gap");
   ok(Shop.room(table, machine, { w: 1500 }).gaps.left < 0, "too narrow: negative gap");
   const mixed = Shop.room(table, machine, { d: 5000 });
-  ok(mixed.x0 === -Shop.MARGIN.x && Math.abs(mixed.y1 - mixed.y0 - 5000) < 1e-9, "blank X stays auto");
+  ok(Math.abs(mixed.x1 - mixed.x0 - Shop.DEFAULT.w) < 1e-9 && Math.abs(mixed.y1 - mixed.y0 - 5000) < 1e-9, "blank X stays the default");
 }
 ok(V.snap(1231.3, IN / 2) === 1231.9 || Math.abs(V.snap(1231.3, IN / 2) - 97 * IN / 2) < 1e-9, "snap to 1/2 in");
 ok(V.clampCut(50) === 200 && V.clampCut(5000) === 4000 && V.clampCut(1000) === 1000, "cut limits");

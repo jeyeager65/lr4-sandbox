@@ -119,7 +119,9 @@ STOPS = dict(
     x_end=73.0,      # X_s0 + strut - tool X at the Max end: core on XZ_Plate_Max
     b_home=138.21 - SW_CLICK,  # b at the Z trip (beam up): XZ plates on the Endstop_Z levers (138.21 = first touch);
                      # the MGN carriages hit the YZ plates 6 mm past first touch
-    b_low=238.05,    # b at the bottom: Z brass nut M3s on the couplers
+    b_low=239.53,    # b at the bottom: StrutPlate_Bottom's Max end on BackWheel_Max (its housing reaches 9.7 mm inside the
+                     # XZ plate); then the MGN carriages on the YZ plates (+1.7), the Z nut M3s on the couplers (+3.5).
+                     # 2026-10-21: coupler moved down to V1E's guide (was 238.05, the nut on a too-high coupler)
 )
 WHEEL_BOTTOM_PY = 238.94         # Min plate print y of the lowest bearing bottom (M8 axle + 11): table top.
                                  # Wheels flush on their screw seats: front axle py 227.68, back 227.94 -> the
@@ -260,7 +262,8 @@ ZSTOPS = {"ZStop_Min": (57.625, -43.704, 25.3), "ZStop_Max": (57.625, 43.704, 25
 # The head sits square to the core (user 2026-10-19): switch / dial end toward machine +X (Kobalt frame 90 deg), cord
 # end toward the Min end; the button then points 38.5 - 90 = -51.5 deg from the switch end, into the notch.
 KOBALT_NOTCH = dict(deg=38.5, button_z=43.0)    # button centre (boss d 16.8: bottom on the notch's at z 34.6)
-ROUTER = dict(nut_z=43.0 - 25.0, bit_out=16.0, cord_out=15.0, switch_deg=90.0)   # nut bottom (Kobalt z), bit stick-out (photo; set
+ROUTER = dict(nut_z=43.0 - 25.0, bit_out=20.0, cord_out=15.0, switch_deg=90.0)   # nut bottom (Kobalt z), bit stick-out (a
+# default, user 2026-10-21: varies with the bit - a deeper cut = a longer bit further out; was 16 from a photo; set
 ROUTER["tip_z"] = ROUTER["nut_z"] - ROUTER["bit_out"]           # yours), cord stub (the rest is routed - CORD)
 ROUTER_AXIS_IN_KOBALT = (-0.8, 0.0)   # mount bore centre in the Kobalt frame (circle fit, both rings: d 66.7)
 # Tiny Touch Plate storage (user 2026-10-19: it clips into the top router holder): Tool_Mount_T_Kobalt has a sprung

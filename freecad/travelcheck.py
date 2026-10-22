@@ -26,6 +26,7 @@ MAXLEN = 2500.0                                   # look this far each way
 SKIP = ("Vac_Hose", "Router_Cord", "Cable_Sleeve", "Stepper_Lead", "Bristles")
 SLIDE = {0: ("X_Rail",), 1: ("Y_Rail", "TableMDF"), 2: ("MGN12_Rail", "MGN_Rail", "Z_Lead", "Leadscrew")}
 MOVES = {0: ("core",), 1: ("gantry", "beam", "core"), 2: ("beam", "core")}
+CUTS = {2: ("Router_Bit",)}                       # Z: the bit cuts into the stock / spoil board - not a stop
 
 t0 = time.time()
 doc = App.openDocument(os.path.join(ROOT, "build", "LowRider4.FCStd"))
@@ -122,7 +123,7 @@ AXES = os.environ.get("LR4_AXES", "XYZ").upper()   # LR4_AXES=Y: just Y
 for k, ax in enumerate("XYZ"):
     if ax not in AXES:
         continue
-    mv = [p for p in parts if p["motion"] in MOVES[k]]
+    mv = [p for p in parts if p["motion"] in MOVES[k] and not p["name"].startswith(CUTS.get(k, ()))]
     fx = [p for p in parts if p["motion"] not in MOVES[k] and not p["name"].startswith(SLIDE[k])]
     for s, sg in ((-1, "-"), (1, "+")):
         found = []

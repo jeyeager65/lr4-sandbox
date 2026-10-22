@@ -76,6 +76,9 @@ JP3_BOARD_RECOLOUR = (((0.62, 0.62, 0.36), (0.10, 0.33, 0.72)),   # (OBJ colour,
                       ((0.29, 0.66, 0.33), (0.07, 0.07, 0.08)))   # green terminal plugs -> black (user photo 2026-10-19)
 STEPPER_LEADS = 12.0   # mm of the 4 stepper leads drawn past their bushing (0 = none; real ones are 1 m)
 Z_SHAFT = 24.0         # Z stepper shaft length from its face (V1E: 20 mm+; hw.nema17 default 24) - MEASURE YOURS
+                       # (only where the leadscrew's end sits inside the coupler; the coupler goes by the plate)
+Z_COUPLER_ABOVE = 6.5  # Z coupler bottom above the motor face: V1E yzz1 lines it up on the YZ plate's guide, just
+                       # clear of the 6.0 mm motor wall (photo, ~ +-1). Its top stops the Z nut = Z's bottom stop
 CHECK = None           # overlap checks (~10 min): None = only when run headless
 # -----------------------------------------------------------------------------------------
 
@@ -292,10 +295,11 @@ for side, plate in (("Min", pl_yz_min), ("Max", pl_yz_max)):
     zface = my(177.67)
     add_stepper(f"Z_Stepper_{side}", plate.multiply(hw.along((lr4.LEADSCREW_PX, zface, lr4.LEADSCREW_PZ), up)),
                 f"YZ_{side}", shaft=Z_SHAFT)
-    # 5-8 mm helical coupler (D19 x 25) centred on the joint: the leadscrew sits on the 24 mm motor shaft's end
-    # (V1E yzz6a: "fully seated and touching the stepper shaft"), 2 set screws per hub (2026-10-19: was a plain
-    # cylinder on the motor boss with the leadscrew starting 10 mm down inside the shaft)
-    cp = hw.helical_coupler(plate.multiply(hw.along((lr4.LEADSCREW_PX, zface - s * (Z_SHAFT - 12.5), lr4.LEADSCREW_PZ), up)))
+    # 5-8 mm helical coupler (D19 x 25), its bottom Z_COUPLER_ABOVE over the motor face (V1E yzz1: the plate's
+    # guide; 2026-10-21: was centred on the shaft's end, 5 mm higher, which stopped Z 5 mm short); the leadscrew
+    # sits on the motor shaft's end inside it (V1E yzz6a: "fully seated and touching the stepper shaft"), 2 set
+    # screws per hub
+    cp = hw.helical_coupler(plate.multiply(hw.along((lr4.LEADSCREW_PX, zface - s * Z_COUPLER_ABOVE, lr4.LEADSCREW_PZ), up)))
     m.add(f"Z_Coupler_{side}", cp["body"], group=f"YZ_{side}", colour=hw.ALUMINIUM)
     m.add(f"Z_Coupler_{side}__grubs", cp["grubs"], group="Hardware", colour=hw.BLACK)
     p0 = plate.multVec(V(lr4.LEADSCREW_PX, zface - s * Z_SHAFT, lr4.LEADSCREW_PZ))

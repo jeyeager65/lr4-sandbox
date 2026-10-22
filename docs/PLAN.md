@@ -86,7 +86,9 @@ plates, front_wing_size 11.5 (1" EMT). Plates 830 x 90.5 (front) and 830 x 78.5 
 | 1/8" bit | 1-flute upcut, 12 mm flutes, 38 mm long | GUESS - MEASURE |
 | Power supply | 150 x 60 x 32 mm brick | GUESS |
 | Bottom temp strut orientation | both ends the same way round, bed face down, small d 3.5 hole at the back edge | GUESS from beam5 (`lr4.TEMP_STRUT_FRAMES`); front ones from the notches (B4/B5) |
-| Z stepper shaft | 24 mm from the face (`Z_SHAFT`) | GUESS - V1E says 20 mm+; MEASURE (sets the coupler / leadscrew height) |
+| Z stepper shaft | 24 mm from the face (`Z_SHAFT`) | GUESS - V1E says 20 mm+; only where the leadscrew's end sits in the coupler |
+| Z coupler | bottom 6.5 mm above the motor face (`Z_COUPLER_ABOVE`): V1E yzz1, on the plate's guide, just clear of the 6 mm wall | from a photo (~ +-1); its top is the nut's stop, near Z's bottom stop |
+| Bit stick-out | 20 mm below the collet nut (`lr4.ROUTER["bit_out"]`) | a default (user 2026-10-21): varies with the bit - a deeper cut, a longer bit further out |
 | Vacuum hose | Fulton 2-1/2" x 20 ft clear PVC, steel wire (user's) - 73 mm OD | OD GUESS - MEASURE (`lr4.HOSE['od']`) |
 | Endstop lever | Omron SS-3GL13PT 19.8 x 10.0 body, hinge 2.7 in, curl 1.0 past the body, crest 6.5 free / 4.5 at the click (`hw.SS_GL13`) | MEASURED 2026-10-20; lever width + curl shape still from the photo |
 | Y stop screws | backed out 5 mm (`lr4.Y_STOP_OUT`) - sets Y home, clicks ~3 mm before the wheels hit the front holders | CHOICE - set on the machine |

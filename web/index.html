@@ -1238,7 +1238,7 @@ body.vr-on .stage { grid-row: 1; }
     const R = LR4Shop.room(table, machine, ROOM), g = R.gaps, auto = !(ROOM.w && ROOM.d && ROOM.h);
     shopRoom = R;
     if (shopVR) { shop = LR4Shop.build(THREE, { room: R, table, machine, floor }); scene.add(shop); }
-    note.textContent = `Room ${roomLen(R.x1 - R.x0)} \u00d7 ${roomLen(R.y1 - R.y0)}, ${roomLen(R.h)} ceiling${auto ? " (blank = auto)" : ""}, ` +
+    note.textContent = `Room ${roomLen(R.x1 - R.x0)} \u00d7 ${roomLen(R.y1 - R.y0)}, ${roomLen(R.h)} walls${auto ? " (blank = a 16 × 20 ft shop, 8′ 4″ ceiling)" : ""}, ` +
       `machine centered. To the walls: X sides ${roomLen(g.left)} / ${roomLen(g.right)}, front ${roomLen(g.front)}, ` +
       `back ${roomLen(g.back)}; ${roomLen(g.top)} above it.`;
     const warn = [], side = { left: "on the \u2212X side", right: "on the +X side", front: "at the front", back: "at the back" };
@@ -1921,8 +1921,8 @@ body.vr-on .stage { grid-row: 1; }
   // plate (checkbox: on the strut job's stock) trips the probe at the bit's end on it. The jog pad jogs ($J=G91);
   // Home sends $H. Until it has homed, its MPos is greyed: it doesn't know where it is. Machine speed = FluidNC's time scale. A new size or
   // config.yaml restarts it. window.LR4FluidNC = the running sim. ----
-  // the touch plate: on the strut job's stock (strut_cam: 6.35 mm MDF, a 0.5 mm Tiny Touch Plate) - the tip can't
-  // reach the table itself (~2.9 mm above it at the bottom of Z)
+  // the touch plate: on the strut job's stock (strut_cam: 6.35 mm MDF, a 0.5 mm Tiny Touch Plate), where you'd
+  // probe; Part 17 puts it on the job's own stock
   const TOUCH_PLATE = { stock: StrutCam.DEFAULTS.t, plate: StrutCam.DEFAULTS.plate };
   function ctlAdd(text, cls) {
     const log = $("ctl-log"), d = document.createElement("div");
@@ -2560,19 +2560,32 @@ body.vr-on .stage { grid-row: 1; }
     const mx = clamp(p.x + tv.x[0], tv.x), my = clamp(p.y + tv.y[0], tv.y);
     // the bit turns while the job runs, but not with the touch plate out (the router is off for the probe)
     JOB.spinning = JOB.playing && !probing;
-    move([mx, my, at[2] + p.z - tableZ - meta.tip_above_table]);
+    // Z too stops at its bottom stop (the Z nut on the couplers): a job asking for more is cut short there - the bit
+    // needs to stick out further (jobZShort says how much; the carving still follows the file)
+    const zLow = tv.z[0] + tableZ + meta.tip_above_table - at[2];   // the lowest work Z the bit reaches
+    const pz = Math.max(p.z, zLow);
+    move([mx, my, at[2] + pz - tableZ - meta.tip_above_table]);
     if (JOB.bits) {
       const sg = tl.segs[Math.min(p.index, tl.segs.length - 1)], b = JOB.bits.get(sg.toolNumber) || JOB.bits.values().next().value;
       for (const q of JOB.bits.values()) q.visible = q === b;
-      if (b) { b.position.set(at[0] + mx - tv.x[0], at[1] + my - tv.y[0], at[2] + p.z); b.rotation.z = JOB.spinning ? JOB.spin : 0; }
+      if (b) { b.position.set(at[0] + mx - tv.x[0], at[1] + my - tv.y[0], at[2] + pz); b.rotation.z = JOB.spinning ? JOB.spin : 0; }
     }
     $("wx").textContent = p.x.toFixed(1); $("wy").textContent = p.y.toFixed(1); $("wz").textContent = p.z.toFixed(2);
     $("job-t").value = Math.round(JOB.t / tl.total * 1000);
     $("job-o").textContent = clock(JOB.t);
     const m = GcodePlay.message(tl, JOB.t), done = JOB.t >= tl.total;
-    $("job-status").textContent = `${done ? "Done. " : ""}${m ? m.text : ""}`;
+    const short = jobZShort(tl, zLow);
+    $("job-status").textContent = `${done ? "Done. " : ""}${m ? m.text : ""}` + (short > 0.05 ? ` This job goes ` +
+      `${short.toFixed(1)} mm below the bottom of Z: the bit needs to stick out that much further.` : "");
     $("job-install").hidden = !(done && JOB.src.kind === "page");
     if (done) jobPlaying(false);
+  }
+  function jobZShort(tl, zLow) {                     // how far the job's lowest Z is below the reach (cached per job)
+    if (JOB.zMinFor !== tl) {
+      JOB.zMinFor = tl;
+      JOB.zMin = Math.min(...tl.segs.map((q) => Math.min(q.start.z, q.end.z)));
+    }
+    return zLow - JOB.zMin;
   }
   function jobPlaying(on) {
     JOB.playing = on && !!JOB.tl && JOB.t < JOB.tl.total;
