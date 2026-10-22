@@ -3,6 +3,12 @@
 The version is the sandbox page's (`VERSION` in `web/index.html`, shown in its footer). The footer also shows
 the date the model data was built and the Printables file set it was solved for.
 
+## Unreleased
+- `(Video Inspect: ID=core TIME=1.5 ORBIT=8 EXPLODE=0.6 SECTION=x@0.5 FLIP=on)`: the inspect view in a video - the
+  camera blends to its framing, explode and section animate over TIME, ORBIT turns round it, `ID=off` goes back.
+  Each line runs with the job held.
+- The inspect view hides the M0 pause popup, the message bar and the video's speed badge (back with Back).
+
 ## 0.29.0 - 2026-10-22
 - Video scripts set the machine: `(Video: TABLE=34in ROOM=16x20x9ft BRACES=6 STRUTS=temp PETER=none ROUTER=off
   SKIRT=off HOSE=off FAN=off MAIN=#rrggbb ACCENT=#rrggbb)` (with MACHINE=26x50 as before), and `(Video Show:

@@ -241,6 +241,35 @@ const PAGE_REC = `(() => {
       } };
     };
 
+    // (Video Inspect:): runs its own frames (mid-job, the job holds meanwhile). ID opens the page's inspect view and the
+    // camera blends to the page's framing of it (ID=off: back to the machine and the camera from before the first one);
+    // EXPLODE / SECTION animate over TIME; ORBIT turns once round it. -> the camera at the end
+    let inspBack = null;
+    const inspectCmd = async (cmd, start) => {
+      const q = DS.inspectOf(cmd);
+      let to = start;
+      if (q.id && /^off$/i.test(q.id)) { await val("LR4Inspect.close()"); to = inspBack || start; inspBack = null; }
+      else if (q.id) {
+        if (!inspBack) inspBack = start;
+        const got = await val(`(() => { LR4Inspect.open(${JSON.stringify(q.id)}); return LR4Inspect.id(); })()`);
+        if (got !== q.id) console.log(`(Video): line ${cmd.line}: Inspect doesn't know ${q.id}`);
+        to = await val("[LR4Demo.camera.position.toArray(), LR4Demo.controls.target.toArray()]");   // the page's framing
+        if (q.dist) to = from(to[1], to[0].map((v, i) => v - to[1][i]), q.dist);
+      }
+      const st0 = await val("LR4Inspect.tools.state()"), sec = q.section;
+      const secFrom = sec && sec !== "off" ? (st0.axis === sec.axis && st0.flip === q.flip ? st0.at : q.flip ? 0 : 1) : null;   // from uncut
+      if (sec === "off") await val("LR4Inspect.tools.section('')");
+      console.log(`inspect ${q.id || ""}${q.explode !== undefined ? ` explode ${q.explode}` : ""}${sec ? ` section ${sec === "off" ? "off" : sec.axis + "@" + sec.at}` : ""}`);
+      for (let f = 0, bf = n(q.secs); f < bf; f++) {
+        const k = ease((f + 1) / bf);
+        if (q.explode !== undefined) await val(`LR4Inspect.tools.explode(${st0.explode + (q.explode - st0.explode) * k})`);
+        if (secFrom !== null) await val(`LR4Inspect.tools.section(${JSON.stringify(sec.axis)}, ${secFrom + (sec.at - secFrom) * k}, ${q.flip})`);
+        await frame(blend(start, to, (f + 1) / bf));
+      }
+      for (let f = 0, of = q.orbit ? n(q.orbit) : 0; f < of; f++) await frame(turn(to, (f + 1) / of));
+      return to;
+    };
+
     // the job's pace
     const fit = (secs) => Math.max(1, Math.round(job.total / secs));
     const pace = { base: fit(opt.job), real: opt.real, badge: true, temp: null, wait: 0 };
@@ -316,6 +345,7 @@ const PAGE_REC = `(() => {
       } else if (cmd.kind === "text") await caption(cmd);
       else if (cmd.kind === "pendant") await pipCmd(cmd);
       else if (cmd.kind === "show") await showCmd(cmd);
+      else if (cmd.kind === "inspect") cam = await inspectCmd(cmd, cam);
       else if (cmd.kind === "wait") await hold(DS.secsOf(cmd, 1), cam);
       else await paceCmd(cmd);
     }
@@ -332,7 +362,7 @@ const PAGE_REC = `(() => {
     if (!NC) await val("LR4Demo.play()");
     else if (!await val("LR4Demo.ncPlay()")) throw new Error("FluidNC didn't start the job: " + await val(`document.getElementById("job-status").textContent`));
     let held = 0, endHold = 0, s, rate = 0, badge = "", section = -1, realLeft = 0, ramp = -1, k = 0;
-    let shot = null, shotF = 0, titleEnd = 0, msgKey = null, msgEnd = 0;
+    let shot = null, shotF = 0, titleEnd = 0, msgKey = null, msgEnd = 0, inspShot = null;   // inspShot: the shot from before an Inspect
     const setRate = async (r) => {
       ncS = r;
       if (Math.abs(r - rate) > 1e-9) { rate = r; await val(`LR4Demo.rate(${r})`); }
@@ -353,6 +383,15 @@ const PAGE_REC = `(() => {
         } else if (cmd.kind === "text") await caption(cmd);
         else if (cmd.kind === "pendant") await pipCmd(cmd);
         else if (cmd.kind === "show") await showCmd(cmd);
+        else if (cmd.kind === "inspect") {             // the job held while it runs; the view stays on the set until ID=off / a Shot
+          const r0 = rate, off = /^off$/i.test(cmd.kv.id || "");
+          pace.wait = 1; await setRate(1e-9);
+          if (!inspShot && !off && cmd.kv.id) inspShot = { shot, shotF };
+          const end = await inspectCmd(cmd, (shot ? shot.at(Math.max(0, shotF - 1)) : null) || s.cam);
+          pace.wait = 0; await setRate(r0);
+          if (off && inspShot) { ({ shot, shotF } = inspShot); inspShot = null; }
+          else { shot = { frames: Infinity, at: () => end }; shotF = 0; }
+        }
         else if (cmd.kind === "title") { titleEnd = frames + n(DS.secsOf(cmd, 3)); await val(`LR4Demo.title(${JSON.stringify(DS.titleText(cmd))})`); }
         else if (cmd.kind === "wait") pace.wait = n(DS.secsOf(cmd, 1));
         else await paceCmd(cmd);

@@ -195,6 +195,7 @@ canvas { display: block; width: 100%; height: 100%; touch-action: none; }
 .ft-pop button { cursor: pointer; }
 .ft-pop canvas { display: block; width: 100%; height: auto; aspect-ratio: 5 / 3; background: #000; cursor: pointer; touch-action: none; }
 body.rec .panel, body.rec .hint, body.rec .toolbar, body.rec .view-pop, body.rec .pick, body.rec .insp { display: none; }  /* recording (LR4Demo.recording): the 3D view, whole window */
+body.inspecting .job-pop, body.inspecting .rec-msg, body.inspecting .rec-badge { display: none !important; }  /* inspect: no M0 popup / message bar / speed badge (back with Back) */
 body.rec .stage { position: fixed; inset: 0; }
 .rec-badge {                          /* the demo video's speed (LR4Demo.badge): "1× real time" / "62×" */
   position: absolute; left: 2.2%; top: 3.5%; padding: 0.3em 0.65em; border-radius: 8px;
@@ -4333,6 +4334,7 @@ body.vr-on .stage { grid-row: 1; }
     measure: (on) => { if (MEAS.on !== !!on) document.getElementById("insp-meas").click(); },
     snap: (x, y) => measureSnap({ clientX: x, clientY: y }), click: (x, y) => measureClick({ clientX: x, clientY: y }),
     result: () => document.getElementById("meas-out").textContent,
+    state: () => ({ explode: +document.getElementById("insp-ex").value, axis: SEC.axis, at: +document.getElementById("insp-cut").value, flip: SEC.flip }),
     offsets: () => Object.fromEntries(meshes.filter((m) => m.userData.ex).map((m) => [m.userData.name, m.userData.ex])),
     nuts: () => meshes.filter((m) => m.userData.nuts).map((m) => [m.userData.name, !!m.userData.nut, m.userData.nut ? +m.userData.nut.position.length().toFixed(2) : null]) };
 

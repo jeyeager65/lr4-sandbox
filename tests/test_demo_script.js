@@ -58,6 +58,20 @@ ok(DS.parse("( video  shot : view=CORE time=2 )\nG0 X1").intro[0].kv.view === "C
   const w = DS.parse("(Video: MSGTIME=3)\n(Video: MESSAGETIME=2)\nG0 X1");
   ok(w.settings.messagetime === 2 && w.warnings.length === 1 && /line 1: .*MESSAGETIME/.test(w.warnings[0]), "MSGTIME warned, MESSAGETIME used: " + JSON.stringify(w));
 }
+// (Video Inspect:): ID / EXPLODE / SECTION, checked; inspectOf
+{
+  const q = DS.parse(["(Video Inspect: ID=core TIME=1 ORBIT=4 DIST=600)", "(Video Inspect: EXPLODE=0.6 TIME=2)",
+    "(Video Inspect: SECTION=x@0.5 FLIP=on)", "(Video Inspect: SECTION=w@2)", "(Video Inspect: EXPLODE=3)", "(Video Inspect: TIME=2)",
+    "(Video Inspect: ID=off)", "G0 X1", "(Video Inspect: SECTION=off)"].join("\n"));
+  ok(q.intro.length === 4 && q.at.length === 1, `4 intro + 1 later: ${q.intro.length} / ${q.at.length}`);
+  ok(q.warnings.length === 3 && /SECTION=/.test(q.warnings[0]) && /EXPLODE=/.test(q.warnings[1]) && /Inspect wants/.test(q.warnings[2]),
+    "bad SECTION / EXPLODE / nothing warned: " + q.warnings);
+  const [a, b, c, d] = q.intro.map((x) => DS.inspectOf(x));
+  ok(a.id === "core" && a.secs === 1 && a.orbit === 4 && a.dist === 600 && a.explode === undefined, "open: " + JSON.stringify(a));
+  ok(b.explode === 0.6 && b.secs === 2 && !b.id, "explode: " + JSON.stringify(b));
+  ok(c.section.axis === "x" && c.section.at === 0.5 && c.flip === true, "section: " + JSON.stringify(c));
+  ok(d.id === "off" && DS.inspectOf(q.at[0]).section === "off", "off / section off");
+}
 // Part 29: the machine settings and (Video Show:)
 {
   const m = DS.parse(["(Video: TABLE=34in ROOM=16x20x9ft BRACES=6 STRUTS=temp PETER=none ROUTER=off HOSE=no MAIN=#112233)",

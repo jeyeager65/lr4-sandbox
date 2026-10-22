@@ -17,6 +17,11 @@
 //       (assembly: table yz-min yz-max beam core router hose electronics pendant; "asm.kind" with printed / cut /
 //       hardware / electronics; a part = its name, * matches); PRESET (all, no-hardware, printed, frame) first, then
 //       HIDE, then SHOW (a part shown turns its assembly + kind on). Intro or mid-job; the view only, never the BOM.
+//   (Video Inspect: ID=core TIME=1.5 ORBIT=8 DIST=mm EXPLODE=0.6 SECTION=x@0.5 FLIP=on)   the page's inspect view: ID =
+//       a Show tree id (the camera blends to its framing over TIME, DIST overrides the distance; ID=off back to the
+//       machine and the camera from before); EXPLODE (0-1) and SECTION (x|y|z@0-1 across the set, or off; FLIP keeps
+//       the other side) animate over TIME; ORBIT turns once round it. Each line runs its own TIME + ORBIT with the job
+//       held; lines in a row run one after the other. Only the set is drawn until ID=off (a Shot moves the camera).
 //   (Video Shot: VIEW=name TIME=s ORBIT=s DIST=mm)   the camera: blends there over TIME (1.5), then turns once round
 //       it over ORBIT; DIST = how far from what it looks at. VIEW: workshop, machine, stock, tool (close on the bit,
 //       follows it), core (close on the router / core), iso, front, top, side, back, page (mid-job only: the page's own
@@ -46,7 +51,7 @@ const SETTINGS = { size: "wxh", machine: "wxh", fps: "num", volume: "num", pause
   fan: "bool", main: "colour", accent: "colour" };
 const MACHINE_KEYS = ["table", "room", "braces", "struts", "peter", "router", "skirt", "hose", "fan", "main", "accent"];
 const PRESETS = ["all", "no-hardware", "printed", "frame"];   // web/js/show_tree.js PRESETS
-const KINDS = ["shot", "home", "zero", "title", "text", "wait", "speed", "pendant", "show"];
+const KINDS = ["shot", "home", "zero", "title", "text", "wait", "speed", "pendant", "show", "inspect"];
 const INTRO_ONLY = new Set(["home", "zero"]);
 const SHOTS = new Set(["workshop", "machine", "stock", "tool", "core", "iso", "front", "top", "side", "back", "page", "pendant"]);
 const MOTION = /(^|[^A-Z])G0*(0|1|2|3|38\.\d)(?![\d.])/;
@@ -126,6 +131,11 @@ function check(c, intro) {
     case "zero": return Number.isFinite(mm(kv.x)) && Number.isFinite(mm(kv.y)) ? null : "Zero wants X= and Y= (mm, or 4in)";
     case "title": case "text": return kv.text ? null : `${k[0].toUpperCase() + k.slice(1)} wants TEXT=`;
     case "wait": return num(kv.time) ? null : "Wait wants TIME=";
+    case "inspect":
+      if (kv.id === undefined && kv.explode === undefined && kv.section === undefined) return "Inspect wants ID=, EXPLODE= or SECTION=";
+      if (kv.explode !== undefined && !(num(kv.explode) && +kv.explode >= 0 && +kv.explode <= 1)) return "Inspect EXPLODE= wants 0 - 1";
+      if (kv.section !== undefined && !/^(off|[xyz]@(0|1|0?\.\d+|1\.0+))$/i.test(kv.section)) return "Inspect SECTION= wants x@0.5 (x, y or z @ 0 - 1) or off";
+      return null;
     case "show":
       if (kv.preset === undefined && kv.hide === undefined && kv.show === undefined) return "Show wants PRESET=, HIDE= or SHOW=";
       return kv.preset === undefined || PRESETS.includes(kv.preset.toLowerCase()) ? null : `Show PRESET= one of ${PRESETS.join(", ")}`;
@@ -150,6 +160,14 @@ const zeroOf = (c) => [mm(c.kv.x), mm(c.kv.y)];
 const ids = (v) => String(v || "").split(/[,\s]+/).filter(Boolean);
 // a Show cmd -> { preset, hide: [ids], show: [ids] } (LR4Show.apply's argument)
 const showOf = (c) => ({ preset: c.kv.preset ? c.kv.preset.toLowerCase() : undefined, hide: ids(c.kv.hide), show: ids(c.kv.show) });
+// an Inspect cmd -> { id ("off" closes), secs, orbit, dist, explode, section: { axis, at } | "off", flip }
+function inspectOf(c, blend = 1.5) {
+  const kv = c.kv, sec = kv.section && kv.section.toLowerCase();
+  return { id: kv.id, secs: num(kv.time) ? Number(kv.time) : blend, orbit: num(kv.orbit) ? Number(kv.orbit) : 0,
+    dist: num(kv.dist) ? Number(kv.dist) : null, explode: kv.explode !== undefined ? Number(kv.explode) : undefined,
+    section: !sec ? undefined : sec === "off" ? "off" : { axis: sec[0], at: Number(sec.slice(2)) },
+    flip: kv.flip !== undefined && !/^(off|no|0)$/i.test(kv.flip) };
+}
 // the settings -> LR4Machine.apply's argument (only what the file set)
 const machineOf = (settings) => Object.fromEntries(MACHINE_KEYS.filter((k) => settings[k] !== undefined).map((k) => [k, settings[k]]));
 
@@ -161,5 +179,5 @@ function defaultIntro(o) {
 }
 const hasOwnIntro = (s) => s.intro.some((c) => ["shot", "home", "title", "text", "wait"].includes(c.kind));
 
-module.exports = { parse, keyvals, videoOf, shotOf, titleText, secsOf, zeroOf, showOf, machineOf, roomOf, defaultIntro, hasOwnIntro, mm,
+module.exports = { parse, keyvals, videoOf, shotOf, titleText, secsOf, zeroOf, showOf, inspectOf, machineOf, roomOf, defaultIntro, hasOwnIntro, mm,
   SHOTS, MACHINE_KEYS };
