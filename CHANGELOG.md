@@ -3,7 +3,7 @@
 The version is the sandbox page's (`VERSION` in `web/index.html`, shown in its footer). The footer also shows
 the date the model data was built and the Printables file set it was solved for.
 
-## Unreleased
+## 0.30.0 - 2026-10-22
 - `(Video Inspect: ID=core TIME=1.5 ORBIT=8 EXPLODE=0.6 SECTION=x@0.5 FLIP=on)`: the inspect view in a video - the
   camera blends to its framing, explode and section animate over TIME, ORBIT turns round it, `ID=off` goes back.
   Each line runs with the job held.
