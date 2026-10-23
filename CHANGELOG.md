@@ -3,6 +3,17 @@
 The version is the sandbox page's (`VERSION` in `web/index.html`, shown in its footer). The footer also shows
 the date the model data was built and the Printables file set it was solved for.
 
+## 0.33.0 - 2026-10-22
+- **Show > Scene > Lighting: Realistic / Simple.** Realistic: in the workshop its own lights - the four 4 ft LED strips
+  as soft area lights, soft shadows from overhead (Full detail), daylight through the garage door; on Plain a studio
+  sun with shadows; filmic tone mapping and the room's soft light on every surface. Simple: the earlier even light
+  (lightest on the GPU). Default: Realistic, Simple on Lite.
+- Printed parts are smooth-shaded (sharp edges kept) instead of faceted.
+- The two ceiling strips over the machine run along the shop side by side, in line with the bench lights' inner ends
+  (they were one behind the other down the middle).
+- **Background: Empty shop** - the workshop with only the garage door, the lights and the fire extinguisher (no
+  benches, pegboard, computer, shelf or shop vac). `(Video: SCENERY=empty)` in videos.
+
 ## 0.32.0 - 2026-10-22
 - Honeycomb Peter Plates keep the closed plates' counterbores (the button heads were buried in a flat slab): the
   screw holes are layered through the thickness as the closed STL has them, and cells keep 1.2 mm from each counterbore.

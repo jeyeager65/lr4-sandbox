@@ -2,7 +2,7 @@
 // special comments to set settings, display text, etc."; the syntax follows cnc-gcode-tools' CNCSIM / Stock / ToolDef
 // comments). FluidNC and the page ignore them: one file is the job and the video.
 //   (Video: KEY=VALUE ...)           settings, any line before the first move; the command line's flags win:
-//       SIZE=2560x1440 FPS=30 VOLUME=0.6 SOUND=on VOICE=machine|robot (robot = the joke voice) DETAIL=full SCENERY=shop MACHINE=26x50 (cut area, in)
+//       SIZE=2560x1440 FPS=30 VOLUME=0.6 SOUND=on VOICE=machine|robot (robot = the joke voice) DETAIL=full SCENERY=shop|empty|plain MACHINE=26x50 (cut area, in)
 //       PAUSE=2 (s each M0 popup shows, then it resumes)  MESSAGES=on MESSAGETIME=4 (MSG / PRINT lines shown on top, s;
 //       not MSGTIME: FluidNC - and the page - show any comment with "MSG" in it as a message; still read, with a warning)
 //       PARK=on (drive the gantry back at the end)  HOLD=3 (s on the result)

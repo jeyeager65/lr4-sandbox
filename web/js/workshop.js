@@ -15,7 +15,8 @@
 // it's a room. Not in the page's parts: no picking, fit or touch.
 // The room is the user's building size (centered on the machine), blank = DEFAULT.
 //   LR4Shop.room(table, machine, size) -> { x0, x1, y0, y1, h, gaps: { left, right, front, back, top } }
-//   LR4Shop.build(THREE, { room, table, machine, floor }) -> THREE.Group; LR4Shop.dispose(group); LR4Shop.cutaway(group, cam)
+//   LR4Shop.build(THREE, { room, table, machine, floor, empty }) -> THREE.Group (empty: no benches, pegboard, computer,
+//   shelf or shop vac - the building, doors, windows, lights and fire extinguisher only); LR4Shop.dispose(group); LR4Shop.cutaway(group, cam)
 //   table / machine: { x0, x1, y0, y1 } (+ machine.z1 = its top above the floor); size: { w, d, h } mm, each optional
 (function (root) {
   "use strict";
@@ -388,7 +389,7 @@
     const IN = 25.4, doorTop = Math.min(80 * IN, HEIGHT - 200);   // every window's top lines up with the door's
     const benchD = 610, benchH = 914, benchWin = { w: Math.min(762, W / 5), sill: Math.min(1100, doorTop - 500), top: doorTop };
     const benchW = Math.max(0, Math.min(6 * FT, (W - benchWin.w - 300) / 2)), benchY = Y0 + benchD / 2 + 20;
-    const benchOn = g.front >= FURNITURE.bench && benchW > 800;
+    const benchOn = !o.empty && g.front >= FURNITURE.bench && benchW > 800;
     const toolMat = [std({ color: 0xc8241b, roughness: 0.5 }), std({ color: 0x2b2f33, roughness: 0.5 }),
       std({ color: 0xa9adb1, metalness: 0.8, roughness: 0.35 })];
     if (benchOn) for (const side of [-1, 1]) {
@@ -407,7 +408,7 @@
 
     // back long wall (-X): a steel shelf of bins, a few feet past the bench
     const shW = Math.min(4 * FT, D - benchD - 2 * 900), shX = X0 + 250, shY = Y0 + benchD + 900 + shW / 2;   // 4 ft wide
-    const shelfOn = g.left >= FURNITURE.shelf && shW > 600 && HEIGHT > 2100;
+    const shelfOn = !o.empty && g.left >= FURNITURE.shelf && shW > 600 && HEIGHT > 2100;
     if (shelfOn) {
       const shH = Math.min(2000, HEIGHT - 200);
       for (const dy of [-1, 1]) for (const dx of [-1, 1]) box(35, 35, shH, shX + dx * 210, shY + dy * (shW / 2 - 20), Z0, steel);
@@ -425,7 +426,7 @@
 
     // front long wall (+X) by the garage end: a shop vac (low, under the window)
     const vx = X1 - 450, vy = Y1 - 650;
-    if (g.right >= FURNITURE.vac) {
+    if (!o.empty && g.right >= FURNITURE.vac) {
       add(new THREE.CylinderGeometry(230, 210, 520, 32), std({ color: 0xc8241b, roughness: 0.45 }), vx, vy, Z0 + 60 + 260, Math.PI / 2);
       add(new THREE.CylinderGeometry(240, 240, 140, 32), std({ color: 0x2b2f33, roughness: 0.5 }), vx, vy, Z0 + 580 + 70, Math.PI / 2);
       for (const a of [0, 1, 2, 3]) add(new THREE.CylinderGeometry(30, 30, 50, 12), steel,
@@ -632,15 +633,20 @@
     }
 
     // ceiling: four 4 ft strip lights (the user's) - one along each workbench (across the shop), over its front edge,
-    // and two over the machine, down the middle, running the other way (along the shop)
+    // and two running the other way (along the shop), in line with the bench lights' inner ends (nearest the middle),
+    // side by side over the middle of the shop - the machine (user 2026-10-22)
     const lightMat = new THREE.MeshBasicMaterial({ color: 0xfdfcf7 }), lampHousing = std({ color: 0xd0d2d4, roughness: 0.4 });
-    const LL = 4 * FT, benchX = (side) => (side < 0 ? X0 + benchW / 2 + 20 : X1 - benchW / 2 - 20);
-    const lamps = [[benchX(-1), Y0 + benchD - 100, 0], [benchX(1), Y0 + benchD - 100, 0],
-      [cx, cy - LL / 2 - 300, Math.PI / 2], [cx, cy + LL / 2 + 300, Math.PI / 2]];
+    const LL = 4 * FT, benchX = (side) => (side < 0 ? X0 + benchW / 2 + 20 : X1 - benchW / 2 - 20), lampY = Y0 + benchD - 100;
+    const inner = (side) => benchX(side) - side * (LL / 2 - 60);   // under the bench light's inner end
+    const lamps = [[benchX(-1), lampY, 0], [benchX(1), lampY, 0],
+      [inner(-1), cy, Math.PI / 2], [inner(1), cy, Math.PI / 2]];
     for (const [x, y, rz] of lamps) {
       box(LL, 120, 60, x, y, Z0 + HEIGHT - 60, lampHousing, rz);
       box(LL - 40, 90, 4, x, y, Z0 + HEIGHT - 64, lightMat, rz);
     }
+    // for the page's lighting: each strip's lens (machine: the two over the machine), the open garage door's side
+    grp.userData.lamps = lamps.map(([x, y, rz], i) => ({ x, y, z: Z0 + HEIGHT - 67, rz, len: LL - 40, w: 90, machine: i >= 2 }));
+    grp.userData.garage = { y: Y1, z: Z0 };
     return grp;
   }
 

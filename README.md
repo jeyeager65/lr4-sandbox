@@ -70,8 +70,9 @@ Honeycomb or None). Also here: the table height and the print colours.
 
 **Show** only hides parts from the view, never from the BOM: a tree of assembly > printed / cut / hardware /
 electronics > part (a bolt is listed under both assemblies it joins), with presets (All, No hardware, Printed parts
-only, Frame only). **Scene** sets the detail (Full, or Lite for slower devices) and the background (a workshop, or
-plain).
+only, Frame only). **Scene** sets the detail (Full, or Lite for slower devices), the lighting (Realistic: the
+workshop's own lights, soft shadows on Full detail and filmic colour; or Simple: even light, lightest on the GPU) and
+the background (the workshop, the same shop empty, or plain).
 
 **Inspect** (⤢ on a Show row, or double-click a part) shows one assembly or part alone with the bolts and bearings
 that hold it, and its parts list with screw and nut counts. Its tools: an exploded view (along the bolt lines), a
@@ -134,7 +135,9 @@ service workers can't run FluidNC mode; everything else works.
 ### Workshop
 
 **Show** > **Scene** > **Background** > **Workshop** shows the machine in a workshop: by default the maintainer's
-16 x 20 ft shop with an 8' 4" ceiling (benches, shelf, an open garage door). Zoom in and the near walls open up;
+16 x 20 ft shop with an 8' 4" ceiling (benches, shelf, an open garage door, four 4 ft LED strips that light the
+scene). **Empty shop** is the same building with only the garage door, the lights and the fire extinguisher. Zoom in
+and the near walls open up;
 zoom far out to see the closed building. Enter your own building's size (X, Y, ceiling, under Background) to see how
 much room the machine takes: the page gives the gap to each wall and warns when a side is under 2 ft / 600 mm. The
 room and the table legs are drawn by the page only.
@@ -200,7 +203,7 @@ shots and the FluidTouch pendant's screen in a corner. The comments:
 
 | Comment | What it does |
 |---|---|
-| `(Video: SIZE=1920x1080 FPS=30 SOUND=on ...)` | Settings, before the first move: size, frame rate, volume, `VOICE=robot`, `DETAIL`, `SCENERY`, `MACHINE=26x50` (cutting area, in), the machine's options as on My LR4 (`TABLE=34in ROOM=16x20x9ft BRACES= STRUTS= PETER= ROUTER= SKIRT= HOSE= FAN= MAIN= ACCENT=`), `PENDANT=on`, `MODE=fluidnc` (run it on the page's FluidNC), how long M0 pauses and messages show (`PAUSE`, `MESSAGETIME`), `PARK=on`, `HOLD` on the result. |
+| `(Video: SIZE=1920x1080 FPS=30 SOUND=on ...)` | Settings, before the first move: size, frame rate, volume, `VOICE=robot`, `DETAIL`, `SCENERY=shop\|empty\|plain`, `MACHINE=26x50` (cutting area, in), the machine's options as on My LR4 (`TABLE=34in ROOM=16x20x9ft BRACES= STRUTS= PETER= ROUTER= SKIRT= HOSE= FAN= MAIN= ACCENT=`), `PENDANT=on`, `MODE=fluidnc` (run it on the page's FluidNC), how long M0 pauses and messages show (`PAUSE`, `MESSAGETIME`), `PARK=on`, `HOLD` on the result. |
 | `(Video Title: TIME=3 TEXT=Line one\|Line two)` | A full-screen title card. |
 | `(Video Text: TIME=4 TEXT=...)` | A caption over what comes next. |
 | `(Video Shot: VIEW=tool TIME=1.5 ORBIT=8 DIST=600)` | The camera: `workshop`, `machine`, `stock`, `tool` (follows the bit), `core`, `iso`, `front`, `top`, `side`, `back`, `page`, `pendant`; it blends there over TIME and turns round it over ORBIT. |
