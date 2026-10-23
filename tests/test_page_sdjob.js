@@ -32,7 +32,7 @@ const RUN = (k) => `(async () => {
     await T.sleep(100);
     if (LR4Job.held() && !document.getElementById("job-pop").hidden) {
       out.holds.push(document.getElementById("job-pop-msg").textContent);
-      out.plates.push(document.getElementById("ctl-plate").checked);
+      out.plates.push(LR4Ctl.plate());
       await T.sleep(300);
       document.getElementById("job-resume").click();
       await T.until(() => !LR4Job.held(), 10000);
@@ -41,7 +41,7 @@ const RUN = (k) => `(async () => {
   }
   out.secs = (performance.now() - t0) / 1000;
   out.status = document.getElementById("job-status").textContent;
-  out.plateAfter = document.getElementById("ctl-plate").checked;
+  out.plateAfter = LR4Ctl.plate();
   out.log = [...document.querySelectorAll("#ctl-log > div")].slice(-25).map((d) => d.textContent);
   const a = LR4Job.sim(), b = LR4Job.playbackHeights();
   let n = 0, big = 0, cut = 0, cutRef = 0;
@@ -82,24 +82,27 @@ const RUN = (k) => `(async () => {
       await LR4Job.add([new File([${JSON.stringify(SMALL)}], "small job.nc")]);
       await T.until(() => LR4Job.src() && LR4Job.src().name === "/small_job.nc" && LR4Job.tl(), 10000);
       out.files1 = LR4Job.files();
-      out.form = !document.getElementById("job-def").hidden && document.getElementById("job-def").open;
-      out.guess = ["def-x0", "def-x1", "def-y0", "def-y1", "def-t"].map((id) => +document.getElementById(id).value);
-      out.toolRows = document.querySelectorAll("#job-def-tools [data-tool]").length;
+      // Part 31: no (Stock:) / ToolDef -> the hand setup (On the table): sized to the job, then put on the table, a bit installed
       out.stock0 = !!LR4Job.tl().stock;
+      out.tool0 = LR4Job.tl().tools.get(1) && LR4Job.tl().tools.get(1).diameter - LR4Job.hand().bit.d;
+      document.getElementById("hs-fit").click();
+      out.guess = ["hs-x0", "hs-x1", "hs-y0", "hs-y1"].map((id) => +document.getElementById(id).value);
       const set = (id, v) => { document.getElementById(id).value = v; };
-      set("def-x0", -10); set("def-x1", 80); set("def-y0", 0); set("def-y1", 60); set("def-t", 12);
-      document.querySelector('#job-def-tools [data-k="d"]').value = 3.175;
-      document.getElementById("job-def-use").click();
+      set("hs-x0", -10); set("hs-x1", 80); set("hs-y0", 0); set("hs-y1", 60); set("hs-t", 12);
+      document.getElementById("hs-use").click();
       await T.until(() => LR4Job.tl() && LR4Job.tl().stock, 10000);
+      document.querySelector('#hs-bit [data-k="d"]').value = 3.175;
+      document.getElementById("hs-bit-use").click();
+      await T.until(() => LR4Job.tl() && Math.abs(LR4Job.tl().tools.get(1).diameter - 3.175) < 1e-9, 10000);
       out.stock1 = LR4Job.tl().stock; out.tool = LR4Job.tl().tools.get(1);
-      out.note = document.getElementById("job-def-note").hidden;
+      out.note = /set up by hand/.test(document.getElementById("job-src").textContent);
       return out;
     })()`);
     ok(c.files0.includes("/LR4_strut_plates.gcode"), `strut G-code on the card: ${c.files0}`);
     ok(c.files1.includes("/small_job.nc"), `added file cleaned to /small_job.nc: ${c.files1}`);
-    ok(c.form && !c.stock0 && c.toolRows === 1 && c.guess.join() === "0,60,0,40,3", `no stock / bit: form open, guess ${c.guess}`);
+    ok(!c.stock0 && Math.abs(c.tool0) < 1e-9 && c.guess.join() === "0,60,0,40", `no stock, the router's bit; sized to the job ${c.guess}`);
     ok(c.stock1 && c.stock1.xmin === -10 && c.stock1.zmin === -12 && c.tool && Math.abs(c.tool.diameter - 3.175) < 1e-9 && c.note,
-      `form -> stock ${JSON.stringify(c.stock1)}, T1 ${c.tool && c.tool.diameter}`);
+      `hand setup -> stock ${JSON.stringify(c.stock1)}, T1 ${c.tool && c.tool.diameter}`);
 
     // FluidNC boots with the card; $SD/List; a live add; $SD/Delete syncs back
     const f = await page.val(`(async () => {

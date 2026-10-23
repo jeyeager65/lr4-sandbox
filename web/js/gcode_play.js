@@ -7,7 +7,7 @@
   "use strict";
   // V1E's JP3_LR config.yaml (FluidNC_Configs): X / Y 9000 mm/min at 200 mm/s^2, Z 900 at 80
   const V1E = { maxRateX: 9000, maxRateY: 9000, maxRateZ: 900, accelX: 200, accelY: 200, accelZ: 80 };
-  const STOPS = new Set(["pause", "alarm", "tool"]);   // playback halts here: M0, a failed probe, a change to an undefined bit
+  const STOPS = new Set(["pause", "alarm", "tool"]);   // playback halts here: M0, a failed probe, a tool change
 
   // FluidNC config values (parseFluidNCConfig: {"/axes/x/max_rate_mm_per_min": 9000, ...}) -> Animator rates
   function motion(values) {
@@ -76,18 +76,20 @@
     const t = anim.segmentEndTimes, total = anim.totalAnimTime;
     const timeOf = (index) => (index > 0 ? t[Math.min(index, segs.length) - 1] : 0);
     const events = p.events.map((e) => Object.assign({}, e, { time: timeOf(e.index), lineNum: src(e.lineNum) ?? e.lineNum }));
-    // a change to a bit with no ToolDef stops playback, so the user can say what it is (the first tool: at the start)
+    // a tool change stops playback so the bit can be changed (Part 31: every one, as M6 holds; defined = the file has
+    // its ToolDef, else the user says what it is; the first tool: whatever's in the router at the start)
     // (on its M6 / T line: the last one before the move, after the move before it)
     const source = text.split("\n").slice(extra);
     segs.forEach((s, i) => {
-      if (i && s.toolNumber !== segs[i - 1].toolNumber && !tools.has(s.toolNumber)) {
+      if (i && s.toolNumber !== segs[i - 1].toolNumber) {
         let line = s.srcLine;
         for (let n = (s.srcLine || 1) - 1; n >= (segs[i - 1].srcLine || 0) + 1; n--) {
           if (/^[^;(]*\b(M0*6|T\d+)\b/i.test(source[n - 1] || "")) { line = n; break; }
         }
         const k = events.findIndex((e) => e.index > i || (e.index === i && e.lineNum > line));
-        events.splice(k < 0 ? events.length : k, 0, { index: i, lineNum: line, kind: "tool", time: timeOf(i),
-          text: `Tool change to T${s.toolNumber}: the file doesn't say which bit it is.` });
+        const def = tools.has(s.toolNumber);
+        events.splice(k < 0 ? events.length : k, 0, { index: i, lineNum: line, kind: "tool", time: timeOf(i), tool: s.toolNumber,
+          defined: def, text: `Tool change to T${s.toolNumber}: ${def ? "put its bit in the router" : "the file doesn't say which bit it is"}.` });
       }
     });
     // one per probe (a job re-probes after each tool change): from the pause before it ("attach") to the pause

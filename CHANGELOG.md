@@ -3,6 +3,21 @@
 The version is the sandbox page's (`VERSION` in `web/index.html`, shown in its footer). The footer also shows
 the date the model data was built and the Printables file set it was solved for.
 
+## 0.35.0 - 2026-10-23
+- **On the table (Run tab):** the machine set up by hand, as at the real one. **Stock** (size, where on the table,
+  thickness; "Size it to the job"), the **bit in the router** (shape, diameter, V angle, stick-out; drawn in place of
+  the model's bit) and a **Touch plate under the bit** button (on the stock if the bit is over it, else the
+  spoilboard; wired to FluidNC's probe at that height). A job that names its stock / bits brings them; one that
+  doesn't uses these (the per-file "Stock and bits" form is gone).
+- **Every move carves:** jogs (pendant, FluidNC jog pad), console G-code and jobs carve the stock. The position
+  sliders only move the bit (no carving).
+- **The spoilboard carves too** (a height field over the table top) wherever a cut goes below the stock, and keeps
+  its cuts in this browser per machine size. **New spoilboard** starts fresh; "Show the stock" off shows what the jobs
+  did to it. **Surfacing job to the SD card:** a zigzag over the cutting area (bit, step-over, depth below the
+  spoilboard's level) that lowers it - marks shallower than the pass go, deeper ones stay.
+- **M6 holds for the bit** in Basic and FluidNC, at every tool change: the popup shows the file's ToolDef, or asks
+  which bit it is (kept for that file); Resume puts it in the router.
+
 ## 0.34.0 - 2026-10-23
 - **Web UIs (Run > Controller, FluidNC mode):** any `.html` / `.html.gz` on FluidNC's SD card or Flash is listed
   (named WebUI 3, WebUI 2, FigUI or by its title) and **Open** shows it in a window of its own, served by the page's

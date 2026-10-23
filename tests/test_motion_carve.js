@@ -97,7 +97,7 @@ function run(tl, dtJob, mutate) {
   ok(b1.stock && b1.stock.zmin === -6 && b1.tools.get(1).diameter === 6.35 && b1.tools.get(2).shape === "vbit",
     `header: stock ${JSON.stringify(b1.stock)}, tools ${JSON.stringify([...b1.tools])}`);
   ok(b1.lines === b0.lines && b1.segs.every((s, i) => s.srcLine === b0.segs[i].srcLine) && b1.segs[3].srcLine === 6 &&
-    !b1.events.some((e) => e.kind === "tool") && b1.events.find((e) => e.kind === "pause").lineNum === 9, "header: line numbers stay the file's");
+    b1.events.filter((e) => e.kind === "tool").map((e) => [e.tool, e.defined]).join() === "2,true" && b1.events.find((e) => e.kind === "pause").lineNum === 9, "header: line numbers stay the file's");
   ok(JSON.stringify(b0.events.map((e) => [e.kind, e.lineNum])) === '[["tool",8],["msg",9],["pause",9],["end",14]]', "tool stop on its M6 line, before the M0 after it");
   const inch = bare.replace("G21", "G20").replace(/([XYZ])(-?\d+)/g, (s, a, v) => a + (v / 25.4).toFixed(5));
   const b2 = await GP.load(inch, undefined, undefined, { header: GP.header({ xmin: 0, xmax: 80, ymin: 0, ymax: 40, thick: 6 }, { 1: { shape: "flat", d: 6.35 } }, true) });

@@ -171,7 +171,7 @@ function savePng(dataUrl, name) {
     };
     const st = () => page.val(`({ homed: LR4Ctl.homed(), state: LR4Ctl.state(), mpos: LR4Ctl.mpos(), running: LR4Job.running(), held: LR4Job.held(),
       pop: !document.getElementById("job-pop").hidden, msg: document.getElementById("job-pop-msg").textContent,
-      plate: document.getElementById("ctl-plate").checked, status: document.getElementById("job-status").textContent })`);
+      plate: LR4Ctl.plate(), status: document.getElementById("job-status").textContent })`);
     const waitFor = async (fn, ms) => { const t0 = Date.now(); for (;;) { const s = await st(); if (fn(s)) return s; if (Date.now() - t0 > ms) return null; await sleep(200); } };
 
     // the strut job from the pendant alone at 10x: Home All, Files > play, Resume in its HOLD dialog at each M0

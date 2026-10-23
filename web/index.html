@@ -349,7 +349,8 @@ label.btn:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; 
 .sd-row.sd-dir[aria-current="true"] { background: color-mix(in srgb, var(--accent) 12%, transparent); }
 .sd-row button.sd-fold { background: none; border: 0; padding: 2px 4px; width: 20px; cursor: pointer; color: var(--muted); }
 .sd-where { color: var(--muted); align-self: center; }
-#job-def-tools .trio { grid-template-columns: auto 1fr 1fr 1fr; align-items: end; }
+.hs-bit { grid-template-columns: 1fr 1fr 1fr 1fr; align-items: end; }
+.job-pop .hs-bit { margin: 0 0 10px; }
 .jog { display: grid; grid-template-columns: repeat(4, 52px); gap: 6px; margin-top: 10px; }
 .jog button { padding: 8px 0; font-family: var(--font-data); }
 .ctl-form input { flex: 1; min-width: 0; font-family: var(--font-data); }
@@ -617,7 +618,6 @@ body.vr-on .stage { grid-row: 1; }
         <label class="check">Machine speed <select id="ctl-speed" aria-label="Machine speed" title="FluidNC in the browser keeps up to about 5x on rapid moves; at 10x and 20x it may run slower than the label" style="width: auto">
           <option value="1" selected>1×</option><option value="2">2×</option><option value="5">5×</option><option value="10">10×</option>
           <option value="20">20×</option></select></label>
-        <label class="check"><input type="checkbox" id="ctl-plate"> Touch plate under the bit (<span id="ctl-plate-on">on 1/4" stock</span>)</label>
       </div>
       <p class="foot" id="ctl-msg" role="status"></p>
       <details class="cam" id="ctl-box" hidden>
@@ -666,6 +666,45 @@ body.vr-on .stage { grid-row: 1; }
       <p class="foot" id="ctl-src"></p>
     </section>
 
+    <section aria-labelledby="h-setup">
+      <h2 id="h-setup">On the table</h2>
+      <p class="foot">What's on the table and in the router, as at the real machine. A job that names its stock or bits
+        brings them; one that doesn't uses these. Every move carves: jobs, jogs, the console, the pendant.</p>
+      <div class="buttons"><button type="button" id="ctl-plate" aria-pressed="false" title="Lay the touch plate under the bit, on the stock or the spoilboard, and wire it to the probe input">Touch plate under the bit</button></div>
+      <p class="foot" id="hs-plate-note" role="status"></p>
+      <details class="cam" id="hs-stock-box">
+        <summary>Stock: <span id="hs-stock-name">none</span></summary>
+        <p class="foot">mm from the cutting area's front-left corner (a job's work zero), thickness up from the spoilboard.</p>
+        <div class="trio">
+          <label>X from<input id="hs-x0" type="number" step="any"></label><label>to<input id="hs-x1" type="number" step="any"></label>
+          <label>Y from<input id="hs-y0" type="number" step="any"></label><label>to<input id="hs-y1" type="number" step="any"></label>
+          <label>Thickness<input id="hs-t" type="number" step="any" min="0.1"></label>
+        </div>
+        <div class="buttons"><button type="button" id="hs-use">Put it on the table</button><button type="button" id="hs-fit" title="X / Y round the loaded job's cuts">Size it to the job</button>
+          <button type="button" id="hs-off">Take it off</button></div>
+      </details>
+      <details class="cam" id="hs-bit-box">
+        <summary>Bit: <span id="hs-bit-name"></span></summary>
+        <div class="trio hs-bit" id="hs-bit">
+          <label>Bit<select data-k="shape"><option value="flat">Flat end mill</option><option value="ball">Ball end</option><option value="vbit">V-bit</option></select></label>
+          <label>Diameter<input data-k="d" type="number" step="any" min="0.1"></label><label>V angle<input data-k="angle" type="number" step="any" min="10" max="170"></label>
+          <label>Sticks out<input data-k="len" type="number" step="any" min="0" title="mm below the collet (drawing only; 0 = as the model's bit)"></label>
+        </div>
+        <div class="buttons"><button type="button" id="hs-bit-use">Put it in the router</button></div>
+      </details>
+      <details class="cam" id="hs-spoil-box">
+        <summary>Spoilboard</summary>
+        <p class="foot" id="hs-spoil-note">The table's top: it keeps every cut that goes below the stock (kept in this browser, per machine size).</p>
+        <label class="check"><input type="checkbox" id="hs-show-stock" checked> Show the stock (off: see what the jobs did to the spoilboard)</label>
+        <div class="trio">
+          <label>Surfacing bit<input id="hs-sd" type="number" step="any" min="1" value="25.4"></label><label>Step-over %<input id="hs-so" type="number" step="any" min="5" max="95" value="40"></label>
+          <label>Depth<input id="hs-sz" type="number" step="any" min="0.05" value="0.5" title="mm below the spoilboard's level"></label>
+        </div>
+        <div class="buttons"><button type="button" id="hs-surf" title="A zigzag over the cutting area, its bit in a ToolDef, saved to the SD card">Surfacing job to the SD card</button>
+          <button type="button" id="hs-new">New spoilboard</button></div>
+      </details>
+    </section>
+
     <section aria-labelledby="h-job">
       <h2 id="h-job">Run G-code</h2>
       <div id="job-off">
@@ -692,18 +731,6 @@ body.vr-on .stage { grid-row: 1; }
         <label class="check"><input type="checkbox" id="job-closeup" checked> Close-up while probing</label>
         <p class="foot" id="job-status" role="status"></p>
       </div>
-      <details class="cam" id="job-def" hidden>
-        <summary>Stock and bits</summary>
-        <p class="foot" id="job-def-note">This file doesn't say what it cuts or with which bit, so nothing is carved. Say
-          here (mm, work coordinates, top of the stock at Z0) and it carves as it runs.</p>
-        <div class="trio" id="job-def-stock">
-          <label>Stock X from<input id="def-x0" type="number" step="any"></label><label>to<input id="def-x1" type="number" step="any"></label>
-          <label>Stock Y from<input id="def-y0" type="number" step="any"></label><label>to<input id="def-y1" type="number" step="any"></label>
-          <label>Thickness<input id="def-t" type="number" step="any" min="0.1"></label>
-        </div>
-        <div id="job-def-tools"></div>
-        <div class="buttons"><button type="button" id="job-def-use">Use these</button><button type="button" id="job-def-clear">Forget them</button></div>
-      </details>
       <div class="buttons">
         <button type="button" id="job-back" hidden>Back to the strut plate job</button>
         <button type="button" id="job-install" hidden>Install the plates (Permanent)</button>
@@ -863,7 +890,10 @@ body.vr-on .stage { grid-row: 1; }
   <div class="rec-title" id="rec-title" hidden><div></div></div>
   <div class="rec-pip br" id="rec-pip" hidden><canvas id="rec-pip-c" width="800" height="480"></canvas></div>
   <div class="rec-msg" id="rec-msg" hidden></div>
-  <div class="job-pop" id="job-pop" role="alertdialog" aria-labelledby="job-pop-h" hidden><b id="job-pop-h">Paused (M0)</b><p id="job-pop-msg"></p><div class="buttons"><button type="button" id="job-resume">Resume (cycle start)</button><button type="button" id="job-pop-def" hidden>Stock and bits…</button></div></div>
+  <div class="job-pop" id="job-pop" role="alertdialog" aria-labelledby="job-pop-h" hidden><b id="job-pop-h">Paused (M0)</b><p id="job-pop-msg"></p><div class="trio hs-bit" id="job-pop-bit" hidden>
+    <label>Bit<select data-k="shape"><option value="flat">Flat end mill</option><option value="ball">Ball end</option><option value="vbit">V-bit</option></select></label>
+    <label>Diameter<input data-k="d" type="number" step="any" min="0.1"></label><label>V angle<input data-k="angle" type="number" step="any" min="10" max="170"></label>
+    <label>Sticks out<input data-k="len" type="number" step="any" min="0"></label></div><div class="buttons"><button type="button" id="job-resume">Resume (cycle start)</button></div></div>
   <div class="ft-pop" id="ft-pop" role="dialog" aria-labelledby="ft-pop-h" hidden><div class="ft-head"><b id="ft-pop-h">FluidTouch pendant</b>
     <button type="button" id="ft-pop-x" aria-label="Close the pendant screen" title="Close">✕</button></div>
     <canvas id="ft-pop-c" width="800" height="480" aria-label="FluidTouch's screen: click or drag to touch it"></canvas></div>
@@ -898,6 +928,7 @@ body.vr-on .stage { grid-row: 1; }
 <script src="js/lib/cnc-gcode-tools/animator.js"></script>
 <script src="js/gcode_play.js"></script>
 <script src="js/motion_carve.js"></script>
+<script src="js/hand_setup.js"></script>
 <script src="js/sd_card.js"></script>
 <script src="js/homing.js"></script>
 <script src="js/fluidnc_sim.js"></script>
@@ -914,6 +945,10 @@ body.vr-on .stage { grid-row: 1; }
 <script>
 (function () {
   const IN = 25.4;
+  // Part 31: what's on the table / in the router, and the spoilboard ("On the table", below)
+  const HAND = { stock: { on: false, x0: 0, x1: 300, y0: 0, y1: 300, t: 18 }, bit: { shape: "flat", d: 6.35, angle: 90, len: 0 },
+    tool: null, sim: null, mesh: null, bitMesh: null, plate: null, last: null, skip: true, key: "" };
+  const SPOIL = { sim: null, mesh: null, key: "", frame: null, saveTimer: 0, loading: 0 };
   const DUST_PARTS = /^(Dust_Skirt|Bristles_TPU)/;   // the shoe's bottom: own group (Shoe); its top stays with the core
   const SOURCE = {
     printed: "V1E printed part (STL from Printables)",
@@ -1976,6 +2011,16 @@ body.vr-on .stage { grid-row: 1; }
     const rb = meshes.find((m) => m.userData.name === "Router_Bit");
     bitOK = !!rb && inTree.has(rb) && LR4ShowTree.on(tree, showOff, partId(rb)) && (!INSPECT || INSPECT.set.has(partId(rb)));
     if (!bitOK && JOB.bits) for (const b of JOB.bits.values()) b.visible = false;
+    // Part 31: the spoilboard's height field is the table's top (where TableMDF would show); the hand-installed bit
+    // rides in the router unless the job's own bits show
+    const tm = meshes.find((m) => m.userData.name === "TableMDF");
+    if (tm && SPOIL.mesh) { SPOIL.mesh.visible = tm.visible; tm.visible = false; }
+    if (HAND.bitMesh) {
+      HAND.bitMesh.visible = bitOK && !jobBit;
+      if (rb && HAND.bitMesh.visible) rb.visible = false;
+    }
+    if (HAND.mesh) HAND.mesh.visible = !JOB.stock && $("hs-show-stock").checked;
+    if (JOB.stock) JOB.stock.visible = $("hs-show-stock").checked;
     syncShow();
     inspectScene();
     if (selected && !selected.visible) select(null);
@@ -2107,6 +2152,7 @@ body.vr-on .stage { grid-row: 1; }
       el.addEventListener("input", () => {
         if (CTL.mode === "fluidnc") return;                  // hidden in FluidNC mode (the jog pad instead)
         jobPlaying(false); homeCancel(); move();             // the job pauses
+        HAND.skip = true;                                    // a quick move to a spot, not a cut (user: sliders don't carve)
       });
       el.addEventListener("pointerdown", () => { CTL.drag = el; });
     });
@@ -2175,6 +2221,14 @@ body.vr-on .stage { grid-row: 1; }
         rb.updateMatrixWorld();
         const box = new THREE.Box3().setFromObject(rb), c = box.getCenter(new THREE.Vector3());
         for (const b of JOB.bits.values()) if (b.visible) b.position.set(c.x, c.y, box.min.z);
+      }
+    }
+    if (HAND.bitMesh) {                               // the hand-installed bit: on the model bit's axis, tip at its tip
+      const rb = meshes.find((m) => m.userData.name === "Router_Bit");
+      if (rb) {
+        rb.updateMatrixWorld();
+        const box = new THREE.Box3().setFromObject(rb), c = box.getCenter(new THREE.Vector3());
+        HAND.bitMesh.position.set(c.x, c.y, box.min.z);
       }
     }
     if (hoseMesh) updateHose(dx, dy, dz);
@@ -2751,7 +2805,7 @@ body.vr-on .stage { grid-row: 1; }
     const tl = JOB.tl, st = tl && tl.stock, pl = tl && tl.plates[0];
     TOUCH_PLATE.stock = st ? st.zmax - st.zmin : StrutCam.DEFAULTS.t;
     TOUCH_PLATE.plate = pl && pl.thick > 0 ? pl.thick : StrutCam.DEFAULTS.plate;
-    $("ctl-plate-on").textContent = st ? `on the job's ${+TOUCH_PLATE.stock.toFixed(2)} mm stock` : `on 1/4" stock`;
+    if (HAND.plate && !CTL.jobPlate) TOUCH_PLATE.stock = HAND.plate.z;   // the button's plate: on what's under the bit
     return TOUCH_PLATE;
   }
   function ctlAdd(text, cls) {
@@ -2849,8 +2903,8 @@ body.vr-on .stage { grid-row: 1; }
   function ctlProbe() {
     const sim = CTL.sim, pr = CTL.cfg && CTL.cfg.pins.probe, z = CTL.cfg && CTL.cfg.pins.motors.find((m) => m.axis === "z");
     if (!sim || !pr || !z) return;
-    if (!$("ctl-plate").checked) { sim.clearSwitch(pr.gpio); return; }
-    const tp = touchPlate(), top = tp.stock + tp.plate;   // the plate's top above the table
+    if (!CTL.jobPlate && !HAND.plate) { sim.clearSwitch(pr.gpio); return; }
+    const tp = touchPlate(), top = tp.stock + tp.plate;   // the plate's top above the table (the job's stock, or under the bit)
     sim.setSwitch(pr.gpio, z.step, z.dir, (top - meta.tip_above_table - CTL.boot[2]) * CTL.cfg.steps.z.to, true);
   }
   function ctlHome() {
@@ -3106,7 +3160,7 @@ body.vr-on .stage { grid-row: 1; }
   }
   // tests/test_page_basic.js: what the pendant is told
   window.LR4Basic = { pendant: pendantSet, nc: () => BNC.nc, status: () => BASIC_PAGE.status(), homed: () => !!HOME.home && !HOME.run,
-    playing: () => JOB.playing, pop: () => !$("job-pop").hidden, t: () => JOB.t };
+    playing: () => JOB.playing, pop: () => !$("job-pop").hidden, t: () => JOB.t, jog: (o) => BASIC_PAGE.jog(o), jogging: () => !!BNC.jog || BNC.jogs.length > 0 };
   function ctlSetMode(mode) {
     if (mode === CTL.mode) return;
     CTL.mode = mode;
@@ -3163,7 +3217,6 @@ body.vr-on .stage { grid-row: 1; }
       b.addEventListener("click", () => CTL.sim && CTL.sim.realtime(/^\d+$/.test(b.dataset.rt) ? Number(b.dataset.rt) : b.dataset.rt));
     setInterval(() => { if (CTL.sim && !document.hidden) CTL.sim.realtime("?"); }, 500);   // auto reports only come on a change
     $("ctl-speed").addEventListener("change", () => ncScale(Number($("ctl-speed").value)));
-    $("ctl-plate").addEventListener("change", ctlProbe);
     for (const b of document.querySelectorAll("#pos-jog [data-jog]"))
       b.addEventListener("click", () => ctlJogPad(b.dataset.jog[0], b.dataset.jog[1] === "+" ? 1 : -1));
     $("jog-stop").addEventListener("click", () => CTL.sim && CTL.sim.realtime(0x85));
@@ -3173,10 +3226,11 @@ body.vr-on .stage { grid-row: 1; }
   // for tests/test_page_fluidnc.js: the controller's state and the model's pose (mm from the parked pose)
   window.LR4Ctl = { mode: () => CTL.mode, state: () => CTL.state, mpos: () => CTL.mpos, boot: () => CTL.boot,
     cfg: () => CTL.cfg, pose: () => HOME.pose && [HOME.pose.x, HOME.pose.y, HOME.pose.z], travel: () => meta && meta.travel,
-    tip: () => meta && meta.tip_above_table, TOUCH_PLATE, sync: () => ctlTick(), homed: () => CTL.homed };
+    tip: () => meta && meta.tip_above_table, TOUCH_PLATE, sync: () => ctlTick(), homed: () => CTL.homed,
+    plate: () => !!(CTL.jobPlate || HAND.plate) };
 
   // ---- version + feedback: the issue link carries the size, data date and the loaded files' checksums ----
-  const VERSION = "0.34.0";
+  const VERSION = "0.35.0";
   function setupAbout() {
     const bits = [`lr4-sandbox ${VERSION}`];
     if (cfg.built) bits.push(`model data built ${cfg.built}`);
@@ -3275,13 +3329,13 @@ body.vr-on .stage { grid-row: 1; }
     catch (e) { /* V1E's */ }
     return GcodePlay.V1E;
   }
-  function jobStockMaterial(top, bottom, through, skirt) {   // cnc-gcode-tools' stock shader (theme colours as there)
+  function jobStockMaterial(top, bottom, through, skirt, rgb) {   // cnc-gcode-tools' stock shader (theme colours as there; rgb: MDF)
     const dark = matchMedia("(prefers-color-scheme: dark)").matches;
     const m = new THREE.ShaderMaterial({
       side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1,
       uniforms: { uLight: { value: new THREE.Vector3(0, 0, 1) }, uView: { value: new THREE.Vector3(0, 0, 1) },
-        uStockColor: { value: new THREE.Vector3(...(dark ? [0.80, 0.68, 0.50] : [0.87, 0.75, 0.56])) },
-        uCutColor: { value: new THREE.Vector3(...(dark ? [0.70, 0.55, 0.38] : [0.76, 0.60, 0.42])) },
+        uStockColor: { value: new THREE.Vector3(...(rgb || (dark ? [0.80, 0.68, 0.50] : [0.87, 0.75, 0.56]))) },
+        uCutColor: { value: new THREE.Vector3(...(rgb ? rgb.map((v) => v * 0.85) : dark ? [0.70, 0.55, 0.38] : [0.76, 0.60, 0.42])) },
         uTop: { value: top }, uBottom: { value: bottom }, uThroughZ: { value: through + (top - bottom) * 1e-5 },
         uSkirt: { value: skirt ? 1 : 0 } },
       vertexShader: `uniform float uThroughZ; varying vec3 vPos; varying vec3 vNormal; varying float vThrough;
@@ -3313,7 +3367,7 @@ body.vr-on .stage { grid-row: 1; }
       for (const m of mats) { m.uniforms.uLight.value.copy(l); m.uniforms.uView.value.set(e[8], e[9], e[10]).normalize(); }
     };
   }
-  function jobStockMesh(sim, at) {                   // the heightmap as one grid (top) + its four side walls
+  function jobStockMesh(sim, at, rgb) {              // the heightmap as one grid (top) + its four side walls
     const { nx, ny, vx, vy, dx, dy, stock: s } = sim;
     const pos = new Float32Array(vx * vy * 3);
     for (let j = 0, k = 0; j < vy; j++) for (let i = 0; i < vx; i++, k++) {
@@ -3331,21 +3385,21 @@ body.vr-on .stage { grid-row: 1; }
     // shaded as cnc-gcode-tools shades its stock (StockMeshRenderer): cut surfaces in their own colour, darker with
     // depth, lit from beside the camera; cut-through triangles dropped so the table shows; pushed back (polygon offset)
     // so the moves on its surface stay visible
-    const top = new THREE.Mesh(geo, jobStockMaterial(at[2] + s.zmax, at[2] + s.zmin, sim.bottom + at[2], false));
+    const top = new THREE.Mesh(geo, jobStockMaterial(at[2] + s.zmax, at[2] + s.zmin, sim.bottom + at[2], false, rgb));
     const x0 = at[0] + s.xmin, x1 = at[0] + s.xmax, y0 = at[1] + s.ymin, y1 = at[1] + s.ymax, z0 = at[2] + s.zmin, z1 = at[2] + s.zmax;
     const w = [[x0, y0, x1, y0], [x1, y0, x1, y1], [x1, y1, x0, y1], [x0, y1, x0, y0]].flatMap(([a, b, c, d]) =>
       [a, b, z0, c, d, z0, c, d, z1, a, b, z0, c, d, z1, a, b, z1]);
     const wg = new THREE.BufferGeometry();
     wg.setAttribute("position", new THREE.Float32BufferAttribute(w, 3));
     wg.computeVertexNormals();
-    top.add(new THREE.Mesh(wg, jobStockMaterial(z1, z0, -Infinity, true)));
+    top.add(new THREE.Mesh(wg, jobStockMaterial(z1, z0, -Infinity, true, rgb)));
     top.userData.z = at[2];
     top.onBeforeRender = camLight([top.material]);
     top.children[0].onBeforeRender = camLight([top.children[0].material]);
     return top;
   }
-  function jobUpdateMesh(all) {                      // copy the carved rows into the grid: heights, normals, shading
-    const sim = JOB.sim, mesh = JOB.stock;
+  function jobUpdateMesh(all) { meshUpdate(JOB.sim, JOB.stock, all); }
+  function meshUpdate(sim, mesh, all) {              // copy the carved rows into the grid: heights, normals, shading
     if (!sim || !mesh || (!all && !sim.isDirty)) return;
     const { vx, vy, dx, dy, heights: h, stock: s } = sim, z0 = mesh.userData.z, span = s.zmax - s.zmin || 1;
     const j0 = all ? 0 : Math.max(0, sim.dirtyMin - 1), j1 = all ? vy - 1 : Math.min(vy - 1, sim.dirtyMax + 1);
@@ -3424,6 +3478,7 @@ body.vr-on .stage { grid-row: 1; }
       pad: V(c).addScaledVector(V(L), at[0]).addScaledVector(V(W), at[1]).addScaledVector(V(N), at[2]) });
   }
   function jobTouch(pl) {                           // pl: the probe's tl.plates entry, or null = back on the core
+    if (!pl && HAND.plate) pl = HAND.plate;          // the button's plate stays where it was laid (world mm)
     const parts = meshes.filter((m) => TOUCH_PARTS.includes(m.userData.name)), plate = parts.find((m) => m.userData.name === "TouchPlate");
     if (probing !== !!(pl && plate)) { probing = !!(pl && plate); applyVisibility(); }   // skirt off while probing
     if (!pl || !plate) {                             // back on the core: move() places them again
@@ -3431,11 +3486,11 @@ body.vr-on .stage { grid-row: 1; }
       for (const m of parts) { m.userData.held = false; m.quaternion.identity(); }
       return was;
     }
-    const f = touchFrame(plate.geometry), at = JOB.at;
+    const f = touchFrame(plate.geometry), at = pl.world ? [0, 0, 0] : JOB.at;
     const dir = new THREE.Vector3(1, -1, 0).normalize(), up = new THREE.Vector3(0, 0, 1), side = up.clone().cross(dir);
     const R = new THREE.Matrix4().makeBasis(dir, side, up).multiply(new THREE.Matrix4().makeBasis(f.L, f.W, f.N).transpose());
     const q = new THREE.Quaternion().setFromRotationMatrix(R);
-    const target = new THREE.Vector3(at[0] + pl.x, at[1] + pl.y, at[2] + pl.z + Math.max(pl.thick, 0.5) / 2);
+    const target = new THREE.Vector3(at[0] + pl.x, at[1] + pl.y, at[2] + (pl.world ? pl.wz : pl.z) + Math.max(pl.thick, 0.5) / 2);
     const pos = target.sub(f.pad.clone().applyMatrix4(R));
     for (const m of parts) { m.userData.held = true; m.quaternion.copy(q); m.position.copy(pos); m.scale.set(1, 1, 1); }
     return true;
@@ -3520,7 +3575,8 @@ body.vr-on .stage { grid-row: 1; }
       JOB.group.traverse((o) => { if (o.geometry) o.geometry.dispose(); if (o.material) [].concat(o.material).forEach((m) => m.dispose()); });
     }
     Object.assign(JOB, { tl: null, sim: null, group: null, done: null, ahead: null, stock: null, bits: null, t: 0, k: 0, key: "",
-      spinning: false });
+      spinning: false, tools: null, spoil: null });
+    handShow();
     if (jobBit) { jobBit = false; applyVisibility(); }
     jobPlaying(false);
     $("job-pop").hidden = true;
@@ -3533,8 +3589,9 @@ body.vr-on .stage { grid-row: 1; }
     const src = JOB.file || page;
     $("job-off").hidden = !!src;
     $("job-back").hidden = !(JOB.file && page);
-    if (!src || !meta) { jobClear(); $("job-on").hidden = true; $("job-def").hidden = true; $("job-src").textContent = ""; return; }
-    const def = defLoad(src), head = def ? GcodePlay.header(def.stock, def.tools, def.inch) : "";
+    if (meta) handRefresh();                         // the spoilboard / hand stock / bit for this size
+    if (!src || !meta) { jobClear(); $("job-on").hidden = true; $("job-src").textContent = ""; return; }
+    const head = handHeader(src);
     const spot = jobSpot();
     const key = `${src.kind}|${src.name}|${src.text.length}|${src.text.slice(-200)}|${S.cutX},${S.cutY},${S.n},${lite},${tableTop}|` +
       `${spot ? [spot.x, spot.y, spot.z].map((v) => v.toFixed(3)) : "-"}|${head}|${JOB.zero ? JOB.zero.join(",") : ""}`;
@@ -3550,24 +3607,18 @@ body.vr-on .stage { grid-row: 1; }
     if (seq !== JOB.seq) return;                     // a newer one started meanwhile
     const keep = FJ.job && JOB.tl && JOB.tl.segs.length === tl.segs.length;   // the stock / bits given mid-run: same moves
     jobClear(keep);
-    const t = meshes.find((m) => m.userData.name === "TableMDF");
-    if (!t || !tl.segs.length) { $("job-on").hidden = true; $("job-src").textContent = `${src.name}: no moves.`; return; }
-    const bb = new THREE.Box3().setFromObject(t), cx = (bb.min.x + bb.max.x) / 2, cy = (bb.min.y + bb.max.y) / 2;
-    const at = [cx - S.cutX / 2, cy - S.cutY / 2, bb.max.z - (tl.stock ? tl.stock.zmin : 0)];   // work zero, world mm
-    // ...on the model router's own axis: it sits ~0.8 mm off the nominal tool spot (placed by the dust shoe's notch),
-    // so measure the model bit at machine zero (a plain cylinder: its box centre is on the axis)
-    const mb = meshes.find((m) => m.userData.name === "Router_Bit");
-    if (mb) {
-      const tv0 = meta.travel;
-      move([tv0.x[0], tv0.y[0], 0]);
-      const g = mb.geometry;
-      if (!g.boundingBox) g.computeBoundingBox();
-      at[0] = (g.boundingBox.min.x + g.boundingBox.max.x) / 2 * mb.scale.x + mb.position.x;
-      at[1] = (g.boundingBox.min.y + g.boundingBox.max.y) / 2 * mb.scale.y + mb.position.y;
-      JOB.tipErr = g.boundingBox.min.z * mb.scale.z + mb.position.z - (bb.max.z + meta.tip_above_table);   // model tip vs tip_above_table
-    }
-    if (JOB.zero) { at[0] += JOB.zero[0]; at[1] += JOB.zero[1]; }   // work zero off the corner (LR4Demo.zero)
+    const fr = tableFrame();
+    if (!fr || !tl.segs.length) { $("job-on").hidden = true; $("job-src").textContent = `${src.name}: no moves.`; return; }
+    const zmin = tl.stock ? tl.stock.zmin : 0, z0 = jobZ0();
+    const at = [fr[0] + z0[0], fr[1] + z0[1], fr[2] - zmin];   // work zero, world mm (off the corner: LR4Demo.zero)
     Object.assign(JOB, { tl, at, src, key, group: new THREE.Group() });
+    // Part 31: the job's bits carve the spoilboard too (its moves seen from the table's frame), and the first one goes
+    // in the router
+    JOB.tools = StockSimulator.compileTools(tl.tools);
+    JOB.spoil = SPOIL.sim ? HandSetup.shifted(SPOIL.sim, [z0[0], z0[1], -zmin], JOB.tools, JOB.tools.values().next().value || null) : null;
+    JOB.spoilAt = 0;
+    const t1 = tl.tools.get(tl.segs[0].toolNumber);
+    if (t1 && !keep) handBit(HandSetup.fromDef(t1), false);
     if (tl.stock && tl.tools.size) {
       JOB.cells = lite ? 1.2e5 : 4e5;
       JOB.sim = new StockSimulator(tl.stock, tl.tools, { maxCells: JOB.cells });
@@ -3587,77 +3638,278 @@ body.vr-on .stage { grid-row: 1; }
     JOB.group.add(mv.ahead, mv.done, mv.partial);
     mv.ahead.visible = mv.done.visible = mv.partial.visible = $("job-moves").checked;
     scene.add(JOB.group);
+    handShow();
     const tv = meta.travel, b = tl.segs.reduce((r, sg) => [Math.min(r[0], sg.end.x), Math.max(r[1], sg.end.x), Math.min(r[2], sg.end.y),
       Math.max(r[3], sg.end.y)], [Infinity, -Infinity, Infinity, -Infinity]);
-    const z0 = jobZ0();
     JOB.fits = b[0] + z0[0] >= -0.01 && b[2] + z0[1] >= -0.01 && b[1] + z0[0] <= tv.x[1] - tv.x[0] + 0.01 && b[3] + z0[1] <= tv.y[1] - tv.y[0] + 0.01;
     const units = { mm: "mm (G21)", in: "inches (G20), shown in mm", mixed: "G20 + G21, shown in mm" }[tl.units];
     $("job-src").textContent = `${src.name}: ${tl.lines} lines, ${tl.segs.length} moves, ${units}; ~${clock(tl.total)} at ` +
       `${jobRates() === GcodePlay.V1E ? "V1E's JP3_LR" : "your config.yaml's"} speeds. ` +
-      (tl.stock ? "" : "No stock given (a (Stock:) line, or Stock and bits below), so nothing is carved. ") +
+      (tl.stock ? (JOB.handStock ? "On the stock set up by hand. " : "") : "No stock on the table (On the table > Stock): only the spoilboard carves. ") +
       (JOB.fits ? "" : "Some moves are outside this machine's travel: the bit stops at its limits.");
     $("job-on").hidden = false;
-    defShow(src, tl);
     if (keep) fjReload(); else if (FJ.job) fjDone("The file changed: the page stopped following the job.");
     if (CTL.mode !== "fluidnc") jobSeek(0, false);
     else if (!keep) { JOB.done.geometry.setDrawRange(0, 0); JOB.partial.geometry.setDrawRange(0, 0); }   // the model follows the motors
   }
-  // ---- Stock and bits (user 2026-10-21): a file with no (Stock:) line or no ToolDef for a bit it uses gets them
-  // from the user - at the start, at a pause, or at a change to that bit (Playback stops there; FluidNC is held).
-  // Kept per file in this browser (mm, + whether the file's header units are inches) and read as a header before
-  // the file (GcodePlay.header), so the file itself is unchanged. ----
+  // ---- On the table (Part 31, user 2026-10-23): the stock, the bit in the router and the touch plate, set up by hand
+  // as at the real machine, and the spoilboard. A file with no (Stock:) line gets the hand stock and a bit it doesn't
+  // define gets the router's (or the one picked at its tool change, kept per file in this browser), as a header before
+  // the file (GcodePlay.header), so the file itself is unchanged. Every move carves (handTick): the stock (the job's,
+  // else the hand one) and the spoilboard, a height field over the whole table top kept in IndexedDB per machine size
+  // (HandSetup.board). Table frame: mm from the cutting area's front-left corner, Z up from the spoilboard's top. ----
   const defKey = (src) => "lr4-jobdef:" + (src.kind === "sd" ? src.name : src.kind);
   function defLoad(src) {
     try { return JSON.parse(localStorage.getItem(defKey(src)) || "null"); } catch (e) { return null; }
   }
-  const SHAPES = [["flat", "Flat end mill"], ["ball", "Ball end"], ["vbit", "V-bit"]];
-  function defShow(src, tl) {
-    const def = defLoad(src), miss = GcodePlay.missing(tl);
-    const userStock = def && def.stock, userTools = (def && def.tools) || {};
-    const stockShown = miss.stock || !!userStock, tools = [...new Set([...miss.tools, ...Object.keys(userTools).map(Number)])];
-    JOB.defMissing = miss.stock || miss.tools.length > 0;
-    $("job-def").hidden = !stockShown && !tools.length;
-    if ($("job-def").hidden) return;
-    if (JOB.defMissing) $("job-def").open = true;
-    $("job-def-note").hidden = !JOB.defMissing;
-    $("job-def-stock").hidden = !stockShown;
-    const g = userStock || miss.guess || { xmin: 0, xmax: 100, ymin: 0, ymax: 100, thick: 6 };
-    $("def-x0").value = +g.xmin.toFixed(2); $("def-x1").value = +g.xmax.toFixed(2);
-    $("def-y0").value = +g.ymin.toFixed(2); $("def-y1").value = +g.ymax.toFixed(2); $("def-t").value = +g.thick.toFixed(2);
-    const box = $("job-def-tools");
-    box.innerHTML = "";
-    for (const n of tools) {
-      const t = userTools[n] || { shape: "flat", d: 6.35, angle: 90 }, row = document.createElement("div");
-      row.className = "trio"; row.dataset.tool = n;
-      row.innerHTML = `<b>T${n}</b><label>Bit<select data-k="shape">${SHAPES.map(([v, l]) => `<option value="${v}">${l}</option>`).join("")}</select></label>` +
-        `<label>Diameter<input data-k="d" type="number" step="any" min="0.1"></label><label>V angle<input data-k="angle" type="number" step="any" min="10" max="170"></label>`;
-      row.querySelector('[data-k="shape"]').value = t.shape;
-      row.querySelector('[data-k="d"]').value = t.d;
-      row.querySelector('[data-k="angle"]').value = t.angle || 90;
-      box.appendChild(row);
+  function handHeader(src) {
+    const n = HandSetup.needs(src.text), saved = (defLoad(src) || {}).tools || {}, tools = {}, z0 = jobZ0(), s = HAND.stock;
+    for (const t of n.tools) tools[t] = saved[t] || HAND.bit;
+    // the surfacing job runs on the bare spoilboard
+    const st = !n.stock && !n.surfacing && s.on ? { xmin: s.x0 - z0[0], xmax: s.x1 - z0[0], ymin: s.y0 - z0[1], ymax: s.y1 - z0[1], thick: s.t } : null;
+    JOB.handStock = !!st;
+    return GcodePlay.header(st, tools, n.inch);
+  }
+  // the cutting area's front-left corner on the table top, world mm: on the model router's own axis (it sits ~0.8 mm
+  // off the nominal tool spot, placed by the dust shoe's notch), so the model bit is measured at machine zero (a plain
+  // cylinder: its box centre is on the axis)
+  function tableFrame() {
+    const t = meshes.find((m) => m.userData.name === "TableMDF");
+    if (!t || !meta) return null;
+    const bb = new THREE.Box3().setFromObject(t), fr = [(bb.min.x + bb.max.x) / 2 - S.cutX / 2, (bb.min.y + bb.max.y) / 2 - S.cutY / 2, bb.max.z];
+    const mb = meshes.find((m) => m.userData.name === "Router_Bit");
+    if (mb) {
+      const tv0 = meta.travel, was = HOME.pose && [HOME.pose.x, HOME.pose.y, HOME.pose.z];
+      HAND.skip = true;
+      move([tv0.x[0], tv0.y[0], 0]);
+      const g = mb.geometry;
+      if (!g.boundingBox) g.computeBoundingBox();
+      fr[0] = (g.boundingBox.min.x + g.boundingBox.max.x) / 2 * mb.scale.x + mb.position.x;
+      fr[1] = (g.boundingBox.min.y + g.boundingBox.max.y) / 2 * mb.scale.y + mb.position.y;
+      if (was) move(was);
+    }
+    return fr;
+  }
+  try { Object.assign(HAND, JSON.parse(localStorage.getItem("lr4-hand") || "{}")); } catch (e) { /* defaults */ }
+  const handSave = () => { try { localStorage.setItem("lr4-hand", JSON.stringify({ stock: HAND.stock, bit: HAND.bit })); } catch (e) { /* not kept */ } };
+  function handShow() {                              // which stock shows: the job's, else the hand one (Show the stock)
+    const on = $("hs-show-stock").checked;
+    if (HAND.mesh) HAND.mesh.visible = on && !JOB.stock;
+    if (JOB.stock) JOB.stock.visible = on;
+  }
+  function bitForm(box, b) {                         // fill / read a bit form (On the table > Bit, the tool-change popup)
+    const q = (k) => box.querySelector(`[data-k="${k}"]`);
+    if (b) { q("shape").value = b.shape; q("d").value = +(+b.d).toFixed(4); q("angle").value = b.angle || 90; q("len").value = b.len || 0; return b; }
+    const d = parseFloat(q("d").value);
+    return d > 0 ? { shape: q("shape").value, d, angle: parseFloat(q("angle").value) || 90, len: Math.max(0, parseFloat(q("len").value) || 0) } : null;
+  }
+  // a bit into the router: drawn instead of the model's bit (its stick-out: the model bit's length if 0), carves the
+  // hand moves; what's in the router is kept for next time (a job's bit going in counts too)
+  function handBit(b) {
+    HAND.bit = Object.assign({}, b);
+    HAND.tool = compileStockTool(HandSetup.toDef(b));
+    handSave();
+    $("hs-bit-name").textContent = HandSetup.bitName(b);
+    bitForm($("hs-bit"), b);
+    if (HAND.bitMesh) { scene.remove(HAND.bitMesh); HAND.bitMesh.geometry.dispose(); [].concat(HAND.bitMesh.material).forEach((m) => m.dispose()); HAND.bitMesh = null; }
+    const rb = meshes.find((m) => m.userData.name === "Router_Bit");
+    if (rb && meta) {
+      const g = rb.geometry;
+      if (!g.boundingBox) g.computeBoundingBox();
+      const len = b.len > 0 ? b.len : (g.boundingBox.max.z - g.boundingBox.min.z) * rb.scale.z;
+      HAND.bitMesh = jobBitMesh(Object.assign(HandSetup.toDef(b), { overallLength: len, fluteLength: Math.min(len, b.d * 3) }), TOOL_RGB[0]);
+      if (HAND.bitMesh) scene.add(HAND.bitMesh);
+      applyVisibility();
+      move(HOME.pose ? [HOME.pose.x, HOME.pose.y, HOME.pose.z] : undefined);
     }
   }
-  $("job-def-use").addEventListener("click", () => {
-    if (!JOB.src || !JOB.tl) return;
-    const num = (id) => parseFloat($(id).value);
-    const def = { inch: JOB.tl.metaInch, tools: {} };
-    if (!$("job-def-stock").hidden) {
-      const st = { xmin: num("def-x0"), xmax: num("def-x1"), ymin: num("def-y0"), ymax: num("def-y1"), thick: num("def-t") };
-      if (!(st.xmax > st.xmin && st.ymax > st.ymin && st.thick > 0)) { $("job-status").textContent = "Stock: each 'to' must be past its 'from', and the thickness above 0."; return; }
-      def.stock = st;
+  // the hand stock (no job loaded): a StockSimulator in the table's frame, bottom on the spoilboard
+  function handStock() {
+    const s = HAND.stock, fr = SPOIL.frame, key = `${JSON.stringify(s)}|${fr && fr.join()}|${lite}`;
+    $("hs-stock-name").textContent = s.on ? `${+(s.x1 - s.x0).toFixed(1)} × ${+(s.y1 - s.y0).toFixed(1)} × ${+s.t.toFixed(2)} mm` : "none";
+    for (const [id, v] of [["hs-x0", s.x0], ["hs-x1", s.x1], ["hs-y0", s.y0], ["hs-y1", s.y1], ["hs-t", s.t]]) $(id).value = +v.toFixed(2);
+    if (key === HAND.key) return;
+    HAND.key = key;
+    if (HAND.mesh) { scene.remove(HAND.mesh); HAND.mesh.traverse((o) => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); }); HAND.mesh = null; }
+    HAND.sim = null;
+    if (!s.on || !fr) return;
+    HAND.sim = new StockSimulator({ xmin: s.x0, xmax: s.x1, ymin: s.y0, ymax: s.y1, zmin: 0, zmax: s.t }, new Map(), { maxCells: lite ? 1.2e5 : 4e5, snapshots: false });
+    HAND.mesh = jobStockMesh(HAND.sim, fr);
+    scene.add(HAND.mesh);
+    meshUpdate(HAND.sim, HAND.mesh, true);
+    handShow();
+  }
+  // the spoilboard: the TableMDF top as a height field (Z 0 = its top when new), kept per machine size
+  function spoilSetup() {
+    const t = meshes.find((m) => m.userData.name === "TableMDF"), fr = tableFrame();
+    if (!t || !fr) return;
+    const bb = new THREE.Box3().setFromObject(t), key = `${S.cutX.toFixed(1)}x${S.cutY.toFixed(1)}`;
+    const look = `${key}|${fr.map((v) => v.toFixed(2)).join()}|${lite}`;
+    SPOIL.frame = fr;
+    if (look === SPOIL.look) return;
+    SPOIL.look = look;
+    if (SPOIL.mesh) { scene.remove(SPOIL.mesh); SPOIL.mesh.traverse((o) => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); }); }
+    const st = { xmin: bb.min.x - fr[0], xmax: bb.max.x - fr[0], ymin: bb.min.y - fr[1], ymax: bb.max.y - fr[1], zmin: bb.min.z - fr[2], zmax: 0 };
+    const keep = SPOIL.sim && SPOIL.key === key ? SPOIL.sim : null;
+    SPOIL.sim = new StockSimulator(st, new Map(), { maxCells: lite ? 1.5e5 : 6e5, snapshots: false });
+    if (keep) SPOIL.sim.heights.set(HandSetup.resample(keep.heights, keep.nx, keep.ny, SPOIL.sim.nx, SPOIL.sim.ny));
+    SPOIL.key = key;
+    SPOIL.mesh = jobStockMesh(SPOIL.sim, fr, MDF_RGB);
+    scene.add(SPOIL.mesh);
+    meshUpdate(SPOIL.sim, SPOIL.mesh, true);
+    applyVisibility();
+    HAND.key = "";                                   // the hand stock sits on it: placed again
+    if (!keep) {                                     // this size's board from the last session
+      const seq = ++SPOIL.loading, sim = SPOIL.sim;
+      HandSetup.board.get(key).then((r) => {
+        if (!r || seq !== SPOIL.loading || sim !== SPOIL.sim) return;
+        sim.heights.set(r.nx === sim.nx && r.ny === sim.ny ? r.heights : HandSetup.resample(r.heights, r.nx, r.ny, sim.nx, sim.ny));
+        sim.markAllDirty();
+        meshUpdate(sim, SPOIL.mesh, true);
+        spoilNote();
+      }).catch(() => { /* none kept */ });
     }
-    for (const row of $("job-def-tools").children) {
-      const v = (k) => row.querySelector(`[data-k="${k}"]`).value, d = parseFloat(v("d"));
-      if (d > 0) def.tools[row.dataset.tool] = { shape: v("shape"), d, angle: parseFloat(v("angle")) || 90 };
+    spoilNote();
+  }
+  function spoilNote() {
+    if (!SPOIL.sim) return;
+    const lv = HandSetup.level(SPOIL.sim, { x: [0, S.cutX], y: [0, S.cutY] });
+    $("hs-spoil-note").textContent = `The table's top: it keeps every cut below the stock, in this browser, per machine size. ` +
+      `Level now ${lv < -0.005 ? `${(-lv).toFixed(2)} mm below new (surfaced)` : "as new"}; ` +
+      `${((SPOIL.sim.stock.zmax - SPOIL.sim.stock.zmin) + lv).toFixed(1)} mm thick.`;
+  }
+  function spoilSaveSoon() {                         // carving -> kept a moment later (not every frame)
+    clearTimeout(SPOIL.saveTimer);
+    SPOIL.saveTimer = setTimeout(() => { if (SPOIL.sim) HandSetup.board.put(SPOIL.key, SPOIL.sim).catch(() => {}); spoilNote(); }, 1500);
+  }
+  function handRefresh() { spoilSetup(); handStock(); if (!HAND.tool) handBit(HAND.bit, false); }
+  // the touch plate (button): under the bit on what's there - the stock if the bit is over it, else the spoilboard -
+  // and wired to the probe at that surface + the plate; again = away. Jobs lay their own (fjPlate / jobSeek)
+  function handPlate(on) {
+    if (!on) HAND.plate = null;
+    else {
+      const p = HOME.pose, tv = meta.travel, x = p.x - tv.x[0], y = p.y - tv.y[0], z0 = jobZ0(), fr = SPOIL.frame || tableFrame();
+      let z = null;
+      if (JOB.sim) { const w = HandSetup.topAt(JOB.sim, x - z0[0], y - z0[1]); if (w !== null) z = w - JOB.tl.stock.zmin; }
+      else if (HAND.sim) z = HandSetup.topAt(HAND.sim, x, y);
+      if (z === null || z < 0.01) z = SPOIL.sim ? HandSetup.topAt(SPOIL.sim, x, y) ?? 0 : 0;
+      const thick = StrutCam.DEFAULTS.plate;
+      HAND.plate = { world: true, x: fr[0] + x, y: fr[1] + y, wz: fr[2] + z, z, thick, tool: 0 };
+      TOUCH_PLATE.stock = z; TOUCH_PLATE.plate = thick;
+      $("hs-plate-note").textContent = `On the ${z > 0.01 && (JOB.sim || HAND.sim) ? "stock" : "spoilboard"} under the bit: its top ` +
+        `${(z + thick).toFixed(2)} mm above the spoilboard. ${CTL.mode === "fluidnc" ? "G38.2 down stops on it." : ""}`;
     }
-    try { localStorage.setItem(defKey(JOB.src), JSON.stringify(def)); } catch (e) { /* not kept */ }
-    $("job-pop-def").hidden = true;
-    jobSetup(JOB.pageJob);
+    if (!on) $("hs-plate-note").textContent = "";
+    $("ctl-plate").setAttribute("aria-pressed", String(!!on));
+    $("ctl-plate").textContent = on ? "Put the touch plate away" : "Touch plate under the bit";
+    ctlProbe();
+    if (jobTouch(HAND.plate || null) && meta) move(HOME.pose ? [HOME.pose.x, HOME.pose.y, HOME.pose.z] : undefined);
+  }
+  $("ctl-plate").addEventListener("click", () => { if (meta && HOME.pose) handPlate(!HAND.plate); });
+  // every move carves (once a frame): the tip's path since the last frame, with the router's bit, into the stock (the
+  // job's, seen in its work frame, else the hand one) and the spoilboard - except a job's own moves (carved from the
+  // job: jobSeek, fjTick) and the page's own jumps (HAND.skip: a scrub, a reload, measuring the router)
+  function handTick() {
+    if (!meta || !HOME.pose) return;
+    const tv = meta.travel, p = HOME.pose, now = { x: p.x - tv.x[0], y: p.y - tv.y[0], z: p.z + meta.tip_above_table };
+    const prev = HAND.last;
+    HAND.last = now;
+    if (HAND.skip || JOB.playing || FJ.job || !prev || !HAND.tool || HOME.run) { HAND.skip = false; return; }
+    if (prev.x === now.x && prev.y === now.y && prev.z === now.z) return;
+    let cut = false;
+    if (JOB.sim) {
+      const z0 = jobZ0(), zm = JOB.tl.stock.zmin;
+      if (JOB.sim.sweep(prev.x - z0[0], prev.y - z0[1], prev.z + zm, now.x - z0[0], now.y - z0[1], now.z + zm, HAND.tool)) { jobUpdateMesh(false); cut = true; }
+    } else if (HAND.sim && HAND.sim.sweep(prev.x, prev.y, prev.z, now.x, now.y, now.z, HAND.tool)) { meshUpdate(HAND.sim, HAND.mesh, false); cut = true; }
+    if (SPOIL.sim && Math.min(prev.z, now.z) < 0 && SPOIL.sim.sweep(prev.x, prev.y, prev.z, now.x, now.y, now.z, HAND.tool)) {
+      meshUpdate(SPOIL.sim, SPOIL.mesh, false); spoilSaveSoon(); cut = true;
+    }
+    return cut;
+  }
+  // a job's moves into the spoilboard, as far as the job has got (forward only: it keeps its cuts)
+  function spoilJob(index) {
+    if (!JOB.spoil || !JOB.tl) return;
+    const segs = JOB.tl.segs;
+    if (index < JOB.spoilAt) { JOB.spoilAt = index; return; }
+    let cut = false;
+    for (let i = JOB.spoilAt; i < index && i < segs.length; i++) cut = JOB.spoil.carveOne(segs[i], segs[i - 1], JOB.spoil.tools, JOB.spoil.defaultTool) || cut;
+    JOB.spoilAt = index;
+    if (cut) { meshUpdate(SPOIL.sim, SPOIL.mesh, false); spoilSaveSoon(); }
+  }
+  // a tool change (M6, both modes): the popup asks for the bit - the file's ToolDef, or the one picked before for this
+  // file, or what's in the router - and Resume puts it in (a bit the file doesn't define is kept for the file)
+  function toolAsk(e) {
+    // the file's own ToolDef (not the one handHeader put in front of it for a bit the file doesn't define)
+    e = Object.assign({}, e, { defined: e.defined && !HandSetup.needs(JOB.src.text).tools.includes(e.tool) });
+    const def = e.defined ? JOB.tl.tools.get(e.tool) : null, saved = ((defLoad(JOB.src) || {}).tools || {})[e.tool];
+    JOB.toolAsk = e;
+    bitForm($("job-pop-bit"), def ? HandSetup.fromDef(def) : saved || HAND.bit);
+    $("job-pop-bit").hidden = false;
+    $("job-pop-h").textContent = `Tool change (M6 T${e.tool}) - line ${e.lineNum}`;
+    $("job-pop-msg").textContent = def ? `Put the file's T${e.tool} in the router (its ToolDef below), then resume.` :
+      `The file doesn't say which bit T${e.tool} is: say here, put it in the router, then resume.`;
+    $("job-resume").textContent = "Bit's in: resume";
+  }
+  function toolPut() {                               // Resume after a tool change: the picked bit goes in
+    const e = JOB.toolAsk;
+    JOB.toolAsk = null;
+    $("job-pop-bit").hidden = true;
+    if (!e || !JOB.tl) return;
+    const b = bitForm($("job-pop-bit"));
+    if (!b) return;
+    handBit(b);
+    if (e.defined) return;                           // the file's own: carved with its ToolDef
+    const d = defLoad(JOB.src) || {};
+    d.tools = Object.assign({}, d.tools, { [e.tool]: b });
+    try { localStorage.setItem(defKey(JOB.src), JSON.stringify(d)); } catch (err) { /* not kept */ }
+    // this job carves on with it (no reload: the stock keeps its cuts): its tool def, compiled, and its bit drawn
+    const def = HandSetup.toDef(b), tool = compileStockTool(def);
+    JOB.tl.tools.set(e.tool, def);
+    if (tool) { if (JOB.sim) JOB.sim.tools.set(e.tool, tool); if (JOB.tools) JOB.tools.set(e.tool, tool); }
+    if (JOB.bits) {
+      const old = JOB.bits.get(e.tool), m = jobBitMesh(def, toolRgb(JOB.tl, e.tool));
+      if (old) { JOB.group.remove(old); old.geometry.dispose(); }
+      if (m) { m.visible = false; JOB.bits.set(e.tool, m); JOB.group.add(m); }
+    }
+  }
+  for (const id of ["hs-use", "hs-off"]) $(id).addEventListener("click", () => {
+    const num = (k) => parseFloat($(k).value), s = { on: id === "hs-use", x0: num("hs-x0"), x1: num("hs-x1"), y0: num("hs-y0"), y1: num("hs-y1"), t: num("hs-t") };
+    if (s.on && !(s.x1 > s.x0 && s.y1 > s.y0 && s.t > 0)) { $("hs-plate-note").textContent = "Stock: each 'to' must be past its 'from', and the thickness above 0."; return; }
+    HAND.stock = s.on ? s : Object.assign({}, HAND.stock, { on: false });
+    handSave();
+    handStock();
+    jobSetup(JOB.pageJob);                           // a loaded job without its own stock takes it
   });
-  $("job-def-clear").addEventListener("click", () => {
-    if (!JOB.src) return;
-    try { localStorage.removeItem(defKey(JOB.src)); } catch (e) { /* none */ }
-    jobSetup(JOB.pageJob);
+  $("hs-fit").addEventListener("click", () => {      // round the loaded job's cuts (work mm -> the table's)
+    const g = JOB.tl && GcodePlay.missing(JOB.tl).guess, z0 = jobZ0();
+    if (!g) return;
+    $("hs-x0").value = +(g.xmin + z0[0]).toFixed(2); $("hs-x1").value = +(g.xmax + z0[0]).toFixed(2);
+    $("hs-y0").value = +(g.ymin + z0[1]).toFixed(2); $("hs-y1").value = +(g.ymax + z0[1]).toFixed(2);
+    if (JOB.tl.stock) $("hs-t").value = +(JOB.tl.stock.zmax - JOB.tl.stock.zmin).toFixed(2);
+  });
+  $("hs-bit-use").addEventListener("click", () => { const b = bitForm($("hs-bit")); if (b) { handBit(b); jobSetup(JOB.pageJob); } });
+  $("hs-show-stock").addEventListener("change", handShow);
+  $("hs-new").addEventListener("click", () => {
+    if (!SPOIL.sim || !confirm("Start a new spoilboard? Every cut in this one goes (as swapping or resurfacing it).")) return;
+    SPOIL.sim.heights.fill(0);
+    SPOIL.sim.markAllDirty();
+    meshUpdate(SPOIL.sim, SPOIL.mesh, true);
+    HandSetup.board.remove(SPOIL.key).catch(() => {});
+    spoilNote();
+  });
+  $("hs-surf").addEventListener("click", async () => {   // a surfacing job for this cutting area onto the SD card
+    if (!SPOIL.sim) return;
+    const d = parseFloat($("hs-sd").value), over = parseFloat($("hs-so").value) / 100, depth = parseFloat($("hs-sz").value);
+    if (!(d > 0 && over > 0 && over < 1 && depth > 0)) return;
+    const z = HandSetup.level(SPOIL.sim, { x: [0, S.cutX], y: [0, S.cutY] }) - depth;
+    const text = HandSetup.surfacing({ x: [0, S.cutX], y: [0, S.cutY], d, over, z });
+    const path = "/LR4_surfacing.gcode";
+    try { await SdCard.store.put(path, text); } catch (e) { /* the live card is enough */ }
+    if (CTL.sim) SdCard.writeLive(CTL.sim, path, text);
+    await sdRefresh();
+    await sdSelect(path);
+    $("hs-plate-note").textContent = `${path} on the SD card: ${d} mm bit, ${Math.round(over * 100)}% step-over, Z ${z.toFixed(2)} ` +
+      `(${depth} mm below the spoilboard's level). Take the stock off first; it runs on the bare spoilboard.`;
   });
   const clock = (s) => (s >= 3600 ? `${Math.floor(s / 3600)}:${String(Math.floor(s / 60) % 60).padStart(2, "0")}` : `${Math.floor(s / 60)}`) +
     `:${String(Math.floor(s % 60)).padStart(2, "0")}`;
@@ -3667,6 +3919,8 @@ body.vr-on .stage { grid-row: 1; }
     JOB.t = Math.min(Math.max(s, 0), tl.total);
     const p = GcodePlay.at(tl, JOB.t), tv = meta.travel, at = JOB.at, tableZ = at[2] + (tl.stock ? tl.stock.zmin : 0);
     if (carve && JOB.sim) JOB.sim.advanceTo(p.index, 15, p.progress);
+    if (carve) spoilJob(p.index); else if (JOB.spoil) JOB.spoilAt = Math.min(JOB.spoilAt, p.index);
+    HAND.skip = true;                                // the job's own moves: carved from the job, not as hand moves
     jobUpdateMesh(false);
     JOB.done.geometry.setDrawRange(0, 2 * p.index);
     if (p.index < tl.segs.length) {                  // the move in progress: its start to the bit, in its colour
@@ -3718,12 +3972,13 @@ body.vr-on .stage { grid-row: 1; }
     $("job-play").textContent = JOB.playing ? "Pause" : "Play";
     if (JOB.playing) $("job-pop").hidden = true;
   }
-  function jobStop(e) {                              // M0, a failed probe or a change to an undefined bit: hold
+  function jobStop(e) {                              // M0, a failed probe or a tool change: hold
     jobPlaying(false);
-    $("job-pop-h").textContent = e.kind === "alarm" ? "Alarm" : e.kind === "tool" ? `Tool change - line ${e.lineNum}` : `Paused (M0) - line ${e.lineNum}`;
+    $("job-pop-h").textContent = e.kind === "alarm" ? "Alarm" : `Paused (M0) - line ${e.lineNum}`;
     $("job-pop-msg").textContent = e.kind === "pause" ? GcodePlay.pauseText(JOB.tl, e) : e.text;
     $("job-resume").textContent = e.kind === "alarm" ? "Carry on anyway" : "Resume (cycle start)";
-    $("job-pop-def").hidden = !JOB.defMissing;
+    $("job-pop-bit").hidden = true;
+    if (e.kind === "tool") toolAsk(e);
     $("job-pop").hidden = false;
     $("job-status").textContent = $("job-pop-msg").textContent;   // not the MSG lines after the M0 yet
     jobTouch(JOB.tl.plates.find((q) => JOB.t >= q.t0 && JOB.t <= q.t1) || null);
@@ -3757,13 +4012,9 @@ body.vr-on .stage { grid-row: 1; }
   });
   $("job-resume").addEventListener("click", () => {
     $("job-pop").hidden = true;
+    if (JOB.toolAsk) toolPut();
     if (CTL.mode !== "fluidnc") jobPlaying(true);
     else if (CTL.sim && FJ.job) CTL.sim.realtime("~");
-  });
-  $("job-pop-def").addEventListener("click", () => {
-    showTab("run");
-    $("job-def").hidden = false; $("job-def").open = true;
-    $("job-def").scrollIntoView({ block: "center", behavior: "smooth" });
   });
   {                                                  // drag the pause popup anywhere over the view (kept till reload)
     for (const pop of [$("job-pop"), $("ft-pop")]) {
@@ -3890,20 +4141,22 @@ body.vr-on .stage { grid-row: 1; }
     for (const q of pts) {
       const acts = J.T.feed(q, rate * q.dt * 1.5 + 1);
       if (JOB.sim && acts.length) MotionCarve.carve(JOB.sim, tl.segs, acts);
+      if (JOB.spoil && acts.length && MotionCarve.carve(JOB.spoil, tl.segs, acts)) J.spoilCut = true;
     }
     jobUpdateMesh(false);
+    if (J.spoilCut) { J.spoilCut = false; meshUpdate(SPOIL.sim, SPOIL.mesh, false); spoilSaveSoon(); }
     JOB.done.geometry.setDrawRange(0, 2 * J.T.carved);
     JOB.partial.geometry.setDrawRange(0, 0);
     const w = J.T.last;
     if (w) { $("wx").textContent = w.x.toFixed(3); $("wy").textContent = w.y.toFixed(3); $("wz").textContent = w.z.toFixed(3); }
     for (; J.k < tl.events.length && tl.events[J.k].index <= J.T.i; J.k++) {
-      const e = tl.events[J.k];                      // a change to a bit the file doesn't define: hold it there
-      if (e.kind === "tool" && !J.held && JOB.defMissing) { CTL.sim.realtime("!"); J.toolStop = e; }
+      const e = tl.events[J.k];                      // a tool change (M6): hold it there for the bit
+      if (e.kind === "tool" && !J.held) { CTL.sim.realtime("!"); J.toolStop = e; }
     }
   }
   function fjPlate(pl) {                             // the touch plate on the stock (pl: a tl.plates entry) or away
     FJ.job.plate = pl;
-    $("ctl-plate").checked = !!pl;
+    CTL.jobPlate = pl;
     ctlProbe();
     jobTouch(pl);
     jobCloseUp(pl);
@@ -3921,7 +4174,8 @@ body.vr-on .stage { grid-row: 1; }
     $("job-pop-h").textContent = tool ? "Tool change" : FJ.lastMsg ? "Paused (M0)" : "Feed hold";
     $("job-pop-msg").textContent = tool ? tool.text : FJ.lastMsg || "Held. Resume to carry on.";
     $("job-resume").textContent = "Resume (cycle start)";
-    $("job-pop-def").hidden = !JOB.defMissing;
+    $("job-pop-bit").hidden = true;
+    if (tool) toolAsk(tool);
     $("job-pop").hidden = false;
     $("job-status").textContent = $("job-pop-msg").textContent;
   }
@@ -3930,7 +4184,7 @@ body.vr-on .stage { grid-row: 1; }
     if (ev.SD) { J.seenSD = true; $("job-o").textContent = `${ev.SD.pct.toFixed(0)}%`; $("job-t").value = Math.round(ev.SD.pct * 10); }
     const hold = /^Hold/.test(ev.state || "");
     if (hold && !J.held) { J.held = true; fjHold(); fjButtons(); }
-    else if (!hold && J.held && ev.state !== "Door") { J.held = false; $("job-pop").hidden = true; FJ.lastMsg = ""; fjButtons(); }
+    else if (!hold && J.held && ev.state !== "Door") { J.held = false; $("job-pop").hidden = true; if (JOB.toolAsk) toolPut(); FJ.lastMsg = ""; fjButtons(); }
     if (ev.state === "Alarm") fjDone("FluidNC alarmed: the job stopped. Send $X (Unlock) to carry on.");
     else if (J.seenSD && !ev.SD && ev.state === "Idle") fjDone("Done.");
   }
@@ -3948,7 +4202,7 @@ body.vr-on .stage { grid-row: 1; }
     fjButtons();
   }
   // for tests/test_page_sdjob.js: the job, its carving, and Playback's carve of the same moves to compare with
-  window.LR4Job = { tl: () => JOB.tl, src: () => JOB.src, sim: () => JOB.sim, running: () => !!FJ.job, held: () => !!(FJ.job && FJ.job.held),
+  window.LR4Job = { tl: () => JOB.tl, src: () => JOB.src, sim: () => JOB.sim, spoil: () => SPOIL.sim, hand: () => HAND, handSim: () => HAND.sim, running: () => !!FJ.job, held: () => !!(FJ.job && FJ.job.held),
     files: () => SDC.recs.map((r) => r.path), yamlNote: () => yamlBase && yamlBase.note, flashList: () => $("flash-list").textContent, select: sdSelect, add: sdAdd, refresh: sdRefresh, PAGE_SD,
     playbackHeights() {
       const s = new StockSimulator(JOB.tl.stock, JOB.tl.tools, { maxCells: JOB.cells, snapshots: false });
@@ -5513,6 +5767,7 @@ body.vr-on .stage { grid-row: 1; }
     homeTick();
     basicTick();
     jobTick();
+    handTick();
     ctlTick();
     soundTick();
     if (pendant && pendantOn() && (FT.ft || ++frameN % 8 === 0)) pendantScreen();
