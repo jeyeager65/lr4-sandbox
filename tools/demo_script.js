@@ -10,7 +10,7 @@
 //       MODE=basic|fluidnc (fluidnc: the job runs on the page's FluidNC - its own $H, jogs, $SD/Run, M0 holds)
 //     the machine (Part 29; the page's My machine, set before anything is filmed):
 //       TABLE=34in (top of the MDF; mm, in or ft)  ROOM=16x20x9ft (the shop: X x Y x ceiling; a unit at the end covers
-//       the bare numbers, ft if none)  BRACES=auto|6  STRUTS=mdf|temp  PETER=solid|honeycomb|none (the choices the page
+//       the bare numbers, ft if none)  BRACES=auto|6  STRUTS=mdf|temp  BASE=sheet|torsion  PETER=solid|honeycomb|none (the choices the page
 //       shows: with your own files open|closed|honeycomb|none)  ROUTER=off  SKIRT=off  HOSE=off  FAN=off (on by
 //       default)  MAIN=#292a2e ACCENT=#cc1f1a (print colours)
 //   (Video Show: PRESET=frame HIDE=core.hardware,Y_Clip_* SHOW=XZ_Plate_Min)   what's drawn, by the Show tree's ids
@@ -48,9 +48,9 @@
 
 const SETTINGS = { size: "wxh", machine: "wxh", fps: "num", volume: "num", pause: "num", messagetime: "num", msgtime: "num", hold: "num",
   sound: "bool", park: "bool", messages: "bool", detail: "word", scenery: "word", voice: "word", pendant: "bool", mode: "word",
-  table: "len", room: "room", braces: "word", struts: "word", peter: "word", router: "bool", skirt: "bool", hose: "bool",
+  table: "len", room: "room", braces: "word", struts: "word", base: "word", peter: "word", router: "bool", skirt: "bool", hose: "bool",
   fan: "bool", main: "colour", accent: "colour" };
-const MACHINE_KEYS = ["table", "room", "braces", "struts", "peter", "router", "skirt", "hose", "fan", "main", "accent"];
+const MACHINE_KEYS = ["table", "room", "braces", "struts", "base", "peter", "router", "skirt", "hose", "fan", "main", "accent"];
 const PRESETS = ["all", "no-hardware", "printed", "frame"];   // web/js/show_tree.js PRESETS
 const KINDS = ["shot", "home", "zero", "title", "text", "wait", "speed", "pendant", "show", "inspect"];
 const INTRO_ONLY = new Set(["home", "zero"]);

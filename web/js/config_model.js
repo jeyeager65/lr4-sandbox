@@ -1,6 +1,6 @@
 // LR4 configurator: the machine at any size from lr4_config.json (fit_config.py). Pure functions, shared by the
 // page and test_config_model.js (which checks them against every size build, part by part).
-//   size(cutXmm, cutYmm, braces?, struts?) -> the size features f = [1, TW, TL, strut, pitch, cutY] (+ n, bx, ...)
+//   size(cutXmm, cutYmm, braces?, struts?, base?) -> the size features f = [1, TW, TL, strut, pitch, cutY] (+ n, bx, ...)
 //                                     struts "temp": V1E's temp struts (S.struts falls back to "mdf" under 4 braces)
 //   instances(cfg, S)              -> every part to draw: {rec, name, t: [x,y,z], s: [sx,sy,sz], clipP?}
 //                                     world = s * ref_vertex + t (per axis); rigid parts have s = [1,1,1]
@@ -12,6 +12,7 @@
   "use strict";
   const IN = 25.4, XZ = 6.5;
   const Calc = typeof module !== "undefined" && module.exports ? require("./calculator.js") : root.LR4Calc;
+  const TM = typeof module !== "undefined" && module.exports ? require("./table_model.js") : root.LR4Table;
   // build.py HOSE_ORDER (holder file per brace, counted from the Max end) -> fit_config.py HOSE_TYPE keys
   const HOSE_KEY = { Hose_Holder_Hook: "Hook", hose_holder_shorty: "Shorty", Hose_Hook_70: "Hook70" };
   const HOSE_NAME = { Hook: "Hose_Holder_Hook", Shorty: "Hose_Holder_Shorty", Hook70: "Hose_Hook_70" };
@@ -25,7 +26,7 @@
     const a = TEMP_PITCH, b = span - TEMP_PITCH;
     return [0, ...Array.from({ length: n - 2 }, (_, i) => a + (b - a) * i / (n - 3)), span];
   }
-  function size(cutX, cutY, braces, struts) {
+  function size(cutX, cutY, braces, struts, base) {
     const { strut, xtable, ytable } = Calc.calc(cutX, cutY, XZ);
     const auto = Math.floor((strut - 18) / 183) + 1;       // the strut plate generator's brace count
     const n = braces || auto;
@@ -34,7 +35,8 @@
     const want = struts === "temp", temp = want && n >= TEMP_MIN_BRACES;
     const bx = braceOffsets(strut, n, temp);
     return { cutX, cutY, strut, n, auto, pitch, TW, TL, xtable, ytable, f: [1, TW, TL, strut, pitch, cutY, cutX],
-      struts: temp ? "temp" : "mdf", tempBlocked: want && !temp, bx, bay0: bx[1] - bx[0] };
+      struts: temp ? "temp" : "mdf", tempBlocked: want && !temp, bx, bay0: bx[1] - bx[0],
+      base: base === "torsion" ? "torsion" : "sheet" };       // the table under the spoilboard (Part 33, table_model.js)
   }
   // brace idx's offset; idx < 0 counts back from Brace_Max (the hose holders)
   const braceOffset = (S, idx) => (idx >= 0 ? S.bx[idx] : S.bx[S.n - 1 + idx] - S.bx[S.n - 1]);
@@ -187,7 +189,11 @@
     q = sec("Buy / cut: stock");
     if (q) {
       const fmt = (mm) => `${Math.round(mm)} mm (${(mm / IN).toFixed(3)} in)`;
-      set(byName(q, 1, "Table top"), 3, `${+(S.TW / IN).toFixed(2)} x ${+(S.TL / IN).toFixed(2)} in`);
+      const at = q.rows.findIndex((r) => TM.NAMES.test(r[1]));   // the table rows: this size + base (bom.py table_rows)
+      if (at >= 0) {
+        q.rows = q.rows.filter((r) => !TM.NAMES.test(r[1]));
+        q.rows.splice(at, 0, ...TM.rows(S.base, TM.parts(S.base, S.TW, S.TL, xtable, ytable, S.cutX, S.cutY)));
+      }
       set(byName(q, 1, "X rail"), 3, fmt(xrails));
       set(byName(q, 1, "Y rail"), 3, fmt(yrail));
       const emt = byName(q, 1, "(EMT to buy)"), bins = [];
@@ -247,14 +253,14 @@
     router: [["Printed parts", 1, /^(Dust_Shoe|Dust_Skirt|Tool_Mount|TPU_Bristles)/], ["Buy: specialty", 1, /trim router/i],
       ["Hardware: where", 2, /^Tool Mount/]],
     skirt: [["Printed parts", 1, /^(Dust_Skirt|TPU_Bristles)/]],
-    hose: [["Buy: specialty", 1, /^Fulton|^Wire sleeve/]],
+    hose: [["Buy: specialty", 1, /^Fulton|^Wire sleeve/], ["Printed parts", 1, /^(Dust_Shoe|Dust_Skirt|TPU_Bristles)/]],   // the shoe goes with the hose
     fan: [["Buy: specialty", 1, /blower fan/i], ["Hardware: where", 2, /^Jackpot3 Fan/]],
   };
   function bomOptions(secs, opt) {
     const sec = (t) => secs.find((q) => q.title.startsWith(t));
     const gone = [];                                    // dropped "where" rows
     for (const [k, rules] of Object.entries(OPT_ROWS)) {
-      if (opt[k] !== false && !(k === "skirt" && opt.router === false)) continue;
+      if (opt[k] !== false && !(k === "skirt" && (opt.router === false || opt.hose === false))) continue;
       for (const [t, col, re] of rules) {
         const q = sec(t);
         if (!q) continue;

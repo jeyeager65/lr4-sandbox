@@ -1,8 +1,8 @@
 # LowRider4
 
 V1 Engineering LowRider 4 CNC for a 26 x 50 in usable cutting area: every printed part, the
-strut plates, hardware, Jackpot3 box and Kobalt tool mount assembled on a single MDF sheet
-table (a real table comes later). Also makes the strut plate G-code for the user's current
+strut plates, hardware, Jackpot3 box and Kobalt tool mount assembled on a table: a spoilboard
+between two rail strips (3/4" MDF) on an MDF sheet or a plywood torsion box (`TABLE`, Part 33). Also makes the strut plate G-code for the user's current
 LowRider (FluidNC).
 
 ## Settings
@@ -58,7 +58,7 @@ script is history only.
 - Usable cutting area 26 x 50 in (660.4 x 1270 mm), X (beam) the short axis.
 - Sizes from the V1E LR4 calculator; strut plates from the Vector76 strut plate generator.
 - All printed parts + strut plates + hardware (Jackpot3, endstops, steppers, rails, belts...)
-  in one FreeCAD assembly, sitting on a table that is just an MDF sheet for now.
+  in one FreeCAD assembly, on the table above (no legs in the model; the web page draws basic ones).
 - CAM for the strut plates -> FluidNC G-code (user's LowRider v3 + Jackpot, Kobalt router).
 
 ## Calculator results (26 x 50 in, XZ plate 6.5 mm)
@@ -81,7 +81,9 @@ plates, front_wing_size 11.5 (1" EMT). Plates 830 x 90.5 (front) and 830 x 78.5 
 | Rail tubes | 1" EMT, 29.5 mm OD | V1E docs (US); wall 1.45 GUESS |
 | XZ plates | 6.5 mm aluminium | GUESS - V1E shop plates (calculator default); 6.35 if cut from the DXFs |
 | Strut plate stock | 1/4" MDF, 6.35 mm | GUESS - MEASURE YOURS (sets cam.py depth) |
-| Table | 3/4" MDF, 40 x 65 in | GUESS - footprint + 1" margin each way, rounded up |
+| Table | 40 x 65 in (footprint + 1" margin each way, rounded up) | GUESS |
+| Spoilboard + rail strips | 3/4" MDF; spoilboard = the bit's full travel + 1/4" a side (26-9/16 x 50-9/16 in: a 1/4" bit stays on it, a 3/4" bit surfaces all of it); Min strip to the footprint + 2.5", Max strip from the footprint - 4" (`lr4.TABLE`) | thickness MEASURE YOURS; strip widths GUESS |
+| Table base | "sheet": 3/4" MDF; "torsion": 5/8" plywood ribs (0.6" GUESS - plywood is thin), 3-1/2" tall, <= 12" grid, half-lapped | GUESS - MEASURE YOURS / choose |
 | Router | Kobalt 1.25 HP trim router (Makita RT0701C clone): `hw.trim_router`, grip 65.8 (owners' figure), ER11 nut | motor length, grip/head heights, head 82 x 64, bit stick-out, colours GUESS - MEASURE (override in `lr4.ROUTER`) |
 | 1/8" bit | 1-flute upcut, 12 mm flutes, 38 mm long | GUESS - MEASURE |
 | Power supply | 150 x 60 x 32 mm brick | GUESS |
@@ -105,7 +107,7 @@ plates, front_wing_size 11.5 (1" EMT). Plates 830 x 90.5 (front) and 830 x 78.5 
 | 4 | 1" EMT (29.5) parts: Brace_29p5, Y_Clip_29p5, wings 11.5 | 30/32 mm tubes |
 | 5 | Kobalt tool mount (user's router) | Makita/DeWalt mounts |
 | 6 | Jackpot3 (user is buying one, 2026-10-17) in the Jackpot3 box on the bottom strut plate, first bay on the YZ_Min side (V1E recommendation) | other bays; reusing the LR3's Jackpot |
-| 7 | Table = MDF sheet only, 40 x 65 in | full 4 x 8 sheet (too big), exact footprint (no margin) |
+| 7 | Table 40 x 65 in (Part 33: spoilboard + rail strips on a base - decision 17) | full 4 x 8 sheet (too big), exact footprint (no margin) |
 | 8 | Strut plate CAM: one 1/8" 1-flute upcut (dogbones are sized for it), holes first, tabs on outlines, plates along Y | 1/4" bit (no dogbones fit); EstlCAM as in the V1E docs |
 | 9 | Vac hose (user's 2.5") clamped in the Min-end holder, zip-tied lengthwise on the core's top, slack folded like a drag chain (upper run nested between the lower run and the upper X rail, U-turn 5 mm past the core) (user, 2026-10-18) | hose sliding loose through the trays; across the core; U-turn far past the core (stuck out past the table) |
 | 10 | Y belts: holder slot -> back of idler 1 -> pulley front + inboard side -> front of idler 2 -> holder (the only path with the smooth back on both idlers; V1E yzb1/yzb2) | belt between the idlers in a straight line |
@@ -114,6 +116,8 @@ plates, front_wing_size 11.5 (1" EMT). Plates 830 x 90.5 (front) and 830 x 78.5 
 | 13 | Jackpot3 lid fan: 5015 on the OUTSIDE, exhausting (dusty shop - don't blow in), outlet toward the Min end (user, 2026-10-19) | inside the lid (board and wiring in the way); blowing in |
 | 14 | Peter Plates on both YZ plates (Max mirrored), stepper cut-outs filled (user); "solid" in the model, "honeycomb" kept as the viewer alternative | designer's covers with stepper openings |
 | 15 | Temp struts as a build option (`STRUTS = "temp"`): V1E's 4 Temp_Strut_v1 (front + bottom at each end) in the plates' own 2D frames (`lr4.TEMP_STRUT_FRAMES`); the end braces move to 180 mm from the next, the rest evenly between (V1E beam3), needs 4+ braces; PSU on the Max-end bottom temp strut, Jackpot3 box on the Min-end one. The configurator shows it as the Strut plates Temporary / Permanent toggle (2026-10-20) | keep the MDF brace pitch (temp strut screws would miss the inner braces) |
+
+| 17 | Table (Part 33, user 2026-10-23): a separate 3/4" MDF spoilboard (cutting area + margin) between two 3/4" MDF rail strips (rail mounts level with the spoilboard's bottom, so the work surface and the bit's reach don't change), on `TABLE = "sheet"` (MDF) or `"torsion"` (plywood egg-crate, no skins). The work surface stays at z 0..T: the base is below z 0, so the machine + size builds didn't move | the sheet as the spoilboard; rails on the base with a thicker spoilboard |
 
 ## How the parts were placed (V1E publishes no assembly CAD)
 

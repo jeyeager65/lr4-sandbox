@@ -1,5 +1,5 @@
-# LowRider4 - V1 Engineering LowRider 4 CNC sized for a 26 x 50 in cutting area, on a flat
-# MDF sheet table. Script-built assembly (the script owns the model):
+# LowRider4 - V1 Engineering LowRider 4 CNC sized for a 26 x 50 in cutting area, on a table:
+# a spoilboard between two rail strips (3/4" MDF) on an MDF sheet or a plywood torsion box (TABLE). Script-built assembly (the script owns the model):
 #   - sizes from the LR4 calculator (calculator.py, matches V1E's)
 #   - strut plates from Vector76's strut plate generator (ported in strut_plate.py), the real cut shapes
 #   - every printed part is the V1E STL from Printables (parts/), placed by measured mating
@@ -12,8 +12,8 @@
 #     p = r"D:/GitHub/lr4-sandbox/freecad/build.py"; exec(open(p, encoding="utf-8").read(), {"__file__": p, "__name__": "__main__"})
 # Writes build/LowRider4.FCStd, build/bom.md and exports/strut_plates_<strut>mm.(dxf|svg).
 # STEP: export_step.py. Strut plate G-code: cam.py.
-# Axes: X along the beam (YZ_Min side at the left), Y depth (front = 0), Z up (floor of the
-# MDF sheet at 0). Units: mm inside; the cutting area and table are given in inches.
+# Axes: X along the beam (YZ_Min side at the left), Y depth (front = 0), Z up (bottom of the
+# spoilboard / rail strips at 0; the table base is below 0 - lr4.table_parts). Units: mm inside; the cutting area and table are given in inches.
 
 import importlib
 import json
@@ -50,7 +50,9 @@ EMT_WALL = 1.45        # 1" EMT (29.5 mm OD) wall - nominal, MEASURE YOURS (OD m
 STRUT_T = 6.35         # strut plate stock: 1/4" MDF per V1E (no ply) - MEASURE YOURS
 WING = 11.5            # generator front_wing_size: 11.5 for 29.5 mm (1" EMT) rails (V1E docs)
 DOGBONE = 3.5          # generator dogbones: 3.5 for a 1/8" bit (V1E docs)
-MDF_T = 0.75 * IN      # table: one MDF sheet, 3/4" - GUESS / MEASURE YOURS
+MDF_T = 0.75 * IN      # spoilboard + rail strips: 3/4" MDF (user 2026-10-23) - MEASURE YOURS
+TABLE = "sheet"        # base under them: "sheet" = one 3/4" MDF sheet, "torsion" = a 5/8" plywood egg-crate
+                       # (ribs half-lapped, no skins; rib size / grid GUESSes in lr4.TABLE) - Part 33, user 2026-10-23
 TABLE_IN = None        # (width X, length Y) in inches; None = calculator footprint + margin,
 TABLE_MARGIN_IN = 1.0  # rounded up to whole inches (V1E: 1-2" extra is nice per side... each dim)
 # Where the machine is parked in the model (0..1 of the travel): tool X, tool Y, Z axis
@@ -83,6 +85,7 @@ CHECK = None           # overlap checks (~10 min): None = only when run headless
 # -----------------------------------------------------------------------------------------
 
 CHECK = {"0": False, "1": True}.get(os.environ.get("LR4_CHECK", ""), CHECK)   # LR4_CHECK=0 skips it
+TABLE = os.environ.get("LR4_TABLE", TABLE)       # LR4_TABLE=torsion: try the other table without editing this file
 CUT_X, CUT_Y = CUT_X_IN * IN, CUT_Y_IN * IN
 calc = lr4.calculator(CUT_X, CUT_Y, XZ_PLATE)
 calc_in = lr4.calculator_inches(CUT_X_IN, CUT_Y_IN, XZ_PLATE / IN)
@@ -96,7 +99,7 @@ if TABLE_IN:
 else:
     TW = math.ceil(xtable / IN + 2 * TABLE_MARGIN_IN) * IN
     TL = math.ceil(ytable / IN + 2 * TABLE_MARGIN_IN) * IN
-T = MDF_T                                       # table top
+T = MDF_T                                       # work surface (spoilboard / rail strip tops)
 FX0, FY0 = (TW - xtable) / 2, (TL - ytable) / 2   # calculator footprint (belt holder outsides)
 FX1, FY1 = FX0 + xtable, FY0 + ytable
 
@@ -156,6 +159,7 @@ PRINT_MAIN = (0.16, 0.16, 0.18)        # printed parts, main colour (black PLA i
 PRINT_ACCENT = (0.80, 0.12, 0.10)      # printed accents (V1E red)
 MDF = (0.55, 0.42, 0.30)
 MDF_TABLE = (0.78, 0.66, 0.50)
+SPOIL_RGB = (0.72, 0.60, 0.45)         # the spoilboard, a shade darker than the rail strips
 ROUTER_HEAD = (0.13, 0.33, 0.80)       # Kobalt blue head; brush caps / button / switch / dial / cord black
 ROUTER_CAP = (0.07, 0.07, 0.08)
 ROUTER_DIAL = (0.07, 0.07, 0.08)
@@ -188,8 +192,31 @@ def stl(name, file, pl, group, colour=PRINT_MAIN, folder=LR4, count=True):
 
 stage("setup")
 # ---- table --------------------------------------------------------------------------------
-m.add("TableMDF", core.box(0, TW, 0, TL, 0, T), group="Table", colour=MDF_TABLE,
-      cut=wood.sheet(t=T / IN, w=TW / IN, l=TL / IN, note="table top / spoil board"))
+table_parts = lr4.table_parts(TABLE, TW, TL, xtable, ytable, CUT_X, CUT_Y, T=T)
+TABLE_NOTE = {"spoil": "3/4in MDF spoilboard (the bit's full travel + 1/4in a side), screwed down - surface it flat",
+              "strip": "3/4in MDF rail strip: the Y belt holders + {} on it",
+              "base": "3/4in MDF table sheet", "rib": "5/8in plywood rib, {} half-lap slots from the {}",
+              "edge": "5/8in plywood: the box's outer rib, full length under the rail strip, {} half-lap slots"}
+for tp in table_parts:
+    x0, y0, z0, x1, y1, z1 = tp["box"]
+    shp = core.box(x0, x1, y0, y1, z0, z1)
+    for sl in tp["slots"]:
+        shp = shp.cut(core.box(sl[0], sl[3], sl[1], sl[4], sl[2], sl[5]))
+    dims = sorted((x1 - x0, y1 - y0, z1 - z0))
+    note = TABLE_NOTE[tp["role"]]
+    if tp["role"] == "strip":
+        note = note.format("Min wheels" if tp["name"].endswith("Min") else "Y clips")
+    elif tp["role"] == "edge":
+        note = note.format(len(tp["slots"]))
+    elif tp["role"] == "rib":
+        note = note.format(len(tp["slots"]), "top" if "_Y" in tp["name"] else "bottom")
+    rgb = wood.PLYWOOD if tp["role"] in ("rib", "edge") else MDF_TABLE
+    m.add(tp["name"], shp, group="Table", colour=rgb if tp["role"] != "spoil" else SPOIL_RGB,
+          cut=wood.sheet(t=dims[0] / IN, w=dims[1] / IN, l=dims[2] / IN, note=note))
+os.makedirs(os.path.join(ROOT, "build"), exist_ok=True)
+with open(os.path.join(ROOT, "build", "table.json"), "w") as f:   # tests/test_table_model.js vs web/js/table_model.js
+    json.dump(dict(kind=TABLE, TW=TW, TL=TL, xtable=xtable, ytable=ytable, cut=[CUT_X, CUT_Y], T=T,
+                   parts=[dict(name=tp["name"], box=tp["box"], role=tp["role"]) for tp in table_parts]), f, indent=1)
 
 stage("table")
 # ---- YZ assemblies -------------------------------------------------------------------------
@@ -905,7 +932,9 @@ print(path)
 print(f"calculator (mm): {calc}")
 print(f"calculator (in): {calc_in}")
 print(f"strut generator: {strut} mm, {n_braces} braces, pitch {pitch:.2f} mm, {pitch - 18:.2f} mm between braces")
-print(f"table {TW / IN:g} x {TL / IN:g} in MDF, footprint {xtable} x {ytable} mm at ({FX0:.1f}, {FY0:.1f})")
+n_ribs = sum(tp["role"] == "rib" for tp in table_parts)
+print(f"table {TW / IN:g} x {TL / IN:g} in ({TABLE}: spoilboard + 2 rail strips on "
+      f"{'the MDF sheet' if TABLE == 'sheet' else f'{n_ribs} torsion box ribs'}), footprint {xtable} x {ytable} mm at ({FX0:.1f}, {FY0:.1f})")
 print(f"machine {core.size_text(bb)}; tool at X {tool_x:.1f} Y {tool_y:.1f}, bit tip {tip_z - T:.1f} mm above the table "
       f"(Z_POS {Z_POS}); Y rail clips {n_clips}")
 if not lr4.B_RANGE[0] <= b <= lr4.B_RANGE[1]:

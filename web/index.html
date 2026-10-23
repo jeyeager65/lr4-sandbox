@@ -458,7 +458,7 @@ body.vr-on .stage { grid-row: 1; }
       <div class="opts" id="opts">
         <label class="check"><input type="checkbox" id="opt-router" checked> Router + dust shoe (Kobalt mount)</label>
         <label class="check sub"><input type="checkbox" id="opt-skirt" checked> Dust skirt + bristles</label>
-        <label class="check sub"><input type="checkbox" id="opt-hose" checked> Vacuum hose, router cord + cable sleeve</label>
+        <label class="check sub"><input type="checkbox" id="opt-hose" checked> Dust shoe + vacuum hose, router cord + cable sleeve</label>
         <label class="check"><input type="checkbox" id="opt-fan" checked> Jackpot3 lid fan</label>
         <label class="check" title="The FluidTouch touchscreen pendant (github.com/jeyeager65/FluidTouch) on the table's front, running its real firmware in the page"><input type="checkbox" id="ft-on"> FluidTouch pendant</label>
       </div>
@@ -473,7 +473,10 @@ body.vr-on .stage { grid-row: 1; }
 
     <section aria-labelledby="h-shop">
       <h2 id="h-shop">Table</h2>
-      <div class="field"><label for="table-top">Table height (top of the MDF; legs are drawn only)</label>
+      <div class="variant" id="table-variant" title="The spoilboard and the two rail strips (3/4 in MDF) sit on this"><span>Base</span>
+        <button type="button" data-v="sheet" aria-pressed="true">MDF sheet</button>
+        <button type="button" data-v="torsion" aria-pressed="false">Torsion box</button></div>
+      <div class="field"><label for="table-top">Table height (top of the spoilboard; legs are drawn only)</label>
         <div class="unit-input"><input id="table-top" type="number" step="any" min="1"><span class="u">in</span></div></div>
     </section>
 
@@ -920,6 +923,7 @@ body.vr-on .stage { grid-row: 1; }
 <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/lights/RectAreaLightUniformsLib.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/polygon-clipping@0.15.7/dist/polygon-clipping.umd.min.js"></script>
 <script src="js/calculator.js"></script>
+<script src="js/table_model.js"></script>
 <script src="js/strut_plate.js"></script>
 <script src="js/strut_cam.js"></script>
 <script src="js/lib/cnc-gcode-tools/gcode-expander.js"></script>
@@ -1021,7 +1025,18 @@ body.vr-on .stage { grid-row: 1; }
   function creaseNormals(geo, deg) {                  // smooth across shallow angles, keep sharp edges sharp
     const g = geo.index ? geo.toNonIndexed() : geo;
     const P = g.attributes.position.array, nt = P.length / 9, fn = new Float32Array(nt * 3);
-    const key = (i) => `${Math.round(P[i] * 200)},${Math.round(P[i + 1] * 200)},${Math.round(P[i + 2] * 200)}`;
+    // each vertex's spot (0.005 mm grid) as one number when the mesh's grid fits in 53 bits (else a string), made once
+    // (strings for every vertex, twice, were ~0.5 s of the load)
+    if (!g.boundingBox) g.computeBoundingBox();
+    const b0 = g.boundingBox.min, span = g.boundingBox.getSize(new THREE.Vector3());
+    const bits = Math.max(...span.toArray().map((v) => Math.ceil(Math.log2(v * 200 + 3))));
+    const K = 2 ** bits, num = bits * 3 <= 53;
+    const keys = new Array(nt * 3);
+    for (let v = 0; v < nt * 3; v++) {
+      const i = v * 3, x = Math.round((P[i] - b0.x) * 200), y = Math.round((P[i + 1] - b0.y) * 200), z = Math.round((P[i + 2] - b0.z) * 200);
+      keys[v] = num ? x + K * (y + K * z) : `${x},${y},${z}`;
+    }
+    const key = (i) => keys[i / 3];
     const at = new Map();
     for (let t = 0; t < nt; t++) {
       const o = t * 9;
@@ -1417,7 +1432,7 @@ body.vr-on .stage { grid-row: 1; }
     srcCache.clear();
     soupCache.clear();
   }
-  function material(color, fin, hasUV) {
+  function material(color, fin, hasUV, grain) {         // grain: "pine" / "ply" (woodTex; boxesGeo's UVs)
     if (fin) {                                        // metal: reflects the environment
       const mat = new THREE.MeshStandardMaterial({
         color: new THREE.Color().setRGB(...fin.c).convertSRGBToLinear(), metalness: 1.0, roughness: fin.r,
@@ -1428,9 +1443,11 @@ body.vr-on .stage { grid-row: 1; }
       else if (fin.thread) Object.assign(mat, { map: thread, bumpMap: thread, bumpScale: 1.2 });
       return mat;
     }
-    return new THREE.MeshStandardMaterial({
+    const mat = new THREE.MeshStandardMaterial({
       color: new THREE.Color().setRGB(...color).convertSRGBToLinear(),
       roughness: 0.6, metalness: 0.0, envMapIntensity: 0.3, side: THREE.DoubleSide});
+    if (grain) Object.assign(mat, { map: woodTex(grain), bumpMap: woodTex(grain), bumpScale: 0.25, roughness: 0.75 });
+    return mat;
   }
   const pretty = (n) => n.replace(/_/g, " ").replace("29p5", "29.5").replace(" V1", "").replace("Kobalt", "(Kobalt)").trim();
   let platePolys = null;
@@ -1458,31 +1475,96 @@ body.vr-on .stage { grid-row: 1; }
   const LEG = 3.5 * IN, APRON_T = 1.5 * IN, APRON_H = 3.5 * IN, LEG_GAP = 1800, TOP_DEFAULT = 34 * IN;
   let tableTop = TOP_DEFAULT;
   try { tableTop = +localStorage.getItem("lr4-table-top") || TOP_DEFAULT; } catch (e) { /* default */ }
-  function boxesGeo(list) {                           // [x0, y0, z0, x1, y1, z1] boxes as one flat-shaded geometry
-    const pos = [], nor = [];
+  // [x0, y0, z0, x1, y1, z1] boxes as one flat-shaded geometry. UVs in mm / GRAIN_MM, u along each box's longest side
+  // (the grain runs along the board; end grain gets the cross-section), for the wood textures (woodTex)
+  const GRAIN_MM = [600, 150];
+  function boxesGeo(list) {
+    const pos = [], nor = [], uv = [];
     for (const [x0, y0, z0, x1, y1, z1] of list) {
       const g = new THREE.BoxGeometry(x1 - x0, y1 - y0, z1 - z0).toNonIndexed();
       g.translate((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2);
-      pos.push(...g.attributes.position.array); nor.push(...g.attributes.normal.array);
+      const p = g.attributes.position.array, n = g.attributes.normal.array, d = [x1 - x0, y1 - y0, z1 - z0];
+      const L = d.indexOf(Math.max(...d)), off = (x0 * 7.3 + y0 * 3.1 + z0) % 997;   // each board its own stretch of grain
+      for (let i = 0; i < p.length; i += 3) {
+        const na = [0, 1, 2].find((k) => Math.abs(n[i + k]) > 0.5), rest = [0, 1, 2].filter((k) => k !== na);
+        const a = na === L ? rest[0] : L, b = rest.find((k) => k !== a);
+        uv.push((p[i + a] + off) / GRAIN_MM[0], (p[i + b] + off) / GRAIN_MM[1]);
+      }
+      pos.push(...p); nor.push(...n);
       g.dispose();
     }
     const geo = new THREE.BufferGeometry();
     geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
     geo.setAttribute("normal", new THREE.Float32BufferAttribute(nor, 3));
+    geo.setAttribute("uv", new THREE.Float32BufferAttribute(uv, 2));
     return geo;
   }
+  // wood grain (procedural, once per kind): "pine" = 2x4s (wide soft streaks + a knot or two), "ply" = plywood faces
+  // (finer, straighter); light / dark around white so the material's colour still sets the wood's tone. MDF stays plain.
+  const woodTexs = {};
+  function woodTex(kind) {
+    if (woodTexs[kind]) return woodTexs[kind];
+    const W = 512, H = 128, cv = document.createElement("canvas");
+    cv.width = W; cv.height = H;
+    const ctx = cv.getContext("2d"), img = ctx.createImageData(W, H);
+    let seed = kind === "pine" ? 7 : 13;
+    const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+    const waves = Array.from({ length: 5 }, () => [rnd() * 6 + 1, rnd() * Math.PI * 2, rnd() * (kind === "pine" ? 4.5 : 1.5)]);
+    const knots = kind === "pine" ? Array.from({ length: 2 }, () => [rnd() * W, rnd() * H, 5 + rnd() * 7]) : [];
+    const rings = kind === "pine" ? 0.22 : 0.4, depth = kind === "pine" ? 0.20 : 0.11;
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      let v = y;
+      for (const [f, ph, a] of waves) v += a * Math.sin(x / W * Math.PI * 2 * f + ph);   // whole periods: tiles in u
+      for (const [kx, ky, r] of knots) { const dx = (x - kx) / 2.5, dy = y - ky, q = Math.hypot(dx, dy); v += r * 2.2 * Math.exp(-(q * q) / (r * r * 2)); }
+      const ring = 0.5 + 0.5 * Math.sin(v * rings * Math.PI * 2 / (H * rings / Math.round(H * rings)) );
+      const fine = (rnd() - 0.5) * 0.05;
+      const k = Math.min(1, 1.06 - depth * Math.pow(ring, 3) + fine), i = (y * W + x) * 4;
+      img.data[i] = img.data[i + 1] = img.data[i + 2] = Math.round(255 * k); img.data[i + 3] = 255;
+    }
+    ctx.putImageData(img, 0, 0);
+    const tex = new THREE.CanvasTexture(cv);
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    tex.encoding = THREE.sRGBEncoding;
+    tex.anisotropy = 8;
+    return (woodTexs[kind] = tex);
+  }
+  // ---- the table (Part 33, table_model.js): spoilboard + rail strips (z 0..T, the work surface) on the base (U.base:
+  // the MDF sheet, or the torsion box's ribs drawn as one mesh, slots left out) ----
+  const TABLE_PART = /^(TableBase|TableRibs|Spoilboard|RailStrip_(Min|Max)|RailEdge_(Min|Max))$/;
+  function tableMeshes() {
+    const list = LR4Table.parts(U.base, S.TW, S.TL, S.xtable, S.ytable, S.cutX, S.cutY), ribs = list.filter((p) => p.role === "rib");
+    const ud = (name, label, color) => ({ name, label, group: "Table", motion: "table", source: "made", color, ownGeo: true });
+    const LABEL = { Spoilboard: "Spoilboard (3/4 in MDF, the bit's full travel + 1/4 in a side)", RailStrip_Min: "Rail strip, Min (3/4 in MDF)",
+      RailStrip_Max: "Rail strip, Max (3/4 in MDF)", TableBase: "Table sheet (3/4 in MDF)",
+      RailEdge_Min: "Rail side board, Min (5/8 in plywood: the box's outer rib, full length under the strip)",
+      RailEdge_Max: "Rail side board, Max (5/8 in plywood: the box's outer rib, full length under the strip)" };
+    const out = list.filter((p) => p.role !== "rib").map((p) => [boxesGeo([p.box]),
+      Object.assign(ud(p.name, LABEL[p.name], p.role === "spoil" ? [0.72, 0.60, 0.45] : p.role === "edge" ? [0.86, 0.68, 0.44] : [0.78, 0.66, 0.50]),
+        p.role === "edge" ? { grain: "ply" } : {})]);
+    if (ribs.length) out.push([boxesGeo(ribs.map((p) => p.box)), Object.assign(ud("TableRibs",
+      `Torsion box ribs (${ribs.length}, 5/8 in plywood, half-lapped egg-crate)`, [0.86, 0.68, 0.44]), { grain: "ply" })]);
+    return out;
+  }
+  function tableBox(base) {                           // the whole table (base: the sheet / box only), world mm; null before drawn
+    const ts = meshes.filter((m) => (base ? /^(TableBase|TableRibs)$/ : TABLE_PART).test(m.userData.name));
+    if (!ts.length) return null;
+    const bb = new THREE.Box3();
+    for (const m of ts) bb.union(new THREE.Box3().setFromObject(m));
+    return bb;
+  }
+  // under the base (the torsion box is shorter than the strips). The torsion box is its own apron: the legs go right
+  // under it, flush with its sides, no 2x4 apron (user 2026-10-23: "a table on a table" otherwise)
   function legMeshes() {
-    const t = meshes.find((m) => m.userData.name === "TableMDF");
-    if (!t) return [];
-    t.geometry.computeBoundingBox();
-    const b = t.userData.base || { t: [0, 0, 0], s: [1, 1, 1] }, bb = t.geometry.boundingBox;
-    const ends = [bb.min, bb.max].map((p) => [0, 1, 2].map((i) => p.getComponent(i) * b.s[i] + b.t[i]));
-    const lo = [0, 1, 2].map((i) => Math.min(ends[0][i], ends[1][i])), hi = [0, 1, 2].map((i) => Math.max(ends[0][i], ends[1][i]));
-    const minTop = hi[2] - lo[2] + APRON_H + 100;     // legs at least 100 mm below the apron
+    const tb = tableBox(true), all = tableBox();
+    if (!tb) return [];
+    const box = U.base === "torsion", AP = box ? 0 : APRON_T, AH = box ? 0 : APRON_H;
+    const lo = tb.min.toArray(), hi = tb.max.toArray();
+    hi[2] = all.max.z;                                // the table height: the spoilboard's top
+    const minTop = hi[2] - lo[2] + AH + 100;          // legs at least 100 mm below the apron / box
     const top = Math.max(tableTop, minTop), floor = hi[2] - top, under = lo[2];
     const spread = (a, z, n) => Array.from({ length: n }, (_, i) => a + (z - a) * i / (n - 1));
     const along = (a, z) => spread(a, z, Math.max(2, Math.ceil((z - a) / LEG_GAP) + 1));
-    const x0 = lo[0] + APRON_T, x1 = hi[0] - APRON_T - LEG, y0 = lo[1] + APRON_T, y1 = hi[1] - APRON_T - LEG;
+    const x0 = lo[0] + AP, x1 = hi[0] - AP - LEG, y0 = lo[1] + AP, y1 = hi[1] - AP - LEG;
     const spots = new Set();
     for (const x of along(x0, x1)) for (const y of [y0, y1]) spots.add(`${x},${y}`);
     for (const y of along(y0, y1)) for (const x of [x0, x1]) spots.add(`${x},${y}`);
@@ -1491,10 +1573,12 @@ body.vr-on .stage { grid-row: 1; }
       [lo[0], hi[1] - APRON_T, under - APRON_H, hi[0], hi[1], under],
       [lo[0], lo[1] + APRON_T, under - APRON_H, lo[0] + APRON_T, hi[1] - APRON_T, under],
       [hi[0] - APRON_T, lo[1] + APRON_T, under - APRON_H, hi[0], hi[1] - APRON_T, under]];
-    const ud = (name, label) => ({ name, label, group: "Table", motion: "table", source: "made", color: [0.84, 0.70, 0.50],
-      ownGeo: true, floor: true });
-    return [[boxesGeo(legs), ud("TableLegs", `Table legs (basic: ${legs.length} doubled 2x4s, ${+(top / IN).toFixed(1)} in top - not in the cut list)`)],
-      [boxesGeo(aprons), ud("TableApron", "Table apron (basic: 2x4 on edge - not in the cut list)")]];
+    const ud = (name, label) => ({ name, label, group: "Table", motion: "table", source: "made", color: [0.88, 0.74, 0.54],
+      ownGeo: true, floor: true, grain: "pine" });
+    const out = [[boxesGeo(legs), ud("TableLegs", `Table legs (basic: ${legs.length} doubled 2x4s, ${+(top / IN).toFixed(1)} in top` +
+      `${box ? ", right under the torsion box" : ""} - not in the cut list)`)]];
+    if (!box) out.push([boxesGeo(aprons), ud("TableApron", "Table apron (basic: 2x4 on edge - not in the cut list)")]);
+    return out;
   }
   function clearMachine() {
     select(null);
@@ -1555,20 +1639,36 @@ body.vr-on .stage { grid-row: 1; }
     } catch (e) { console.warn("pendant not loaded:", e.message); }
   }
   function pendantMeshes() {                          // [geometry, material, userData] at this size's table
-    const t = meshes.find((m) => m.userData.name === "TableMDF");
-    if (!pendant || !t) return [];
-    const bb = new THREE.Box3().setFromObject(t), P = pendant.info.parts, stand = P.stand.bbox;
+    const bb = tableBox(true);
+    if (!pendant || !bb) return [];
+    const P = pendant.info.parts, stand = P.stand.bbox;
     const ap = meshes.find((m) => m.userData.name === "TableApron");
     const bottom = ap ? new THREE.Box3().setFromObject(ap).min.z : bb.min.z;   // the apron's bottom (no apron: the top's)
     const caseLow = Math.min(P.case_top.bbox[2], P.case_bottom.bbox[2]);
-    const base = { t: [bb.min.x + PENDANT.x, bb.min.y - PENDANT.spacer, bottom - caseLow], s: [1, 1, 1] };
+    let base = { t: [bb.min.x + PENDANT.x, bb.min.y - PENDANT.spacer, bottom - caseLow], s: [1, 1, 1] }, mount = null;
+    // torsion box: the dust shoe passes over the box's front face, so the pendant goes on the front end of the wider
+    // (Max) rail strip, past the front belt holder (user 2026-10-23): a block under the strip's overhang makes the face
+    const bx = (n) => { const m = meshes.find((q) => q.userData.name === n); return m && new THREE.Box3().setFromObject(m); };
+    const st = bx("RailStrip_Max"), ed = bx("RailEdge_Max");
+    if (U.base === "torsion" && st && ed) {
+      // the stand's right edge flush with the table's side; a thicker spacer (2 x 5/8 ply) so the case's back clears
+      // the strip's end (user 2026-10-23: "stick out a bit further")
+      const sp = 2 * PENDANT.spacer, cx = Math.min((st.min.x + ed.max.x) / 2, ed.max.x - P.stand.bbox[3]);
+      const front = st.min.y, low = ed.min.z;
+      base = { t: [cx, front - sp, low - caseLow], s: [1, 1, 1] };
+      mount = { front, sp, block: [st.min.x, front, low, st.max.x, front + 60, st.min.z] };
+    }
     const ud = (name, label, extra) => Object.assign({ name, label, group: "Pendant", motion: "table", source: "pendant", base }, extra);
     const out = PENDANT.parts.map(([part, label, role]) => [pendant.geos[part], material(PRINT_ROLE[role], null),
       ud("Pendant_" + part, label, { role, color: PRINT_ROLE[role] })]);
     // the spacer: the stand's length, from the apron's bottom (or the stand's base) to the stand's top
     const sx = base.t[0], sz = base.t[2];
-    out.push([boxesGeo([[sx + stand[0], bb.min.y - PENDANT.spacer, Math.max(sz + stand[2], bottom), sx + stand[3], bb.min.y, sz + stand[5]]]),
-      material([0.84, 0.70, 0.50], null), { name: "Pendant_spacer", label: "Pendant spacer block (5/8 in plywood)", group: "Pendant",
+    if (mount) out.push([boxesGeo([mount.block]), material([0.86, 0.68, 0.44], null, false, "ply"), { name: "Pendant_mount",
+      label: "Pendant mount block (5/8 in plywood, glued + screwed under the Max rail strip's front end)", group: "Pendant",
+      motion: "table", source: "made", color: [0.86, 0.68, 0.44], ownGeo: true, grain: "ply" }]);
+    const fy = mount ? mount.front : bb.min.y, sp = mount ? mount.sp : PENDANT.spacer, sBot = mount ? sz + stand[2] : Math.max(sz + stand[2], bottom);
+    out.push([boxesGeo([[sx + stand[0], fy - sp, sBot, sx + stand[3], fy, sz + stand[5]]]),
+      material([0.86, 0.68, 0.44], null, false, "ply"), { name: "Pendant_spacer", label: `Pendant spacer block (${mount ? "2 x " : ""}5/8 in plywood)`, group: "Pendant",
         motion: "table", source: "made", color: [0.84, 0.70, 0.50], ownGeo: true }]);
     pendantScreen(true);
     out.push([pendant.screen.geo, new THREE.MeshBasicMaterial({ map: pendant.screen.tex, toneMapped: false }),
@@ -1619,6 +1719,7 @@ body.vr-on .stage { grid-row: 1; }
     let tris = 0;
     const inst = LR4Model.instances(cfg, S);
     for (const o of inst) {
+      if (o.name === "TableMDF") continue;           // Part 33: the table is drawn from table_model.js (tableMeshes)
       const g = recGeometry(o.rec);
       if (!g) continue;
       const { geo, fin, hasUV, tris: n } = g;
@@ -1635,7 +1736,8 @@ body.vr-on .stage { grid-row: 1; }
       addMesh(geo, material(rec.meta.color, null), Object.assign({}, rec.meta, { name: rec.key, ownGeo: true }));
       tris += geo.attributes.position.count / 3;
     }
-    for (const [geo, ud] of legMeshes()) addMesh(geo, material(ud.color, null), ud);
+    for (const [geo, ud] of tableMeshes()) addMesh(geo, material(ud.color, null, false, ud.grain), ud);
+    for (const [geo, ud] of legMeshes()) addMesh(geo, material(ud.color, null, false, ud.grain), ud);
     for (const [geo, mat, ud] of pendantMeshes()) addMesh(geo, mat, ud);
     meta = { cut_in: [S.cutX / IN, S.cutY / IN], travel: LR4Model.travel(cfg, S), tip_above_table: cfg.tip_above_table,
       hose: LR4Model.hose(cfg, S, inst), table_mm: [S.TW, S.TL], bom: cfg.bom_ref, peter_style: cfg.peter_style, parts: meshes,
@@ -1753,20 +1855,20 @@ body.vr-on .stage { grid-row: 1; }
     await nextFrame();
     bin = await new Response(new Blob([raw]).stream().pipeThrough(new DecompressionStream("gzip"))).arrayBuffer();
     if (cfg.files) await setupFiles();
-    progress("Building the machine…", 1, `${cfg.parts.length} parts`);
-    await nextFrame();
-    setupShow();
-    setupColours();
-    setupDetail();
-    setupSliders();
-    setupSize();
-    setupVariants();
-    setupBom();
-    setupAbout();
-    setupScenery();
-    setupLighting();
-    updateShop();
-    fitView([1, -1.15, 0.85]);
+    // the build in named stages, the popup saying which (user 2026-10-23: it sat on "Building the machine" for seconds)
+    const stages = [
+      ["Setting up the panels", () => { setupShow(); setupColours(); setupDetail(); setupSliders(); }],
+      [`Placing the ${cfg.parts.length} parts`, setupSize],
+      ["Bill of materials", () => { setupVariants(); setupBom(); setupAbout(); }],
+      ["Workshop and lights", () => { setupScenery(); setupLighting(); updateShop(); fitView([1, -1.15, 0.85]); }],
+      ["Compiling shaders (first frame)", () => { lighting(); renderer.compile(scene, camera); renderer.render(scene, camera); }]];
+    for (const [i, [what, run]] of stages.entries()) {
+      progress("Building the machine…", i / stages.length, what);
+      await nextFrame();
+      run();
+    }
+    progress("Building the machine…", 1, "Done");
+    building = false;
     await nextFrame();
     statusEl.hidden = true;
     const dev = cfg.files && new URLSearchParams(location.search).get("parts");   // testing: fetch the files from a folder URL
@@ -1952,13 +2054,14 @@ body.vr-on .stage { grid-row: 1; }
   });
 
   // ---- My machine (Part 26): what's on the machine. Off = gone from the model AND the BOM (and the Show tree). The
-  // skirt and the hose need the router (the hose threads into its shoe); the pendant is the FluidTouch option. Kept
+  // skirt and the hose need the router (the hose threads into its shoe); the shoe goes with the hose (user 2026-10-23:
+  // no hose = no shoe, skirt or bristles - the skirt needs both); the pendant is the FluidTouch option. Kept
   // in this browser (lr4-opts; the pendant in lr4-pendant). ----
   const OPT = { router: true, skirt: true, hose: true, fan: true };
   const OPT_PARTS = { router: /^(Router_(?!Cord_Run)|Tool_Mount_|Dust_Shoe|Dust_Skirt|Bristles_TPU)/, skirt: DUST_PARTS,
-    hose: /^(Vacuum_Hose|Router_Cord_Run|Cable_Sleeve|Hose_Holder|Hose_Hook)/, fan: /^Jackpot3_Fan/ };
+    hose: /^(Vacuum_Hose|Router_Cord_Run|Cable_Sleeve|Hose_Holder|Hose_Hook|Dust_Shoe|Dust_Skirt|Bristles_TPU)/, fan: /^Jackpot3_Fan/ };
   const pendantOn = () => document.getElementById("ft-on").checked;   // My machine > FluidTouch pendant (kept)
-  const optsOn = () => ({ router: OPT.router, skirt: OPT.router && OPT.skirt, hose: OPT.router && OPT.hose, fan: OPT.fan,
+  const optsOn = () => ({ router: OPT.router, skirt: OPT.router && OPT.hose && OPT.skirt, hose: OPT.router && OPT.hose, fan: OPT.fan,
     pendant: pendantOn() });
   function fitted(m) {
     const n = m.userData.name || "", o = optsOn();
@@ -1969,7 +2072,7 @@ body.vr-on .stage { grid-row: 1; }
     try { Object.assign(OPT, JSON.parse(localStorage.getItem("lr4-opts") || "{}")); } catch (e) { /* defaults */ }
     const mark = () => {
       for (const k of Object.keys(OPT)) document.getElementById("opt-" + k).checked = OPT[k];
-      for (const k of ["skirt", "hose"]) document.getElementById("opt-" + k).disabled = !OPT.router;
+      for (const k of ["skirt", "hose"]) document.getElementById("opt-" + k).disabled = !OPT.router || (k === "skirt" && !OPT.hose);
     };
     for (const k of Object.keys(OPT)) document.getElementById("opt-" + k).addEventListener("change", (e) => {
       OPT[k] = e.target.checked;
@@ -2011,10 +2114,15 @@ body.vr-on .stage { grid-row: 1; }
     const rb = meshes.find((m) => m.userData.name === "Router_Bit");
     bitOK = !!rb && inTree.has(rb) && LR4ShowTree.on(tree, showOff, partId(rb)) && (!INSPECT || INSPECT.set.has(partId(rb)));
     if (!bitOK && JOB.bits) for (const b of JOB.bits.values()) b.visible = false;
-    // Part 31: the spoilboard's height field is the table's top (where TableMDF would show); the hand-installed bit
-    // rides in the router unless the job's own bits show
-    const tm = meshes.find((m) => m.userData.name === "TableMDF");
-    if (tm && SPOIL.mesh) { SPOIL.mesh.visible = tm.visible; tm.visible = false; }
+    // Part 31: the spoilboard's height field is drawn instead of the Spoilboard (Part 33: its own part); the hand-installed
+    // bit rides in the router unless the job's own bits show
+    const tm = meshes.find((m) => m.userData.name === "Spoilboard");
+    if (tm) {                                         // under the height field it only casts the shadow (the field's
+      const f = !!SPOIL.mesh;                         // shader doesn't), and isn't picked (userData.shadowOnly)
+      if (f) SPOIL.mesh.visible = tm.visible;
+      tm.material.colorWrite = tm.material.depthWrite = !f;
+      tm.userData.shadowOnly = f;
+    }
     if (HAND.bitMesh) {
       HAND.bitMesh.visible = bitOK && !jobBit;
       if (rb && HAND.bitMesh.visible) rb.visible = false;
@@ -2359,7 +2467,7 @@ body.vr-on .stage { grid-row: 1; }
 
   // ---- size inputs, V1E calculator, cut list, strut plate drawing + downloads ----
   const EMT_STICK = 3048, KERF = 3, XZ = 6.5;
-  const U = { unit: "in", cutX: 26 * IN, cutY: 50 * IN, braces: 0, struts: "mdf" };
+  const U = { unit: "in", cutX: 26 * IN, cutY: 50 * IN, braces: 0, struts: "mdf", base: "sheet" };
   const $ = (id) => document.getElementById(id);
   const disp = (mm) => U.unit === "in" ? mm / IN : mm;
   function frac(v) {                                  // 32.625 -> 32 5/8
@@ -2419,7 +2527,7 @@ body.vr-on .stage { grid-row: 1; }
   }
   function updateText() {
     $("sub").textContent = `V1E LowRider 4 for a ${+(S.cutX / IN).toFixed(2)} × ${+(S.cutY / IN).toFixed(2)} in cutting area, ` +
-      `on a ${frac(S.TW / IN)} × ${frac(S.TL / IN)} in MDF sheet. Every printed part is the official STL, placed from its holes.`;
+      `on a ${frac(S.TW / IN)} × ${frac(S.TL / IN)} in ${S.base === "torsion" ? "torsion box" : "MDF sheet"} table. Every printed part is the official STL, placed from its holes.`;
     const sel = $("braces"), want = String(U.braces);
     const pitch = (n) => { const mm = (S.strut - 18) / (n - 1); return U.unit === "in" ? `${frac(mm / IN)}"` : `${mm.toFixed(1)} mm`; };
     sel.innerHTML = `<option value="0">Auto: ${S.auto} braces, ${pitch(S.auto)} pitch</option>` +
@@ -2443,7 +2551,7 @@ body.vr-on .stage { grid-row: 1; }
   function applySize(now) {
     clearTimeout(pending);
     const go = () => {
-      S = LR4Model.size(U.cutX, U.cutY, U.braces, U.struts);
+      S = LR4Model.size(U.cutX, U.cutY, U.braces, U.struts, U.base);
       updateText();
       updateCalc();
       rebuild();
@@ -2487,6 +2595,15 @@ body.vr-on .stage { grid-row: 1; }
       U.struts = b.dataset.v; keep(); markStruts(); applySize(true);
     }));
     markStruts();
+    // Table base (Part 33): the MDF sheet or the plywood torsion box under the spoilboard + rail strips (table_model.js)
+    if (!LR4Table.KINDS.includes(U.base)) U.base = "sheet";
+    const tv = $("table-variant");
+    const markBase = () => tv.querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.v === U.base)));
+    tv.querySelectorAll("button").forEach((b) => b.addEventListener("click", () => {
+      if (U.base === b.dataset.v) return;
+      U.base = b.dataset.v; keep(); markBase(); applySize(true);
+    }));
+    markBase();
     $("u-in").addEventListener("click", () => { U.unit = "in"; keep(); fillInputs(); updateCalc(); updateText(); drawPlates(); });
     $("u-mm").addEventListener("click", () => { U.unit = "mm"; keep(); fillInputs(); updateCalc(); updateText(); drawPlates(); });
     fillInputs();
@@ -3230,7 +3347,7 @@ body.vr-on .stage { grid-row: 1; }
     plate: () => !!(CTL.jobPlate || HAND.plate) };
 
   // ---- version + feedback: the issue link carries the size, data date and the loaded files' checksums ----
-  const VERSION = "0.35.0";
+  const VERSION = "0.36.0";
   function setupAbout() {
     const bits = [`lr4-sandbox ${VERSION}`];
     if (cfg.built) bits.push(`model data built ${cfg.built}`);
@@ -3674,9 +3791,9 @@ body.vr-on .stage { grid-row: 1; }
   // off the nominal tool spot, placed by the dust shoe's notch), so the model bit is measured at machine zero (a plain
   // cylinder: its box centre is on the axis)
   function tableFrame() {
-    const t = meshes.find((m) => m.userData.name === "TableMDF");
-    if (!t || !meta) return null;
-    const bb = new THREE.Box3().setFromObject(t), fr = [(bb.min.x + bb.max.x) / 2 - S.cutX / 2, (bb.min.y + bb.max.y) / 2 - S.cutY / 2, bb.max.z];
+    const bb = tableBox();
+    if (!bb || !meta) return null;
+    const fr = [(bb.min.x + bb.max.x) / 2 - S.cutX / 2, (bb.min.y + bb.max.y) / 2 - S.cutY / 2, bb.max.z];
     const mb = meshes.find((m) => m.userData.name === "Router_Bit");
     if (mb) {
       const tv0 = meta.travel, was = HOME.pose && [HOME.pose.x, HOME.pose.y, HOME.pose.z];
@@ -3739,9 +3856,9 @@ body.vr-on .stage { grid-row: 1; }
     meshUpdate(HAND.sim, HAND.mesh, true);
     handShow();
   }
-  // the spoilboard: the TableMDF top as a height field (Z 0 = its top when new), kept per machine size
+  // the spoilboard: the Spoilboard's top as a height field (Z 0 = its top when new), kept per machine size
   function spoilSetup() {
-    const t = meshes.find((m) => m.userData.name === "TableMDF"), fr = tableFrame();
+    const t = meshes.find((m) => m.userData.name === "Spoilboard"), fr = tableFrame();
     if (!t || !fr) return;
     const bb = new THREE.Box3().setFromObject(t), key = `${S.cutX.toFixed(1)}x${S.cutY.toFixed(1)}`;
     const look = `${key}|${fr.map((v) => v.toFixed(2)).join()}|${lite}`;
@@ -4643,7 +4760,7 @@ body.vr-on .stage { grid-row: 1; }
     const r = canvas.getBoundingClientRect();
     ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
     ray.setFromCamera(ndc, camera);
-    const hit = ray.intersectObjects(meshes.filter((m) => m.visible), false)[0];
+    const hit = ray.intersectObjects(meshes.filter((m) => m.visible && !m.userData.shadowOnly), false)[0];
     select(hit ? hit.object : null);
   });
   function select(m) {
@@ -4735,11 +4852,11 @@ body.vr-on .stage { grid-row: 1; }
     const r = canvas.getBoundingClientRect();
     ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
     ray.setFromCamera(ndc, camera);
-    const hit = ray.intersectObjects(meshes.filter((m) => m.visible), false)[0];
+    const hit = ray.intersectObjects(meshes.filter((m) => m.visible && !m.userData.shadowOnly), false)[0];
     if (hit && !MEAS.on) inspect(INSPECT ? partId(hit.object) : asmOf(hit.object));
   });
   window.LR4Inspect = { open: inspect, close: inspectEnd, id: () => INSPECT && INSPECT.id,
-    shown: () => meshes.filter((m) => m.visible).map((m) => m.userData.name) };
+    shown: () => meshes.filter((m) => m.visible && !m.userData.shadowOnly).map((m) => m.userData.name) };
 
   // ---- Inspect tools (Part 28): exploded slider, section cut, measure. Explode: LR4ShowTree.explode's unit steps along
   // the bolt lines (meta.axis / chain; a family bolt's chain names mapped to this size's names) times the slider; the
@@ -4961,7 +5078,7 @@ body.vr-on .stage { grid-row: 1; }
     ndc.set((px[0] / r.width) * 2 - 1, -(px[1] / r.height) * 2 + 1);
     ray.setFromCamera(ndc, camera);
     const keep = (p) => !renderer.clippingPlanes.length || SEC.plane.distanceToPoint(p) >= 0;
-    const hit = ray.intersectObjects(meshes.filter((m) => m.visible), false).find((h) => keep(h.point));
+    const hit = ray.intersectObjects(meshes.filter((m) => m.visible && !m.userData.shadowOnly), false).find((h) => keep(h.point));
     const scr = (p) => { const q = p.clone().project(camera); return [(q.x + 1) / 2 * r.width, (1 - q.y) / 2 * r.height, q.z]; };
     let best = null;
     const offer = (p, what) => {
@@ -5056,7 +5173,7 @@ body.vr-on .stage { grid-row: 1; }
     const r = canvas.getBoundingClientRect();
     ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
     ray.setFromCamera(ndc, camera);
-    const h = ray.intersectObjects(all ? meshes.filter((q) => q.visible) : [m], false)[0];
+    const h = ray.intersectObjects(all ? meshes.filter((q) => q.visible && !q.userData.shadowOnly) : [m], false)[0];
     return h && h.object === m && h.uv ? [h.uv.x * FT.ft.width, (1 - h.uv.y) * FT.ft.height] : null;
   }
   {
@@ -5303,7 +5420,7 @@ body.vr-on .stage { grid-row: 1; }
   function shareLink() {
     const q = [`${+(S.cutX / IN).toFixed(3)}x${+(S.cutY / IN).toFixed(3)}`], add = (k, v) => q.push(`${k}=${encodeURIComponent(v)}`);
     if ($("braces").value !== "0") add("braces", $("braces").value);
-    for (const [box, k] of [["strut-variant", "struts"], ["peter-variant", "peter"]]) {
+    for (const [box, k] of [["strut-variant", "struts"], ["peter-variant", "peter"], ["table-variant", "base"]]) {
       const b = !$(box).hidden && $(box).querySelector('button[aria-pressed="true"]');
       if (b) add(k, b.dataset.v);
     }
@@ -5328,7 +5445,7 @@ body.vr-on .stage { grid-row: 1; }
     if (o.pendant !== undefined && $("ft-on").checked !== (o.pendant !== "0")) $("ft-on").click();
     const set = {};
     for (const k of ["router", "skirt", "hose", "fan"]) if (o[k] !== undefined) set[k] = o[k] !== "0";
-    for (const k of ["braces", "struts", "peter"]) if (o[k] !== undefined) set[k] = o[k];
+    for (const k of ["braces", "struts", "peter", "base"]) if (o[k] !== undefined) set[k] = o[k];
     if (o.table !== undefined) set.table = Number(o.table);
     if (o.room) { const r = o.room.split(",").map(Number); if (r.length === 3 && r.every((v) => v > 0)) set.room = r; }
     for (const role of ["main", "accent"]) if (o[role]) set[role] = "#" + o[role];
@@ -5404,7 +5521,7 @@ body.vr-on .stage { grid-row: 1; }
   // ---- for scripts (Part 29: the video sets the machine - tools/record_demo.js): My machine and Show by name / id,
   // through the panel's own controls (so they're kept and drawn as if clicked) ----
   window.LR4Machine = {
-    // o = { router, skirt, hose, fan (bool), peter, struts (a button's data-v), braces ("auto" or a count the menu has),
+    // o = { router, skirt, hose, fan (bool), peter, struts, base (a button's data-v: base "sheet" / "torsion"), braces ("auto" or a count the menu has),
     // table (mm, top of the MDF), room ([x, y, ceiling] mm), main, accent (#rrggbb) } -> problems (strings; the rest is set)
     apply(o) {
       const bad = [], el = (id) => document.getElementById(id), fire = (e, t) => e.dispatchEvent(new Event(t));
@@ -5413,7 +5530,7 @@ body.vr-on .stage { grid-row: 1; }
         const c = el("opt-" + k);
         if (c.checked !== !!o[k]) { c.checked = !!o[k]; fire(c, "change"); }
       }
-      for (const [k, box] of [["peter", "peter-variant"], ["struts", "strut-variant"]]) {
+      for (const [k, box] of [["peter", "peter-variant"], ["struts", "strut-variant"], ["base", "table-variant"]]) {
         if (o[k] === undefined) continue;
         const bs = el(box).hidden ? [] : [...el(box).querySelectorAll("button")], b = bs.find((x) => x.dataset.v === String(o[k]));
         if (b) b.click();
@@ -5760,9 +5877,11 @@ body.vr-on .stage { grid-row: 1; }
   let lastT = performance.now();
   const camPos = new THREE.Vector3();
   let frameN = 0;
-  function tick() {
+  let building = true;                                // load(): no frames until the build's stages are done (each
+  function tick() {                                   // frame mid-build was a full draw: slow, and nothing to see yet)
     const now = performance.now(), dt = Math.min((now - lastT) / 1000, 0.1);
     lastT = now;
+    if (building) return;
     if (shop) LR4Shop.cutaway(shop, camera.getWorldPosition(camPos));   // hide walls the camera is outside of
     homeTick();
     basicTick();

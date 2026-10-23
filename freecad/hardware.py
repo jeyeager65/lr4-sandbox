@@ -34,7 +34,7 @@ DRIVE = "phillips"     # button head recess: "phillips" (user, 2026-10-18), "hex
 THREADS = True         # model the threads (revolved V profile) - FCStd / STEP; the viewer draws a texture
 # parts with no modelled holes that screws thread into (tapped metal) or drive into (wood)
 TAPPED = ("Z_Stepper_", "Y_Stepper_", "X_Stepper", "MGN12H_")
-THROUGH = ("TableMDF",)
+THROUGH = ("TableMDF", "RailStrip_Min", "RailStrip_Max", "Spoilboard", "TableBase")   # wood (Part 33: the screws go into the rail strips)
 
 
 def joints(names):

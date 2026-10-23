@@ -3,6 +3,22 @@
 The version is the sandbox page's (`VERSION` in `web/index.html`, shown in its footer). The footer also shows
 the date the model data was built and the Printables file set it was solved for.
 
+## 0.36.0 - 2026-10-23
+- **The table has a separate spoilboard:** 3/4" MDF covering the bit's full travel + 1/4" a side (a 3/4" bit surfaces all of it), between two 3/4" MDF **rail
+  strips** (the Y belt holders, the Min wheels and the Y rail clips sit on those), so the spoilboard can be surfaced or
+  replaced on its own. The spoilboard's cuts (On the table) are on it.
+- **Table base (Build > Table > Base):** the **MDF sheet** as before, or a **torsion box** - a plywood egg-crate of
+  half-lapped ribs (5/8" ply, 3-1/2" tall, about 12" apart; no skins). The cut list follows (spoilboard, rail strips,
+  sheet or ribs with their slot counts). Also in the share link (`base=torsion`) and video scripts (`BASE=torsion`).
+- The torsion box is as long as the spoilboard; the rail strips run past its ends on the box's two outer ribs, which
+  run the full length under them (side boards), and the box sits right on the legs (no apron). The pendant mounts on
+  the front end of the wider rail strip (on the box's face the dust shoe would hit it).
+- Wood grain on the legs, apron and plywood parts (the MDF stays plain).
+- The spoilboard casts its shadow again (since 0.35.0 the carving surface drawn over it let the light through).
+- Loading says what it's doing (placing the parts, bill of materials, workshop and lights, compiling shaders).
+- No vacuum hose = no dust shoe: turning the hose off also takes the shoe, skirt and bristles off (model and BOM).
+- The table height is now the spoilboard's top.
+
 ## 0.35.0 - 2026-10-23
 - **On the table (Run tab):** the machine set up by hand, as at the real one. **Stock** (size, where on the table,
   thickness; "Size it to the job"), the **bit in the router** (shape, diameter, V angle, stick-out; drawn in place of

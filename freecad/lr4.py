@@ -620,7 +620,7 @@ MOTION_BEAM = ("XZ_Plate", "Z_Stub", "Z_Nut", "Z_BrassNut", "MGN12H", "Brace", "
                "X_Belt", "Belt_X", "Hose_", "Jackpot3", "PSU", "Vac_Hose")
 MOTION_CORE = ("Core", "Tool_Mount", "Dust_", "Router", "Bristles", "X_Stepper", "X_Pulley", "X_Idler",
                "Bearing_Core", "Endstop_X", "TouchPlate")
-MOTION_TABLE = ("TableMDF", "Y_Belt_", "Y_Rail", "Y_Clip", "Belt_Y")
+MOTION_TABLE = ("TableMDF", "TableBase", "TableRib", "Spoilboard", "RailStrip", "RailEdge", "Y_Belt_", "Y_Rail", "Y_Clip", "Belt_Y")
 
 
 def motion(name):
@@ -642,6 +642,71 @@ def motion(name):
     if name.startswith(MOTION_TABLE):
         return "table"
     return "gantry"
+
+
+# ---- the table (Part 33, user 2026-10-23) ------------------------------------------------------------------
+# The work surface stays at z 0..T (T = 3/4" MDF) so the machine and the size builds don't move: a Spoilboard
+# (the cutting area + a margin, what the bit cuts into) between two Rail strips the same thickness (the Y belt
+# holders + Min wheels on the Min one, the belt holders + Y clips on the Max one), all screwed onto a base below
+# z 0: "sheet" = one 3/4" MDF sheet (TableBase), "torsion" = a plywood egg-crate (TableRib_X* along X, TableRib_Y*
+# along Y, half-lapped: the Y ribs slotted from the top, the X ribs from the bottom; no skins) only as long as the
+# spoilboard - the rail strips run the full length and stick out past its ends, on the box's two outer long ribs run
+# the full length under them (RailEdge_Min / Max; user 2026-10-23).
+# web/js/table_model.js mirrors table_parts (tests/test_table_model.js compares it with build/table.json).
+TABLE = dict(
+    spoil_t=0.75 * 25.4,          # spoilboard + rail strips: 3/4" MDF (user) - MEASURE YOURS
+    spoil_margin=0.25 * 25.4,     # spoilboard past the bit's full travel (reach), each side: more than a 1/4" bit's
+                                  # radius (it never runs off), less than a 3/4" bit's (it surfaces all of it) - user
+    # the bit's full travel (home trip -> hard stop, STOPS) from the footprint's edges: X from the Min / Max edge
+    # (YZ outer face 9 + carriage 46 + XZ plate 6.5 to the strut's end), Y from the front / back edge
+    reach=(55.0 + 6.5 + STOPS["x_home"], 55.0 + 6.5 + STOPS["x_end"], STOPS["y_home"], STOPS["y_end"]),
+    spoil_gap=0.125 * 25.4,       # at least this gap to the rail strips
+    strip_min=2.5 * 25.4,         # Min strip: table edge to the footprint's Min edge + this (wheels at +26..34 mm)
+    strip_max=4.0 * 25.4,         # Max strip: the footprint's Max edge - this (Y clips from -79 mm) to the table edge
+    sheet_t=0.75 * 25.4,          # "sheet" base: 3/4" MDF - MEASURE YOURS
+    rib_t=0.6 * 25.4,             # "torsion" ribs: 5/8" plywood (thinner than nominal) - GUESS / MEASURE YOURS
+    rib_h=3.5 * 25.4,             # rib height - GUESS
+    grid=12.0 * 25.4,             # most rib spacing (centre to centre) - GUESS (the user's picture: ~12")
+    slot_clear=0.4,               # half-lap slot width = rib_t + this
+)
+
+
+def rib_spots(length, t, grid):
+    """Rib positions (low face) along a side: the two outer ribs flush with the edges, the rest even, <= grid apart."""
+    n = max(2, math.ceil((length - t) / grid - 1e-9) + 1)
+    return [(length - t) * i / (n - 1) for i in range(n)]
+
+
+def table_parts(kind, TW, TL, xtable, ytable, cut_x, cut_y, T=None, c=None):
+    """The table's parts as boxes, mm: [dict(name, box=(x0, y0, z0, x1, y1, z1), slots=[box, ...], role)].
+    kind "sheet" / "torsion"; the footprint (xtable x ytable) and the cutting area are centred on the TW x TL table."""
+    c = dict(TABLE, **(c or {}))
+    T = c["spoil_t"] if T is None else T
+    fx0, fx1 = (TW - xtable) / 2, (TW + xtable) / 2
+    a, b = fx0 + c["strip_min"], fx1 - c["strip_max"]
+    fy0, fy1, r, mg = (TL - ytable) / 2, (TL + ytable) / 2, c["reach"], c["spoil_margin"]
+    sx0 = max(fx0 + r[0] - mg, a + c["spoil_gap"])   # the bit's travel + the margin (cut_x / cut_y: not used since
+    sx1 = min(fx1 - r[1] + mg, b - c["spoil_gap"])   # 2026-10-23 - the travel isn't centred on the nominal cut area)
+    sy0 = max(fy0 + r[2] - mg, 0.0)
+    sy1 = min(fy1 - r[3] + mg, TL)
+    out = [dict(name="RailStrip_Min", box=(0.0, 0.0, 0.0, a, TL, T), slots=[], role="strip"),
+           dict(name="RailStrip_Max", box=(b, 0.0, 0.0, TW, TL, T), slots=[], role="strip"),
+           dict(name="Spoilboard", box=(sx0, sy0, 0.0, sx1, sy1, T), slots=[], role="spoil")]
+    if kind == "sheet":
+        out.append(dict(name="TableBase", box=(0.0, 0.0, -c["sheet_t"], TW, TL, 0.0), slots=[], role="base"))
+        return out
+    t, h, w = c["rib_t"], c["rib_h"], c["rib_t"] + c["slot_clear"]
+    xs = rib_spots(TW, t, c["grid"])
+    ys = [sy0 + y for y in rib_spots(sy1 - sy0, t, c["grid"])]   # the box: the spoilboard's length
+    for i, x in enumerate(xs):           # along Y: slots from the top where the X ribs cross. The outer two run the
+        edge = i in (0, len(xs) - 1)     # full length under the rail strips (RailEdge_*: stiffen the overhang, user)
+        out.append(dict(name=("RailEdge_Min" if i == 0 else "RailEdge_Max") if edge else f"TableRib_Y{i}",
+                        box=(x, 0.0 if edge else sy0, -h, x + t, TL if edge else sy1, 0.0), role="edge" if edge else "rib",
+                        slots=[(x - 1, y - (w - t) / 2, -h / 2, x + t + 1, y + (w + t) / 2, 1.0) for y in ys]))
+    for j, y in enumerate(ys):           # along X: slots from the bottom
+        out.append(dict(name=f"TableRib_X{j + 1}", box=(0.0, y, -h, TW, y + t, 0.0), role="rib",
+                        slots=[(x - (w - t) / 2, y - 1, -h - 1, x + (w + t) / 2, y + t + 1, -h / 2) for x in xs]))
+    return out
 
 
 # ---- vacuum hose -------------------------------------------------------------------------------

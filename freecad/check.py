@@ -56,7 +56,8 @@ PAIRS = [
     ("Bristles_TPU_2", "Dust_Shoe_Kobalt"), ("Bristles_TPU_1", "Bristles_TPU_2"), ("Bristles_TPU_1", "Router_Bit"),
     # table
     ("Y_Rail", "Y_Clip_1"), ("Y_Rail", "Y_Clip_2"), ("Y_Rail", "Y_Belt_MaxF"), ("Y_Rail", "Y_Belt_MaxB"),
-    ("Y_Rail", "FrontWheel_Max"), ("Y_Rail", "BackWheel_Max"), ("TableMDF", "FrontWheel_Max"),
+    ("Y_Rail", "FrontWheel_Max"), ("Y_Rail", "BackWheel_Max"), ("RailStrip_Max", "FrontWheel_Max"),
+    ("Spoilboard", "FrontWheel_Max"), ("Spoilboard", "FrontWheel_Min"), ("Spoilboard", "BackWheel_Min"),
     # Y belts: idlers + pulley in the YZ plate pocket, belt round them and into the holder lock slots
     *[p for s in ("Min", "Max") for p in (
         (f"YZ_Plate_{s}", f"Y_Idler_{s}_1"), (f"YZ_Plate_{s}", f"Y_Idler_{s}_2"), (f"YZ_Plate_{s}", f"Y_Pulley_{s}"),
@@ -66,7 +67,14 @@ PAIRS = [
         (f"Belt_Y_{s}_Front", f"Y_Belt_{s}F"), (f"Belt_Y_{s}_Front", f"Y_Belt_{s}_Lock"),
         (f"Belt_Y_{s}_Back", f"Y_Belt_{s}B"), (f"Belt_Y_{s}_Back", f"Y_Belt_{s}_Tension"))],
     ("Belt_Y_Max_Front", "Y_Rail"), ("Belt_Y_Max_Back", "Y_Rail"),
-    ("TableMDF", "FrontWheel_Min"), ("TableMDF", "BackWheel_Min"), ("TableMDF", "Y_Clip_1"),
+    ("RailStrip_Min", "FrontWheel_Min"), ("RailStrip_Min", "BackWheel_Min"), ("RailStrip_Max", "Y_Clip_1"),
+    ("RailStrip_Min", "Y_Belt_MinF"), ("RailStrip_Min", "Y_Belt_MinB"), ("RailStrip_Max", "Y_Belt_MaxF"),
+    ("RailStrip_Min", "PeterPlate_B_Min"), ("RailStrip_Min", "YZ_Plate_Min"), ("RailStrip_Min", "Endstop_Y_Min_Lever"),
+    # Part 33: the table base under the strips / spoilboard (TABLE "sheet" or "torsion": half-laps, slot clear 0.4)
+    ("TableBase", "RailStrip_Min"), ("TableBase", "Spoilboard"), ("TableRib_Y1", "TableRib_X1"),
+    ("TableRib_Y2", "TableRib_X2"), ("TableRib_Y1", "RailStrip_Min"), ("TableRib_X2", "Spoilboard"),
+    ("RailEdge_Min", "RailStrip_Min"), ("RailEdge_Min", "TableRib_X1"), ("RailEdge_Max", "RailStrip_Max"),
+    ("RailEdge_Min", "Vac_Hose"), ("RailEdge_Min", "Y_Belt_MinF"), ("RailEdge_Max", "Y_Belt_MaxF"),
     # electronics
     ("Jackpot3_Box", "StrutPlate_Bottom"), ("Jackpot3_Box", "X_Rail_Lower"), ("Jackpot3_Box", "Brace_1"),
     ("Jackpot3_Box", "Jackpot3_Lid"), ("Jackpot3_Box", "Brace_2"), ("Jackpot3_Box", "Hose_Hook_70_1"),
@@ -90,7 +98,7 @@ PAIRS = [
     ("Vac_Hose", "Router_Head"), ("Vac_Hose", "Router_Cap"), ("Vac_Hose", "Router_Cord"),
     ("Vac_Hose", "Hose_Holder_Shorty_1"), ("Vac_Hose", "Hose_Hook_70_1"), ("Vac_Hose", "Hose_Holder_Shorty_2"),
     ("Vac_Hose", "Brace_1"), ("Vac_Hose", "Brace_2"), ("Vac_Hose", "Jackpot3_Lid"), ("Vac_Hose", "YZ_Plate_Min"),
-    ("Vac_Hose", "TableMDF"), ("Vac_Hose", "Hose_Holder_Hook_1"), ("Vac_Hose", "Brace_3"), ("Vac_Hose", "Brace_4"),
+    ("Vac_Hose", "RailStrip_Min"), ("Vac_Hose", "TableBase"), ("Vac_Hose", "TableRib_Y1"), ("Vac_Hose", "Hose_Holder_Hook_1"), ("Vac_Hose", "Brace_3"), ("Vac_Hose", "Brace_4"),
     # temp struts (build.py STRUTS = "temp"), instead of the strut plates
     *[(f"Temp_Strut_{w}_{e}", b) for w in ("Front", "Bottom") for e in ("Min", "Max")
       for b in ("Brace_1", "Brace_2", "Brace_3", "Brace_4", "Brace_5", "Brace_6", "Brace_7", "Brace_Max", "X_Rail_Upper",
@@ -107,12 +115,12 @@ PAIRS = [
                                        "Router_Cap", "Router_Dial", "Router_Switch", "X_Stepper", "Hose_Holder_Shorty_1",
                                        "Hose_Hook_70_1", "Hose_Holder_Shorty_2", "Hose_Holder_Hook_1",
                                        "Hose_Holder_Hook_2", "Brace_1", "Brace_2", "Brace_3", "Brace_4", "Brace_Max",
-                                       "Jackpot3_Lid", "YZ_Plate_Min", "TableMDF", "XZ_Plate_Max", "YZ_Plate_Max")],
+                                       "Jackpot3_Lid", "YZ_Plate_Min", "RailStrip_Min", "TableBase", "XZ_Plate_Max", "YZ_Plate_Max")],
     *[("Cable_Sleeve", n) for n in ("Vac_Hose", "Router_Cord_Run", "Jackpot3_Box", "Jackpot3_Fan", "Dust_Shoe_Kobalt", "Core", "Router_Kobalt", "Router_Head",
                                        "Router_Cap", "Router_Dial", "Router_Switch", "X_Stepper", "Hose_Holder_Shorty_1",
                                        "Hose_Hook_70_1", "Hose_Holder_Shorty_2", "Hose_Holder_Hook_1",
                                        "Hose_Holder_Hook_2", "Brace_1", "Brace_2", "Brace_3", "Brace_4", "Brace_Max",
-                                       "Jackpot3_Lid", "YZ_Plate_Min", "TableMDF", "XZ_Plate_Max", "YZ_Plate_Max")],
+                                       "Jackpot3_Lid", "YZ_Plate_Min", "RailStrip_Min", "TableBase", "XZ_Plate_Max", "YZ_Plate_Max")],
 ]
 
 

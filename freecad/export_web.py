@@ -162,7 +162,7 @@ for o in doc.Objects:
             pts, facets = fm.Topology
         else:
             pts, facets = o.Shape.tessellate(TESSELLATE)
-        source = "made" if o.Name.startswith(("StrutPlate", "TableMDF", "XZ_Plate")) else "hardware"
+        source = "made" if o.Name.startswith(("StrutPlate", "TableMDF", "TableBase", "TableRib_", "RailStrip_", "Spoilboard", "XZ_Plate")) else "hardware"
     else:
         continue
     if not facets:
@@ -263,7 +263,10 @@ meta = dict(
     tip_above_table=tip_now - T,
     calc=lr4.calculator(CUT_X, CUT_Y, B["XZ_PLATE"]),
 )
-bb = doc.getObject("TableMDF").Shape.BoundBox
+bb = App.BoundBox()                              # the whole table (Part 33: rail strips + spoilboard + base)
+for o in doc.Objects:
+    if o.Name.startswith(("TableMDF", "TableBase", "TableRib_", "RailStrip_", "Spoilboard")) and hasattr(o, "Shape"):
+        bb.add(o.Shape.BoundBox)
 meta["table_mm"] = [bb.XLength, bb.YLength, bb.ZLength]
 meta["peter_style"] = style
 meta["bom"] = load("bom.json")                  # build/bom.json (bom.py): the page's bill of materials

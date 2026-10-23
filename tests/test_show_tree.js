@@ -149,6 +149,9 @@ ok(/^177 fasteners/.test(bare.find((q) => q.title.startsWith("Hardware: where"))
 const skirt = bomWith({ router: true, skirt: false, hose: true, fan: true });
 ok(!rows(skirt, "Printed parts").some((r) => /^(Dust_Skirt|TPU_)/.test(r[1])) && rows(skirt, "Printed parts").some((r) => r[1] === "Dust_Shoe_Kobalt"),
   "no skirt: shoe stays");
+const nohose = bomWith({ router: true, skirt: true, hose: false, fan: true });   // the shoe goes with the hose (user 2026-10-23)
+ok(!rows(nohose, "Printed parts").some((r) => /^(Dust_|TPU_)/.test(r[1])) && rows(nohose, "Printed parts").some((r) => /^Tool_Mount/.test(r[1])),
+  "no hose: no shoe / skirt / bristles, the tool mount stays");
 const pend = bomWith({ router: true, skirt: true, hose: true, fan: true, pendant: true });
 ok(rows(pend, "Printed parts").some((r) => r[1] === "stand") && rows(pend, "Buy: specialty").some((r) => /CrowPanel/.test(r[1])), "pendant rows");
 

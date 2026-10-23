@@ -7,6 +7,7 @@
 "use strict";
 const fs = require("fs"), path = require("path");
 const M = require("../web/js/config_model.js");
+const TM = require("../web/js/table_model.js");
 const CONF = path.join(__dirname, "..", "build", "config");      // fit_config.py's output
 const cfg = JSON.parse(fs.readFileSync(path.join(CONF, "lr4_config.json"), "utf8"));
 const SIZES = path.join(__dirname, "..", "private", "sizes");
@@ -68,6 +69,11 @@ for (const [tag, [cx, cy], struts] of runs) {
   if (checks.length) console.log(`     (${tag}: build flagged ${checks.map((r) => r[2]).join("; ")}: BOM not compared)`);
   if (realBom && !checks.length) {
     const real = realBom, mine = M.bom(cfg, S, inst.map((o) => o.name));
+    // a size build from before Part 33 has one "Table top" row: leave the table rows out on both sides (the new ones are
+    // test_table_model.js's - the same generator as build.py); a newer build's table rows are compared as the rest
+    const stock = (b) => b.find((q) => q.title.startsWith("Buy / cut: stock"));
+    if (stock(real) && stock(real).rows.some((r) => r[1] === "Table top"))
+      for (const q of [stock(real), stock(mine)]) if (q) q.rows = q.rows.filter((r) => !TM.NAMES.test(r[1]));
     const norm = (v) => typeof v === "number" ? +v.toFixed(3) : String(v).replace(/\d+/g, "#");
     for (const rs of real) {
       const ms = mine.find((q) => q.title === rs.title);
