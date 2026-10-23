@@ -3,6 +3,20 @@
 The version is the sandbox page's (`VERSION` in `web/index.html`, shown in its footer). The footer also shows
 the date the model data was built and the Printables file set it was solved for.
 
+## 0.34.0 - 2026-10-23
+- **Web UIs (Run > Controller, FluidNC mode):** any `.html` / `.html.gz` on FluidNC's SD card or Flash is listed
+  (named WebUI 3, WebUI 2, FigUI or by its title) and **Open** shows it in a window of its own, served by the page's
+  FluidNC web server as a board serves it - the Flash's `index.html.gz` at `/`, `/sd/ui/<name>/` at `/ui/<name>/`,
+  others at `/sd/<file>` / `/flash/<file>` (the `.gz` left off). The UI's commands, WebSocket and uploads reach
+  FluidNC; files it writes show on the page's SD card / Flash. Add a UI with "Add to the Flash…" / "Add to the SD
+  card…" or drop it on the list: a release's `index.html.gz` goes onto the card in a folder of its own
+  (`/ui/figui/`, `/ui/webui3/`, `/ui/webui2/`), so several fit. In Basic, Open switches to FluidNC; the window waits
+  (and retries) while the sandbox tab isn't running FluidNC.
+- A web UI file on the SD card isn't a G-code job: no ▶, not loaded as the job when added or dropped.
+- **Folders on the SD card and the Flash:** both lists are a folder tree (▾ / ▸ folds); click a folder to add files
+  and new folders into it, ✕ on a folder deletes it and what's in it. Empty folders are kept (also ones FluidNC or a
+  web UI makes) and are back after a reload. The Flash list can add and delete files too (not config.yaml).
+
 ## 0.33.0 - 2026-10-22
 - **Show > Scene > Lighting: Realistic / Simple.** Realistic: in the workshop its own lights - the four 4 ft LED strips
   as soft area lights, soft shadows from overhead (Full detail), daylight through the garage door; on Plain a studio

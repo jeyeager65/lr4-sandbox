@@ -1,0 +1,33 @@
+<!doctype html>
+<!-- A sandbox Web UI window: registers device/sw.js (scope device/), then loads FluidNC's page through it at
+     device/nc/<token><path>. Opened by the sandbox (Run > Controller > Web UIs) as device/?t=<token>&p=<path>. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FluidNC Web UI</title>
+<style>
+  :root { --bg: #f6f6f4; --ink: #222; --dim: #666; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #1b1c1e; --ink: #e8e8e6; --dim: #9a9a98; } }
+  body { font: 15px system-ui, sans-serif; margin: 40px 16px; color: var(--ink); background: var(--bg); }
+  p { color: var(--dim); max-width: 60ch; }
+</style>
+</head>
+<body>
+<h2>Connecting to FluidNC…</h2>
+<p id="msg"></p>
+<script>
+(async () => {
+  const q = new URLSearchParams(location.search), t = q.get("t"), p = q.get("p") || "/";
+  const msg = (s) => { document.getElementById("msg").textContent = s; };
+  if (!t || !/^[A-Za-z0-9]+$/.test(t)) { msg("Open this from the LowRider 4 Sandbox: Run > Controller > Web UIs."); return; }
+  if (!navigator.serviceWorker) { msg("This browser has no service workers here (a private window?), so the Web UI can't reach FluidNC."); return; }
+  try {
+    await navigator.serviceWorker.register("sw.js", { scope: "./" });
+    await navigator.serviceWorker.ready;
+  } catch (e) { msg("Couldn't start the window's service worker: " + e.message); return; }
+  location.replace("nc/" + t + (p.startsWith("/") ? p : "/" + p));
+})();
+</script>
+</body>
+</html>

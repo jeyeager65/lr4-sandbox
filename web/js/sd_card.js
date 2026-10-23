@@ -33,6 +33,23 @@
     go(dir, "");
     return out;
   }
+  // the folders under dir -> ["/jobs", "/ui", "/ui/figui"] (empty ones too: walk() only sees files)
+  function walkDirs(FS, dir = DIR) {
+    const out = [];
+    const go = (d, rel) => {
+      let names;
+      try { names = FS.readdir(d); } catch (e) { return; }
+      for (const n of names) {
+        if (n === "." || n === "..") continue;
+        const p = `${d}/${n}`;
+        if (FS.isDir(FS.stat(p).mode)) { out.push(`${rel}/${n}`); go(p, `${rel}/${n}`); }
+      }
+    };
+    go(dir, "");
+    return out;
+  }
+  // "/a/b/c.gcode" -> ["/a", "/a/b"]
+  const parents = (path) => { const s = path.split("/").slice(1, -1); return s.map((_, i) => "/" + s.slice(0, i + 1).join("/")); };
   const same = (a, b) => a.length === b.length && a.every((v, i) => v === b[i]);
   // what to change in the store so it matches the card: { put: [records], remove: [paths] }
   function diff(stored, card) {
@@ -65,32 +82,66 @@
   const toBytes = (data) => (typeof data === "string" ? new TextEncoder().encode(data) : new Uint8Array(data));
   // one card: its IndexedDB store and its folder in FluidNC's filesystem. skip: paths on the live card that aren't
   // the user's (the Flash's sim_config.yaml) - never synced back. Records may carry extra fields (put(path, data, extra)).
+  // Folders are records too ({ path: "/jobs", dir: true }), so empty ones last; all() is the files only, dirs() the
+  // folders (a file's folders needn't have a record: it implies them).
   function card(DB, dir, skip = []) {
+    const raw = async () => ((await tx(DB, "readonly", (st) => st.getAll())) || []).sort((a, b) => a.path.localeCompare(b.path));
     const store = {
-      all: async () => ((await tx(DB, "readonly", (st) => st.getAll())) || []).sort((a, b) => a.path.localeCompare(b.path)),
+      all: async () => (await raw()).filter((r) => !r.dir),
+      dirs: async () => (await raw()).filter((r) => r.dir).map((r) => r.path),
       get: (path) => tx(DB, "readonly", (st) => st.get(path)),
       put: (path, data, extra) => tx(DB, "readwrite", (st) => { st.put(Object.assign({}, extra, { path, bytes: toBytes(data), mtime: Date.now() })); }),
       putAll: (recs) => tx(DB, "readwrite", (st) => { for (const r of recs) st.put(r); }),
       remove: (paths) => tx(DB, "readwrite", (st) => { for (const p of [].concat(paths)) st.delete(p); }),
+      // a folder and the ones it's in
+      mkdir: (path) => tx(DB, "readwrite", (st) => { for (const p of [...parents(path), path]) st.put({ path: p, dir: true, bytes: new Uint8Array(0), mtime: Date.now() }); }),
+      // a folder and everything in it -> the file paths removed
+      async removeTree(path) {
+        const gone = (await raw()).filter((r) => r.path === path || r.path.startsWith(path + "/"));
+        await store.remove(gone.map((r) => r.path));
+        return gone.filter((r) => !r.dir).map((r) => r.path);
+      },
     };
-    // the running FluidNC (sim from fluidnc_sim.start): write / delete one file, or bring its changes back
+    // the running FluidNC (sim from fluidnc_sim.start): write / delete one file or folder, or bring its changes back
     const writeLive = (sim, path, data) => { if (sim && !sim.stopped) sim.writeFile(dir + path, toBytes(data)); };
     const removeLive = (sim, path) => { if (sim && !sim.stopped) try { sim.FS.unlink(dir + path); } catch (e) { /* not there */ } };
-    async function sync(sim) {                         // the card -> the store; returns { put, remove } (what changed)
-      if (!sim || sim.stopped) return { put: [], remove: [] };
+    const mkdirLive = (sim, path) => { if (sim && !sim.stopped) sim.FS.mkdirTree(dir + path); };
+    function removeTreeLive(sim, path) {
+      if (!sim || sim.stopped) return;
+      const FS = sim.FS, go = (p) => {
+        let names;
+        try { names = FS.readdir(p); } catch (e) { return; }
+        for (const n of names) {
+          if (n === "." || n === "..") continue;
+          const q = `${p}/${n}`;
+          if (FS.isDir(FS.stat(q).mode)) go(q); else FS.unlink(q);
+        }
+        FS.rmdir(p);
+      };
+      try { go(dir + path); } catch (e) { /* not there */ }
+    }
+    // the card -> the store; returns { put, remove, dirs } (what changed; dirs: a folder came or went)
+    async function sync(sim) {
+      if (!sim || sim.stopped) return { put: [], remove: [], dirs: false };
       const d = diff(await store.all(), walk(sim.FS, dir, skip));
       if (d.put.length) await store.putAll(d.put);
       if (d.remove.length) await store.remove(d.remove);
+      const had = new Set(await store.dirs()), live = walkDirs(sim.FS, dir);
+      const add = live.filter((p) => !had.has(p)), gone = [...had].filter((p) => !live.includes(p));
+      if (add.length) await store.putAll(add.map((p) => ({ path: p, dir: true, bytes: new Uint8Array(0), mtime: Date.now() })));
+      if (gone.length) await store.remove(gone);
+      d.dirs = add.length + gone.length > 0;
       return d;
     }
-    // every stored file as start()'s opts.files ({ "/native_sd/a.gcode": bytes })
+    // every stored file as start()'s opts.files ({ "/native_sd/a.gcode": bytes }); folders as its opts.dirs
     const files = (recs) => Object.fromEntries(recs.map((r) => [dir + r.path, r.bytes]));
-    return { DIR: dir, store, writeLive, removeLive, sync, files };
+    const dirs = (paths) => paths.map((p) => dir + p);
+    return { DIR: dir, store, writeLive, removeLive, mkdirLive, removeTreeLive, sync, files, dirs };
   }
   const sd = card("lr4-sandbox-sd", DIR);
   const flash = card("lr4-sandbox-flash", "/native_localfs", ["/sim_config.yaml"]);
 
-  const api = Object.assign({ cleanName, pathOf, walk, diff, card, flash }, sd);
+  const api = Object.assign({ cleanName, pathOf, walk, walkDirs, parents, diff, card, flash }, sd);
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.SdCard = api;
 })(typeof self !== "undefined" ? self : this);

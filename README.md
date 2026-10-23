@@ -125,6 +125,14 @@ download is always your real file.)
 
 G-code files on the page's SD card run through FluidNC too (`$SD/Run`), from the page or from the FluidTouch pendant.
 
+**Web UIs:** put a web UI on FluidNC's SD card or Flash (WebUI 3, WebUI 2 or FigUI: their release `index.html.gz`,
+as they are) and **Run > Controller > Web UIs > Open** shows it in a window of its own, served by the page's FluidNC
+web server the way a board serves it: watch and drive the machine from there, upload files to its card. The Flash's
+`index.html.gz` opens at `/`, `/sd/ui/<name>/index.html.gz` at `/ui/<name>/`, any other `x.html.gz` at
+`/sd/x.html` (FluidNC's WebDAV, in 4.1.1 too). Keep the sandbox tab open: FluidNC runs there, and the window reaches
+it through its own service worker (`web/device/`; same browser only). Several UIs open at once can get errors from
+FluidNC, as on a board.
+
 ![FluidNC mode, homed, with its console](docs/img/fluidnc.webp)
 
 **Browser:** tested in desktop Chrome (and Edge for VR). FluidNC mode needs the page to be cross-origin isolated
@@ -251,6 +259,9 @@ It runs `pio run -e wasm` and copies `program.js` / `program.wasm`, FluidNC's GP
 exact commit and a source link) into `web/fluidnc/`. `--dirty` builds a checkout with local changes (marked so in
 `build.json`; don't commit that). The defaults are `D:/GitHub/FluidNC` and `D:/emsdk`.
 
+`web/fluidnc/vnet_host.js` and `web/device/` (the Web UI windows) are adapted from FluidNC's
+`FluidNC/wasm/demo/vnet-*.js` and are GPL-3.0 like the rest of `web/fluidnc/`.
+
 ## Tests
 
 ```sh
@@ -272,6 +283,8 @@ node test_sim_config.js                      # config.yaml -> the browser copy (
 node test_page_fluidnc.js                    # headless Chrome: FluidNC in the page - boot, home, probe, jog,
                                              #   speed, restarts; served with headers and as plain files (Pages)
 node test_page_vr.js                         # headless Chrome: the page in VR preview
+node test_page_webui.js                      # headless Chrome: a web UI from the SD card / Flash in its own
+                                             #   window - /command, WebSocket, a move, an upload (headers + plain)
 node test_page_inspect.js                    # headless Chrome: the inspect view and its tools (needs parts/)
 node test_page_basic.js                      # headless Chrome: Basic mode with the FluidTouch pendant
 node test_page_sdjob.js                      # headless Chrome: the SD card and a job run on FluidNC

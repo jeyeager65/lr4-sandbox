@@ -337,6 +337,7 @@ label.btn:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; 
 .sd-list { margin-top: 6px; border: 1px solid var(--line); border-radius: 4px; max-height: 220px; overflow: auto; }
 .sd-list.drop { outline: 2px dashed var(--accent); }
 .sd-list:empty::before { content: "No files yet."; display: block; padding: 8px; color: var(--muted); font-size: 13px; }
+#ui-list:empty::before { content: "No .html or .html.gz files on the SD card or Flash yet."; }
 .sd-row { display: flex; align-items: center; gap: 6px; padding: 4px 6px; border-top: 1px solid var(--line); font-size: 13px; }
 .sd-row:first-child { border-top: 0; }
 .sd-row .sd-name { flex: 1; min-width: 0; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
@@ -344,6 +345,10 @@ label.btn:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; 
 .sd-row[aria-selected="true"] .sd-name { color: var(--accent); font-weight: 600; }
 .sd-row small { color: var(--muted); font-family: var(--font-data); }
 .sd-row button.sd-act { padding: 2px 8px; }
+.sd-row.sd-dir .sd-name { font-weight: 600; }
+.sd-row.sd-dir[aria-current="true"] { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.sd-row button.sd-fold { background: none; border: 0; padding: 2px 4px; width: 20px; cursor: pointer; color: var(--muted); }
+.sd-where { color: var(--muted); align-self: center; }
 #job-def-tools .trio { grid-template-columns: auto 1fr 1fr 1fr; align-items: end; }
 .jog { display: grid; grid-template-columns: repeat(4, 52px); gap: 6px; margin-top: 10px; }
 .jog button { padding: 8px 0; font-family: var(--font-data); }
@@ -637,7 +642,26 @@ body.vr-on .stage { grid-row: 1; }
           which comes back after a reload). FluidNC boots a translated copy, sim_config.yaml, with plain stepper drivers;
           if config.yaml changes on its Flash, the page uses that one and restarts FluidNC.</p>
         <div class="sd-list" id="flash-list" aria-label="Files on the Flash"></div>
+        <div class="buttons">
+          <label class="btn">Add files…<input type="file" id="flash-file" multiple hidden></label>
+          <button type="button" id="flash-mkdir">New folder</button>
+          <small class="sd-where" id="flash-where"></small>
+        </div>
         <p class="foot" id="flash-status" role="status"></p>
+      </details>
+      <details class="cam" id="ui-box" open>
+        <summary>Web UIs</summary>
+        <p class="foot">WebUI, FigUI or any web UI on FluidNC's SD card or Flash (.html or .html.gz), served by FluidNC's
+          own web server in a window of its own, the way a real board serves it: watch and drive the machine from there.
+          Keep this tab open. The Flash's index.html.gz opens at <code>/</code>, others at their own path
+          (<code>/sd/x.html</code> for x.html.gz). Add a UI with the buttons below (or drop it on the list): its
+          release's <code>index.html.gz</code>, as it is. Web UIs run on FluidNC: in Basic, Open switches to it.</p>
+        <div class="sd-list" id="ui-list" aria-label="Web UIs on the SD card and Flash"></div>
+        <div class="buttons">
+          <label class="btn">Add to the Flash…<input type="file" id="ui-file-flash" accept=".html,.htm,.gz" hidden></label>
+          <label class="btn">Add to the SD card…<input type="file" id="ui-file-sd" accept=".html,.htm,.gz" multiple hidden></label>
+        </div>
+        <p class="foot" id="ui-status" role="status"></p>
       </details>
       <p class="foot" id="ctl-src"></p>
     </section>
@@ -687,10 +711,13 @@ body.vr-on .stage { grid-row: 1; }
       <details class="cam" id="sd-box" open>
         <summary>SD card (<span id="sd-count">0 files</span>)</summary>
         <p class="foot">G-code files kept in this browser: ▶ plays one (Basic) or runs it on FluidNC, which sees
-          the same card ($SD/List); the name loads it without starting. Drop files here or add them. The strut plate G-code is kept as /LR4_strut_plates.gcode.</p>
+          the same card ($SD/List); the name loads it without starting. Drop files here or add them. The strut plate G-code is kept as /LR4_strut_plates.gcode.
+          Click a folder to add files and folders into it (again to go back to the top).</p>
         <div class="sd-list" id="sd-list" role="listbox" aria-label="Files on the SD card"></div>
         <div class="buttons">
           <label class="btn">Add G-code files…<input type="file" id="job-file" accept=".gcode,.nc,.ngc,.tap,.gc,.txt" multiple hidden></label>
+          <button type="button" id="sd-mkdir">New folder</button>
+          <small class="sd-where" id="sd-where"></small>
         </div>
         <p class="foot" id="sd-status" role="status"></p>
       </details>
@@ -874,6 +901,7 @@ body.vr-on .stage { grid-row: 1; }
 <script src="js/sd_card.js"></script>
 <script src="js/homing.js"></script>
 <script src="js/fluidnc_sim.js"></script>
+<script src="fluidnc/vnet_host.js"></script>
 <script src="js/fluidtouch_sim.js"></script>
 <script src="js/basic_nc.js"></script>
 <script src="js/sounds.js"></script>
@@ -2452,23 +2480,99 @@ body.vr-on .stage { grid-row: 1; }
       } catch (e) { /* not kept */ }
     }, 600);
   }
-  async function flashRefresh() {                    // the Flash's files under the controller
-    let recs = [];
-    try { recs = await SdCard.flash.store.all(); } catch (e) { /* none */ }
-    const list = $("flash-list");
+  // ---- folders on the SD card and the Flash (user 2026-10-23): both lists are a tree. A folder row: ▾/▸ folds it,
+  // its name makes it where Add / New folder go (again: back to the top), ✕ deletes it and everything in it. ----
+  // cardTree(list, files, dirs, st = { cur, closed: Set }, fileRow(r) -> row, onDelDir(path), refresh)
+  function cardTree(list, files, dirs, st, fileRow, onDelDir, refresh) {
+    const all = new Set(dirs);
+    for (const r of files) for (const p of SdCard.parents(r.path)) all.add(p);
+    if (st.cur && !all.has(st.cur)) st.cur = "";
+    const parent = (p) => p.slice(0, p.lastIndexOf("/"));
+    const base = (p) => p.slice(p.lastIndexOf("/") + 1);
     list.innerHTML = "";
-    for (const r of recs) {
+    const pad = (row, depth) => { row.style.paddingLeft = `${6 + depth * 16}px`; };
+    const go = (dir, depth) => {
+      for (const d of [...all].filter((p) => parent(p) === dir).sort()) {
+        const row = document.createElement("div"), fold = document.createElement("button"), name = document.createElement("button"), del = document.createElement("button");
+        row.className = "sd-row sd-dir"; pad(row, depth);
+        if (list.getAttribute("role") === "listbox") row.setAttribute("role", "option");
+        row.setAttribute("aria-current", String(st.cur === d));
+        const shut = st.closed.has(d);
+        fold.type = name.type = del.type = "button"; fold.className = "sd-fold"; name.className = "sd-name"; del.className = "sd-act";
+        fold.textContent = shut ? "▸" : "▾"; fold.title = shut ? `Open ${d}` : `Fold ${d}`; fold.setAttribute("aria-label", fold.title);
+        fold.addEventListener("click", () => { if (shut) st.closed.delete(d); else st.closed.add(d); refresh(); });
+        name.textContent = base(d) + "/";
+        name.title = st.cur === d ? `Adding to ${d}: click to add to the top instead` : `Add files and folders to ${d}`;
+        name.addEventListener("click", () => { st.cur = st.cur === d ? "" : d; refresh(); });
+        del.textContent = "✕"; del.title = `Delete ${d} and everything in it`; del.setAttribute("aria-label", del.title);
+        del.addEventListener("click", () => { if (confirm(`Delete ${d} and everything in it?`)) onDelDir(d); });
+        row.append(fold, name, del);
+        list.appendChild(row);
+        if (!shut) go(d, depth + 1);
+      }
+      for (const r of files.filter((f) => parent(f.path) === dir)) {
+        const row = fileRow(r);
+        pad(row, depth);
+        list.appendChild(row);
+      }
+    };
+    go("", 0);
+  }
+  const cardWhere = (st) => (st.cur ? `Adding to ${st.cur}` : "");
+  async function cardMkdir(card, st, refresh, status) {   // New folder: in the folder picked, or at the top
+    const name = (prompt(`New folder in ${st.cur || "the top"}:`) || "").trim();
+    if (!name) return;
+    const clean = SdCard.cleanName(name).replace(/\./g, "_");
+    const path = `${st.cur}/${clean}`;
+    await card.store.mkdir(path);
+    card.mkdirLive(CTL.sim, path);
+    st.cur = path;
+    $(status).textContent = `Made ${path}.`;
+    refresh();
+  }
+  FLASH.tree = { cur: "", closed: new Set() };
+  async function flashRefresh() {                    // the Flash's files and folders under the controller
+    let recs = [], dirs = [];
+    try { recs = await SdCard.flash.store.all(); dirs = await SdCard.flash.store.dirs(); } catch (e) { /* none */ }
+    cardTree($("flash-list"), recs, dirs, FLASH.tree, (r) => {
       const row = document.createElement("div"), name = document.createElement("span"), dl = document.createElement("button");
-      row.className = "sd-row"; name.className = "sd-name"; name.textContent = r.path + (r.path === FLASH_YAML ? (r.origin === "user" ? " (yours)" : " (V1E's)") : "");
+      row.className = "sd-row"; name.className = "sd-name"; name.title = r.path;
+      name.textContent = r.path.split("/").pop() + (r.path === FLASH_YAML ? (r.origin === "user" ? " (yours)" : " (V1E's)") : "");
       dl.type = "button"; dl.className = "sd-act"; dl.textContent = "⬇"; dl.title = `Download ${r.path}`; dl.setAttribute("aria-label", dl.title);
       dl.addEventListener("click", () => save(r.path.split("/").pop(), r.bytes, "flash-status"));
       row.append(name, dl);
-      list.appendChild(row);
-    }
+      if (r.path !== FLASH_YAML) {                   // config.yaml stays: the page boots FluidNC with it
+        const del = document.createElement("button");
+        del.type = "button"; del.className = "sd-act"; del.textContent = "✕"; del.title = `Delete ${r.path}`; del.setAttribute("aria-label", del.title);
+        del.addEventListener("click", async () => { await SdCard.flash.store.remove(r.path); SdCard.flash.removeLive(CTL.sim, r.path); flashRefresh(); });
+        row.append(del);
+      }
+      return row;
+    }, async (d) => {
+      if (recs.some((r) => r.path === FLASH_YAML && r.path.startsWith(d + "/"))) return;
+      await SdCard.flash.store.removeTree(d); SdCard.flash.removeTreeLive(CTL.sim, d); flashRefresh();
+    }, flashRefresh);
+    $("flash-where").textContent = cardWhere(FLASH.tree);
+    uiRefresh();
   }
+  async function flashAdd(files) {
+    const added = [];
+    for (const f of files) {
+      const path = FLASH.tree.cur + SdCard.pathOf(f.name);
+      if (path === FLASH_YAML || path === "/sim_config.yaml") { $("flash-status").textContent = `${path} is the page's: load your config.yaml under Build.`; continue; }
+      const bytes = new Uint8Array(await f.arrayBuffer());
+      await SdCard.flash.store.put(path, bytes);
+      SdCard.flash.writeLive(CTL.sim, path, bytes);
+      added.push(path);
+    }
+    if (added.length) $("flash-status").textContent = `Added ${added.join(", ")}.`;
+    flashRefresh();
+  }
+  $("flash-file").addEventListener("change", (e) => { const f = [...e.target.files]; e.target.value = ""; if (f.length) flashAdd(f); });
+  $("flash-mkdir").addEventListener("click", () => cardMkdir(SdCard.flash, FLASH.tree, flashRefresh, "flash-status"));
   async function flashSyncBack() {                   // FluidNC changed its Flash: a new config.yaml is the user's now
     const d = await SdCard.flash.sync(CTL.sim).catch(() => ({ put: [], remove: [] }));
-    if (!d.put.length && !d.remove.length) return;
+    if (!d.put.length && !d.remove.length && !d.dirs) return;
     const y = d.put.find((r) => r.path === FLASH_YAML);
     if (y) {
       const text = new TextDecoder().decode(y.bytes);
@@ -2481,6 +2585,113 @@ body.vr-on .stage { grid-row: 1; }
       }
     }
     flashRefresh();
+  }
+  // ---- Web UIs (fluidnc/vnet_host.js + device/): any .html / .html.gz on FluidNC's card or Flash opens in a window of
+  // its own, served by FluidNC's web server through this tab (user 2026-10-23: the UIs are files on the card / Flash,
+  // run as released - never patched). The address is the one a board serves it at: the Flash's index.html(.gz) at /,
+  // /sd/ui/<name>/index.html(.gz) at /ui/<name>/ (HTTP/UIDir: FluidNC after 4.1.1), anything else by WebDAV at
+  // /sd/<path> or /flash/<path> with the .gz left off (FluidNC sends the .gz, Content-Encoding gzip). A UI that calls
+  // FluidNC by a relative path only works at / or /ui/<name>/, as on a board. ----
+  const UI = { titles: new Map(), timer: 0 };
+  const VNET = window.VnetHost ? VnetHost.serve({ sim: () => (CTL.mode === "fluidnc" && CTL.sim) || null, changed: uiChanged }) : null;
+  window.LR4Vnet = VNET;
+  const UI_FILE = /\.html?(\.gz)?$/i;
+  function uiUrl(where, path) {                       // where FluidNC serves a UI file
+    if (where === "flash" && /^\/index\.html?(\.gz)?$/i.test(path)) return "/";
+    const m = /^\/ui\/([^/]+)\/index\.html?(\.gz)?$/i.exec(path);
+    if (where === "sd" && m) return `/ui/${m[1]}/`;
+    return `/${where}${path.replace(/\.gz$/i, "")}`;
+  }
+  // which UI a file is (cached by path + size): FigUI / WebUI 3 / WebUI 2 by markers in their release builds (FigUI
+  // 1.4.1, WebUI 3.0.11, WebUI 2.2.3; their <title>s say "FluidNC" / "ESP3D"), else the page's <title>, else ""
+  async function uiTitle(r) {
+    const key = `${r.path}:${r.bytes.length}`;
+    if (UI.titles.has(key)) return UI.titles.get(key);
+    let text = "";
+    try {
+      let bytes = r.bytes;
+      if (/\.gz$/i.test(r.path)) bytes = new Uint8Array(await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream("gzip"))).arrayBuffer());
+      const html = new TextDecoder().decode(bytes), m = /<title[^>]*>([^<]*)<\/title>/i.exec(html);
+      if (/figui-packed|\bFigUI\b/.test(html)) text = "FigUI";
+      else if (/webui-v3/.test(html)) text = "WebUI 3";
+      else if (/ESP3D/i.test(html)) text = "WebUI 2";
+      else if (m) { const d = document.createElement("textarea"); d.innerHTML = m[1]; text = d.value.trim(); }
+    } catch (e) { /* not gzip / not text */ }
+    UI.titles.set(key, text);
+    return text;
+  }
+  async function uiRefresh() {
+    const list = $("ui-list");
+    if (!list) return;
+    const recs = [];
+    for (const [where, store] of [["flash", SdCard.flash.store], ["sd", SdCard.store]]) {
+      try { for (const r of await store.all()) if (UI_FILE.test(r.path)) recs.push({ where, store, r, url: uiUrl(where, r.path) }); }
+      catch (e) { /* no storage */ }
+    }
+    for (const u of recs) u.title = await uiTitle(u.r);
+    const ready = !!(VNET && CTL.mode === "fluidnc" && CTL.sim);
+    list.innerHTML = "";
+    for (const u of recs) {
+      const row = document.createElement("div"), name = document.createElement("span"), at = document.createElement("small");
+      row.className = "sd-row"; name.className = "sd-name";
+      name.textContent = u.title || u.r.path.split("/").pop();
+      name.title = `${u.where === "flash" ? "Flash" : "SD card"}: ${u.r.path}`;
+      at.textContent = u.url;
+      const open = document.createElement("button"), del = document.createElement("button");
+      open.type = del.type = "button"; open.className = "ui-open"; del.className = "sd-act";
+      // In Basic, Open switches to FluidNC first (a web UI needs FluidNC's web server; Basic's stand-in has none);
+      // the window shows "Waiting for the sandbox" and reloads itself until FluidNC is up.
+      open.textContent = "Open"; open.disabled = !VNET || !$("ctl-mode").querySelector('[data-v="fluidnc"]') || $("ctl-mode").querySelector('[data-v="fluidnc"]').disabled;
+      open.title = ready ? `Open ${u.url} in a window of its own` : !VNET ? "This browser has no service workers here"
+        : CTL.mode === "fluidnc" ? `Open ${u.url} (FluidNC is still starting)` : `Switch to FluidNC and open ${u.url}`;
+      open.addEventListener("click", () => {
+        const w = VNET.open(u.url, "lr4-ui-" + u.url.replace(/[^A-Za-z0-9]+/g, "_"));
+        $("ui-status").textContent = w ? "" : "The browser blocked the window: allow pop-ups for this page.";
+        if (w && CTL.mode !== "fluidnc") { ctlSetMode("fluidnc"); $("ui-status").textContent = "Starting FluidNC for the web UI…"; }
+      });
+      del.textContent = "✕"; del.title = `Delete ${u.r.path} from the ${u.where === "flash" ? "Flash" : "SD card"}`; del.setAttribute("aria-label", del.title);
+      del.addEventListener("click", async () => {
+        await u.store.remove(u.r.path);
+        (u.where === "flash" ? SdCard.flash : SdCard).removeLive(CTL.sim, u.r.path);
+        if (u.where === "flash") flashRefresh(); else sdRefresh();
+      });
+      row.append(name, at, open, del);
+      list.appendChild(row);
+    }
+  }
+  function uiChanged() {                             // a Web UI wrote to FluidNC (upload, delete, settings): sync back
+    clearTimeout(UI.timer);
+    UI.timer = setTimeout(() => { if (CTL.sim) { sdSyncBack(); flashSyncBack(); } }, 300);
+  }
+  // Releases are all called index.html.gz: on the SD card each goes in a folder of its own, /ui/<figui|webui3|webui2|
+  // its title>/ (served at /ui/<name>/, and at /sd/ui/<name>/index.html by 4.1.1's WebDAV); on the Flash it's the
+  // one served at / (a new one replaces it).
+  async function uiAdd(files, where) {
+    const card = where === "flash" ? SdCard.flash : SdCard, added = [];
+    const cur = (where === "flash" ? FLASH.tree : SDC.tree).cur;   // the folder picked in that list, if any
+    for (const f of files) {
+      let path = cur + SdCard.pathOf(f.name);
+      const bytes = new Uint8Array(await f.arrayBuffer());
+      if (where === "flash" && path === FLASH_YAML) continue;
+      if (where === "sd" && !cur && /^\/index\.html?(\.gz)?$/i.test(path)) {
+        const t = await uiTitle({ path, bytes });
+        const slug = { "FigUI": "figui", "WebUI 3": "webui3", "WebUI 2": "webui2" }[t] || t.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "ui";
+        path = `/ui/${slug}${path}`;
+      }
+      await card.store.put(path, bytes);
+      card.writeLive(CTL.sim, path, bytes);
+      added.push(path);
+    }
+    if (where === "flash") flashRefresh(); else sdRefresh();
+    $("ui-status").textContent = `Added ${added.join(", ")} to the ${where === "flash" ? "Flash" : "SD card"}.`;
+  }
+  for (const where of ["flash", "sd"])
+    $("ui-file-" + where).addEventListener("change", (e) => { const f = [...e.target.files]; e.target.value = ""; if (f.length) uiAdd(f, where); });
+  {                                                  // drop a UI on the list: onto the SD card
+    const box = $("ui-box"), list = $("ui-list");
+    box.addEventListener("dragover", (e) => { e.preventDefault(); list.classList.add("drop"); });
+    box.addEventListener("dragleave", () => list.classList.remove("drop"));
+    box.addEventListener("drop", (e) => { e.preventDefault(); list.classList.remove("drop"); if (e.dataTransfer.files.length) uiAdd([...e.dataTransfer.files], "sd"); });
   }
   async function yamlText() {
     await FLASH.loaded;
@@ -2690,12 +2901,14 @@ body.vr-on .stage { grid-row: 1; }
     if (CTL.booting !== me) return;
     ctlAdd(`Starting FluidNC with ${yamlBase && /^From your/.test(yamlBase.note) ? "your" : "V1E's JP3_LR"} config.yaml…`, "dim");
     let sim;
-    let files = {};                                  // the SD card and the Flash, as kept in this browser
-    try { files = Object.assign(SdCard.files(await SdCard.store.all()), SdCard.flash.files(await SdCard.flash.store.all())); }
-    catch (e) { /* no storage: empty */ }
+    let files = {}, dirs = [];                       // the SD card and the Flash, as kept in this browser
+    try {
+      files = Object.assign(SdCard.files(await SdCard.store.all()), SdCard.flash.files(await SdCard.flash.store.all()));
+      dirs = [...SdCard.dirs(await SdCard.store.dirs()), ...SdCard.flash.dirs(await SdCard.flash.store.dirs())];
+    } catch (e) { /* no storage: empty */ }
     Object.assign(files, { "/native_localfs/config.yaml": yaml, "/native_localfs/sim_config.yaml": tr.text,
       "/native_nvs/Config.Filename": "sim_config.yaml" });   // it boots the translated copy; config.yaml is the real one
-    try { sim = await FluidNCSim.start({ files, onLine: ctlLine }); }
+    try { sim = await FluidNCSim.start({ files, dirs, onLine: ctlLine }); }
     catch (e) {
       if (CTL.booting === me) { CTL.booting = null; ctlAdd("FluidNC didn't start: " + e.message, "err"); ctlMsg("FluidNC didn't start."); }
       return;
@@ -2705,6 +2918,7 @@ body.vr-on .stage { grid-row: 1; }
     Object.assign(CTL, { sim, cfg: tr, yaml, boot: [HOME.pose.x, HOME.pose.y, HOME.pose.z] });
     window.LR4FluidNC = sim;
     ftStart(sim);                                    // the pendant (re)connects to this FluidNC
+    uiRefresh();                                     // Web UIs can open now
     if (!sim.pins) ctlAdd("This FluidNC build has no simulated switches (rebuild web/fluidnc).", "err");
     ctlSwitches();
     ncScale(Number($("ctl-speed").value));
@@ -2899,6 +3113,7 @@ body.vr-on .stage { grid-row: 1; }
     const on = mode === "fluidnc";
     for (const b of $("ctl-mode").querySelectorAll("button")) b.setAttribute("aria-pressed", String(b.dataset.v === mode));
     $("ctl-box").hidden = $("ctl-opts").hidden = $("pos-jog").hidden = $("flash-box").hidden = !on;
+    uiRefresh();
     $("pos-play").hidden = $("home-real-l").hidden = on;
     fjButtons();
     if (JOB.bits && JOB.bits.size) {                 // the model's bit moves with the router; the job's only in Playback
@@ -2961,7 +3176,7 @@ body.vr-on .stage { grid-row: 1; }
     tip: () => meta && meta.tip_above_table, TOUCH_PLATE, sync: () => ctlTick(), homed: () => CTL.homed };
 
   // ---- version + feedback: the issue link carries the size, data date and the loaded files' checksums ----
-  const VERSION = "0.33.0";
+  const VERSION = "0.34.0";
   function setupAbout() {
     const bits = [`lr4-sandbox ${VERSION}`];
     if (cfg.built) bits.push(`model data built ${cfg.built}`);
@@ -3756,36 +3971,55 @@ body.vr-on .stage { grid-row: 1; }
   // ---- the SD card (js/sd_card.js): G-code files kept in this browser. A name loads it; ▶ plays it (Playback) or runs it
   // (FluidNC, which boots with the same files on its card); the strut plate G-code is kept on it as PAGE_SD. ----
   const sdText = (r) => new TextDecoder().decode(r.bytes);
-  async function sdRefresh() {
-    try { SDC.recs = await SdCard.store.all(); }
-    catch (e) { SDC.recs = []; $("sd-status").textContent = "This browser keeps no files for the page (site data blocked?)."; }
-    const list = $("sd-list");
-    list.innerHTML = "";
-    $("sd-count").textContent = `${SDC.recs.length} file${SDC.recs.length === 1 ? "" : "s"}`;
-    for (const r of SDC.recs) {
-      const row = document.createElement("div"), name = document.createElement("button"), size = document.createElement("small");
-      row.className = "sd-row"; row.setAttribute("role", "option");
-      const sel = JOB.file ? JOB.file.kind === "sd" && JOB.file.name === r.path : r.path === PAGE_SD && pageLive();
-      row.setAttribute("aria-selected", String(sel));
-      name.type = "button"; name.className = "sd-name"; name.textContent = r.path; name.title = `Load ${r.path}`;
+  SDC.tree = { cur: "", closed: new Set() };
+  function sdRow(r) {                                // one file on the card's tree
+    const row = document.createElement("div"), name = document.createElement("button"), size = document.createElement("small");
+    row.className = "sd-row"; row.setAttribute("role", "option");
+    const sel = JOB.file ? JOB.file.kind === "sd" && JOB.file.name === r.path : r.path === PAGE_SD && pageLive();
+    row.setAttribute("aria-selected", String(sel));
+    name.type = "button"; name.className = "sd-name"; name.textContent = r.path.split("/").pop(); name.title = `Load ${r.path}`;
+    size.textContent = r.bytes.length >= 1e6 ? `${(r.bytes.length / 1e6).toFixed(1)} MB` : `${Math.ceil(r.bytes.length / 1e3)} KB`;
+    row.append(name, size);
+    if (UI_FILE.test(r.path)) {                      // a web UI, not a job: it opens under Controller > Web UIs
+      name.title = `${r.path} is a web UI: open it under Run > Controller > Web UIs`;
+      name.addEventListener("click", () => { $("ui-box").open = true; $("ui-box").scrollIntoView({ block: "center", behavior: "smooth" }); });
+    } else {
       name.addEventListener("click", () => sdSelect(r.path));
-      const go = document.createElement("button");    // load it and start: Play (Playback) or $SD/Run (FluidNC)
+      const go = document.createElement("button");  // load it and start: Play (Playback) or $SD/Run (FluidNC)
       go.type = "button"; go.className = "sd-act"; go.textContent = "▶";
       go.title = `${CTL.mode === "fluidnc" ? "Run" : "Play"} ${r.path}`; go.setAttribute("aria-label", go.title);
       go.addEventListener("click", () => sdStart(r.path));
-      size.textContent = r.bytes.length >= 1e6 ? `${(r.bytes.length / 1e6).toFixed(1)} MB` : `${Math.ceil(r.bytes.length / 1e3)} KB`;
-      const dl = document.createElement("button"), del = document.createElement("button");
-      dl.type = del.type = "button"; dl.className = del.className = "sd-act";
-      dl.textContent = "⬇"; dl.title = `Download ${r.path}`; dl.setAttribute("aria-label", dl.title);
-      dl.addEventListener("click", () => save(r.path.split("/").pop(), r.bytes, "sd-status"));
-      del.textContent = "✕"; del.title = `Delete ${r.path}`; del.setAttribute("aria-label", del.title);
-      del.addEventListener("click", () => sdDelete(r.path));
-      row.append(name, size, go, dl, del);
-      list.appendChild(row);
+      row.append(go);
     }
+    const dl = document.createElement("button"), del = document.createElement("button");
+    dl.type = del.type = "button"; dl.className = del.className = "sd-act";
+    dl.textContent = "⬇"; dl.title = `Download ${r.path}`; dl.setAttribute("aria-label", dl.title);
+    dl.addEventListener("click", () => save(r.path.split("/").pop(), r.bytes, "sd-status"));
+    del.textContent = "✕"; del.title = `Delete ${r.path}`; del.setAttribute("aria-label", del.title);
+    del.addEventListener("click", () => sdDelete(r.path));
+    row.append(dl, del);
+    return row;
   }
+  async function sdRefresh() {
+    let dirs = [];
+    try { SDC.recs = await SdCard.store.all(); dirs = await SdCard.store.dirs(); }
+    catch (e) { SDC.recs = []; $("sd-status").textContent = "This browser keeps no files for the page (site data blocked?)."; }
+    $("sd-count").textContent = `${SDC.recs.length} file${SDC.recs.length === 1 ? "" : "s"}`;
+    cardTree($("sd-list"), SDC.recs, dirs, SDC.tree, sdRow, sdDeleteDir, sdRefresh);
+    $("sd-where").textContent = cardWhere(SDC.tree);
+    uiRefresh();
+  }
+  async function sdDeleteDir(d) {                    // a folder and everything in it
+    const gone = await SdCard.store.removeTree(d);
+    SdCard.removeTreeLive(CTL.sim, d);
+    if (gone.includes(PAGE_SD)) SDC.saved = null;
+    if (JOB.file && JOB.file.kind === "sd" && gone.includes(JOB.file.name)) { JOB.file = null; jobSetup(JOB.pageJob); }
+    sdRefresh();
+  }
+  $("sd-mkdir").addEventListener("click", () => cardMkdir(SdCard, SDC.tree, sdRefresh, "sd-status"));
   const pageLive = () => U.struts === "temp" && !!JOB.pageJob;   // the strut job is the page's own (Temporary struts)
   async function sdSelect(path) {
+    if (UI_FILE.test(path)) return;                  // web UIs open under Controller > Web UIs
     const r = SDC.recs.find((q) => q.path === path);
     if (!r) return;
     JOB.file = path === PAGE_SD && pageLive() ? null : { kind: "sd", name: path, text: sdText(r) };
@@ -3802,12 +4036,14 @@ body.vr-on .stage { grid-row: 1; }
     else { if (JOB.t >= JOB.tl.total) jobSeek(0); if (!JOB.playing) $("job-play").click(); }
   }
   async function sdAdd(files) {
+    const uis = files.filter((f) => UI_FILE.test(f.name));   // web UIs dropped on the card: as from Web UIs
+    if (uis.length) { await uiAdd(uis, "sd"); files = files.filter((f) => !uis.includes(f)); if (!files.length) return; }
     let first = null;
     for (const f of files) {
-      const path = SdCard.pathOf(f.name), bytes = new Uint8Array(await f.arrayBuffer());
+      const path = SDC.tree.cur + SdCard.pathOf(f.name), bytes = new Uint8Array(await f.arrayBuffer());
       await SdCard.store.put(path, bytes);
       SdCard.writeLive(CTL.sim, path, bytes);
-      first = first || path;
+      if (!UI_FILE.test(path)) first = first || path;   // a web UI isn't a job to load
     }
     await sdRefresh();
     if (first) sdSelect(first);
@@ -3822,7 +4058,7 @@ body.vr-on .stage { grid-row: 1; }
   }
   async function sdSyncBack() {                       // FluidNC changed its card ($SD/Delete ...): keep the store in step
     const d = await SdCard.sync(CTL.sim).catch(() => ({ put: [], remove: [] }));
-    if (!d.put.length && !d.remove.length) return;
+    if (!d.put.length && !d.remove.length && !d.dirs) return;
     if (JOB.file && JOB.file.kind === "sd" && d.remove.includes(JOB.file.name)) { JOB.file = null; jobSetup(JOB.pageJob); }
     sdRefresh();
   }
@@ -3849,7 +4085,7 @@ body.vr-on .stage { grid-row: 1; }
   sdRefresh().then(() => {                           // the file picked last time
     let p = null;
     try { p = localStorage.getItem("lr4-sd-sel"); } catch (e) { /* none */ }
-    if (p && p !== PAGE_SD && SDC.recs.some((r) => r.path === p)) sdSelect(p);
+    if (p && p !== PAGE_SD && !UI_FILE.test(p) && SDC.recs.some((r) => r.path === p)) sdSelect(p);
   });
   $("job-back").addEventListener("click", () => {
     JOB.file = null;

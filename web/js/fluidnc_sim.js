@@ -71,7 +71,8 @@
     });
   }
 
-  // start({ base: "fluidnc/", config: yaml text, files: { "/native_sd/job.gcode": text | Uint8Array }, onLine, timeout })
+  // start({ base: "fluidnc/", config: yaml text, files: { "/native_sd/job.gcode": text | Uint8Array },
+  //   dirs: ["/native_sd/jobs"] (folders to make, empty ones too), onLine, timeout })
   // (onLine = sim.on("line") from before the boot, so it sees the boot messages too)
   // -> Promise<sim>, resolved once FluidNC has printed its greeting. Each FluidNC runs in its own hidden same-origin
   // iframe (the module's output hook is that window's fluidncOnOutput, and fluidnc_start runs once per module):
@@ -136,7 +137,7 @@
       FS.mkdirTree(path.slice(0, path.lastIndexOf("/")) || "/");
       FS.writeFile(path, data);
     };
-    for (const d of ["/native_localfs", "/native_sd"]) FS.mkdirTree(d);
+    for (const d of ["/native_localfs", "/native_sd", ...(opts.dirs || [])]) FS.mkdirTree(d);
     if (opts.config !== undefined) writeFile("/native_localfs/config.yaml", opts.config);
     for (const [p, d] of Object.entries(opts.files || {})) writeFile(p, d);
 
