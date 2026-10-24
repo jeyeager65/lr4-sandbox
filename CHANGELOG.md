@@ -1,7 +1,11 @@
 # Changelog
 
-The version is the sandbox page's (`VERSION` in `web/index.html`, shown in its footer). The footer also shows
+The version is the sandbox page's (`VERSION` in `web/js/page/job.js`, shown in its footer). The footer also shows
 the date the model data was built and the Printables file set it was solved for.
+
+## Unreleased
+- **The page's source is split up (no change in what it does):** `web/index.html` is the markup only; its styles are
+  `web/css/page.css` and its script is `web/js/page/*.js` (12 files by area, loaded in order, sharing one scope).
 
 ## 0.37.0 - 2026-10-23
 - **As built (My LR4 tab, off by default):** the machine as a real one is - a little out of square until it homes. Each Y and each Z
