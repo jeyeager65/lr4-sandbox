@@ -50,7 +50,6 @@ async function run(mode) {
     const a = await page.val(`(async () => {
       await FTT.loadScript("js/fluidtouch_sim.js");
       document.getElementById("t-run").click();
-      document.querySelector('#ctl-mode [data-v="fluidnc"]').click();
       const sim = await T.booted(null);
       if (!sim) return { err: "FluidNC didn't boot" };
       const ft = await FluidTouchSim.start({ fluidnc: sim, onPrint: (l) => FTT.log.push(l) });

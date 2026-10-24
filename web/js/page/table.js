@@ -185,7 +185,7 @@
       HAND.plate = { world: true, x: fr[0] + x, y: fr[1] + y, wz: fr[2] + z, z, thick, tool: 0 };
       TOUCH_PLATE.stock = z; TOUCH_PLATE.plate = thick;
       $("hs-plate-note").textContent = `On the ${z > 0.01 && (JOB.sim || HAND.sim) ? "stock" : "spoilboard"} under the bit: its top ` +
-        `${(z + thick).toFixed(2)} mm above the spoilboard. ${CTL.mode === "fluidnc" ? "G38.2 down stops on it." : ""}`;
+        `${(z + thick).toFixed(2)} mm above the spoilboard. G38.2 down stops on it.`;
     }
     if (!on) $("hs-plate-note").textContent = "";
     $("ctl-plate").setAttribute("aria-pressed", String(!!on));
@@ -202,7 +202,7 @@
     const tv = meta.travel, p = HOME.pose, now = { x: p.x - tv.x[0], y: p.y - tv.y[0], z: p.z + meta.tip_above_table };
     const prev = HAND.last;
     HAND.last = now;
-    if (HAND.skip || JOB.playing || FJ.job || !prev || !HAND.tool || HOME.run) { HAND.skip = false; return; }
+    if (HAND.skip || JOB.playing || FJ.job || !prev || !HAND.tool || JOB.preview) { HAND.skip = false; return; }
     if (prev.x === now.x && prev.y === now.y && prev.z === now.z) return;
     let cut = false;
     if (JOB.sim) {
@@ -213,16 +213,6 @@
       meshUpdate(SPOIL.sim, SPOIL.mesh, false); spoilSaveSoon(); cut = true;
     }
     return cut;
-  }
-  // a job's moves into the spoilboard, as far as the job has got (forward only: it keeps its cuts)
-  function spoilJob(index) {
-    if (!JOB.spoil || !JOB.tl) return;
-    const segs = JOB.tl.segs;
-    if (index < JOB.spoilAt) { JOB.spoilAt = index; return; }
-    let cut = false;
-    for (let i = JOB.spoilAt; i < index && i < segs.length; i++) cut = JOB.spoil.carveOne(segs[i], segs[i - 1], JOB.spoil.tools, JOB.spoil.defaultTool) || cut;
-    JOB.spoilAt = index;
-    if (cut) { meshUpdate(SPOIL.sim, SPOIL.mesh, false); spoilSaveSoon(); }
   }
   // a tool change (M6, both modes): the popup asks for the bit - the file's ToolDef, or the one picked before for this
   // file, or what's in the router - and Resume puts it in (a bit the file doesn't define is kept for the file)
@@ -308,7 +298,7 @@
   // ---- As built (Part 32, user 2026-10-23): the machine a little out of square / level until it homes (each Y / Z
   // side its own switch, side 2's stops a little apart, the motors letting go when powered down), a warped spoilboard
   // and the router out of tram. AB (above) + js/imperfect.js; every stock sim carves through it (Imperfect.attach). ----
-  function abYaml() { return CTL.mode === "fluidnc" && CTL.yaml ? CTL.yaml : yamlBase ? yamlBase.text : null; }
+  function abYaml() { return CTL.yaml ? CTL.yaml : yamlBase ? yamlBase.text : null; }
   function abPulls() {                               // each Y / Z motor's pulloff_mm in the config.yaml in use
     const y = abYaml();
     if (AB.set.pull) return Object.assign(abPullsOf(y), AB.set.pull);   // a video's stand-in for a tuned config
@@ -383,14 +373,8 @@
   // power down and up: the gantry comes up racked, the beam off level, not homed (FluidNC restarts)
   function abPowerCycle() {
     AB.E = Imperfect.powerUp(AB.set);
-    AB.home = null;
-    if (CTL.mode === "fluidnc") ctlBoot();
-    else {
-      homeCancel();
-      HOME.home = null;
-      $("home-status").textContent = "Powered up: not homed.";
-      dro();
-    }
+    if (JOB.preview) previewEnd();
+    ctlBoot();
     abRedraw();
     abNote();
   }
@@ -440,14 +424,13 @@
     } };
   const clock = (s) => (s >= 3600 ? `${Math.floor(s / 3600)}:${String(Math.floor(s / 60) % 60).padStart(2, "0")}` : `${Math.floor(s / 60)}`) +
     `:${String(Math.floor(s % 60)).padStart(2, "0")}`;
-  function jobSeek(s, carve = true) {                // the machine to time s; the stock carved up to it
+  function jobSeek(s, carve = true) {                // Preview: the model to time s; the stock copy carved up to it
     const tl = JOB.tl;
     if (!tl) return;
     JOB.t = Math.min(Math.max(s, 0), tl.total);
     const p = GcodePlay.at(tl, JOB.t), tv = meta.travel, at = JOB.at, tableZ = at[2] + (tl.stock ? tl.stock.zmin : 0);
-    if (carve && JOB.sim) JOB.sim.advanceTo(p.index, 15, p.progress);
-    if (carve) spoilJob(p.index); else if (JOB.spoil) JOB.spoilAt = Math.min(JOB.spoilAt, p.index);
-    HAND.skip = true;                                // the job's own moves: carved from the job, not as hand moves
+    if (carve && JOB.sim) JOB.sim.advanceTo(p.index, 15, p.progress);   // (never the spoilboard: Run cuts that)
+    HAND.skip = true;                               // the job's own moves: carved from the job, not as hand moves
     jobUpdateMesh(false);
     JOB.done.geometry.setDrawRange(0, 2 * p.index);
     if (p.index < tl.segs.length) {                  // the move in progress: its start to the bit, in its colour
@@ -494,10 +477,69 @@
     return zLow - JOB.zMin;
   }
   function jobPlaying(on) {
-    if (CTL.mode === "fluidnc") { JOB.playing = false; fjButtons(); return; }
-    JOB.playing = on && !!JOB.tl && JOB.t < JOB.tl.total;
-    $("job-play").textContent = JOB.playing ? "Pause" : "Play";
+    JOB.playing = !!JOB.preview && on && !!JOB.tl && JOB.t < JOB.tl.total;
     if (JOB.playing) $("job-pop").hidden = true;
+    fjButtons();
+  }
+  // ---- Preview (Part 34, user 2026-10-24; was Basic mode): "what happens if I press Run now". Plays the loaded file
+  // fast (1-100x, scrub) from where FluidNC is, laid out as Run lays it out (fjPrepare's G54), the file's own G38.2 P /
+  // G10 L20 / G92 on the parser's copy of the offsets (GcodePlay), never sent to FluidNC. It carves a throwaway copy
+  // of the stock (put back on the way out), never the spoilboard; a tool change's bit goes back too. Back to the
+  // machine (or FluidNC moving: ctlTick) snaps the model back to where FluidNC is. ----
+  async function previewStart() {
+    if (!JOB.tl || FJ.job || JOB.preview) return;
+    if (CTL.homed && CTL.sim) {                     // lay it out from where the machine is now, as Run would
+      const p = ctlRaw(), from = jobSpot();
+      if (!from || ["x", "y", "z"].some((a, i) => Math.abs(p[i] - from[a]) > 0.005)) {
+        CTL.runFrom = { x: p[0], y: p[1], z: p[2] };
+        await jobSetup(JOB.pageJob);
+        if (!JOB.tl || FJ.job || JOB.preview) return;
+      }
+    }
+    JOB.preview = { heights: JOB.sim ? JOB.sim.heights.slice() : null, carved: JOB.sim ? JOB.sim.carvedIndex : 0,
+      bit: HAND.bit && Object.assign({}, HAND.bit) };
+    if (JOB.sim) JOB.sim.reset();
+    if (JOB.bits && JOB.bits.size && !jobBit) { jobBit = true; applyVisibility(); }   // the job's bits ride the router
+    JOB.k = 0;
+    jobSeek(0);
+    $("job-prev").setAttribute("aria-pressed", "true");
+    $("job-prev-note").hidden = false;
+    const warn = previewWarnings();
+    $("job-status").textContent = (CTL.homed ? "Preview from where FluidNC is." : "Preview: FluidNC isn't homed, so " +
+      "Run won't start yet; previewed from work zero (the cutting area's front-left corner, Z on the stock top).") + warn;
+    jobPlaying(true);
+  }
+  function previewWarnings() {                       // below the spoilboard, past the travel (Run would do the same)
+    const tl = JOB.tl, st = tl.stock, w = [];
+    jobZShort(tl, 0);                                // (caches JOB.zMin)
+    if (st && JOB.zMin < st.zmin - 0.01) w.push(`it cuts ${(st.zmin - JOB.zMin).toFixed(2)} mm into the spoilboard (not shown here; Run cuts it)`);
+    if (!JOB.fits) w.push("some moves are past the machine's travel");
+    return w.length ? ` Note: ${w.join("; ")}.` : "";
+  }
+  function previewEnd(why) {
+    const P = JOB.preview;
+    if (!P) return;
+    JOB.preview = null;
+    jobPlaying(false);
+    $("job-pop").hidden = true;
+    if (JOB.sim && P.heights) {                      // the stock as it was: the preview's carve was a copy
+      JOB.sim.heights.set(P.heights);
+      JOB.sim.carvedIndex = P.carved;
+      JOB.sim.markAllDirty();
+      jobUpdateMesh(true);
+    }
+    if (P.bit && JSON.stringify(P.bit) !== JSON.stringify(HAND.bit)) handBit(P.bit);
+    if (JOB.bits) for (const b of JOB.bits.values()) b.visible = false;
+    if (jobBit) { jobBit = false; applyVisibility(); }
+    JOB.done.geometry.setDrawRange(0, 0); JOB.partial.geometry.setDrawRange(0, 0);
+    jobTouch(null); jobCloseUp(null);
+    JOB.t = 0; JOB.k = 0;
+    HAND.skip = true;                                // back to FluidNC's pose: not a cut
+    if (CTL.pose) move(CTL.pose);
+    $("job-prev").setAttribute("aria-pressed", "false");
+    $("job-prev-note").hidden = true;
+    $("job-status").textContent = why || "Back to the machine.";
+    fjButtons();
   }
   function jobStop(e) {                              // M0, a failed probe or a tool change: hold
     jobPlaying(false);
@@ -521,26 +563,26 @@
       jobSeek(r.t);
       if (r.stop) jobStop(r.stop);
     } else if (FJ.job) fjTick();
-    else if (JOB.sim && CTL.mode !== "fluidnc") {     // catch up after a scrub (carving is spread over frames)
+    else if (JOB.sim && JOB.preview) {               // catch up after a scrub (carving is spread over frames)
       const p = GcodePlay.at(JOB.tl, JOB.t);
       if (JOB.sim.carvedIndex < p.index) { JOB.sim.advanceTo(p.index, 15, p.progress); jobUpdateMesh(false); }
     }
   }
   $("job-play").addEventListener("click", () => {
     if (!JOB.tl) return;
-    if (CTL.mode === "fluidnc") {
+    if (!JOB.preview) {                              // Run / Hold / Resume on FluidNC
       if (!FJ.job) fjRun();
       else if (CTL.sim) CTL.sim.realtime(FJ.job.held ? "~" : "!");
       return;
     }
-    homeCancel();
     if (!JOB.playing && JOB.t >= JOB.tl.total) { jobSeek(0); JOB.k = 0; }
     jobPlaying(!JOB.playing);
   });
+  $("job-prev").addEventListener("click", () => (JOB.preview ? previewEnd() : previewStart()));
   $("job-resume").addEventListener("click", () => {
     $("job-pop").hidden = true;
     if (JOB.toolAsk) toolPut();
-    if (CTL.mode !== "fluidnc") jobPlaying(true);
+    if (JOB.preview) jobPlaying(true);
     else if (CTL.sim && FJ.job) CTL.sim.realtime("~");
   });
   {                                                  // drag the pause popup anywhere over the view (kept till reload)
@@ -566,7 +608,7 @@
     }
   }
   $("job-reset").addEventListener("click", () => {
-    if (CTL.mode === "fluidnc") {                    // Stop = soft reset: FluidNC drops the job (ALARM:3 if it was moving)
+    if (!JOB.preview) {                              // Stop = soft reset: FluidNC drops the job (ALARM:3 if it was moving)
       if (CTL.sim && FJ.job) { CTL.sim.realtime(0x18); fjDone("Stopped (reset)."); }
       return;
     }

@@ -2,28 +2,13 @@
 // The page's scripts share one global scope (js/page/*.js, loaded in order by index.html): names declared
 // at the top level here are seen by the later files.
   // ---- travel sliders: X along the beam, Y along the table, Z by bit-tip height, over the real travel (0 = the
-  // home switch trip, lr4.STOPS). A new size keeps the gantry and core at the same fraction of their travel. ----
+  // home switch trip, lr4.STOPS). A new size keeps the gantry and core at the same fraction of their travel. Hidden
+  // since Part 34 (FluidNC moves the machine; the jog pad instead): they only hold the model's pose for move(). ----
   const sx = document.getElementById("sx"), sy = document.getElementById("sy"), sz = document.getElementById("sz");
-  function setupSliders() {
-    [sx, sy, sz].forEach((el) => {
-      el.addEventListener("input", () => {
-        if (CTL.mode === "fluidnc") return;                  // hidden in FluidNC mode (the jog pad instead)
-        jobPlaying(false); homeCancel(); move();             // the job pauses
-        HAND.skip = true;                                    // a quick move to a spot, not a cut (user: sliders don't carve)
-      });
-      el.addEventListener("pointerdown", () => { CTL.drag = el; });
-    });
-    for (const ev of ["pointerup", "pointercancel"]) window.addEventListener(ev, () => { CTL.drag = null; });
-  }
   function updateSliders() {
     const t = meta.travel, first = !sx.dataset.init, cx = (t.x[1] - t.x[0]) / IN, cy = (t.y[1] - t.y[0]) / IN;
     const fx = first ? -t.x[0] / (t.x[1] - t.x[0]) : sx.value / sx.max;
     const fy = first ? -t.y[0] / (t.y[1] - t.y[0]) : sy.value / sy.max;
-    if (JSON.stringify(t) !== HOME.travel) {         // another machine: not homed
-      if (HOME.home || HOME.run) $("home-status").textContent = "New size: not homed.";
-      HOME.run = null; HOME.home = null; HOME.travel = JSON.stringify(t);
-      $("home").textContent = "Home ($H)";
-    }
     sx.min = 0; sx.max = cx.toFixed(2); sx.value = (fx * cx).toFixed(1);
     sy.min = 0; sy.max = cy.toFixed(2); sy.value = (fy * cy).toFixed(1);
     if (first) {
@@ -98,9 +83,9 @@
     // (mm from the parked pose; the job playback) sets the sliders instead of reading them
     const t = meta.travel;
     if (pose) {
-      if (CTL.drag !== sx) sx.value = ((pose[0] - t.x[0]) / IN).toFixed(1);
-      if (CTL.drag !== sy) sy.value = ((pose[1] - t.y[0]) / IN).toFixed(1);
-      if (CTL.drag !== sz) sz.value = (pose[2] + meta.tip_above_table).toFixed(1);
+      sx.value = ((pose[0] - t.x[0]) / IN).toFixed(1);
+      sy.value = ((pose[1] - t.y[0]) / IN).toFixed(1);
+      sz.value = (pose[2] + meta.tip_above_table).toFixed(1);
     }
     const [dx, dy, dz] = pose || [sx.value * IN + t.x[0], sy.value * IN + t.y[0], sz.value - meta.tip_above_table];
     const X = (dx - t.x[0]) / IN, Y = (dy - t.y[0]) / IN, Z = dz + meta.tip_above_table;
@@ -156,13 +141,13 @@
     document.getElementById("oz").textContent = `${zr.toFixed(playing ? 1 : 0)} mm`;
   }
 
-  // ---- Home ($H, js/homing.js): FluidNC's homing with the config.yaml in use (V1E's JP3_LR values until one is
-  // read): Z up to its switch, then X + Y to theirs; seek, pull off, feed back, pull off; the switches flash at each
-  // trip. Homed: the DRO shows MPos (mpos_mm at the pulled-off spot) and Run G-code starts there. Touching the
-  // sliders mid-home stops it; a new size un-homes. ----
-  const HOME = { run: null, t: 0, k: 0, home: null, s: null, pose: null, travel: "" };
-  // the Controller (setupController): mode, the running sim, its config copy, the MPos <-> pose anchor, last status
-  const CTL = { mode: "play", sim: null, cfg: null, boot: null, mpos: null, state: "", drag: null, booting: null,
+  // ---- Home ($H): FluidNC's own homing (ctlHome); the switches flash at each trip (clickSwitch, from its pins).
+  // Homed: the DRO shows FluidNC's MPos and Run G-code starts there. HOME.pose = the model's pose (move());
+  // HOME.order = a video's HOMING= order ($HZ, $HX, $HY). Part 34 retired Basic's own homing. ----
+  const HOME = { pose: null, order: null };
+  // the Controller (setupController): the running FluidNC, its config copy, the MPos <-> pose anchor, last status.
+  // mode is always "fluidnc" since Part 34 (Basic became Preview: JOB.preview)
+  const CTL = { mode: "fluidnc", sim: null, cfg: null, boot: null, mpos: null, state: "", booting: null,
     pins: 0, pose: null, yaml: "", homed: false, homing: false, rel: {} };
   // FluidNC's machine clock (ms): machine time runs k x the real clock (its time scale). realNow is the real clock even
   // while tools/record_demo.js freezes performance.now; ncScale sets FluidNC's scale and keeps the count.
@@ -175,64 +160,6 @@
   }
   const SWITCHES = { x: ["Endstop_X"], y: ["Endstop_Y_Min", "Endstop_Y_Max"], z: ["Endstop_Z_Min", "Endstop_Z_Max"] };
   let flashMat = null;
-  // axes: "Z" / "XY" ... = only those ($HZ, the pendant's axis buttons), together in one cycle; the others stay put and
-  // keep their homing from before. Omitted = $H (the config's cycles)
-  function homeStart(axes) {
-    if (!meta || !HOME.pose) return;
-    jobClear();                                      // its bit / stock would stay behind; reloaded when done
-    const s = Homing.settings(yamlBase ? yamlBase.text : null), speed = $("home-real").checked ? { seek: 1, feed: 1 } : undefined;
-    if (HOME.order) for (const a of ["x", "y", "z"]) if (HOME.order[a]) s[a].cycle = HOME.order[a];   // a video's HOMING= ($HZ, $HX, $HY)
-    const only = axes ? String(axes).toLowerCase() : "";
-    if (only) for (const a of ["x", "y", "z"]) s[a].cycle = only.includes(a) ? 1 : 0;   // cycle 0: not homed, stays put
-    const keep = only && HOME.home && HOME.s ? Object.fromEntries(Object.entries(HOME.home).filter(([a]) => !only.includes(a))) : null;
-    Object.assign(HOME, { s, t: 0, k: 0, home: null, keep, last: performance.now(), run: Homing.plan(HOME.pose, meta.travel, s, speed) });
-    // Part 32: each Y / Z side homes on its own (side 2's switch stop mm on, each its own pulloff): AB.E = side 2 - side 1
-    AB.home = null;
-    if (AB.set.on) {
-      const pl = abPulls(), st = abStops(), tv = meta.travel, s1 = JSON.parse(JSON.stringify(s)), s2 = JSON.parse(JSON.stringify(s));
-      for (const a of ["y", "z"]) { s1[a].pulloff = pl[a][0]; s2[a].pulloff = pl[a][1]; }
-      const tv2 = { x: tv.x, y: tv.y.map((v) => v + st.y), z: tv.z.map((v) => v + st.z) }, p = HOME.pose;
-      AB.home = { r1: Homing.plan(p, tv, s1, speed), r2: Homing.plan({ x: p.x, y: p.y + AB.E.y, z: p.z + AB.E.z }, tv2, s2, speed) };
-    }
-    $("home").textContent = "Stop homing";
-    dro();
-  }
-  function homeCancel() {
-    if (!HOME.run) return;
-    HOME.run = null;
-    $("home").textContent = "Home ($H)";
-    $("home-status").textContent = "Homing stopped: not homed.";
-    jobSetup(JOB.pageJob);
-  }
-  function homeTick() {
-    const r = HOME.run, now = performance.now();
-    if (!r) return;
-    HOME.t = Math.min(HOME.t + Math.min((now - (HOME.last || now)) / 1000, 0.5), r.total);   // wall time, as jobTick
-    HOME.last = now;
-    for (; HOME.k < r.events.length && r.events[HOME.k].time <= HOME.t; HOME.k++) clickSwitch(r.events[HOME.k].axis, r.events[HOME.k].kind === "release");
-    const p = GcodePlay.at(r, HOME.t), sg = r.segs[Math.min(p.index, r.segs.length - 1)];
-    if (AB.home) {
-      const tt = HOME.t >= r.total ? Infinity : HOME.t, a = GcodePlay.at(AB.home.r1, tt), b = GcodePlay.at(AB.home.r2, tt);
-      AB.E = { y: b.y - a.y, z: b.z - a.z };
-      if (HOME.t >= r.total) { AB.home = null; abNote(); }
-    }
-    move([p.x, p.y, p.z]);
-    if (HOME.t < r.total) {
-      const axes = ["x", "y", "z"].filter((a) => r.settings[a].cycle === sg.cycle).map((a) => a.toUpperCase()).join(" + ");
-      $("home-status").textContent = `Homing ${axes}: ${{ seek: "seeking the switch", pulloff: "pulling off",
-        feed: "feeding back to the switch", settle: "settling" }[sg.phase]}…`;
-      return;
-    }
-    HOME.home = Object.assign({}, HOME.keep, r.home); HOME.run = null;   // + the axes homed before ($HZ then $HX ...)
-    $("home").textContent = "Home ($H)";
-    const s = HOME.s, src = ["x", "y", "z"].some((a) => s[a].from === "yaml") && /^From your/.test(yamlBase && yamlBase.note)
-      ? "your config.yaml's" : "V1E's JP3_LR";
-    const notYet = ["x", "y", "z"].filter((a) => !(a in HOME.home)).map((a) => a.toUpperCase());
-    $("home-status").textContent = `Homed${notYet.length ? ` ${["X", "Y", "Z"].filter((a) => !notYet.includes(a)).join(", ")} (not ${notYet.join(", ")} yet)` : ""} (${src} homing: mpos_mm ${s.x.mpos} / ${s.y.mpos} / ${s.z.mpos}, pulloff_mm ` +
-      `${s.x.pulloff} / ${s.y.pulloff} / ${s.z.pulloff}). Run G-code starts from here.`;
-    dro();
-    jobSetup(JOB.pageJob);                           // the job reloads to start from the homed spot
-  }
   function clickSwitch(axis, release) {              // the switch + its lever light up for a moment at each trip
     if (SND.s) SND.s.event(release ? "release" : "switch");   // and tick (pressed) / tock (released) (js/sounds.js)
     if (release) return;
@@ -246,23 +173,15 @@
       m.userData.flashT = setTimeout(() => { m.material = m.userData.flashOrig; delete m.userData.flashOrig; }, 300);
     }
   }
-  function dro() {                                   // MPos once homed, else dashes (FluidNC mode: its MPos)
-    if (CTL.mode === "fluidnc") {                   // its own MPos; greyed until homed (it doesn't know where it is)
-      for (const [i, a] of ["x", "y", "z"].entries()) {
-        $("m" + a).textContent = CTL.mpos ? CTL.mpos[i].toFixed(3) : "–";
-        $("m" + a).style.opacity = CTL.homed ? "" : "0.55";
-      }
-      return;
+  function dro() {                                   // FluidNC's MPos, greyed until homed (it doesn't know where it is)
+    for (const [i, a] of ["x", "y", "z"].entries()) {
+      $("m" + a).textContent = CTL.mpos ? CTL.mpos[i].toFixed(3) : "–";
+      $("m" + a).style.opacity = CTL.homed ? "" : "0.55";
     }
-    for (const a of ["x", "y", "z"]) $("m" + a).style.opacity = "";
-    const m = HOME.home && HOME.pose && !HOME.run ? Homing.mpos(HOME.s, HOME.home, HOME.pose) : null;
-    for (const a of ["x", "y", "z"]) $("m" + a).textContent = m && m[a] !== null ? m[a].toFixed(3) : "–";
   }
-  // the homed spot in the job's work mm (work zero = the cutting area's corner = the X / Y trips, Z on the stock
-  // top), for GcodePlay.load's start; undefined when not homed
-  // where the job starts: Playback's homed spot; FluidNC mode: where the machine was when Run was pressed (fjRun), else
-  // where its $H left it
-  const jobSpot = () => (CTL.mode === "fluidnc" ? (CTL.homed && (CTL.runFrom || CTL.homePose)) || null : HOME.home);
+  // where the job starts (Run and Preview): where the machine was when Run / Preview was pressed (CTL.runFrom), else
+  // where its $H left it; null when not homed
+  const jobSpot = () => (CTL.homed && (CTL.runFrom || CTL.homePose)) || null;
   // work zero's offset from the cutting area's corner (mm; LR4Demo.zero, videos only): poses = work + corner + this
   const jobZ0 = () => JOB.zero || [0, 0];
   function jobStartAt() {
@@ -271,6 +190,5 @@
     const tv = meta.travel, z0 = JOB.zero;   // JOB.zero: LR4Demo.zero (videos: jogged there first)
     return (stock) => ({ x: z0 ? 0 : h.x - tv.x[0], y: z0 ? 0 : h.y - tv.y[0], z: h.z + meta.tip_above_table + (stock ? stock.zmin : 0) });
   }
-  document.getElementById("home").addEventListener("click", () =>
-    (CTL.mode === "fluidnc" ? ctlHome() : HOME.run ? homeCancel() : homeStart()));
+  document.getElementById("home").addEventListener("click", () => ctlHome());
 

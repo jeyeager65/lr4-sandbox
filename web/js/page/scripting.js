@@ -115,23 +115,18 @@
       if (![...sel.options].some((o) => +o.value === x)) sel.add(new Option(`${x}×`, String(x)));
       sel.value = String(x);
     },
-    play() { if (!JOB.playing) $("job-play").click(); },
-    home(real) {                                     // Playback homing ($H): the switches flash and click; real = V1E's speeds
-      if (CTL.mode === "fluidnc") { ctlHome(); return !!CTL.sim; }   // FluidNC's own $H
-      const c = $("home-real"), was = c.checked;
-      if (real) c.checked = true;
-      homeStart();
-      c.checked = was;
-      return !!HOME.run;
-    },
-    homing: () => (CTL.mode === "fluidnc" ? CTL.homing : !!HOME.run),
+    async preview() { if (!JOB.preview) await previewStart(); return !!JOB.preview; },   // Preview on (playing)
+    previewEnd() { previewEnd(); },
+    play() { if (!JOB.playing) $("job-play").click(); },   // Preview: play; else FluidNC's Run (ncPlay for videos)
+    home() { ctlHome(); return !!CTL.sim; },        // FluidNC's own $H (Part 34: no Basic homing)
+    homing: () => CTL.homing,
     nearHome(mm = 30) {                              // the machine mm off each home switch: a short $H, in real time
       const t = meta.travel, s = Homing.settings(yamlBase ? yamlBase.text : null);
       move(["x", "y", "z"].map((a) => (s[a].positive ? t[a][1] - mm : t[a][0] + mm)));
       return true;
     },
     async layout() {                                 // after homing: the job laid out again from the homed spot
-      if (CTL.mode === "fluidnc" && CTL.homed) { const p = ctlRaw(); CTL.runFrom = { x: p[0], y: p[1], z: p[2] }; }   // FluidNC: from here
+      if (CTL.homed) { const p = ctlRaw(); CTL.runFrom = { x: p[0], y: p[1], z: p[2] }; }   // from where FluidNC is
       await jobSetup(JOB.pageJob);
       return { stock: JOB.tl && JOB.tl.stock, at: JOB.at };
     },
@@ -149,7 +144,7 @@
       return { from: [p.x, p.y, p.z], to: [p.x, tv.y[1] - tv.y[0] - jobZ0()[1], meta.tip_above_table + tv.z[1] - (at[2] - tableZ)] };
     },
     job() {                                          // + cut: the bit on a cutting move; section: messages / pauses passed
-      const tl = JOB.tl, nc = CTL.mode === "fluidnc", t = nc ? this.ncT() : JOB.t;
+      const tl = JOB.tl, nc = !JOB.preview, t = nc ? this.ncT() : JOB.t;
       const p = tl ? GcodePlay.at(tl, t) : null, i = tl ? Math.min(p.index, tl.segs.length - 1) : -1, sg = tl && tl.segs[i];
       return { t, total: tl ? tl.total : 0, playing: nc ? !!FJ.job && !FJ.job.held : JOB.playing, paused: !$("job-pop").hidden,
         closeUp: !!JOB.camSaved || !!camTween, cut: !!sg && sg.type === "cut", line: sg ? sg.srcLine || 0 : 0,
@@ -167,7 +162,7 @@
     badge(text) { const b = $("rec-badge"); b.hidden = !text; b.textContent = text || ""; },
     caption(text) { const b = $("rec-caption"); b.hidden = !text; b.textContent = text || ""; },
     msg(text) { const b = $("rec-msg"); b.hidden = !text; b.textContent = text || ""; },
-    homingOrder(str) {                               // a video's HOMING=z,x,y: Home sends $HZ, $HX, $HY (Basic: the same order)
+    homingOrder(str) {                               // a video's HOMING=z,x,y: Home sends $HZ, $HX, $HY
       HOME.order = str ? Homing.order(str) : null;
       return HOME.order;
     },
@@ -191,7 +186,7 @@
     },
     zero(x, y) {                                     // work zero x, y mm from the cut area's front-left corner (null = there)
       JOB.zero = x === null || x === undefined ? null : [x, y];
-      const h = CTL.mode === "fluidnc" ? CTL.homed && CTL.pose && { x: CTL.pose[0], y: CTL.pose[1], z: CTL.pose[2] } : HOME.home, tv = meta.travel;         // -> the jog from the homed spot to it (move() poses)
+      const h = CTL.homed && CTL.pose && { x: CTL.pose[0], y: CTL.pose[1], z: CTL.pose[2] }, tv = meta.travel;         // -> the jog from the homed spot to it (move() poses)
       return h ? { from: [h.x, h.y, h.z], to: [tv.x[0] + (JOB.zero ? x : 0), tv.y[0] + (JOB.zero ? y : 0), h.z] } : null;
     },
     movePose(x, y, z) { move([x, y, z]); },
@@ -200,8 +195,9 @@
     // capture), and ncUntil(m) tops it up to m machine ms before each frame - so each frame shows the machine at a known
     // machine time. (All but stopping it between frames was jerky at slow feeds: its step thread's next wake-up was
     // already scheduled at the crawl's pace.)
-    async fluidnc(timeout = 90000) {                 // switch to FluidNC mode; resolves once it is booted and reporting
-      ctlSetMode("fluidnc");
+    async fluidnc(timeout = 90000) {                 // (re)start FluidNC; resolves once it is booted and reporting
+      if (!window.crossOriginIsolated) return false;
+      ctlBoot();                                     // (re)start it where the machine is now (a video moves it first)
       for (const t0 = Date.now(); Date.now() - t0 < timeout;) {
         if (CTL.sim && CTL.cfg && !CTL.booting && CTL.state) return true;
         await new Promise((r) => setTimeout(r, 250));
@@ -291,11 +287,11 @@
   // mode) -> the steppers, at the real machine's speed (the motion / the time scale in use); the router's set speed at
   // the job's line (M3 / M5, or the file's "Turn On Router at Dial N"; only while a job runs or holds) + the shop vac
   // with it; the cutting load = how fast the stock's heightmap loses material; clicks: the switches as they trip
-  // (clickSwitch), the probe touching the plate (a probe move ending in Playback, the probe pin in FluidNC mode).
+  // (clickSwitch), the probe touching the plate (a probe move ending in Preview, else the probe pin).
   // The engine exists once Sound is turned on, or a video records (LR4Demo.sound). ----
   const SND = { s: null, yaml: undefined, steps: null, planSrc: null, plan: null, vol: null, sim: null, seg: -1, rec: null };
   function soundSteps() {                            // steps/mm, microsteps, run_mode per axis of the config.yaml in use
-    const y = CTL.mode === "fluidnc" && CTL.yaml ? CTL.yaml : yamlBase && yamlBase.text;
+    const y = CTL.yaml ? CTL.yaml : yamlBase && yamlBase.text;
     if (y !== SND.yaml || !SND.steps) { SND.yaml = y; SND.steps = LR4Sound.stepsFromYaml(y); }
     return SND.steps;
   }
@@ -306,15 +302,9 @@
     }
     return SND.s;
   }
-  // machine seconds per wall second: FluidNC's speed; Playback as it really ran (probes play slower than the speed set);
-  // the page's quick homing at its phase's multiplier (seek x4, feed x10); else 1
+  // machine seconds per wall second: FluidNC's speed; Preview as it really ran (probes play slower than the speed set)
   function soundScale(dt) {
-    if (CTL.mode === "fluidnc") return SND.rec || Number($("ctl-speed").value);   // SND.rec: a video's pace
-    const r = HOME.run;
-    if (r) {
-      const sg = r.segs[Math.min(GcodePlay.at(r, HOME.t).index, r.segs.length - 1)], k = r.speed || { seek: 1, feed: 1 };
-      return !sg ? 1 : sg.phase === "seek" ? k.seek : sg.phase === "feed" || sg.phase === "pulloff" ? k.feed : 1;
-    }
+    if (!JOB.preview) return SND.rec || Number($("ctl-speed").value);   // SND.rec: a video's pace
     if (JOB.playing && dt > 0 && SND.jt !== undefined && JOB.t > SND.jt) return (JOB.t - SND.jt) / dt;
     return JOB.playing ? Number($("job-speed").value) : 1;
   }
@@ -343,7 +333,7 @@
     if (!SND.s || !p) return;
     const j = soundJob(), scale = soundScale(dt), removed = soundRemoved();
     SND.jt = JOB.t;
-    if (j && CTL.mode !== "fluidnc") {               // Playback: a probe move just ended = the bit touched the plate
+    if (j && JOB.preview) {                          // Preview: a probe move just ended = the bit touched the plate
       const sg = JOB.tl.segs[SND.seg];
       if (SND.seg >= 0 && j.seg > SND.seg && sg && sg.type === "probe") SND.s.event("tap");
     }
@@ -384,8 +374,6 @@
     lastT = now;
     if (building) return;
     if (shop) LR4Shop.cutaway(shop, camera.getWorldPosition(camPos));   // hide walls the camera is outside of
-    homeTick();
-    basicTick();
     jobTick();
     handTick();
     ctlTick();

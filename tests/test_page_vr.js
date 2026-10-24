@@ -13,7 +13,7 @@ const ok = (cond, msg) => { if (!cond) { fails++; console.log("FAIL " + msg); } 
 
 const steps = [
   // on the Run tab (Machine hidden): what the menu reads, and what shows in VR
-  `LR4Basic.pendant(true); document.getElementById('t-run').click(); const v = LR4VR.page; v.preview('one'); const s = v.state();
+  `LR4Pendant.set(true); document.getElementById('t-run').click(); const v = LR4VR.page; v.preview('one'); const s = v.state();
    const shown = (q) => getComputedStyle(document.querySelector(q)).display !== 'none';
    return { machineHidden: document.getElementById('tab-machine').hidden, groups: s.groups.length, peter: s.peter.length,
      unit: s.unit, toolbar: shown('.toolbar'), panel: shown('.panel'), vrpop: shown('#vr-pop'),

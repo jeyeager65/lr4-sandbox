@@ -1,8 +1,8 @@
-// lr4-sandbox page, part 6 of 12: version + feedback, strut plate G-code, Run G-code (Basic playback).
+// lr4-sandbox page, part 6 of 12: version + feedback, strut plate G-code, Run G-code (the job, its stock and moves).
 // The page's scripts share one global scope (js/page/*.js, loaded in order by index.html): names declared
 // at the top level here are seen by the later files.
   // ---- version + feedback: the issue link carries the size, data date and the loaded files' checksums ----
-  const VERSION = "0.37.0";
+  const VERSION = "0.38.0";
   function setupAbout() {
     const bits = [`lr4-sandbox ${VERSION}`];
     if (cfg.built) bits.push(`model data built ${cfg.built}`);
@@ -85,7 +85,7 @@
   // (Stock:) header is carved as it goes. Work zero = the cutting area's front-left corner, stock top. Touching the
   // position sliders pauses it. ----
   const JOB = { tl: null, sim: null, group: null, done: null, at: null, t: 0, k: 0, playing: false,
-    key: "", seq: 0, src: null, file: null, pageJob: null, last: 0 };
+    key: "", seq: 0, src: null, file: null, pageJob: null, last: 0, preview: null };   // preview: Preview is on (table.js)
   const PAGE_SD = "/LR4_strut_plates.gcode";                       // the SD card (below) and its strut plate file
   const SDC = { recs: [], sel: null, saved: null, saveTimer: 0 };
   const FJ = { job: null, pts: [], timer: 0, lastMsg: "" };        // a job running on FluidNC (fjRun)
@@ -352,6 +352,7 @@
     }
   }
   function jobClear(keepRun) {
+    if (JOB.preview && JOB.done) previewEnd();      // a new file / size: the preview ends
     if (!keepRun) {
       jobCloseUp(null);
       if (jobTouch(null) && meta) move();
@@ -420,7 +421,7 @@
       const b = jobBitMesh(def, toolRgb(tl, n));
       if (b) { b.visible = false; JOB.bits.set(n, b); JOB.group.add(b); }
     }
-    if (JOB.bits.size && !jobBit && CTL.mode !== "fluidnc") { jobBit = true; applyVisibility(); }
+    if (JOB.bits.size && !jobBit && JOB.preview) { jobBit = true; applyVisibility(); }
     const mv = jobMoves(tl, at);
     JOB.ahead = mv.ahead; JOB.done = mv.done; JOB.partial = mv.partial; JOB.moveRgb = mv.col;
     JOB.group.add(mv.ahead, mv.done, mv.partial);
@@ -431,12 +432,16 @@
       Math.max(r[3], sg.end.y)], [Infinity, -Infinity, Infinity, -Infinity]);
     JOB.fits = b[0] + z0[0] >= -0.01 && b[2] + z0[1] >= -0.01 && b[1] + z0[0] <= tv.x[1] - tv.x[0] + 0.01 && b[3] + z0[1] <= tv.y[1] - tv.y[0] + 0.01;
     const units = { mm: "mm (G21)", in: "inches (G20), shown in mm", mixed: "G20 + G21, shown in mm" }[tl.units];
+    // FluidNC stops a job on a line over 127 bytes, comments included ("14 Line too long", ALARM:17): say which, before Run finds it
+    const longAt = src.text.split("\n").findIndex((l) => new TextEncoder().encode(l.replace(/\r$/, "")).length > 127);
     $("job-src").textContent = `${src.name}: ${tl.lines} lines, ${tl.segs.length} moves, ${units}; ~${clock(tl.total)} at ` +
       `${jobRates() === GcodePlay.V1E ? "V1E's JP3_LR" : "your config.yaml's"} speeds. ` +
       (tl.stock ? (JOB.handStock ? "On the stock set up by hand. " : "") : "No stock on the table (On the table > Stock): only the spoilboard carves. ") +
-      (JOB.fits ? "" : "Some moves are outside this machine's travel: the bit stops at its limits.");
+      (JOB.fits ? "" : "Some moves are outside this machine's travel: the bit stops at its limits. ") +
+      (longAt < 0 ? "" : `Line ${longAt + 1} is too long for FluidNC (over 127 bytes): Run will stop there with ` +
+        "error 14 (Line too long). Shorten or split it.");
     $("job-on").hidden = false;
     if (keep) fjReload(); else if (FJ.job) fjDone("The file changed: the page stopped following the job.");
-    if (CTL.mode !== "fluidnc") jobSeek(0, false);
+    if (JOB.preview) jobSeek(0, false);
     else if (!keep) { JOB.done.geometry.setDrawRange(0, 0); JOB.partial.geometry.setDrawRange(0, 0); }   // the model follows the motors
   }

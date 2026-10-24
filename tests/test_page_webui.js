@@ -69,7 +69,6 @@ async function run(mode) {
       await SdCard.store.put("/tinyui.html.gz", gz);
       await SdCard.flash.store.put("/index.html", ${JSON.stringify(FLASH_UI)});
       document.getElementById("t-run").click();
-      document.querySelector('#ctl-mode [data-v="fluidnc"]').click();
       const sim = await T.booted(null);
       if (!sim) return { err: "FluidNC didn't boot" };
       const rows = await T.until(() => { const r = [...document.querySelectorAll("#ui-list .sd-row")]; return r.length >= 2 && r.every((x) => !x.querySelector("button").disabled) ? r : null; }, 10000);
@@ -135,8 +134,8 @@ async function run(mode) {
     const seen = await page.val(`(async () => { for (let i = 0; i < 50; i++) { if ((await SdCard.store.dirs()).includes("/made_by_ui")) return true; await T.sleep(100); } return false; })()`);
     ok(mk >= 200 && mk < 300 && seen, `MKCOL /sd/made_by_ui from the window (${mk}): the empty folder is kept on the page's SD card`);
 
-    // back to Basic: the window says it's waiting for the sandbox
-    await page.val(`document.querySelector('#ctl-mode [data-v="play"]').click(); true`);
+    // FluidNC stopped: the window says it's waiting for the sandbox
+    await page.val(`LR4Ctl.stop(); true`);
     await win.val(`location.reload(); true`);
     t = "";
     for (let i = 0; i < 40 && !/Waiting/.test(t); i++) { await sleep(250); try { t = await win.val("document.title"); } catch (e) { /* loading */ } }
@@ -154,16 +153,16 @@ async function run(mode) {
     ok(c.row, "index.html.gz added to the SD card goes to /ui/tiny-ui/ (served at /ui/tiny-ui/)");
     ok(c.play === false && !/html/.test(c.job || ""), `a web UI on the SD card has no ▶ and isn't loaded as the job (job: ${c.job || "none"})`);
 
-    // Open in Basic: switches to FluidNC, and the waiting window comes up with the UI
+    // Open while FluidNC is down: the waiting window comes up with the UI once FluidNC is back
     await page.send("Runtime.evaluate", { userGesture: true, expression:
       `[...document.querySelectorAll("#ui-list .sd-row")].find((r) => /tinyui/.test(r.querySelector("small").textContent)).querySelector("button").click()` });
-    const mode = await page.val(`T.booted(null).then(() => LR4Ctl.mode ? LR4Ctl.mode() : document.querySelector('#ctl-mode [aria-pressed="true"]').dataset.v)`);
+    const mode = await page.val(`(LR4Ctl.start(), T.booted(null)).then(() => LR4Ctl.mode())`);
     // (a new window: the first one, now at /, left the page's browsing context group, so its name isn't reused)
     const win2 = await attach(cport, (u) => /\/device\/nc\/[A-Za-z0-9]+\/sd\/tinyui\.html$/.test(u));
     t = "";
     for (let i = 0; win2 && i < 80 && t !== "Tiny UI"; i++) { await sleep(250); try { t = await win2.val("document.title"); } catch (e) { /* reloading */ } }
     if (win2) win2.close();
-    ok(mode === "fluidnc" && t === "Tiny UI", `Open in Basic switches to FluidNC (${mode}) and the window comes up ("${t}")`);
+    ok(mode === "fluidnc" && t === "Tiny UI", `Open while FluidNC is down: it comes up (${mode}) and so does the window ("${t}")`);
 
     // the restarted FluidNC has the empty folders; ✕ on a folder deletes it and what's in it
     const g = await page.val(`(async () => {

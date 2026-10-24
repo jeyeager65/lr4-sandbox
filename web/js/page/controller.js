@@ -1,4 +1,4 @@
-// lr4-sandbox page, part 5 of 12: config.yaml, SD / Flash folders, Web UIs, the Controller (Basic / FluidNC), Basic's pendant.
+// lr4-sandbox page, part 5 of 12: config.yaml, SD / Flash folders, Web UIs, the Controller (FluidNC), the pendant.
 // The page's scripts share one global scope (js/page/*.js, loaded in order by index.html): names declared
 // at the top level here are seen by the later files.
   // ---- FluidNC config.yaml: V1E's JP3_LR file (pinned commit, fetched on demand - not shipped) or the user's own,
@@ -146,7 +146,7 @@
   // /sd/<path> or /flash/<path> with the .gz left off (FluidNC sends the .gz, Content-Encoding gzip). A UI that calls
   // FluidNC by a relative path only works at / or /ui/<name>/, as on a board. ----
   const UI = { titles: new Map(), timer: 0 };
-  const VNET = window.VnetHost ? VnetHost.serve({ sim: () => (CTL.mode === "fluidnc" && CTL.sim) || null, changed: uiChanged }) : null;
+  const VNET = window.VnetHost ? VnetHost.serve({ sim: () => CTL.sim || null, changed: uiChanged }) : null;
   window.LR4Vnet = VNET;
   const UI_FILE = /\.html?(\.gz)?$/i;
   function uiUrl(where, path) {                       // where FluidNC serves a UI file
@@ -182,7 +182,7 @@
       catch (e) { /* no storage */ }
     }
     for (const u of recs) u.title = await uiTitle(u.r);
-    const ready = !!(VNET && CTL.mode === "fluidnc" && CTL.sim);
+    const ready = !!(VNET && CTL.sim);
     list.innerHTML = "";
     for (const u of recs) {
       const row = document.createElement("div"), name = document.createElement("span"), at = document.createElement("small");
@@ -192,15 +192,13 @@
       at.textContent = u.url;
       const open = document.createElement("button"), del = document.createElement("button");
       open.type = del.type = "button"; open.className = "ui-open"; del.className = "sd-act";
-      // In Basic, Open switches to FluidNC first (a web UI needs FluidNC's web server; Basic's stand-in has none);
-      // the window shows "Waiting for the sandbox" and reloads itself until FluidNC is up.
-      open.textContent = "Open"; open.disabled = !VNET || !$("ctl-mode").querySelector('[data-v="fluidnc"]') || $("ctl-mode").querySelector('[data-v="fluidnc"]').disabled;
+      // before FluidNC is up, the window shows "Waiting for the sandbox" and reloads itself until it is
+      open.textContent = "Open"; open.disabled = !VNET || !window.crossOriginIsolated;
       open.title = ready ? `Open ${u.url} in a window of its own` : !VNET ? "This browser has no service workers here"
-        : CTL.mode === "fluidnc" ? `Open ${u.url} (FluidNC is still starting)` : `Switch to FluidNC and open ${u.url}`;
+        : `Open ${u.url} (FluidNC is still starting)`;
       open.addEventListener("click", () => {
         const w = VNET.open(u.url, "lr4-ui-" + u.url.replace(/[^A-Za-z0-9]+/g, "_"));
         $("ui-status").textContent = w ? "" : "The browser blocked the window: allow pop-ups for this page.";
-        if (w && CTL.mode !== "fluidnc") { ctlSetMode("fluidnc"); $("ui-status").textContent = "Starting FluidNC for the web UI…"; }
       });
       del.textContent = "✕"; del.title = `Delete ${u.r.path} from the ${u.where === "flash" ? "Flash" : "SD card"}`; del.setAttribute("aria-label", del.title);
       del.addEventListener("click", async () => {
@@ -290,7 +288,7 @@
       "end, though the tool physically reaches it." : "";
   }
 
-  // ---- Controller (Run tab): Playback (the page moves the machine) or FluidNC: the firmware in the page
+  // ---- Controller (Run tab): FluidNC, the firmware in the page (the only machine since Part 34)
   // (js/fluidnc_sim.js), booted with js/sim_config.js's copy of the config.yaml in use. In FluidNC mode the machine
   // follows its motors: each frame, each axis' first motor's step count (from the pose it booted at; status reports
   // come ~1 s apart while homing). Every limit switch is a virtual one on its motor (sim.setSwitch: the trip at the
@@ -366,7 +364,12 @@
     });
     const E = CTL.recRaw ? CTL.recE : abFromMotors(), moved = E && (Math.abs(E.y - AB.E.y) > 1e-4 || Math.abs(E.z - AB.E.z) > 1e-4);
     if (moved) { AB.E = E; abNoteSoon(); }
-    if (moved || !CTL.pose || q.some((v, i) => Math.abs(v - CTL.pose[i]) > 1e-3)) { CTL.pose = q; move(q); }
+    if (moved || !CTL.pose || q.some((v, i) => Math.abs(v - CTL.pose[i]) > 1e-3)) {
+      const was = CTL.pose;
+      CTL.pose = q;
+      if (JOB.preview && was) previewEnd("FluidNC moved: the preview ended.");   // the machine wins over the preview
+      if (!JOB.preview) move(q);
+    }
     if (AB.set.on && AB.geo && Math.abs(Imperfect.tipErr(AB.E, AB.geo, q[0] - t.x[0]).dz - AB.probeDz) > 0.002) ctlProbe();   // the tip's height along a tilted beam
     const warn = past.length ? `Past the hard stop (${past.join(", ")}): the real machine would hit it there. ` +
       "This config.yaml's soft_limits are off, so FluidNC doesn't stop it." : "";
@@ -487,12 +490,20 @@
       if (CTL.booting === me) { CTL.booting = null; ctlAdd("FluidNC didn't start: " + e.message, "err"); ctlMsg("FluidNC didn't start."); }
       return;
     }
-    if (CTL.booting !== me || CTL.mode !== "fluidnc") { sim.stop(); return; }
+    if (CTL.booting !== me) { sim.stop(); return; }
     CTL.booting = null;
     Object.assign(CTL, { sim, cfg: tr, yaml, boot: [HOME.pose.x, HOME.pose.y, HOME.pose.z] });
     // each motor where its side is (Part 32: side 2 = side 1 + AB.E: the machine as it is at this power-up)
     CTL.bootM = tr.pins.motors.map((m) => CTL.boot["xyz".indexOf(m.axis)] + (AB.set.on && m.motor === 1 && (m.axis === "y" || m.axis === "z") ? AB.E[m.axis] : 0));
     window.LR4FluidNC = sim;
+    try {                                            // SD card / Flash files added while it booted (it boots with the page)
+      const now = Object.assign(SdCard.files(await SdCard.store.all()), SdCard.flash.files(await SdCard.flash.store.all()));
+      for (const [p, bytes] of Object.entries(now)) if (!(p in files)) {
+        try { sim.FS.mkdirTree(p.slice(0, p.lastIndexOf("/"))); } catch (e) { /* there */ }
+        sim.writeFile(p, bytes);
+      }
+    } catch (e) { /* no storage */ }
+    if (CTL.sim !== sim) return;                     // restarted meanwhile
     ftStart(sim);                                    // the pendant (re)connects to this FluidNC
     uiRefresh();                                     // Web UIs can open now
     if (!sim.pins) ctlAdd("This FluidNC build has no simulated switches (rebuild web/fluidnc).", "err");
@@ -514,9 +525,9 @@
     }
   }
   function ctlConfigChanged() {                      // a new size or config.yaml: restart FluidNC with it
-    if (CTL.mode !== "fluidnc" || !CTL.sim) return;
+    if (!CTL.sim) return;
     yamlText().then((r) => {
-      if (CTL.mode === "fluidnc" && CTL.sim && SimConfig.translate(r.text).text !== CTL.cfg.text) {
+      if (CTL.sim && SimConfig.translate(r.text).text !== CTL.cfg.text) {
         ctlAdd("New size / config.yaml: restarting FluidNC.", "dim");
         ctlBoot();
       }
@@ -546,7 +557,6 @@
     pendantScreen(true);
   }
   function ftCommand(text) {                         // what FluidTouch sends, before FluidNC gets it
-    if (CTL.mode !== "fluidnc") return null;         // Basic: the stand-in does it all (BNC)
     const t = text.trim();
     if (/^\$H$/i.test(t)) {                         // Home All: the page follows it in the status reports (ctlLine)
       FT.homing = "sent"; CTL.homed = false;
@@ -556,121 +566,14 @@
     const m = /^\$SD\/Run=(\S+)/i.exec(t);
     return m ? fjFromPendant(m[1]).catch(() => {}) : null;
   }
-  const ftEnd = () => (CTL.mode === "fluidnc" ? CTL.sim : BNC.nc);   // what the pendant talks to
+  const ftEnd = () => CTL.sim;                       // what the pendant talks to (Part 34: only FluidNC)
 
-  // ---- Basic mode's pendant (Part 24): FluidTouch talks to js/basic_nc.js, a small, labelled stand-in for FluidNC that
-  // answers from what the page is doing and drives it: $H = Home, $J jogs (queued, at their feed, inside the travel),
-  // ! / ~ = pause / resume (and the M0 popup's Resume), Ctrl-X stops the job where it is, its Files tab = the SD card
-  // ($SD/Run plays the file), an M0's text goes to it as a MSG. Basic has no work offsets: WPos = MPos. Anything else:
-  // "error: not in Basic mode". Starts a few seconds after the page (it loads FluidTouch) when the page is isolated. ----
-  const BNC = { nc: null, jogs: [], jog: null, aborted: null, lp: null, feed: 0, pop: false };
-  function basicMpos() {                             // MPos once homed, else mm from the parked pose (as FluidNC unhomed)
-    const p = HOME.pose;
-    if (!p) return [0, 0, 0];
-    const m = HOME.home && !HOME.run ? Homing.mpos(HOME.s, HOME.home, p) : null;
-    return ["x", "y", "z"].map((a) => (m && m[a] !== null ? m[a] : p[a]));
-  }
-  const basicMidJob = () => !!JOB.tl && JOB.t > 0 && JOB.t < JOB.tl.total && BNC.aborted !== JOB.t;
-  const basicJogStop = () => { BNC.jogs = []; BNC.jog = null; };
-  const BASIC_PAGE = {
-    status() {
-      const now = performance.now(), m = basicMpos();
-      if (JOB.playing) BNC.aborted = null;
-      if (!BNC.lp || now - BNC.lp.t > 100) {        // feed: how fast the tool moves (the real machine's: / the replay speed)
-        if (BNC.lp) BNC.feed = Math.hypot(...m.map((v, i) => v - BNC.lp.m[i])) / ((now - BNC.lp.t) / 60000) /
-          (JOB.playing ? Number($("job-speed").value) || 1 : 1);
-        BNC.lp = { t: now, m };
-      }
-      const mid = basicMidJob(), j = JOB.playing || mid ? soundJob() : null, path = fjPath();
-      return {
-        state: HOME.run ? "Home" : BNC.jog ? "Jog" : JOB.playing ? "Run" : !$("job-pop").hidden || mid ? "Hold:0" : "Idle",
-        mpos: m, feed: BNC.feed, rpm: j ? j.rpm : 0,
-        sd: (JOB.playing || mid) && JOB.src ? [100 * JOB.t / JOB.tl.total, path ? "/sd" + path : JOB.src.name || "job"] : null,
-      };
-    },
-    home(axes) {                                     // $H, or $HX / $HY / $HZ / $HXY ... (axes = "X" etc.): only those
-      if (JOB.playing) return "error: a job is playing - hold it first";
-      basicJogStop();
-      if (!HOME.run) homeStart(axes || undefined);
-      return new Promise((done) => {                 // FluidNC says ok once homing is over
-        const t = setInterval(() => { if (!HOME.run) { clearInterval(t); done(HOME.home ? null : "error: homing stopped"); } }, 100);
-      });
-    },
-    jog(o) {
-      if (JOB.playing || HOME.run) return "error: busy (a job or homing is running)";
-      BNC.jogs.push(o);
-      return null;
-    },
-    jogCancel: basicJogStop,
-    hold() { basicJogStop(); if (JOB.playing) jobPlaying(false); return null; },
-    resume() {
-      if (!$("job-pop").hidden) $("job-resume").click();
-      else if (basicMidJob() && !JOB.playing) jobPlaying(true);
-      return null;
-    },
-    reset() {                                        // the job stops where it is (FluidNC aborts it)
-      homeCancel(); basicJogStop();
-      if (JOB.playing || basicMidJob() || !$("job-pop").hidden) { jobPlaying(false); $("job-pop").hidden = true; BNC.aborted = JOB.t; }
-      return null;
-    },
-    async files(dir) {                               // the card's files in dir (sub-folders as size -1)
-      const pre = dir.endsWith("/") ? dir : dir + "/", out = new Map();
-      for (const r of await SdCard.store.all()) {
-        if (!r.path.startsWith(pre)) continue;
-        const rest = r.path.slice(pre.length), k = rest.indexOf("/");
-        if (k < 0) out.set(rest, { name: rest, size: r.bytes.length });
-        else out.set(rest.slice(0, k), { name: rest.slice(0, k), size: -1 });
-      }
-      return [...out.values()];
-    },
-    async run(path) {
-      if (JOB.playing || HOME.run) return "error: busy (a job or homing is running)";
-      if (!(SDC.recs || []).some((r) => r.path === path)) await sdRefresh();
-      if (!(SDC.recs || []).some((r) => r.path === path)) return "error: no such file: /sd" + path;
-      basicJogStop(); BNC.aborted = null;
-      await sdStart(path);
-      return null;
-    },
-    async del(path) {
-      if (!(await SdCard.store.all()).some((r) => r.path === path)) return "error: no such file: /sd" + path;
-      await sdDelete(path);
-      return null;
-    },
-  };
-  function basicTick() {                             // once a frame in Basic: the jogs, the M0 text to the pendant
-    if (CTL.mode === "fluidnc" || !BNC.nc) return;
-    const now = performance.now();
-    if (!BNC.jog && BNC.jogs.length && HOME.pose && meta) {
-      const o = BNC.jogs.shift(), p = HOME.pose, m = basicMpos(), tv = meta.travel, from = [p.x, p.y, p.z], to = from.slice();
-      ["x", "y", "z"].forEach((a, i) => { if (o[a] !== undefined) to[i] += o.rel ? o[a] : o[a] - m[i]; });
-      const tip = meta.tip_above_table, lim = [[sx.min * IN + tv.x[0], sx.max * IN + tv.x[0]], [sy.min * IN + tv.y[0], sy.max * IN + tv.y[0]],
-        [sz.min - tip, sz.max - tip]];
-      to.forEach((v, i) => { to[i] = Math.min(lim[i][1], Math.max(lim[i][0], v)); });
-      const d = Math.hypot(...to.map((v, i) => v - from[i]));
-      if (d > 1e-4) BNC.jog = { from, to, t0: now, ms: d / (o.f / 60) * 1000 };
-    }
-    const J = BNC.jog;
-    if (J) {
-      const k = Math.min(1, (now - J.t0) / J.ms);
-      move(J.from.map((v, i) => v + (J.to[i] - v) * k));
-      if (k >= 1) BNC.jog = null;
-    }
-    const pop = !$("job-pop").hidden;
-    if (pop && !BNC.pop) BNC.nc.message(`${$("job-pop-h").textContent}: ${$("job-pop-msg").textContent}`);
-    BNC.pop = pop;
-  }
-  function basicPendant() {                          // Basic: the stand-in + FluidTouch on it
-    if (CTL.mode === "fluidnc" || !window.crossOriginIsolated || !window.BasicNC || !window.FluidTouchSim) return;
-    if (!BNC.nc || BNC.nc.stopped) BNC.nc = BasicNC.create(BASIC_PAGE);
-    ftStart(BNC.nc);
-  }
-  function basicStop() { if (BNC.nc) BNC.nc.stop(); BNC.nc = null; basicJogStop(); }
   function pendantSet(on) {                          // the option: the pendant model + FluidTouch, or neither
     $("ft-on").checked = on;
     $("ft-pop-btn").hidden = !on;
     try { localStorage.setItem("lr4-pendant", on ? "1" : "0"); } catch (e) { /* not kept */ }
-    if (on) { if (CTL.mode === "fluidnc") ftStart(CTL.sim); else basicPendant(); }
-    else { ftStop(); basicStop(); }
+    if (on) ftStart(CTL.sim);
+    else ftStop();
     if (meta) { applyVisibility(); renderBom(); }
   }
   {
@@ -680,49 +583,18 @@
     $("ft-pop-btn").hidden = !pendantOn();
     $("ft-on").addEventListener("change", () => pendantSet(pendantOn()));
   }
-  // tests/test_page_basic.js: what the pendant is told
-  window.LR4Basic = { pendant: pendantSet, nc: () => BNC.nc, status: () => BASIC_PAGE.status(), homed: () => !!HOME.home && !HOME.run,
-    playing: () => JOB.playing, pop: () => !$("job-pop").hidden, t: () => JOB.t, jog: (o) => BASIC_PAGE.jog(o), home: (axes) => BASIC_PAGE.home(axes), jogging: () => !!BNC.jog || BNC.jogs.length > 0 };
-  function ctlSetMode(mode) {
-    if (mode === CTL.mode) return;
-    CTL.mode = mode;
-    const on = mode === "fluidnc";
-    for (const b of $("ctl-mode").querySelectorAll("button")) b.setAttribute("aria-pressed", String(b.dataset.v === mode));
-    $("ctl-box").hidden = $("ctl-opts").hidden = $("pos-jog").hidden = $("flash-box").hidden = !on;
-    uiRefresh();
-    $("pos-play").hidden = $("home-real-l").hidden = on;
-    fjButtons();
-    if (JOB.bits && JOB.bits.size) {                 // the model's bit moves with the router; the job's only in Playback
-      if (on) for (const b of JOB.bits.values()) b.visible = false;
-      jobBit = !on;
-      applyVisibility();
-      if (!on) jobSeek(JOB.t, false);
+  // the page is built (scene.js load()): FluidNC starts with the config.yaml in use. It is the only machine (Part 34,
+  // user 2026-10-24): where it can't run, that's an error the page shows - Preview still plays jobs.
+  function ctlStartup() {
+    if (!window.crossOriginIsolated) {
+      ctlMsg("Error: FluidNC can't run here: this page isn't cross-origin isolated (reload once; private windows in " +
+        "some browsers have no service workers). The machine can't move; Run G-code > Preview still plays a job.");
+      $("ctl-msg").classList.add("err");
+      return;
     }
-    if (on) {
-      jobPlaying(false); homeCancel();
-      basicStop(); ftStop();                         // the pendant starts afresh on FluidNC
-      $("ctl-box").open = true;
-      ctlBoot();
-    } else {
-      CTL.booting = null;
-      ctlStop();
-      ftStop();
-      basicPendant();
-      ctlMsg("");
-      $("home-status").textContent = HOME.home ? "Homed." : "Not homed.";
-      dro();
-      move();
-    }
-    jobSetup(JOB.pageJob);                           // the job starts from the other mode's homed spot
-    sdRefresh();                                     // ▶ = Play or Run
+    if (!CTL.sim && !CTL.booting) ctlBoot();
   }
   function setupController() {
-    if (!window.crossOriginIsolated) {
-      $("ctl-mode").querySelector('[data-v="fluidnc"]').disabled = true;
-      ctlMsg("FluidNC can't run here: this page isn't cross-origin isolated (reload once; private windows in some " +
-        "browsers have no service workers).");
-    }
-    for (const b of $("ctl-mode").querySelectorAll("button")) b.addEventListener("click", () => ctlSetMode(b.dataset.v));
     const sendLine = (text) => {
       if (!CTL.sim || !text.trim()) return;
       ctlLastSent = text.trim();
@@ -744,10 +616,9 @@
     $("jog-stop").addEventListener("click", () => CTL.sim && CTL.sim.realtime(0x85));
   }
   setupController();
-  setTimeout(basicPendant, 3000);                    // Basic's pendant, once the page has settled
   // for tests/test_page_fluidnc.js: the controller's state and the model's pose (mm from the parked pose)
   window.LR4Ctl = { mode: () => CTL.mode, state: () => CTL.state, mpos: () => CTL.mpos, boot: () => CTL.boot,
     cfg: () => CTL.cfg, pose: () => HOME.pose && [HOME.pose.x, HOME.pose.y, HOME.pose.z], travel: () => meta && meta.travel,
     tip: () => meta && meta.tip_above_table, TOUCH_PLATE, sync: () => ctlTick(), homed: () => CTL.homed,
-    plate: () => !!(CTL.jobPlate || HAND.plate) };
+    plate: () => !!(CTL.jobPlate || HAND.plate), stop: () => ctlStop(), start: () => ctlBoot() };   // stop / start: FluidNC down and up (tests)
 

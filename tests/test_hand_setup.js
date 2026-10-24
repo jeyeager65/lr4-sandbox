@@ -52,6 +52,7 @@ const ok = (cond, msg) => { checks++; if (!cond) { fails++; console.log("FAIL " 
   const text = HS.surfacing({ x: [0, 200], y: [0, 200], d: 25.4, over: 0.4, z: -0.5 });
   const tl = await GP.load(text);
   ok(HS.needs(text).surfacing && !HS.needs(text).tools.length && tl.tools.get(1).diameter === 25.4 && !tl.stock, "surfacing job: marked, brings its bit");
+  ok(text.split("\n").every((l) => new TextEncoder().encode(l).length <= 127), "surfacing job: every line fits FluidNC (<= 127 bytes)");
   const sim = HS.shifted(board, [0, 0, 0], StockSimulator.compileTools(tl.tools), null);
   tl.segs.forEach((s, i) => sim.carveOne(s, tl.segs[i - 1], sim.tools, sim.defaultTool));
   ok(Math.abs(HS.level(board.heights) - -0.5) < 1e-4, `surfaced level ${HS.level(board.heights)}`);

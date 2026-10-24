@@ -91,29 +91,14 @@ decimals, as FluidNC reports them.
 
 ![Build: the BOM, the cut list and the strut plates](docs/img/build.webp)
 
-### Run: Basic
-
-**Run** > **Runs on Basic** plays G-code on the machine: the strut plate job (V1E's build order: the machine runs
-on its printed temporary struts and cuts its own MDF strut plates; **Use the temporary struts**), or any G-code file
-from the page's **SD card** (**Add G-code files…**, or drop them on it; ▶ plays one). The bit follows the moves at
-FluidNC-like speeds, the stock is carved as it goes (with the file's own bits, from
-[cnc-gcode-tools](https://github.com/jeyeager65/cnc-gcode-tools) `(Stock: ...)` / `(ToolDef ...)` comments, or ones
-you describe under **Stock and bits**), M0 pauses pop up their message, G38.2 probes stop on the touch plate, tool
-changes swap the bit, and **Home ($H)** plays FluidNC's homing. Speeds 1x to 100x; scrub with the timeline;
-**Space** plays / pauses. With **FluidTouch pendant** ticked (off by default), the pendant on the table works
-here too: it talks to a small stand-in for
-FluidNC (labelled as such) that homes, jogs, holds / resumes, lists the SD card and plays a file from it; anything
-else answers "not in Basic mode".
-
-![Basic: the strut plate job on the temporary struts](docs/img/playback.webp)
-
 ### Run: FluidNC
 
-**Run** > **Runs on FluidNC** boots the real FluidNC firmware in the page, with your config.yaml (V1E's JP3_LR until
+**Run** boots the real FluidNC firmware in the page, with your config.yaml (V1E's JP3_LR until
 you load your own under Build). The browser build has no stepper drivers or real pins, so it runs a translated
 copy: every motor becomes a plain stepper and the limit and probe pins move to known pins; rates, acceleration,
 travel, homing and limits are kept as in your file. (`$CD` in the console shows that copy; the page's config.yaml
-download is always your real file.)
+download is always your real file.) FluidNC needs a cross-origin isolated page (`tools/serve.py`, or GitHub Pages
+after one reload); where it can't run, the page says so.
 
 - **Home ($H)** homes on the machine's switches: each switch trips when its motor reaches the stop, so each Y motor
   stops on its own switch and squares the gantry, as on the real machine.
@@ -123,7 +108,20 @@ download is always your real file.)
 - **Machine speed** runs it at 1x, 2x, 5x or 10x.
 - MPos is greyed until it has homed: like the real controller, it doesn't know where the machine is until then.
 
-G-code files on the page's SD card run through FluidNC too (`$SD/Run`), from the page or from the FluidTouch pendant.
+**Run G-code** runs the strut plate job (V1E's build order: the machine runs on its printed temporary struts and
+cuts its own MDF strut plates; **Use the temporary struts**) or any G-code file from the page's **SD card** (**Add
+G-code files…**, or drop them on it; ▶ runs one) through FluidNC (`$SD/Run`), from the page or from the FluidTouch
+pendant. The stock is carved as the motors move (with the file's own bits, from
+[cnc-gcode-tools](https://github.com/jeyeager65/cnc-gcode-tools) `(Stock: ...)` / `(ToolDef ...)` comments, or the
+ones set up under **On the table**), M0 holds pop up their message, G38.2 probes stop on the touch plate and tool
+changes hold for the bit.
+
+**Preview** plays the loaded file fast (1x to 100x, scrub with the timeline, **Space** plays / pauses) from where
+FluidNC is: what Run would do, with the file's own probing and zeroing (G38.2 P, G10 L20, G92) on a copy of the
+offsets. It carves a copy of the stock, never the spoilboard, and FluidNC doesn't move; **Back to the machine** (or
+FluidNC moving) puts the model back where FluidNC is. Preview works even where FluidNC can't run.
+
+![Preview: the strut plate job on the temporary struts](docs/img/playback.webp)
 
 **Web UIs:** put a web UI on FluidNC's SD card or Flash (WebUI 3, WebUI 2 or FigUI: their release `index.html.gz`,
 as they are) and **Run > Controller > Web UIs > Open** shows it in a window of its own, served by the page's FluidNC
@@ -275,9 +273,8 @@ node test_strut_cam.js                       # the page's strut plate G-code; vs
 node test_show_tree.js                       # the Show tree, its presets and the inspect sets
 node test_sounds.js                          # the machine sound helpers (stepper pitch, router, cutting load)
 node test_demo_script.js                     # (Video ...) comments -> the video's settings and commands
-node test_basic_nc.js                        # Basic mode's FluidNC stand-in, driven as FluidTouch would
 node test_gcode_play.js                      # G-code playback: pauses, probe, G20/G21, carving frees the plates
-node test_homing.js                          # Basic mode's Home: FluidNC's homing order, pull-offs, MPos
+node test_homing.js                          # homing helpers: FluidNC's homing order, pull-offs, MPos
 node test_fluidnc_sim.js                     # parsing FluidNC's output (status reports, ok / error, messages)
 node test_sim_config.js                      # config.yaml -> the browser copy (V1E's JP3_LR + an odd user file)
 node test_page_fluidnc.js                    # headless Chrome: FluidNC in the page - boot, home, probe, jog,
@@ -286,9 +283,8 @@ node test_page_vr.js                         # headless Chrome: the page in VR p
 node test_page_webui.js                      # headless Chrome: a web UI from the SD card / Flash in its own
                                              #   window - /command, WebSocket, a move, an upload (headers + plain)
 node test_page_inspect.js                    # headless Chrome: the inspect view and its tools (needs parts/)
-node test_page_basic.js                      # headless Chrome: Basic mode with the FluidTouch pendant
 node test_page_sdjob.js                      # headless Chrome: the SD card and a job run on FluidNC
-node test_page_pendant.js                    # headless Chrome: the pendant in FluidNC mode
+node test_page_pendant.js                    # headless Chrome: the pendant on FluidNC
 node test_page_fluidtouch.js                 # headless Chrome: FluidTouch's UI connected to the page
 node test_page_sound.js                      # headless Chrome: machine sounds start, follow the axes, render a WAV
 node test_strut_plate.js                     # JS strut plates vs Vector76's OpenSCAD generator (maintainer only)
@@ -332,7 +328,7 @@ only data, and it holds no V1E geometry (the page places your downloaded files).
   sizing matches V1E's LowRider 4 calculator; the `config.yaml` is V1E's JP3_LR.
 - **[Vector76](https://github.com/vector76)** wrote the [LR4 strut plate generator](https://vector76.github.io/Web_OpenSCAD_Customizer/strut_plate.html)
   (OpenSCAD) that the strut plate code follows.
-- Basic mode parses, times and carves with [cnc-gcode-tools](https://github.com/jeyeager65/cnc-gcode-tools) (MIT):
+- Preview and the job carving use [cnc-gcode-tools](https://github.com/jeyeager65/cnc-gcode-tools) (MIT):
   its parser, expander, animator and stock simulator, copied unmodified into `web/js/lib/cnc-gcode-tools/`.
 - The Run tab's controller is **[FluidNC](https://github.com/bdring/FluidNC)** (GPL-3.0) itself, built for the
   browser with its wasm port, from the `wasm-sim` branch of [a fork](https://github.com/jeyeager65/FluidNC/tree/wasm-sim)

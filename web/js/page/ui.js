@@ -156,7 +156,7 @@
     room: () => (shop ? shopRoom : null),       // the workshop at 1:1, not on the tabletop
     poke: ftPoke,
     carry: { meshes: () => meshes.filter((m) => m.userData.group === "Pendant" && /^Pendant_(case|screen)/.test(m.userData.name)),
-      done: () => move(CTL.mode === "fluidnc" ? CTL.pose : null) } });   // back on its stand
+      done: () => move(JOB.preview ? null : CTL.pose) } });   // back on its stand
   window.LR4VR.page = vr;
   // ---- automation handle for scripted videos (tools/record_demo.js); nothing on the page uses it ----
   // ---- share link, picture, measure in the main view, reset, keyboard ----
@@ -258,7 +258,7 @@
     else if (k === "p") saveImage();
     else if (k === "h") click("v-panel");
     else if (k === "?") $("keys-dlg").showModal();
-    else if (k === " " && CTL.mode !== "fluidnc" && !$("job-on").hidden) click("job-play");
+    else if (k === " " && JOB.preview && !$("job-on").hidden) click("job-play");
     else if (k === "Escape" && MEAS.main) mainMeasure(false);
     else return;
     e.preventDefault();

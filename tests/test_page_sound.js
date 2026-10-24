@@ -1,5 +1,5 @@
 // Machine sounds in headless Chrome (Parts 21-22): a real click on the Sound toggle (under ⚙) starts Web Audio; moving X
-// makes its stepper voice sound at the real speed's pitch; Playback homing clicks the switches; a short trace renders
+// makes its stepper voice sound at the real speed's pitch; FluidNC's $H clicks the switches; a short trace renders
 // to a WAV that isn't silent.
 //   node tests/test_page_sound.js   (not in npm test: needs Chrome + Python)
 "use strict";
@@ -35,15 +35,18 @@ const ok = (cond, msg) => { checks++; console.log((cond ? "  ok   " : "  FAIL ")
       // the page clock frozen and stepped a frame at a time, as tools/record_demo.js does (headless frames are slow)
       let vt = performance.now(); const realNow = performance.now.bind(performance); performance.now = () => vt;
       const step = async (ms) => { vt += ms; await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))); };
-      const x = document.getElementById("sx"), v0 = Math.round((Number(x.min) + Number(x.max)) / 2), lv = [];
-      x.value = String(v0); x.dispatchEvent(new Event("input"));
+      // X moved by hand (LR4Demo.movePose, as videos do; Part 34 hid the sliders), 0.1 in a frame
+      const sim = await T.booted(null), tv = LR4Ctl.travel(), p0 = LR4Ctl.pose(), x0 = (tv.x[0] + tv.x[1]) / 2, lv = [];
+      const at = (x) => LR4Demo.movePose(x, p0[1], p0[2]);
+      at(x0);
       for (let i = 0; i < 10; i++) await step(33.3);
-      for (let i = 1; i <= 20; i++) { x.value = String(v0 + i * 0.1); x.dispatchEvent(new Event("input")); await step(33.3); lv.push(LR4Demo.soundLevels().x); }
+      for (let i = 1; i <= 20; i++) { at(x0 + i * 2.54); await step(33.3); lv.push(LR4Demo.soundLevels().x); }
       for (let i = 0; i < 20; i++) await step(33.3);
       const quiet = LR4Demo.soundLevels().x;
-      performance.now = realNow;                     // homing in real time (its clicks; the motion is checked above)
-      LR4Demo.home();
-      await T.until(() => !LR4Demo.homing(), 120000);
+      performance.now = realNow;                     // FluidNC's $H in real time (its clicks; the motion is checked above)
+      const sp = document.getElementById("ctl-speed"); sp.value = "2"; sp.dispatchEvent(new Event("change"));   // $H at 2x (the page polls the switch pins once a frame: 10x can trip and release between frames)
+      LR4Demo.home(); await T.sleep(500);
+      await T.until(() => !LR4Demo.homing(), 240000);
       const stats = LR4Demo.soundStats(), chunks = await LR4Demo.soundWav();
       const wav = atob(LR4Demo.soundChunk(0));
       let peak = 0;
@@ -51,7 +54,7 @@ const ok = (cond, msg) => { checks++; console.log((cond ? "  ok   " : "  FAIL ")
       return { moving: lv[15], quiet, stats, chunks, peak };
     })()`);
     // 0.1 in a frame at 30 fps = 76 mm/s -> x 50 steps/mm / 8 microsteps / 4 = 119 Hz
-    ok(b.moving.gain > 0.5 && Math.abs(b.moving.hz - 119) < 3, `X slider moving: X voice ${b.moving.hz.toFixed(0)} Hz, gain ${b.moving.gain.toFixed(2)}`);
+    ok(b.moving.gain > 0.5 && Math.abs(b.moving.hz - 119) < 3, `X moving: X voice ${b.moving.hz.toFixed(0)} Hz, gain ${b.moving.gain.toFixed(2)}`);
     ok(b.quiet.gain === 0, "stopped: silent");
     ok(b.stats.clicks >= 3, `homing: ${b.stats.clicks} switch clicks`);
     ok(b.chunks > 0 && b.peak > 1000, `the trace renders to a WAV (peak ${b.peak})`);

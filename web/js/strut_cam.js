@@ -247,7 +247,8 @@
       `#<probe_x>=${g(o.margin / 2)} (probe spot X)`, `#<probe_y>=${g(o.margin / 2)} (probe spot Y)`);
     const lo = router.dial[0][1], hi = router.dial[router.dial.length - 1][1];
     const note = rpm < lo * 0.97 ? ` - ${router.name} can't go below ~${lo} RPM` : rpm > hi * 1.03 ? ` - above this router's ~${hi} RPM max` : "";
-    L.push("", `(Start: Tool T1 ${o.bitName} in the router, jogged to stock front-left corner, just above the MDF, router off)`, "",
+    // (comment lines kept short: FluidNC stops a job on a line over 127 bytes, "14 Line too long")
+    L.push("", `(Start: Tool T1 ${o.bitName} in the router, router off,)`, "(jogged to the stock's front-left corner, just above the MDF)", "",
       `(===== T1: ${o.bitName} - ${router.name} dial ${g(o.dial)} = ~${Math.round(rpm)} RPM${note}, ${fmtMin(total)} =====)`,
       "T1", "G10 L20 P0 X0 Y0 Z0 (here = X0 Y0, temporary Z0)");
     if (plate) L.push("G0 X#<probe_x> Y#<probe_y> (probe spot: the uncut margin corner)", "M0 (MSG, Attach Probe)",

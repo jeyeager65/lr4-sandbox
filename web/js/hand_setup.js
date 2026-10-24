@@ -107,7 +107,8 @@
   // feed, plunge (mm/min), rpm }. Passes along Y (the long way), stepping over in X; T1 is its bit (ToolDef).
   function surfacing(o) {
     const f = (v) => (+v).toFixed(3), step = o.d * o.over, nx = Math.max(1, Math.ceil((o.x[1] - o.x[0]) / step));
-    const L = [`(LR4 surfacing) (Made by the LowRider 4 Sandbox: a ${f(o.d)} mm bit, ${Math.round(o.over * 100)}% step-over, Z ${f(o.z)})`,
+    // short lines: FluidNC stops a job on a line over 127 bytes ("14 Line too long")
+    const L = ["(LR4 surfacing)", "(Made by the LowRider 4 Sandbox)", `(A ${f(o.d)} mm bit, ${Math.round(o.over * 100)}% step-over, Z ${f(o.z)})`,
       `(ToolDef 1: SHAPE=flat D=${f(o.d)} NAME=surfacing ${f(o.d)} mm)`,
       "G21 G90 G54", "T1", `M3 S${o.rpm || 18000}`, "G0 Z5", `G0 X${f(o.x[0])} Y${f(o.y[0])}`, `G1 Z${f(o.z)} F${o.plunge || 300}`];
     for (let i = 0; i <= nx; i++) {

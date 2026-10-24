@@ -1,4 +1,4 @@
-// lr4-sandbox page, part 8 of 12: Run G-code on FluidNC, the SD card.
+// lr4-sandbox page, part 8 of 12: Run G-code on FluidNC (+ Preview's buttons), the SD card.
 // The page's scripts share one global scope (js/page/*.js, loaded in order by index.html): names declared
 // at the top level here are seen by the later files.
   // ---- Run G-code on FluidNC (Part 17): the picked file runs from FluidNC's SD card ($SD/Run=/file). The page
@@ -6,15 +6,17 @@
   // while the machine is on them, else its sampled path). M0 holds it -> the pause popup with its MSG (Resume sends ~);
   // the touch plate goes on the stock at the hold before a probe and comes off at the one after it, as you would; a
   // change to a bit the file doesn't define holds it (!) so the bit can be given. The job's work zero is wherever it
-  // starts (the strut job: G10 L20 at the homed spot), so it needs $H first, as Playback starts from Home. ----
+  // starts (the strut job: G10 L20 at the homed spot), so it needs $H first. ----
   const fjPath = () => (!JOB.src ? null : JOB.src.kind === "sd" ? JOB.src.name : JOB.src.kind === "page" ? PAGE_SD : null);
   function fjButtons() {
-    const on = CTL.mode === "fluidnc";
+    const on = !JOB.preview;                         // FluidNC's Run / Hold / Stop, else Preview's Play / Pause / Start over
     $("job-play").textContent = !on ? (JOB.playing ? "Pause" : "Play") : !FJ.job ? "Run ($SD/Run)" : FJ.job.held ? "Resume ~" : "Hold !";
     $("job-reset").textContent = on ? "Stop (reset)" : "Start over";
     $("job-reset").disabled = on && !FJ.job;
     $("job-speed").hidden = on;
     $("job-t").disabled = on;
+    $("job-prev").textContent = on ? "Preview" : "Back to the machine";
+    $("job-prev").disabled = !!FJ.job;               // not while FluidNC runs a job
   }
   function fjWork(p) {                               // the page's pose (mm from the parked pose) -> the job's work mm
     const tv = meta.travel, st = JOB.tl.stock, z0 = jobZ0();
@@ -36,7 +38,7 @@
   // file it names (picked here first if it's another one on the card); FluidNC runs it either way
   async function fjFromPendant(file) {
     const path = file.replace(/^\/sd(?=\/)/i, "");
-    if (CTL.mode !== "fluidnc" || !CTL.sim || FJ.job) return;
+    if (!CTL.sim || FJ.job) return;
     if (fjPath() !== path) {
       if (!SDC.recs.some((r) => r.path === path)) { $("job-status").textContent = `The pendant runs ${path}: not on this card's list, so the page can't follow it.`; return; }
       await sdSelect(path);
@@ -48,11 +50,12 @@
     }
   }
   async function fjPrepare() {                       // get the page ready to follow the picked file; false = it can't
+    if (JOB.preview) previewEnd();                   // Run: the machine, not the preview
     const sim = CTL.sim, path = fjPath();
     if (!sim || !JOB.tl || !path) return false;
     if (!CTL.homed) {
       $("job-status").textContent = "Home it first ($H): the job zeroes where the machine is when it starts, and the " +
-        "page lays the stock out from the homed spot, as Basic mode does.";
+        "page lays the stock out from the homed spot. Preview plays it without homing.";
       return false;
     }
     const p = ctlRaw(), here = { x: p[0], y: p[1], z: p[2] }, from = jobSpot();   // lay the job out from where it starts
@@ -76,7 +79,7 @@
     $("job-pop").hidden = true;
     $("job-status").textContent = `Running ${path} on FluidNC…`;
     fjButtons();
-    // G54 = the cutting area's front-left corner on the stock top, where Playback puts work zero (as you'd jog there
+    // G54 = the cutting area's front-left corner on the stock top, where Preview puts work zero too (as you'd jog there
     // and zero); a file that zeroes itself (the strut job's G10 L20) moves it, in both
     const tv = meta.travel, hp = CTL.homePose, hs = Homing.settings(CTL.yaml), st = JOB.tl.stock;
     const z0 = jobZ0();                              // + a video's work zero (LR4Demo.zero)
@@ -157,7 +160,7 @@
     $("job-install").hidden = !(text === "Done." && JOB.src && JOB.src.kind === "page");
     fjButtons();
   }
-  // for tests/test_page_sdjob.js: the job, its carving, and Playback's carve of the same moves to compare with
+  // for tests/test_page_sdjob.js: the job, its carving, and Preview's carve of the same moves to compare with
   window.LR4Job = { tl: () => JOB.tl, src: () => JOB.src, sim: () => JOB.sim, spoil: () => SPOIL.sim, hand: () => HAND, handSim: () => HAND.sim, running: () => !!FJ.job, held: () => !!(FJ.job && FJ.job.held),
     files: () => SDC.recs.map((r) => r.path), yamlNote: () => yamlBase && yamlBase.note, flashList: () => $("flash-list").textContent, select: sdSelect, add: sdAdd, refresh: sdRefresh, PAGE_SD,
     playbackHeights() {
@@ -169,7 +172,7 @@
       return s;
     } };
   $("job-t").addEventListener("input", (e) => {
-    if (!JOB.tl) return;
+    if (!JOB.tl || !JOB.preview) return;            // (disabled outside Preview)
     $("job-pop").hidden = true;
     jobSeek(e.target.value / 1000 * JOB.tl.total);
     JOB.k = GcodePlay.pending(JOB.tl, JOB.t);
@@ -180,7 +183,7 @@
     if (!e.target.checked) jobCloseUp(null);
   });
   $("job-moves").addEventListener("change", (e) => { if (JOB.ahead) JOB.ahead.visible = JOB.done.visible = JOB.partial.visible = e.target.checked; });
-  // ---- the SD card (js/sd_card.js): G-code files kept in this browser. A name loads it; ▶ plays it (Playback) or runs it
+  // ---- the SD card (js/sd_card.js): G-code files kept in this browser. A name loads it; ▶ runs it
   // (FluidNC, which boots with the same files on its card); the strut plate G-code is kept on it as PAGE_SD. ----
   const sdText = (r) => new TextDecoder().decode(r.bytes);
   SDC.tree = { cur: "", closed: new Set() };
@@ -197,9 +200,9 @@
       name.addEventListener("click", () => { $("ui-box").open = true; $("ui-box").scrollIntoView({ block: "center", behavior: "smooth" }); });
     } else {
       name.addEventListener("click", () => sdSelect(r.path));
-      const go = document.createElement("button");  // load it and start: Play (Playback) or $SD/Run (FluidNC)
+      const go = document.createElement("button");  // load it and run it on FluidNC ($SD/Run)
       go.type = "button"; go.className = "sd-act"; go.textContent = "▶";
-      go.title = `${CTL.mode === "fluidnc" ? "Run" : "Play"} ${r.path}`; go.setAttribute("aria-label", go.title);
+      go.title = `Run ${r.path}`; go.setAttribute("aria-label", go.title);
       go.addEventListener("click", () => sdStart(r.path));
       row.append(go);
     }
@@ -239,13 +242,12 @@
     sdRefresh();
     await jobSetup(JOB.pageJob);
   }
-  async function sdStart(path) {                     // ▶: load the file, then Play it / run it on FluidNC
+  async function sdStart(path) {                     // ▶: load the file, then run it on FluidNC
     if (FJ.job) { $("sd-status").textContent = "A job is running on FluidNC: stop it first."; return; }
     await sdSelect(path);
     $("h-job").scrollIntoView({ block: "start", behavior: "smooth" });
     if (!JOB.tl || !JOB.src || (JOB.src.kind === "sd" ? JOB.src.name !== path : path !== PAGE_SD)) return;
-    if (CTL.mode === "fluidnc") { if (CTL.sim) fjRun(); else $("sd-status").textContent = "FluidNC is still starting."; }
-    else { if (JOB.t >= JOB.tl.total) jobSeek(0); if (!JOB.playing) $("job-play").click(); }
+    if (CTL.sim) fjRun(); else $("sd-status").textContent = CTL.booting ? "FluidNC is still starting." : "FluidNC isn't running.";
   }
   async function sdAdd(files) {
     const uis = files.filter((f) => UI_FILE.test(f.name));   // web UIs dropped on the card: as from Web UIs

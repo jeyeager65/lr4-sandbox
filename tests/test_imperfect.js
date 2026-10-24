@@ -97,6 +97,7 @@ const rk = 600 / 700, dd = 2 * rk * 1200 / Math.hypot(600, 1200);
 ok(Math.abs(sq1.diff - dd) < 0.01 && sq1.skew > 0, `racked 1 mm: diagonals differ ${sq1.diff.toFixed(3)} vs ${dd.toFixed(3)}`);
 const job = IM.squareJob({ x: 20, y: 20, w: 500, h: 1000, z: -0.3 });
 ok(/^\(LR4 squareness test\)/.test(job) && /ToolDef 1: SHAPE=vbit/.test(job) && /G1 X520\.000 Y1020\.000/.test(job) && /M30/.test(job), "squareJob");
+ok(job.split("\n").every((l) => new TextEncoder().encode(l).length <= 127), "squareJob: every line fits FluidNC (<= 127 bytes)");
 
 // a tuned config's pulloffs written into a config.yaml (FluidNC boots it): only motor pulloff_mm lines change, a missing one is added
 const yml = "axes:\n  y:\n    motor0:\n      hard_limits: true\n      pulloff_mm: 4.000\n    motor1:\n      hard_limits: true\n  z:\n    motor1:\n      pulloff_mm: 4\n";

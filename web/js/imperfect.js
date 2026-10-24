@@ -329,7 +329,9 @@
   // the diagonals between
   function squareJob(o) {
     const f = (v) => (+v).toFixed(3), x0 = o.x, y0 = o.y, x1 = o.x + o.w, y1 = o.y + o.h, k = 10;
-    const L = [`(LR4 squareness test) (Made by the LowRider 4 Sandbox: a ${f(o.w)} x ${f(o.h)} mm rectangle; measure the diagonals between the corner crosses - equal = square)`,
+    // short lines: FluidNC stops a job on a line over 127 bytes ("14 Line too long")
+    const L = ["(LR4 squareness test)", "(Made by the LowRider 4 Sandbox)", `(A ${f(o.w)} x ${f(o.h)} mm rectangle, crosses at the corners)`,
+      "(Measure the diagonals between the crosses: equal = square)",
       "(ToolDef 1: SHAPE=vbit D=6.35 ANGLE=60 NAME=60 deg V-bit)", "G21 G90 G54", "T1", `M3 S${o.rpm || 18000}`, "G0 Z5"];
     const cut = (pts) => {
       L.push(`G0 X${f(pts[0][0])} Y${f(pts[0][1])}`, `G1 Z${f(o.z)} F${o.plunge || 300}`);

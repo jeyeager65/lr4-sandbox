@@ -19,6 +19,8 @@
 #   - stock simulation comments for cnc-gcode-tools: (CNCSIM 1 UNITS=mm), (Stock: ...) from the
 #     Job's stock, (ToolDef N: SHAPE=... D=... NAME=...) per bit (the viewer's tool names too),
 #     (PriorJob: <file>) per --prior-job
+#   - every line within FluidNC's 127-byte limit (MAX_LINE, fit_line): long comments wrap onto
+#     more comment lines, an M0's (MSG ...) is cut short with a warning, code that can't fit is an error
 # Arguments (Job > Post Processor Arguments), e.g. "--plate=15.0 --probe-xy=0,0":
 
 TOOLTIP = """FluidNC (GRBL-compatible) post: modal output, no K on arcs, M0 + (MSG,...) bit
@@ -190,6 +192,77 @@ MAX_RADIUS_TO_CHORD = 1e4  # arcs whose radius is this many times their chord be
 MAX_ARC_RADIUS = 10000.0   # mm: and any arc bigger than this - above anything a LowRider can
                            # cut, so real curves (an arched headboard, r = 1-3 m) stay arcs
 ARC_TOLERANCE = 0.002      # mm: max deviation allowed when an arc is replaced by lines
+
+# FluidNC rejects a line over 127 BYTES, comments included: GCode.cpp gc_execute_line copies it
+# into char[128] and checks strlen before stripping comments -> "14 Line too long", ALARM:17,
+# the job stops (verified in source and in the wasm sim, 2026-10-24). UTF-8: x / em dash = 2 / 3.
+MAX_LINE = 127
+
+
+def _nbytes(s):
+    return len(s.encode("utf-8"))
+
+
+def _cut(text, room):
+    """text cut at a word boundary to fit room bytes, ending in '...'"""
+    if _nbytes(text) <= room:
+        return text
+    words, out = text.split(" "), ""
+    for w in words:
+        nxt = (out + " " + w) if out else w
+        if _nbytes(nxt) + 3 > room:
+            break
+        out = nxt
+    if not out:                                    # one huge word: cut it by bytes
+        out = text.encode("utf-8")[:max(0, room - 3)].decode("utf-8", "ignore")
+    return out + "..."
+
+
+def _wrap(text, room):
+    """text split at word boundaries into pieces of at most room bytes"""
+    pieces, cur = [], ""
+    for w in text.split(" "):
+        while _nbytes(w) > room:                   # a word longer than a line
+            if cur:
+                pieces.append(cur)
+                cur = ""
+            head = w.encode("utf-8")[:room].decode("utf-8", "ignore")
+            pieces.append(head)
+            w = w[len(head):]
+        nxt = (cur + " " + w) if cur else w
+        if _nbytes(nxt) > room and cur:
+            pieces.append(cur)
+            cur = w
+        else:
+            cur = nxt
+    if cur:
+        pieces.append(cur)
+    return pieces
+
+
+def fit_line(ln, warn=print):
+    """one output line -> the lines to write, each within FluidNC's MAX_LINE bytes:
+    a comment-only line wraps into several; an M0 / code line keeps its (MSG ...) cut short
+    (warns: the message must stay on its M0); another trailing comment moves above the code;
+    code alone that is too long is an error (nothing is cut silently)."""
+    if _nbytes(ln) <= MAX_LINE:
+        return [ln]
+    if ln.startswith("(") and ln.endswith(")"):
+        inner = ln[1:-1]
+        if inner.startswith("MSG"):                # a lone message: keep it one message, cut short
+            warn(f"fluidnc post: message cut to fit FluidNC's {MAX_LINE}-byte line: {ln}")
+            return ["(" + _cut(inner, MAX_LINE - 2) + ")"]
+        return ["(" + p + ")" for p in _wrap(inner, MAX_LINE - 2)]
+    if "(" in ln and ln.endswith(")"):
+        i = ln.index("(")
+        code, inner = ln[:i].rstrip(), ln[i + 1:-1]
+        if _nbytes(code) > MAX_LINE:
+            raise ValueError(f"fluidnc post: G-code line over FluidNC's {MAX_LINE} bytes: {ln!r}")
+        if inner.startswith("MSG"):
+            warn(f"fluidnc post: message cut to fit FluidNC's {MAX_LINE}-byte line: {ln}")
+            return [code + " (" + _cut(inner, MAX_LINE - _nbytes(code) - 3) + ")"]
+        return ["(" + p + ")" for p in _wrap(inner, MAX_LINE - 2)] + [code]
+    raise ValueError(f"fluidnc post: G-code line over FluidNC's {MAX_LINE} bytes: {ln!r}")
 
 
 def linearize_big_arcs(lines, max_radius=MAX_ARC_RADIUS, tol=ARC_TOLERANCE):
@@ -478,7 +551,7 @@ def fluidnc_program(title, sections, plate=None, probe_xy=(10.0, 10.0), probe_to
         if "(" in ln and ln.endswith(")"):
             i = ln.index("(")
             ln = ln[:i + 1] + ln[i + 1:-1].replace("(", "[").replace(")", "]") + ")"
-        clean.append(ln)
+        clean.extend(fit_line(ln))                 # FluidNC's 127-byte line limit
     return "\n".join(clean) + "\n"
 
 

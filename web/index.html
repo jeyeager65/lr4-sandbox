@@ -244,27 +244,23 @@
   <div class="tabpanel" role="tabpanel" id="tab-run" aria-labelledby="t-run" hidden>
     <section aria-labelledby="h-ctl">
       <h2 id="h-ctl">Controller</h2>
-      <div class="variant" id="ctl-mode"><span>Runs on</span>
-        <button type="button" data-v="play" aria-pressed="true">Basic</button>
-        <button type="button" data-v="fluidnc" aria-pressed="false">FluidNC</button></div>
-      <p class="foot" id="ctl-note"><b>Basic</b>: the page moves the machine itself. <b>FluidNC</b>: the real firmware, running in your browser.</p>
+      <p class="foot" id="ctl-note"><b>FluidNC</b>, the real firmware, running in your browser, drives the machine.</p>
       <details class="cam more">
-        <summary>More about the two</summary>
-        <p class="foot">Basic is fast and always there; the pendant talks to a small stand-in for FluidNC (homing, jogging,
-        hold / resume, the SD card). FluidNC drives the machine with the config.yaml in use (V1E's JP3_LR until you load
-        your own, under Build): jog it, home it ($H on the machine's switches), send it G-code. It runs a copy with plain
-        stepper drivers ($CD shows that copy).</p>
+        <summary>More about it</summary>
+        <p class="foot">FluidNC drives the machine with the config.yaml in use (V1E's JP3_LR until you load your own,
+        under Build): jog it, home it ($H on the machine's switches), send it G-code. It runs a copy with plain stepper
+        drivers ($CD shows that copy). To see a job fast, Run G-code > Preview plays it from where FluidNC is.</p>
       </details>
       <div class="buttons" id="ft-row">
         <button type="button" id="ft-pop-btn" disabled title="FluidTouch's screen in a window over the view (or click the pendant's screen in the view)">Pendant screen</button>
       </div>
-      <div class="buttons" id="ctl-opts" hidden>
+      <div class="buttons" id="ctl-opts">
         <label class="check">Machine speed <select id="ctl-speed" aria-label="Machine speed" title="FluidNC in the browser keeps up to about 5x on rapid moves; at 10x and 20x it may run slower than the label" style="width: auto">
           <option value="1" selected>1×</option><option value="2">2×</option><option value="5">5×</option><option value="10">10×</option>
           <option value="20">20×</option></select></label>
       </div>
       <p class="foot" id="ctl-msg" role="status"></p>
-      <details class="cam" id="ctl-box" hidden>
+      <details class="cam" id="ctl-box" open>
         <summary>FluidNC console</summary>
         <p class="ctl-state" id="ctl-state"></p>
         <div class="ctl-log" id="ctl-log" role="log"></div>
@@ -280,7 +276,7 @@
           <button type="button" data-rt="24" title="Soft reset (Ctrl-X)">Reset</button>
         </div>
       </details>
-      <details class="cam" id="flash-box" hidden>
+      <details class="cam" id="flash-box">
         <summary>Flash (LocalFS)</summary>
         <p class="foot">FluidNC's Flash, kept in this browser: config.yaml is the one in use (V1E's, or yours from Build,
           which comes back after a reload). FluidNC boots a translated copy, sim_config.yaml, with plain stepper drivers;
@@ -299,7 +295,7 @@
           own web server in a window of its own, the way a real board serves it: watch and drive the machine from there.
           Keep this tab open. The Flash's index.html.gz opens at <code>/</code>, others at their own path
           (<code>/sd/x.html</code> for x.html.gz). Add a UI with the buttons below (or drop it on the list): its
-          release's <code>index.html.gz</code>, as it is. Web UIs run on FluidNC: in Basic, Open switches to it.</p>
+          release's <code>index.html.gz</code>, as it is.</p>
         <div class="sd-list" id="ui-list" aria-label="Web UIs on the SD card and Flash"></div>
         <div class="buttons">
           <label class="btn">Add to the Flash…<input type="file" id="ui-file-flash" accept=".html,.htm,.gz" hidden></label>
@@ -354,18 +350,22 @@
       <h2 id="h-job">Run G-code</h2>
       <div id="job-off">
         <p class="foot">V1E's build order: the machine runs on the printed temporary struts first and cuts its own MDF
-          strut plates. Switch to the temporary struts to run that job here, or play a G-code file.</p>
+          strut plates. Switch to the temporary struts to run that job here, or run a G-code file.</p>
         <div class="buttons"><button type="button" id="job-temp">Use the temporary struts</button></div>
       </div>
       <p class="foot" id="job-src"></p>
       <div id="job-on" hidden>
         <div class="buttons">
-          <button type="button" id="job-play">Play</button>
-          <button type="button" id="job-reset">Start over</button>
-          <select id="job-speed" aria-label="Playback speed" style="width: auto">
+          <button type="button" id="job-play">Run ($SD/Run)</button>
+          <button type="button" id="job-reset" disabled>Stop (reset)</button>
+          <button type="button" id="job-prev" aria-pressed="false" title="Play the job fast from where FluidNC is, on a copy of the stock: what Run would do. FluidNC doesn't move">Preview</button>
+          <select id="job-speed" aria-label="Preview speed" style="width: auto" hidden>
             <option value="1">1×</option><option value="2">2×</option><option value="5">5×</option><option value="10" selected>10×</option>
             <option value="20">20×</option><option value="50">50×</option><option value="100">100×</option></select>
         </div>
+        <p class="foot" id="job-prev-note" hidden>Preview: the job as Run would do it from where FluidNC is now (its
+          own probing and zeroing on a copy of the offsets), fast, on a copy of the stock. The spoilboard isn't cut and
+          FluidNC doesn't move; Back to the machine puts the model back where FluidNC is.</p>
         <div class="slider"><label for="job-t" title="Job time">⏱</label><input id="job-t" type="range" min="0" max="1000" step="1" value="0"><output id="job-o" for="job-t"></output></div>
         <div class="readout" aria-label="Work position, mm">
           <div><b>Work X</b><span id="wx">0.000</span> <small>mm</small></div>
@@ -382,7 +382,7 @@
       </div>
       <details class="cam" id="sd-box" open>
         <summary>SD card (<span id="sd-count">0 files</span>)</summary>
-        <p class="foot">G-code files kept in this browser: ▶ plays one (Basic) or runs it on FluidNC, which sees
+        <p class="foot">G-code files kept in this browser: ▶ runs one on FluidNC, which sees
           the same card ($SD/List); the name loads it without starting. Drop files here or add them. The strut plate G-code is kept as /LR4_strut_plates.gcode.
           Click a folder to add files and folders into it (again to go back to the top).</p>
         <div class="sd-list" id="sd-list" role="listbox" aria-label="Files on the SD card"></div>
@@ -397,7 +397,7 @@
 
     <section aria-labelledby="h-pos">
       <h2 id="h-pos">Tool position (mm, as FluidNC reports)</h2>
-      <div id="pos-play">
+      <div id="pos-play" hidden><!-- the model's pose store (move() reads the sliders); Part 35 retires it -->
         <div class="readout" title="X, Y from the home switches; Z from Z's homed spot (0 there, negative below)">
           <div><b>X</b><span id="rx">330.200</span> <small>mm</small></div>
           <div><b>Y</b><span id="ry">444.500</span> <small>mm</small></div>
@@ -412,7 +412,7 @@
         <div><b>MPos Y</b><span id="my">–</span> <small>mm</small></div>
         <div><b>MPos Z</b><span id="mz">–</span> <small>mm</small></div>
       </div>
-      <div id="pos-jog" hidden>
+      <div id="pos-jog">
         <div class="jog" role="group" aria-label="Jog">
           <span></span><button type="button" data-jog="Y+">Y+</button><span></span><button type="button" data-jog="Z+">Z+</button>
           <button type="button" data-jog="X-">X−</button><button type="button" id="jog-stop" title="Stop the jog (0x85)">■</button>
@@ -428,7 +428,6 @@
       </div>
       <div class="buttons">
         <button type="button" id="home">Home ($H)</button>
-        <label class="check" id="home-real-l"><input type="checkbox" id="home-real"> Real speed</label>
       </div>
       <p class="foot" id="home-status" role="status">Not homed. Home runs FluidNC's $H: Z up to its switch, then X and Y
         together to theirs (each Y motor stops on its own switch, squaring the gantry).</p>
@@ -473,7 +472,7 @@
     <dt>F</dt><dd>Fit all</dd>
     <dt>M</dt><dd>Measure (Esc ends it)</dd>
     <dt>P</dt><dd>Save the view as a picture</dd>
-    <dt>Space</dt><dd>Play / pause the G-code job (Basic)</dd>
+    <dt>Space</dt><dd>Play / pause the job's Preview</dd>
     <dt>H</dt><dd>Hide / show the panel</dd>
     <dt>Double-click</dt><dd>Inspect an assembly (Esc goes back)</dd>
     <dt>?</dt><dd>This list</dd>
@@ -591,7 +590,6 @@
 <script src="js/fluidnc_sim.js"></script>
 <script src="fluidnc/vnet_host.js"></script>
 <script src="js/fluidtouch_sim.js"></script>
-<script src="js/basic_nc.js"></script>
 <script src="js/sounds.js"></script>
 <script src="js/sim_config.js"></script>
 <script src="js/config_model.js"></script>

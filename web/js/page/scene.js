@@ -8,8 +8,8 @@
   // laid = the warp the board was laid with (null = flat, undefined = not known), ver = bumped when it's laid again
   const SPOIL = { sim: null, mesh: null, key: "", frame: null, saveTimer: 0, loading: 0, laid: null, ver: 0 };
   // Part 32: the machine as built (js/imperfect.js; My LR4 > As built, its status + Power cycle in Run by Home). AB.E = its rack / beam tilt now (side 2 - side
-  // 1, mm): from a power-up (page load, Power cycle), then the motors' own steps (FluidNC) or homing's per-side moves
-  // (Basic). geo = the Y carriages in the table frame (xA, span) + the bit's tip from their line (ty in front, tz below
+  // 1, mm): from a power-up (page load, Power cycle), then the motors' own steps (FluidNC).
+  // geo = the Y carriages in the table frame (xA, span) + the bit's tip from their line (ty in front, tz below
   // the beam's middle), piv = the drawing's pivots (world, at pose 0).
   const AB = { set: null, E: { y: 0, z: 0 }, geo: null, piv: null, posed: false, home: null, probeDz: 0 };
   try { AB.set = Imperfect.settings(JSON.parse(localStorage.getItem("lr4-asbuilt") || "null")); } catch (e) { AB.set = Imperfect.settings(); }
@@ -748,10 +748,9 @@
       pendant.screen.tex.needsUpdate = true;
       return;
     }
-    const fl = CTL.mode === "fluidnc", st = fl ? (CTL.sim ? CTL.state || "…" : "Starting") : "Basic";
-    const m = fl ? CTL.mpos : ["mx", "my", "mz"].map((id) => parseFloat(document.getElementById(id).textContent));
+    const st = CTL.sim ? CTL.state || "…" : "Starting", m = CTL.mpos;
     const pos = m && m.every((v) => Number.isFinite(v)) ? m.map((v) => v.toFixed(2)) : ["–", "–", "–"];
-    const key = [st, ...pos, fl && CTL.homed].join("|");
+    const key = [st, ...pos, CTL.homed].join("|");
     if (!force && key === pendant.screen.key) return;
     pendant.screen.key = key;
     const { canvas, tex } = pendant.screen, g = canvas.getContext("2d"), W = canvas.width, H = canvas.height;
@@ -763,15 +762,15 @@
     g.fillStyle = col; g.fillRect(W - 230, 12, 210, 36);
     g.fillStyle = "#101114"; g.textAlign = "center"; g.fillText(st.split(":")[0].toUpperCase(), W - 125, 31); g.textAlign = "left";
     g.font = "500 22px system-ui, sans-serif"; g.fillStyle = "#8b9099";
-    g.fillText(fl ? (CTL.homed ? "Machine position (MPos), mm" : "Machine position (MPos), mm - not homed") : "Machine position (MPos), mm", 40, 100);
+    g.fillText(CTL.homed ? "Machine position (MPos), mm" : "Machine position (MPos), mm - not homed", 40, 100);
     g.font = "600 64px ui-monospace, Consolas, monospace";
     ["X", "Y", "Z"].forEach((a, i) => {
       const y = 175 + i * 82;
       g.fillStyle = "#8b9099"; g.fillText(a, 50, y);
-      g.fillStyle = fl && !CTL.homed ? "#9aa0a8" : "#f2f2f2"; g.textAlign = "right"; g.fillText(pos[i], 520, y); g.textAlign = "left";
+      g.fillStyle = !CTL.homed ? "#9aa0a8" : "#f2f2f2"; g.textAlign = "right"; g.fillText(pos[i], 520, y); g.textAlign = "left";
     });
     g.font = "400 18px system-ui, sans-serif"; g.fillStyle = "#6b7079";
-    g.fillText(fl ? "Starting FluidTouch…" : "FluidTouch runs on this screen when the Run tab's controller is FluidNC", 40, H - 24);
+    g.fillText(CTL.sim ? "Starting FluidTouch…" : "FluidTouch runs on this screen once FluidNC is running", 40, H - 24);
     tex.needsUpdate = true;
   }
   loadPendant();
@@ -919,7 +918,7 @@
     if (cfg.files) await setupFiles();
     // the build in named stages, the popup saying which (user 2026-10-23: it sat on "Building the machine" for seconds)
     const stages = [
-      ["Setting up the panels", () => { setupShow(); setupColours(); setupDetail(); setupSliders(); }],
+      ["Setting up the panels", () => { setupShow(); setupColours(); setupDetail(); }],
       [`Placing the ${cfg.parts.length} parts`, setupSize],
       ["Bill of materials", () => { setupVariants(); setupBom(); setupAbout(); }],
       ["Workshop and lights", () => { setupScenery(); setupLighting(); updateShop(); fitView([1, -1.15, 0.85]); }],
@@ -937,6 +936,7 @@
     if (dev) await addFiles([...needed.keys()].map((p) => ({ name: p,
       read: () => fetch(dev + p).then((q) => q.ok ? q.arrayBuffer() : Promise.reject(new Error(p + " " + q.status))) })));
     applyLink();
+    ctlStartup();                                    // FluidNC boots on the built machine (controller.js)
   }
 
   // ---- Peter Plates: solid (stepper openings filled) or open honeycomb in a solid border - one shown at a time ----

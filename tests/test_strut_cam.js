@@ -94,6 +94,7 @@ for (const c of CASES) {
   try { J = SC.job(pc, c.L, c); } catch (e) { ok(false, `${tag}: ${e.message}`); continue; }
   const P = parse(J.gcode), lay = SC.layout(pc, c.L, Object.assign({}, SC.DEFAULTS, c));
   ok(P.ops.length === 4, `${tag}: 4 ops`);
+  { const long = J.gcode.split("\n").filter((l) => new TextEncoder().encode(l).length > 127); ok(!long.length, `${tag}: every line fits FluidNC (<= 127 bytes): ${long[0] || ""}`); }
   ok(Math.abs(P.stock.XMAX - J.stock.xmax) < 1e-3 && Math.abs(P.stock.YMAX - c.L - 24) < 1e-3, `${tag}: stock`);
   const want = SC.DEFAULTS.tabs === undefined ? 4 : (c.tabs || SC.DEFAULTS.tabs);
   lay.plates.forEach((pl, k) => {

@@ -7,9 +7,9 @@
 //       not MSGTIME: FluidNC - and the page - show any comment with "MSG" in it as a message; still read, with a warning)
 //       PARK=on (drive the gantry back at the end)  HOLD=3 (s on the result)
 //       PENDANT=on (the FluidTouch pendant on the table, its live screen in a corner of the video; off by default)
-//       MODE=basic|fluidnc (fluidnc: the job runs on the page's FluidNC - its own $H, jogs, $SD/Run, M0 holds)
+//       MODE=fluidnc (the default and the only one since Part 34: the job runs on the page's FluidNC)
 //       HOMING=z,x,y (Home in that order: FluidNC's axis homing commands $HZ, $HX, $HY one after another, the
-//       config.yaml unchanged; z,xy = $HZ then $HXY; Basic homes in the same order)
+//       config.yaml unchanged; z,xy = $HZ then $HXY)
 //     the machine (Part 29; the page's My machine, set before anything is filmed):
 //       TABLE=34in (top of the MDF; mm, in or ft)  ROOM=16x20x9ft (the shop: X x Y x ceiling; a unit at the end covers
 //       the bare numbers, ft if none)  BRACES=auto|6  STRUTS=mdf|temp  BASE=sheet|torsion  PETER=solid|honeycomb|none (the choices the page
@@ -71,7 +71,7 @@ const SHOTS = new Set(["workshop", "machine", "stock", "tool", "core", "iso", "f
 const ASBUILT_NUM = ["rack", "tilt", "exag", "tram", "tramy", "warpx", "warpy", "bow", "rackmax", "tiltmax"];
 const MOTION = /(^|[^A-Z])G0*(0|1|2|3|38\.\d)(?![\d.])/;
 const IN = 25.4;
-const LONG_LINE = 116;                               // see parse()
+const LONG_LINE = 127;                               // bytes: FluidNC's limit (see parse())
 
 // "KEY=VALUE KEY=VALUE TEXT=the rest" -> { key: value } (keys lower case; TEXT / NAME take the rest of the line)
 function keyvals(s) {
@@ -106,9 +106,10 @@ function parse(text) {
   for (let n = 0; n < lines.length; n++) {
     const l = lines[n], code = l.replace(/\([^)]*\)/g, " ").split(";")[0].toUpperCase();
     if (!out.firstMove && MOTION.test(code)) out.firstMove = n + 1;
-    // FluidNC (MODE=fluidnc, or the file on a real machine) stops the job on a long line: "14 (Line too long)" at 121
-    // characters (2026-10-23); tests/video_short.gcode's 116 runs
-    if (l.length > LONG_LINE) out.warnings.push(`line ${n + 1}: ${l.length} characters - FluidNC stops on lines this long (error 14), keep it under ${LONG_LINE}`);
+    // FluidNC stops a job on a line over 127 bytes, comments included ("14 Line too long": gc_execute_line's char[128],
+    // checked before comments are stripped; tested 2026-10-24). In bytes: × and — count 2 and 3 in UTF-8
+    const bytes = new TextEncoder().encode(l.replace(/\r$/, "")).length;
+    if (bytes > LONG_LINE) out.warnings.push(`line ${n + 1}: ${bytes} bytes - FluidNC stops on lines over ${LONG_LINE} (error 14, Line too long)`);
     const v = videoOf(l);
     if (!v) continue;
     const line = n + 1, before = !out.firstMove, warn = (t) => out.warnings.push(`line ${line}: ${t}`);

@@ -84,9 +84,8 @@ function savePng(dataUrl, name) {
     // FluidNC mode: FluidTouch starts with it and connects
     const a = await page.val(`(async () => {
       document.getElementById("t-run").click();
-      LR4Basic.pendant(true);                        // the option (off by default)
+      LR4Pendant.set(true);                          // the option (off by default)
       document.getElementById("job-temp").click();   // the strut job on the card
-      document.querySelector('#ctl-mode [data-v="fluidnc"]').click();
       const sim = await T.booted(null);
       if (!sim) return { err: "FluidNC didn't boot" };
       const ft = await T.until(() => LR4Pendant.ft(), 30000);
@@ -180,7 +179,7 @@ function savePng(dataUrl, name) {
       await page.val(`(() => { const sp = document.getElementById("ctl-speed"); sp.value = "10"; sp.dispatchEvent(new Event("change")); return true; })()`);
       await tap(UI.tab.control); await tap(UI.sub.actions); await tap(UI.homeAll);
       out.homed = !!(await waitFor((s) => s.homed && s.state === "Idle", 120000));
-      if (!out.homed) return out;
+      if (!out.homed) { out.homeWhy = await page.val(`[document.getElementById("home-status").textContent, LR4Ctl.state(), ...[...document.querySelectorAll("#ctl-log > div")].slice(-10).map((d) => d.textContent)]`); return out; }
       await tap(UI.tab.files); await sleep(1500);
       await tap(UI.play);
       const s0 = await waitFor((s) => s.running, 15000);
@@ -215,6 +214,7 @@ function savePng(dataUrl, name) {
     }
     function report(j, how) {
       ok(j.homed, `${how}: Home All on the pendant homes FluidNC ($H)`);
+      if (!j.homed) console.log("    " + (j.homeWhy || []).join(" | "));
       ok(j.started, `${how}: Files > play on the pendant, the page follows the job (${j.startStatus})`);
       ok(j.status === "Done." && j.holds.length >= 2, `${how}: ${j.holds.length} M0 holds resumed on the pendant, ${j.status} (${(j.secs || 0).toFixed(0)} s)`);
       if (j.status !== "Done.") console.log((j.log || []).join(String.fromCharCode(10)));

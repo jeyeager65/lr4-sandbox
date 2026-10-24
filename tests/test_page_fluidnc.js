@@ -8,7 +8,7 @@
 //    the jog pad jogs it, the console shows the traffic; Home ($H on the virtual switches, at 10x) ends at MPos = mpos_mm on Part 13's homed
 //    spot (trip + pulloff) with both Y motors level; G38.2 stops with the tip on the touch plate; an unplugged switch
 //    makes $HX alarm; a move takes 1/5 and 1/10 of its time at 5x / 10x; a new config.yaml and a new size each
-//    restart it (new pulloff / travel); back to Playback: FluidNC gone, the sliders move the model directly again.
+//    restart it (new pulloff / travel); Preview plays the strut job on a copy of the stock and puts it back.
 //   node tests/test_page_fluidnc.js [headers|plain]      (both by default; not in npm test: needs Chrome + Python
 //   and build/fixtures/JP3_LR.yaml - node tests/test_sim_config.js fetches it)
 "use strict";
@@ -104,6 +104,8 @@ async function run(mode) {
 
     // the module on its own, with the wasm demo's config
     const raw = await page.val(`(async () => {
+      await T.booted(null);                           // the page's own FluidNC first, so the count below is steady
+      const base = document.querySelectorAll("iframe").length;   // the page's own FluidNC (booted with it)
       const sim = await FluidNCSim.start({ config: await (await fetch("fluidnc/demo_config.yaml")).text() }), out = {};
       out.greeting = sim.greeting;
       out.i = (await sim.command("$I")).lines.map((e) => e.line);
@@ -112,9 +114,9 @@ async function run(mode) {
       let s;
       for (let k = 0; k < 100; k++) { await T.sleep(100); s = await sim.status(); if (s.state === "Idle" && Math.abs(s.MPos[0] - 10) < 1e-3) break; }
       out.s1 = [s.state, s.MPos];
-      out.frames = document.querySelectorAll("iframe").length;
+      out.frames = document.querySelectorAll("iframe").length - base;
       sim.stop();
-      out.after = document.querySelectorAll("iframe").length;
+      out.after = document.querySelectorAll("iframe").length - base;
       return out;
     })()`);
     ok(/FluidNC/.test(raw.greeting) && raw.i.some((l) => /^\[VER:/.test(l)), `module boots, $I: ${raw.i[0]}`);
@@ -124,7 +126,6 @@ async function run(mode) {
     // the page: FluidNC mode with V1E's JP3_LR
     const p1 = await page.val(`(async () => {
       document.getElementById("t-run").click();
-      document.querySelector('#ctl-mode [data-v="fluidnc"]').click();
       const sim = await T.booted(null), out = {};
       if (!sim) return { msg: document.getElementById("ctl-msg").textContent, log: document.getElementById("ctl-log").textContent.slice(-300) };
       out.greeting = sim.greeting;
@@ -269,19 +270,35 @@ async function run(mode) {
     ok(p2.span2 > p2.span + 90 && Math.abs(p2.mt2 - (p2.span2 - 2)) < 0.06, `new size (30 in) restarts it: max_travel ${p2.mt2} = ${p2.span2 && p2.span2.toFixed(1)} - 2`);
     ok(p2.frames === 1 && p2.frames2 === 1, "one FluidNC iframe at a time");
 
-    // back to Playback: FluidNC gone, the sliders move the model directly
+    // Preview (Part 34): the strut job plays fast on a copy of the stock; FluidNC stays put; Back puts it all back
     const p3 = await page.val(`(async () => {
-      document.querySelector('#ctl-mode [data-v="play"]').click();
+      const sum = (s) => { let v = 0; if (s) for (const h of s.heights) v += h; return v; };
+      document.getElementById("job-temp").click();
+      await T.until(() => LR4Job.tl() && !document.getElementById("job-on").hidden, 20000);
+      await T.idle();
+      const out = { mode: !document.getElementById("ctl-mode"), pose0: LR4Ctl.pose(), mpos0: LR4Ctl.mpos().slice(),
+        stock0: sum(LR4Job.sim()), spoil0: sum(LR4Job.spoil()) };
+      const sp = document.getElementById("job-speed"); sp.value = "100";
+      document.getElementById("job-prev").click();
+      await T.until(() => document.getElementById("job-prev").getAttribute("aria-pressed") === "true", 10000);
+      out.on = { play: document.getElementById("job-play").textContent, speed: !sp.hidden, back: document.getElementById("job-prev").textContent };
+      for (const t0 = Date.now(); Date.now() - t0 < 15000 && sum(LR4Job.sim()) > out.stock0 - 1000;) {
+        if (!document.getElementById("job-pop").hidden) document.getElementById("job-resume").click();
+        await T.sleep(200);
+      }
+      out.pose1 = LR4Ctl.pose(); out.mpos1 = LR4Ctl.mpos().slice(); out.stock1 = sum(LR4Job.sim()); out.spoil1 = sum(LR4Job.spoil());
+      document.getElementById("job-prev").click();       // Back to the machine
       await T.sleep(300);
-      const out = { sim: window.LR4FluidNC, frames: document.querySelectorAll("iframe").length, box: document.getElementById("ctl-box").hidden,
-        home: document.getElementById("home").disabled, sliders: !document.getElementById("pos-play").hidden && document.getElementById("pos-jog").hidden };
-      const sy = document.getElementById("sy");
-      sy.value = "10"; sy.dispatchEvent(new Event("input"));
-      out.y = LR4Ctl.pose()[1]; out.want = 10 * 25.4 + LR4Ctl.travel().y[0];
+      out.pose2 = LR4Ctl.pose(); out.stock2 = sum(LR4Job.sim());
+      out.off = { play: document.getElementById("job-play").textContent, speed: document.getElementById("job-speed").hidden };
       return out;
     })()`);
-    ok(p3.sim === null && p3.frames === 0 && p3.box && !p3.home && p3.sliders, "Playback: FluidNC stopped, console hidden, sliders back");
-    ok(Math.abs(p3.y - p3.want) < 0.01, `Playback: the Y slider moves the model at once (${p3.y.toFixed(1)})`);
+    const d = (a, b) => Math.max(...a.map((v, i) => Math.abs(v - b[i])));
+    ok(p3.mode && /Pause|Play/.test(p3.on.play) && p3.on.speed && /Back/.test(p3.on.back), `Preview on: no mode toggle, ${p3.on.play} + speed + "${p3.on.back}"`);
+    ok(d(p3.pose1, p3.pose0) > 1 && d(p3.mpos1, p3.mpos0) < 1e-6, `Preview moves the model (${d(p3.pose1, p3.pose0).toFixed(0)} mm), not FluidNC (MPos unchanged)`);
+    ok(p3.stock1 < p3.stock0 - 1000 && p3.spoil1 === p3.spoil0, "Preview carves the stock copy, never the spoilboard");
+    ok(d(p3.pose2, p3.pose0) < 1e-3 && p3.stock2 === p3.stock0 && /\$SD\/Run/.test(p3.off.play) && p3.off.speed,
+      `Back to the machine: the model where FluidNC is, the stock as it was, Run again (${p3.off.play})`);
   } finally {
     await page.close();
     srv.kill();

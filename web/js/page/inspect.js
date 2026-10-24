@@ -470,7 +470,7 @@
     return was ? "on" : "down";
   }
   // for tests: the pendant's FluidTouch; a screen point (u, v from its bottom-left; d mm out of the glass) in scene mm
-  window.LR4Pendant = { ft: () => FT.ft, log: () => FT.log, poke: ftPoke, popOpen: () => !$("ft-pop").hidden,
+  window.LR4Pendant = { set: pendantSet, ft: () => FT.ft, log: () => FT.log, poke: ftPoke, popOpen: () => !$("ft-pop").hidden,
     point(u, v, d) {
       const m = ftScreen();
       if (!m) return null;

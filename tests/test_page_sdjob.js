@@ -106,7 +106,6 @@ const RUN = (k) => `(async () => {
 
     // FluidNC boots with the card; $SD/List; a live add; $SD/Delete syncs back
     const f = await page.val(`(async () => {
-      document.querySelector('#ctl-mode [data-v="fluidnc"]').click();
       const sim = await T.booted(null), out = {};
       if (!sim) return { boot: false };
       await T.idle();
