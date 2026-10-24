@@ -66,6 +66,9 @@
     L(0, "stepping");
     L(2, "engine", "timed"); L(2, "idle_ms", val(child(y, "stepping"), "idle_ms") || "255");
     L(2, "pulse_us", "1"); L(2, "dir_delay_us", "0"); L(2, "disable_delay_us", "0");
+    // the most step segments FluidNC allows (~10 ms of machine time each): at a time scale above 1x the buffer lasts
+    // that much less real time, and if it runs dry while homing FluidNC calls it ALARM 9 (Homing Fail Approach)
+    L(2, "segments", "20");
 
     const pins = { motors: [], probe: null, toolsetter: null, sd: SD }, steps = {}, rates = {}, axes = [];
     L(0, "axes");

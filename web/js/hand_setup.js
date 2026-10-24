@@ -81,7 +81,8 @@
     return out;
   }
 
-  // the spoilboard store: one record per machine size (key), { key, nx, ny, heights, mtime }
+  // the spoilboard store: one record per machine size (key), { key, nx, ny, heights, mtime, ...extra } (extra: the page's,
+  // e.g. laid = the warp it was laid with)
   const DB = "lr4-spoilboard", STORE = "boards";
   function tx(mode, fn) {
     return new Promise((res, rej) => {
@@ -97,7 +98,7 @@
   }
   const board = {
     get: (key) => tx("readonly", (st) => st.get(key)),
-    put: (key, sim) => tx("readwrite", (st) => { st.put({ key, nx: sim.nx, ny: sim.ny, heights: sim.heights.slice(), mtime: Date.now() }); }),
+    put: (key, sim, extra) => tx("readwrite", (st) => { st.put(Object.assign({}, extra, { key, nx: sim.nx, ny: sim.ny, heights: sim.heights.slice(), mtime: Date.now() })); }),
     remove: (key) => tx("readwrite", (st) => { st.delete(key); }),
   };
 

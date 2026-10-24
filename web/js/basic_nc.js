@@ -5,7 +5,7 @@
 // "currentID:" / "PING:" in text frames). What it knows - the rest gets "error: not in Basic mode ...":
 //   ? (status now)  ! (hold)  ~ (resume)  0x18 (reset)  0x85 (jog cancel)  other realtime bytes (overrides): ignored
 //   $Report/Interval=ms (auto reports, every ms)  $Build/Info  $G  $#  $X  $I
-//   $H (home all; $HX / $HY / $HZ: Basic homes every axis)  $J=[G91|G90|G53|G20|G21] X Y Z F (jog; queued like FluidNC)
+//   $H (home all; $HX / $HY / $HZ / $HXY: only those axes, the others keep their homing)  $J=[G91|G90|G53|G20|G21] X Y Z F (jog; queued like FluidNC)
 //   $Files/ListGcode=/sd/dir  $SD/List  $SD/Run=/sd/file  $SD/Delete=/sd/file
 // Basic has no work offsets: WPos = MPos (so G10 L20 zeroing is one of the "not in Basic" commands).
 //   const nc = BasicNC.create(page)
@@ -139,7 +139,7 @@
         sendLines(c, [...["G54", "G55", "G56", "G57", "G58", "G59", "G28", "G30", "G92"].map((g) => `[${g}:0.000,0.000,0.000]`),
           "[TLO:0.000]", "[PRB:0.000,0.000,0.000:0]", "ok"]);
       } else if (u === "$X") result(c, null);
-      else if (/^\$H[XYZ]*$/.test(u)) later(c, page.home());
+      else if (/^\$H[XYZ]*$/.test(u)) later(c, page.home(u.slice(2)));
       else if (u.startsWith("$J=")) {
         const j = parseJog(t.slice(3));
         result(c, j ? page.jog(j) : "error: bad jog (Basic mode takes $J=[G91|G90|G53] X Y Z F)");

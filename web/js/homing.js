@@ -36,6 +36,24 @@
     return out;
   }
 
+  // a homing order: "z,x,y" (Z, then X, then Y, each on its own) or "z,xy" (X + Y together, as V1E's cycles) -> { z: 1,
+  // x: 2, y: 3 } (each axis' step), or null if it isn't one (letters x / y / z, each once)
+  function order(str) {
+    const groups = String(str || "").toLowerCase().split(/[,/\s]+/).filter(Boolean), out = {};
+    for (const [i, g] of groups.entries()) for (const a of g) {
+      if (!AXES.includes(a) || out[a]) return null;
+      out[a] = i + 1;
+    }
+    return Object.keys(out).length ? out : null;
+  }
+  // FluidNC's homing commands for an order: null -> ["$H"] (the config's cycles); { z: 1, x: 2, y: 3 } -> ["$HZ", "$HX",
+  // "$HY"] (its axis homing commands, one after another; axes sharing a step go together: "$HXY")
+  function commands(ord) {
+    if (!ord) return ["$H"];
+    const steps = [...new Set(Object.values(ord))].sort((m, n) => m - n);
+    return steps.map((k) => "$H" + AXES.filter((a) => ord[a] === k).map((a) => a.toUpperCase()).join(""));
+  }
+
   // the switch trip and the homed (pulled-off) spot of an axis, in pose space
   const RELEASE_MM = 0.5;   // the lever's travel back before the switch opens (a GUESS; 0.2 tocked too soon - user)
   const trip = (s, tv, a) => (s[a].positive ? tv[a][1] : tv[a][0]);
@@ -102,7 +120,7 @@
   // FluidNC's soft range for an axis: [mpos, mpos + max_travel] (positive_direction: [mpos - max_travel, mpos])
   const softRange = (sa, maxTravel) => (sa.positive ? [sa.mpos - maxTravel, sa.mpos] : [sa.mpos, sa.mpos + maxTravel]);
 
-  const api = { V1E, FAST, RELEASE_MM, settings, plan, trip, spot, mpos, softRange };
+  const api = { V1E, FAST, RELEASE_MM, settings, order, commands, plan, trip, spot, mpos, softRange };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.Homing = api;
 })(typeof self !== "undefined" ? self : this);

@@ -3,6 +3,35 @@
 The version is the sandbox page's (`VERSION` in `web/index.html`, shown in its footer). The footer also shows
 the date the model data was built and the Printables file set it was solved for.
 
+## 0.37.0 - 2026-10-23
+- **As built (My LR4 tab, off by default):** the machine as a real one is - a little out of square until it homes. Each Y and each Z
+  motor has its own switch, and the Max side's switches sit a little further on than the Min side's; powered down,
+  the motors let go, so at each power-up (page load, **Power cycle**) the gantry is racked and the beam off level.
+  `$H` runs each side to its own switch and pulls it off by its own `pulloff_mm`, in Basic and in FluidNC (the
+  firmware homes on per-motor switches): with per-motor pulloffs that make up the difference it comes out square,
+  with V1E's file (equal pulloffs) it's left out by the stops' offset. The stops default to what your config's
+  pulloffs make up for.
+- Basic mode: the pendant's axis homing (`$HX`, `$HY`, `$HZ`) homes only that axis, keeping the axes homed before
+  (it homed every axis).
+- Not fixed by homing: a **warped spoilboard** (a New spoilboard is laid warped; probing reads different heights and
+  a surfacing pass skims the high spots first) and a **router out of tram** (lines between surfacing passes).
+- Every cut follows the machine: a racked gantry cuts out-of-square rectangles, a tilted beam cuts deeper at one end
+  and tilts the bit (and shifts it a little in X: the bit sits in front of the gantry's line and below the beam).
+  **Squareness test** (to the SD card): a rectangle with corner crosses; **Measure the diagonals** reads them off the
+  carved spoilboard / stock (to ~0.1 mm; the test cuts 2.5 mm deep, 5 in Lite, so the sim's grid sees the groove).
+- Stock on a warped spoilboard: **Follows it** (default: bent onto the board, cut and drawn that way, jobs' own stock
+  too) or **Stays flat** (on its high spot) - Stock > On a warped spoilboard.
+- FluidNC mode: homing at a speed above 1x no longer fails now and then with ALARM 9 (Homing Fail Approach). The
+  simulated stepping could run out of prepared moves during a stall and stop, which homing took for "no switch
+  found"; it now waits for them (FluidNC fork `wasm-sim` f946bec4), and the sim's config uses FluidNC's most step
+  segments (20).
+- Changing the warp lays a new spoilboard with it at once if the board has no cuts; with cuts it asks first (No keeps
+  the board, the warp waits for the next New spoilboard). The board keeps the warp it was laid with.
+- **Draw ×**: the rack / tilt drawn up to 100x bigger (a mm is invisible at 1x); cuts stay true.
+- Video scripts: `(Video AsBuilt: RACK= TILT= STOPY= STOPZ= PULLOFFY=4/3.2 EXAG= TRAM= ...)` (PULLOFFY / Z = a tuned
+  config's per-motor pulloffs), `(Video: HOMING=z,x,y)` (Home sends FluidNC's `$HZ`, `$HX`, `$HY` in that order), `(Video Home: VIEW=machine)` (the whole machine while homing) and the `gantry` / `gantrytop` / `ymin` / `ymax` shots (close on
+  each end's Y carriage). Example: `docs/examples/why_home.gcode`.
+
 ## 0.36.0 - 2026-10-23
 - **The table has a separate spoilboard:** 3/4" MDF covering the bit's full travel + 1/4" a side (a 3/4" bit surfaces all of it), between two 3/4" MDF **rail
   strips** (the Y belt holders, the Min wheels and the Y rail clips sit on those), so the spoilboard can be surfaced or

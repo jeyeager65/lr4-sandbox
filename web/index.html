@@ -480,6 +480,37 @@ body.vr-on .stage { grid-row: 1; }
         <div class="unit-input"><input id="table-top" type="number" step="any" min="1"><span class="u">in</span></div></div>
     </section>
 
+    <section aria-labelledby="h-ab">
+      <h2 id="h-ab">As built</h2>
+      <label class="check"><input type="checkbox" id="ab-on"> A real machine: a little out of square until it homes</label>
+      <p class="foot">Off = a perfect machine. On: Run shows how far out it is, with Power cycle and a squareness test.</p>
+      <details class="cam" id="ab-box">
+        <summary>Errors</summary>
+        <p class="foot">Each Y and Z motor has its own switch: <code>$H</code> pulls each side to its switch and off by its
+          own <code>pulloff_mm</code>, which squares the gantry and levels the beam. Side 1 = motor0 = the Min end (a GUESS).</p>
+        <div class="trio">
+          <label>Y stops apart<input id="ab-sy" type="number" step="any" placeholder="auto" title="mm the Max side's Y switch trips past the Min side's (empty = what your pulloffs make up for)"></label>
+          <label>Z stops apart<input id="ab-sz" type="number" step="any" placeholder="auto" title="mm the Max side's Z switch trips past the Min side's (empty = what your pulloffs make up for)"></label>
+        </div>
+        <p class="foot" id="ab-stop-note"></p>
+        <label class="check"><input type="checkbox" id="ab-power"> Powered down, the motors let go (racked / off level at each power-up)</label>
+        <div class="trio">
+          <label>Rack up to<input id="ab-rm" type="number" step="any" min="0" title="mm, side 2 ahead of side 1"></label>
+          <label>Beam tilt up to<input id="ab-tm" type="number" step="any" min="0" title="mm, side 2 above side 1"></label>
+        </div>
+        <p class="foot">Not fixed by homing: a <b>warped spoilboard</b> (changing it lays a new one - asked first if it has cuts; surfacing flattens it) and a
+          <b>router out of tram</b> (lines when surfacing; shim the router mount).</p>
+        <div class="trio">
+          <label>Warp X<input id="ab-wx" type="number" step="any" title="mm the +X end is higher than the -X end"></label>
+          <label>Warp Y<input id="ab-wy" type="number" step="any" title="mm the back is higher than the front"></label>
+          <label>Bow<input id="ab-wb" type="number" step="any" title="mm the middle is above the edges (negative = dished)"></label>
+          <label>Tram X°<input id="ab-tx" type="number" step="any" title="the bit's bottom tilted down toward +X, degrees"></label>
+          <label>Tram Y°<input id="ab-ty" type="number" step="any" title="the bit's bottom tilted down toward +Y, degrees"></label>
+          <label>Draw ×<select id="ab-ex" title="the drawing's rack / tilt, exaggerated (cuts are always true)"><option>1</option><option>10</option><option>25</option><option>50</option><option>100</option></select></label>
+        </div>
+      </details>
+    </section>
+
     <section aria-labelledby="h-colours">
       <h2 id="h-colours">Print colours</h2>
       <div class="swatches">
@@ -682,6 +713,7 @@ body.vr-on .stage { grid-row: 1; }
           <label>X from<input id="hs-x0" type="number" step="any"></label><label>to<input id="hs-x1" type="number" step="any"></label>
           <label>Y from<input id="hs-y0" type="number" step="any"></label><label>to<input id="hs-y1" type="number" step="any"></label>
           <label>Thickness<input id="hs-t" type="number" step="any" min="0.1"></label>
+          <label>On a warped spoilboard<select id="hs-follow" title="As built's warped spoilboard: the stock bent onto it (as clamped down), or flat on its high spot. Jobs that bring their own stock too"><option value="1">Follows it</option><option value="0">Stays flat</option></select></label>
         </div>
         <div class="buttons"><button type="button" id="hs-use">Put it on the table</button><button type="button" id="hs-fit" title="X / Y round the loaded job's cuts">Size it to the job</button>
           <button type="button" id="hs-off">Take it off</button></div>
@@ -790,6 +822,16 @@ body.vr-on .stage { grid-row: 1; }
       </div>
       <p class="foot" id="home-status" role="status">Not homed. Home runs FluidNC's $H: Z up to its switch, then X and Y
         together to theirs (each Y motor stops on its own switch, squaring the gantry).</p>
+      <div id="ab-run" hidden>
+        <p class="foot" id="ab-now" role="status"></p>
+        <div class="buttons">
+          <button type="button" id="ab-cycle" title="Power down and up: the gantry comes up racked and the beam off level (FluidNC restarts)">Power cycle</button>
+          <button type="button" id="ab-sq" title="A rectangle over the cutting area with corner crosses, saved to the SD card: measure its diagonals">Squareness test to the SD card</button>
+          <button type="button" id="ab-meas" title="Find the test's four corner crosses in the carved spoilboard / stock and measure both diagonals">Measure the diagonals</button>
+        </div>
+        <p class="foot" id="ab-sq-note" role="status"></p>
+        <p class="foot">As built is on (My LR4 > As built).</p>
+      </div>
     </section>
   </div>
 
@@ -933,6 +975,7 @@ body.vr-on .stage { grid-row: 1; }
 <script src="js/gcode_play.js"></script>
 <script src="js/motion_carve.js"></script>
 <script src="js/hand_setup.js"></script>
+<script src="js/imperfect.js"></script>
 <script src="js/sd_card.js"></script>
 <script src="js/homing.js"></script>
 <script src="js/fluidnc_sim.js"></script>
@@ -951,8 +994,17 @@ body.vr-on .stage { grid-row: 1; }
   const IN = 25.4;
   // Part 31: what's on the table / in the router, and the spoilboard ("On the table", below)
   const HAND = { stock: { on: false, x0: 0, x1: 300, y0: 0, y1: 300, t: 18 }, bit: { shape: "flat", d: 6.35, angle: 90, len: 0 },
-    tool: null, sim: null, mesh: null, bitMesh: null, plate: null, last: null, skip: true, key: "" };
-  const SPOIL = { sim: null, mesh: null, key: "", frame: null, saveTimer: 0, loading: 0 };
+    follow: true, tool: null, sim: null, mesh: null, bitMesh: null, plate: null, last: null, skip: true, key: "" };
+  // laid = the warp the board was laid with (null = flat, undefined = not known), ver = bumped when it's laid again
+  const SPOIL = { sim: null, mesh: null, key: "", frame: null, saveTimer: 0, loading: 0, laid: null, ver: 0 };
+  // Part 32: the machine as built (js/imperfect.js; My LR4 > As built, its status + Power cycle in Run by Home). AB.E = its rack / beam tilt now (side 2 - side
+  // 1, mm): from a power-up (page load, Power cycle), then the motors' own steps (FluidNC) or homing's per-side moves
+  // (Basic). geo = the Y carriages in the table frame (xA, span) + the bit's tip from their line (ty in front, tz below
+  // the beam's middle), piv = the drawing's pivots (world, at pose 0).
+  const AB = { set: null, E: { y: 0, z: 0 }, geo: null, piv: null, posed: false, home: null, probeDz: 0 };
+  try { AB.set = Imperfect.settings(JSON.parse(localStorage.getItem("lr4-asbuilt") || "null")); } catch (e) { AB.set = Imperfect.settings(); }
+  AB.E = Imperfect.powerUp(AB.set);
+  const abState = () => (AB.geo ? AB : null);
   const DUST_PARTS = /^(Dust_Skirt|Bristles_TPU)/;   // the shoe's bottom: own group (Shoe); its top stays with the core
   const SOURCE = {
     printed: "V1E printed part (STL from Printables)",
@@ -2296,6 +2348,54 @@ body.vr-on .stage { grid-row: 1; }
     nut.quaternion.setFromAxisAngle(ZUP, JOB.spin);
     nut.position.x = ax + c * px - sn * py; nut.position.y = ay + sn * px + c * py;
   }
+  // Part 32: the Y carriages (the gantry's ends at pose 0, from the meshes' own boxes): the table frame's geo for the
+  // tip's error and the drawing's pivots. The span is the gantry's width (outer plate faces), near enough.
+  function abGeo() {
+    const b = new THREE.Box3(), beam = new THREE.Box3(), v = new THREE.Box3();
+    for (const m of meshes) {
+      const k = m.userData.motion;
+      if (k !== "gantry" && k !== "beam") continue;
+      const g = m.geometry, base = m.userData.base || { t: [0, 0, 0], s: [1, 1, 1] };
+      if (!g.boundingBox) g.computeBoundingBox();
+      v.min.set(...[0, 1, 2].map((i) => g.boundingBox.min.getComponent(i) * base.s[i] + base.t[i]));
+      v.max.set(...[0, 1, 2].map((i) => g.boundingBox.max.getComponent(i) * base.s[i] + base.t[i]));
+      (k === "gantry" ? b : beam).union(v);
+    }
+    const fr = SPOIL.frame;
+    if (b.isEmpty() || !fr) { AB.geo = AB.piv = null; return; }
+    const span = b.max.x - b.min.x;
+    AB.piv = { x: b.min.x, y: (b.min.y + b.max.y) / 2, z: beam.isEmpty() ? b.max.z : (beam.min.z + beam.max.z) / 2, span };
+    const rb = meshes.find((m) => m.userData.name === "Router_Bit"), tip = rb && bitTip(rb, rb.userData.base || { t: [0, 0, 0], s: [1, 1, 1] });
+    AB.geo = { xA: b.min.x - fr[0], span, ty: tip ? tip.y - AB.piv.y : 0, tz: tip ? AB.piv.z - tip.z : 0 };
+  }
+  // the model bit's tip (its axis at the bottom: a plain cylinder's box centre / min Z), world mm - as drawn now, or at
+  // pose 0 with base = its userData.base
+  function bitTip(rb, base) {
+    const g = rb.geometry;
+    if (!g.boundingBox) g.computeBoundingBox();
+    const bb = g.boundingBox, p = new THREE.Vector3((bb.min.x + bb.max.x) / 2, (bb.min.y + bb.max.y) / 2, bb.min.z);
+    if (base) return p.set(...[0, 1, 2].map((i) => p.getComponent(i) * base.s[i] + base.t[i]));
+    rb.updateMatrixWorld();
+    return p.applyMatrix4(rb.matrixWorld);
+  }
+  // the gantry racked (about Z) and the beam + core tilted (about Y) by AB.E, x the drawing's exaggeration, about the
+  // Min end's carriage (side 1 stays put; at pose dy / dz)
+  const AB_Y = new THREE.Vector3(0, 1, 0);
+  function abPose(dy, dz) {
+    const P = AB.piv, on = AB.set.on && P && !AB.square, ex = AB.set.exag || 1;   // square: tableFrame measuring
+    const rack = on ? Math.atan2(AB.E.y * ex, P.span) : 0, tilt = on ? Math.atan2(AB.E.z * ex, P.span) : 0;
+    if (!rack && !tilt && !AB.posed) return;
+    AB.posed = !!(rack || tilt);
+    const qr = new THREE.Quaternion().setFromAxisAngle(ZUP, rack), qt = new THREE.Quaternion().setFromAxisAngle(AB_Y, -tilt);
+    const pr = new THREE.Vector3(P ? P.x : 0, P ? P.y + dy : 0, 0), pt = new THREE.Vector3(P ? P.x : 0, 0, P ? P.z + dz : 0);
+    for (const m of meshes) {
+      const k = m.userData.motion;
+      if (m.userData.held || !(k === "gantry" || k === "beam" || k === "core")) continue;
+      m.quaternion.identity();
+      if (k !== "gantry" && tilt) { m.position.sub(pt).applyQuaternion(qt).add(pt); m.quaternion.premultiply(qt); }
+      if (rack) { m.position.sub(pr).applyQuaternion(qr).add(pr); m.quaternion.premultiply(qr); }
+    }
+  }
   function move(pose) {
     // the parked pose is at -travel[0]; each motion frame moves by the slider's offset from it. pose = [dx, dy, dz]
     // (mm from the parked pose; the job playback) sets the sliders instead of reading them
@@ -2322,22 +2422,15 @@ body.vr-on .stage { grid-row: 1; }
           c.axis === "y" ? new THREE.Vector3(px, py + dy, pz) : new THREE.Vector3(px + dx, py + dy, pz + dz));
       }
     }
+    abPose(dy, dz);
     spinNut();
     if (jobBit && JOB.bits) {                         // the file's own bit rides on the router (homing, jogs, the
       const rb = meshes.find((m) => m.userData.name === "Router_Bit");   // video's moves), not left at the job's start
-      if (rb) {
-        rb.updateMatrixWorld();
-        const box = new THREE.Box3().setFromObject(rb), c = box.getCenter(new THREE.Vector3());
-        for (const b of JOB.bits.values()) if (b.visible) b.position.set(c.x, c.y, box.min.z);
-      }
+      if (rb) { const c = bitTip(rb); for (const b of JOB.bits.values()) if (b.visible) b.position.copy(c); }
     }
     if (HAND.bitMesh) {                               // the hand-installed bit: on the model bit's axis, tip at its tip
       const rb = meshes.find((m) => m.userData.name === "Router_Bit");
-      if (rb) {
-        rb.updateMatrixWorld();
-        const box = new THREE.Box3().setFromObject(rb), c = box.getCenter(new THREE.Vector3());
-        HAND.bitMesh.position.set(c.x, c.y, box.min.z);
-      }
+      if (rb) HAND.bitMesh.position.copy(bitTip(rb));
     }
     if (hoseMesh) updateHose(dx, dy, dz);
     if (CAPS.list.length) placeSection();             // inspect's section cut follows the set
@@ -2385,12 +2478,25 @@ body.vr-on .stage { grid-row: 1; }
   }
   const SWITCHES = { x: ["Endstop_X"], y: ["Endstop_Y_Min", "Endstop_Y_Max"], z: ["Endstop_Z_Min", "Endstop_Z_Max"] };
   let flashMat = null;
-  function homeStart() {
+  // axes: "Z" / "XY" ... = only those ($HZ, the pendant's axis buttons), together in one cycle; the others stay put and
+  // keep their homing from before. Omitted = $H (the config's cycles)
+  function homeStart(axes) {
     if (!meta || !HOME.pose) return;
     jobClear();                                      // its bit / stock would stay behind; reloaded when done
-    const s = Homing.settings(yamlBase ? yamlBase.text : null);
-    Object.assign(HOME, { s, t: 0, k: 0, home: null, last: performance.now(),
-      run: Homing.plan(HOME.pose, meta.travel, s, $("home-real").checked ? { seek: 1, feed: 1 } : undefined) });
+    const s = Homing.settings(yamlBase ? yamlBase.text : null), speed = $("home-real").checked ? { seek: 1, feed: 1 } : undefined;
+    if (HOME.order) for (const a of ["x", "y", "z"]) if (HOME.order[a]) s[a].cycle = HOME.order[a];   // a video's HOMING= ($HZ, $HX, $HY)
+    const only = axes ? String(axes).toLowerCase() : "";
+    if (only) for (const a of ["x", "y", "z"]) s[a].cycle = only.includes(a) ? 1 : 0;   // cycle 0: not homed, stays put
+    const keep = only && HOME.home && HOME.s ? Object.fromEntries(Object.entries(HOME.home).filter(([a]) => !only.includes(a))) : null;
+    Object.assign(HOME, { s, t: 0, k: 0, home: null, keep, last: performance.now(), run: Homing.plan(HOME.pose, meta.travel, s, speed) });
+    // Part 32: each Y / Z side homes on its own (side 2's switch stop mm on, each its own pulloff): AB.E = side 2 - side 1
+    AB.home = null;
+    if (AB.set.on) {
+      const pl = abPulls(), st = abStops(), tv = meta.travel, s1 = JSON.parse(JSON.stringify(s)), s2 = JSON.parse(JSON.stringify(s));
+      for (const a of ["y", "z"]) { s1[a].pulloff = pl[a][0]; s2[a].pulloff = pl[a][1]; }
+      const tv2 = { x: tv.x, y: tv.y.map((v) => v + st.y), z: tv.z.map((v) => v + st.z) }, p = HOME.pose;
+      AB.home = { r1: Homing.plan(p, tv, s1, speed), r2: Homing.plan({ x: p.x, y: p.y + AB.E.y, z: p.z + AB.E.z }, tv2, s2, speed) };
+    }
     $("home").textContent = "Stop homing";
     dro();
   }
@@ -2408,18 +2514,24 @@ body.vr-on .stage { grid-row: 1; }
     HOME.last = now;
     for (; HOME.k < r.events.length && r.events[HOME.k].time <= HOME.t; HOME.k++) clickSwitch(r.events[HOME.k].axis, r.events[HOME.k].kind === "release");
     const p = GcodePlay.at(r, HOME.t), sg = r.segs[Math.min(p.index, r.segs.length - 1)];
+    if (AB.home) {
+      const tt = HOME.t >= r.total ? Infinity : HOME.t, a = GcodePlay.at(AB.home.r1, tt), b = GcodePlay.at(AB.home.r2, tt);
+      AB.E = { y: b.y - a.y, z: b.z - a.z };
+      if (HOME.t >= r.total) { AB.home = null; abNote(); }
+    }
     move([p.x, p.y, p.z]);
     if (HOME.t < r.total) {
-      const axes = sg.cycle === r.settings.z.cycle && r.settings.x.cycle !== sg.cycle ? "Z" : "X + Y";
+      const axes = ["x", "y", "z"].filter((a) => r.settings[a].cycle === sg.cycle).map((a) => a.toUpperCase()).join(" + ");
       $("home-status").textContent = `Homing ${axes}: ${{ seek: "seeking the switch", pulloff: "pulling off",
         feed: "feeding back to the switch", settle: "settling" }[sg.phase]}…`;
       return;
     }
-    HOME.home = r.home; HOME.run = null;
+    HOME.home = Object.assign({}, HOME.keep, r.home); HOME.run = null;   // + the axes homed before ($HZ then $HX ...)
     $("home").textContent = "Home ($H)";
     const s = HOME.s, src = ["x", "y", "z"].some((a) => s[a].from === "yaml") && /^From your/.test(yamlBase && yamlBase.note)
       ? "your config.yaml's" : "V1E's JP3_LR";
-    $("home-status").textContent = `Homed (${src} homing: mpos_mm ${s.x.mpos} / ${s.y.mpos} / ${s.z.mpos}, pulloff_mm ` +
+    const notYet = ["x", "y", "z"].filter((a) => !(a in HOME.home)).map((a) => a.toUpperCase());
+    $("home-status").textContent = `Homed${notYet.length ? ` ${["X", "Y", "Z"].filter((a) => !notYet.includes(a)).join(", ")} (not ${notYet.join(", ")} yet)` : ""} (${src} homing: mpos_mm ${s.x.mpos} / ${s.y.mpos} / ${s.z.mpos}, pulloff_mm ` +
       `${s.x.pulloff} / ${s.y.pulloff} / ${s.z.pulloff}). Run G-code starts from here.`;
     dro();
     jobSetup(JOB.pageJob);                           // the job reloads to start from the homed spot
@@ -2895,6 +3007,7 @@ body.vr-on .stage { grid-row: 1; }
   });
   function updateYaml() {
     ctlConfigChanged();
+    abNote();                                        // the pulloffs may have changed (Part 32)
     yamlText().then((r) => flashSaveYaml(r.text)).catch(() => { /* no config.yaml yet */ });
     // max_travel_mm = trip -> stop less pulloff_mm (as LR4Model.fluidncConfig writes it); FluidNC's soft range
     // [mpos, mpos + max_travel] then ends at the stop. Short of the cutting area at most sizes (26 x 50: ~2.4 mm)
@@ -2955,7 +3068,7 @@ body.vr-on .stage { grid-row: 1; }
     }
     if (ev.type === "error" && FJ.job) fjDone(`FluidNC: ${ev.line}${FJ.job.seenSD ? " - the job stopped." : ` (${FJ.job.path})`}`);
     if (ev.type === "msg" && /^Homed:/.test(ev.text)) $("home-status").textContent = `FluidNC ${ev.text}.`;
-    if (ev.type === "alarm") { CTL.homed = false; dro(); }
+    if (ev.type === "alarm") { CTL.homed = false; CTL.alarms = (CTL.alarms || 0) + 1; dro(); }
     if (ev.type === "alarm") ctlMsg(`FluidNC ${ev.line}: send $X (Unlock) in the console to carry on.`);
     if (ev.type === "blank" || (ev.type === "text" && ev.line === ctlLastSent)) return;   // the console's echo
     ctlAdd(ev.line, CTL_CLS[ev.type]);
@@ -2981,7 +3094,10 @@ body.vr-on .stage { grid-row: 1; }
       if (Math.abs(c - v) > 0.5) past.push(`${"XYZ"[i]} ${Math.abs(c - v).toFixed(1)} mm`);
       return c;
     });
-    if (!CTL.pose || q.some((v, i) => Math.abs(v - CTL.pose[i]) > 1e-3)) { CTL.pose = q; move(q); }
+    const E = CTL.recRaw ? CTL.recE : abFromMotors(), moved = E && (Math.abs(E.y - AB.E.y) > 1e-4 || Math.abs(E.z - AB.E.z) > 1e-4);
+    if (moved) { AB.E = E; abNoteSoon(); }
+    if (moved || !CTL.pose || q.some((v, i) => Math.abs(v - CTL.pose[i]) > 1e-3)) { CTL.pose = q; move(q); }
+    if (AB.set.on && AB.geo && Math.abs(Imperfect.tipErr(AB.E, AB.geo, q[0] - t.x[0]).dz - AB.probeDz) > 0.002) ctlProbe();   // the tip's height along a tilted beam
     const warn = past.length ? `Past the hard stop (${past.join(", ")}): the real machine would hit it there. ` +
       "This config.yaml's soft_limits are off, so FluidNC doesn't stop it." : "";
     if (warn ? $("ctl-msg").textContent !== warn : /^Past the hard stop/.test($("ctl-msg").textContent)) ctlMsg(warn);
@@ -3005,14 +3121,16 @@ body.vr-on .stage { grid-row: 1; }
   }
   // the switches: each motor's limit pins trip at its axis' end of the travel (neg: travel[0], pos: travel[1], all: the
   // homing end); the probe at the tip on the touch plate (the table top + its thickness) while that's ticked
+  // Part 32: each motor from its own side's pose at boot (CTL.bootM; side 2 = side 1 + AB.E), side 2's Y / Z switches
+  // stop mm on (abStops)
   function ctlSwitches() {
-    const sim = CTL.sim, tr = CTL.cfg, t = meta.travel, h = Homing.settings(CTL.yaml);
-    for (const m of tr.pins.motors) {
-      const i = "xyz".indexOf(m.axis);
+    const sim = CTL.sim, tr = CTL.cfg, t = meta.travel, h = Homing.settings(CTL.yaml), st = AB.set.on ? abStops() : { y: 0, z: 0 };
+    for (const [k, m] of tr.pins.motors.entries()) {
       sim.addMotor(m.step, m.dir);
+      const off = m.motor === 1 && (m.axis === "y" || m.axis === "z") ? st[m.axis] : 0;
       for (const [kind, g] of Object.entries(m.limits)) {
         const below = kind === "neg" || (kind === "all" && !h[m.axis].positive);
-        sim.setSwitch(g, m.step, m.dir, (t[m.axis][below ? 0 : 1] - CTL.boot[i]) * tr.steps[m.axis].to, below);
+        sim.setSwitch(g, m.step, m.dir, (t[m.axis][below ? 0 : 1] + off - CTL.bootM[k]) * tr.steps[m.axis].to, below);
       }
     }
     ctlProbe();
@@ -3022,19 +3140,30 @@ body.vr-on .stage { grid-row: 1; }
     if (!sim || !pr || !z) return;
     if (!CTL.jobPlate && !HAND.plate) { sim.clearSwitch(pr.gpio); return; }
     const tp = touchPlate(), top = tp.stock + tp.plate;   // the plate's top above the table (the job's stock, or under the bit)
-    sim.setSwitch(pr.gpio, z.step, z.dir, (top - meta.tip_above_table - CTL.boot[2]) * CTL.cfg.steps.z.to, true);
+    // As built: the tip sits dz off motor0's height along a tilted beam (at the tip's X now)
+    AB.probeDz = AB.set.on && AB.geo && CTL.pose ? Imperfect.tipErr(AB.E, AB.geo, CTL.pose[0] - meta.travel.x[0]).dz : 0;
+    sim.setSwitch(pr.gpio, z.step, z.dir, (top - meta.tip_above_table - AB.probeDz - CTL.boot[2]) * CTL.cfg.steps.z.to, true);
   }
-  function ctlHome() {
+  // $H, or with a homing order (a video's HOMING=z,x,y) FluidNC's axis homing commands one after another: $HZ, $HX, $HY
+  async function ctlHome() {
     if (!CTL.sim) return;
-    $("home-status").textContent = "FluidNC is homing ($H)…";
-    ctlLastSent = "$H";
-    ctlAdd("> $H", "in");
+    const cmds = Homing.commands(HOME.order);
+    $("home-status").textContent = `FluidNC is homing (${cmds.join(", ")})…`;
     CTL.homing = true;
-    CTL.sim.command("$H", 600000).then((r) => {
-      CTL.homing = false;
-      if (r.ok) ctlHomed("");
-      else $("home-status").textContent = `Homing failed (error:${r.code}). Send $X to unlock.`;
-    }).catch(() => { CTL.homing = false; });
+    for (const c of cmds) {
+      ctlLastSent = c;
+      ctlAdd("> " + c, "in");
+      let r;
+      const al = CTL.alarms || 0;                    // an ALARM (e.g. 9, homing fail) can come with an ok: stop there
+      try { r = await CTL.sim.command(c, 600000); } catch (e) { CTL.homing = false; return; }
+      if (!r.ok || (CTL.alarms || 0) > al) {
+        CTL.homing = false;
+        $("home-status").textContent = `Homing failed (${c}: ${r.ok ? "alarm" : `error:${r.code}`}). Send $X to unlock.`;
+        return;
+      }
+    }
+    CTL.homing = false;
+    ctlHomed("");
   }
   function ctlHomed(by) {                            // $H finished (from here, or from the pendant: by = " on the pendant")
     CTL.homed = true;
@@ -3067,7 +3196,11 @@ body.vr-on .stage { grid-row: 1; }
     ctlMsg("Starting FluidNC…");
     let tr;
     let yaml;
-    try { yaml = (await yamlText()).text; tr = SimConfig.translate(yaml); }
+    try {
+      yaml = (await yamlText()).text;
+      if (AB.set.on && AB.set.pull) yaml = Imperfect.withPulloffs(yaml, AB.set.pull);   // As built: a video's per-motor pulloffs
+      tr = SimConfig.translate(yaml);
+    }
     catch (e) { if (CTL.booting === me) { CTL.booting = null; ctlMsg(`No config.yaml for FluidNC: ${e.message}`); } return; }
     if (CTL.booting !== me) return;
     ctlAdd(`Starting FluidNC with ${yamlBase && /^From your/.test(yamlBase.note) ? "your" : "V1E's JP3_LR"} config.yaml…`, "dim");
@@ -3087,6 +3220,8 @@ body.vr-on .stage { grid-row: 1; }
     if (CTL.booting !== me || CTL.mode !== "fluidnc") { sim.stop(); return; }
     CTL.booting = null;
     Object.assign(CTL, { sim, cfg: tr, yaml, boot: [HOME.pose.x, HOME.pose.y, HOME.pose.z] });
+    // each motor where its side is (Part 32: side 2 = side 1 + AB.E: the machine as it is at this power-up)
+    CTL.bootM = tr.pins.motors.map((m) => CTL.boot["xyz".indexOf(m.axis)] + (AB.set.on && m.motor === 1 && (m.axis === "y" || m.axis === "z") ? AB.E[m.axis] : 0));
     window.LR4FluidNC = sim;
     ftStart(sim);                                    // the pendant (re)connects to this FluidNC
     uiRefresh();                                     // Web UIs can open now
@@ -3183,10 +3318,10 @@ body.vr-on .stage { grid-row: 1; }
         sd: (JOB.playing || mid) && JOB.src ? [100 * JOB.t / JOB.tl.total, path ? "/sd" + path : JOB.src.name || "job"] : null,
       };
     },
-    home() {
+    home(axes) {                                     // $H, or $HX / $HY / $HZ / $HXY ... (axes = "X" etc.): only those
       if (JOB.playing) return "error: a job is playing - hold it first";
       basicJogStop();
-      if (!HOME.run) homeStart();
+      if (!HOME.run) homeStart(axes || undefined);
       return new Promise((done) => {                 // FluidNC says ok once homing is over
         const t = setInterval(() => { if (!HOME.run) { clearInterval(t); done(HOME.home ? null : "error: homing stopped"); } }, 100);
       });
@@ -3277,7 +3412,7 @@ body.vr-on .stage { grid-row: 1; }
   }
   // tests/test_page_basic.js: what the pendant is told
   window.LR4Basic = { pendant: pendantSet, nc: () => BNC.nc, status: () => BASIC_PAGE.status(), homed: () => !!HOME.home && !HOME.run,
-    playing: () => JOB.playing, pop: () => !$("job-pop").hidden, t: () => JOB.t, jog: (o) => BASIC_PAGE.jog(o), jogging: () => !!BNC.jog || BNC.jogs.length > 0 };
+    playing: () => JOB.playing, pop: () => !$("job-pop").hidden, t: () => JOB.t, jog: (o) => BASIC_PAGE.jog(o), home: (axes) => BASIC_PAGE.home(axes), jogging: () => !!BNC.jog || BNC.jogs.length > 0 };
   function ctlSetMode(mode) {
     if (mode === CTL.mode) return;
     CTL.mode = mode;
@@ -3347,7 +3482,7 @@ body.vr-on .stage { grid-row: 1; }
     plate: () => !!(CTL.jobPlate || HAND.plate) };
 
   // ---- version + feedback: the issue link carries the size, data date and the loaded files' checksums ----
-  const VERSION = "0.36.0";
+  const VERSION = "0.37.0";
   function setupAbout() {
     const bits = [`lr4-sandbox ${VERSION}`];
     if (cfg.built) bits.push(`model data built ${cfg.built}`);
@@ -3455,10 +3590,13 @@ body.vr-on .stage { grid-row: 1; }
         uCutColor: { value: new THREE.Vector3(...(rgb ? rgb.map((v) => v * 0.85) : dark ? [0.70, 0.55, 0.38] : [0.76, 0.60, 0.42])) },
         uTop: { value: top }, uBottom: { value: bottom }, uThroughZ: { value: through + (top - bottom) * 1e-5 },
         uSkirt: { value: skirt ? 1 : 0 } },
-      vertexShader: `uniform float uThroughZ; varying vec3 vPos; varying vec3 vNormal; varying float vThrough;
+      // aRest: how far the vertex sits below where it would on flat stock (a stock following a warped spoilboard): depth
+      // and cut-through are measured without it
+      vertexShader: `uniform float uThroughZ; attribute float aRest; varying vec3 vPos; varying vec3 vNormal; varying float vThrough;
         void main() {
-          vPos = (modelMatrix * vec4(position, 1.0)).xyz; vNormal = mat3(modelMatrix) * normal;
-          vThrough = position.z <= uThroughZ ? 1.0 : 0.0;
+          vec3 p0 = position - vec3(0.0, 0.0, aRest);
+          vPos = (modelMatrix * vec4(p0, 1.0)).xyz; vNormal = mat3(modelMatrix) * normal;
+          vThrough = p0.z <= uThroughZ ? 1.0 : 0.0;
           gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
         }`,
       fragmentShader: `varying vec3 vPos; varying vec3 vNormal; varying float vThrough;
@@ -3484,11 +3622,13 @@ body.vr-on .stage { grid-row: 1; }
       for (const m of mats) { m.uniforms.uLight.value.copy(l); m.uniforms.uView.value.set(e[8], e[9], e[10]).normalize(); }
     };
   }
-  function jobStockMesh(sim, at, rgb) {              // the heightmap as one grid (top) + its four side walls
+  // rest(x, y) (sim frame, optional): how far the stock's bottom is below flat there (Part 32: it follows the spoilboard)
+  function jobStockMesh(sim, at, rgb, rest) {        // the heightmap as one grid (top) + its four side walls
     const { nx, ny, vx, vy, dx, dy, stock: s } = sim;
-    const pos = new Float32Array(vx * vy * 3);
+    const pos = new Float32Array(vx * vy * 3), sag = new Float32Array(vx * vy);
     for (let j = 0, k = 0; j < vy; j++) for (let i = 0; i < vx; i++, k++) {
       pos[3 * k] = at[0] + s.xmin + i * dx; pos[3 * k + 1] = at[1] + s.ymin + j * dy;
+      if (rest) sag[k] = rest(s.xmin + i * dx, s.ymin + j * dy);
     }
     const idx = new Uint32Array(nx * ny * 6);
     for (let j = 0, q = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
@@ -3498,16 +3638,25 @@ body.vr-on .stage { grid-row: 1; }
     const geo = new THREE.BufferGeometry();
     geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
     geo.setAttribute("normal", new THREE.BufferAttribute(new Float32Array(vx * vy * 3), 3));
+    geo.setAttribute("aRest", new THREE.BufferAttribute(sag, 1));
     geo.setIndex(new THREE.BufferAttribute(idx, 1));
     // shaded as cnc-gcode-tools shades its stock (StockMeshRenderer): cut surfaces in their own colour, darker with
     // depth, lit from beside the camera; cut-through triangles dropped so the table shows; pushed back (polygon offset)
     // so the moves on its surface stay visible
     const top = new THREE.Mesh(geo, jobStockMaterial(at[2] + s.zmax, at[2] + s.zmin, sim.bottom + at[2], false, rgb));
     const x0 = at[0] + s.xmin, x1 = at[0] + s.xmax, y0 = at[1] + s.ymin, y1 = at[1] + s.ymax, z0 = at[2] + s.zmin, z1 = at[2] + s.zmax;
-    const w = [[x0, y0, x1, y0], [x1, y0, x1, y1], [x1, y1, x0, y1], [x0, y1, x0, y0]].flatMap(([a, b, c, d]) =>
-      [a, b, z0, c, d, z0, c, d, z1, a, b, z0, c, d, z1, a, b, z1]);
+    const w = [], rz = (x, y) => (rest ? rest(x - at[0], y - at[1]) : 0);   // the walls follow it too, in pieces
+    for (const [a, b, c, d] of [[x0, y0, x1, y0], [x1, y0, x1, y1], [x1, y1, x0, y1], [x0, y1, x0, y0]]) {
+      const m = rest ? Math.max(1, Math.ceil(Math.hypot(c - a, d - b) / 5)) : 1;
+      for (let q = 0; q < m; q++) {
+        const pa = [a + (c - a) * q / m, b + (d - b) * q / m], pb = [a + (c - a) * (q + 1) / m, b + (d - b) * (q + 1) / m];
+        const ra = rz(...pa), rb = rz(...pb);
+        w.push(...pa, z0 + ra, ...pb, z0 + rb, ...pb, z1 + rb, ...pa, z0 + ra, ...pb, z1 + rb, ...pa, z1 + ra);
+      }
+    }
     const wg = new THREE.BufferGeometry();
     wg.setAttribute("position", new THREE.Float32BufferAttribute(w, 3));
+    wg.setAttribute("aRest", new THREE.BufferAttribute(new Float32Array(w.length / 3), 1));
     wg.computeVertexNormals();
     top.add(new THREE.Mesh(wg, jobStockMaterial(z1, z0, -Infinity, true, rgb)));
     top.userData.z = at[2];
@@ -3521,11 +3670,11 @@ body.vr-on .stage { grid-row: 1; }
     const { vx, vy, dx, dy, heights: h, stock: s } = sim, z0 = mesh.userData.z, span = s.zmax - s.zmin || 1;
     const j0 = all ? 0 : Math.max(0, sim.dirtyMin - 1), j1 = all ? vy - 1 : Math.min(vy - 1, sim.dirtyMax + 1);
     const i0 = all ? 0 : Math.max(0, sim.dirtyMinI - 1), i1 = all ? vx - 1 : Math.min(vx - 1, sim.dirtyMaxI + 1);
-    const g = mesh.geometry, P = g.attributes.position, N = g.attributes.normal;
+    const g = mesh.geometry, P = g.attributes.position, N = g.attributes.normal, sag = g.attributes.aRest.array;
     const p = P.array, n = N.array;
     for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
       const k = j * vx + i, z = h[k];
-      p[3 * k + 2] = z0 + z;
+      p[3 * k + 2] = z0 + z + sag[k];
       const gx = (h[j * vx + Math.min(vx - 1, i + 1)] - h[j * vx + Math.max(0, i - 1)]) / (2 * dx);
       const gy = (h[Math.min(vy - 1, j + 1) * vx + i] - h[Math.max(0, j - 1) * vx + i]) / (2 * dy);
       const l = Math.hypot(gx, gy, 1);
@@ -3738,9 +3887,11 @@ body.vr-on .stage { grid-row: 1; }
     if (t1 && !keep) handBit(HandSetup.fromDef(t1), false);
     if (tl.stock && tl.tools.size) {
       JOB.cells = lite ? 1.2e5 : 4e5;
-      JOB.sim = new StockSimulator(tl.stock, tl.tools, { maxCells: JOB.cells });
+      JOB.sim = Imperfect.attach(new StockSimulator(tl.stock, tl.tools, { maxCells: JOB.cells }), [z0[0], z0[1], -zmin], abState);
+      const rest = stockRest({ x: [tl.stock.xmin + z0[0], tl.stock.xmax + z0[0]], y: [tl.stock.ymin + z0[1], tl.stock.ymax + z0[1]] });
+      Imperfect.follow(JOB.sim, rest);
       JOB.sim.setSegments(tl.segs);
-      JOB.stock = jobStockMesh(JOB.sim, at);
+      JOB.stock = jobStockMesh(JOB.sim, at, undefined, rest && ((x, y) => rest.at(x + z0[0], y + z0[1])));
       JOB.group.add(JOB.stock);
       jobUpdateMesh(true);
     }
@@ -3798,7 +3949,9 @@ body.vr-on .stage { grid-row: 1; }
     if (mb) {
       const tv0 = meta.travel, was = HOME.pose && [HOME.pose.x, HOME.pose.y, HOME.pose.z];
       HAND.skip = true;
+      AB.square = true;                              // the frame of the square machine (Part 32's errors are on top)
       move([tv0.x[0], tv0.y[0], 0]);
+      AB.square = false;
       const g = mb.geometry;
       if (!g.boundingBox) g.computeBoundingBox();
       fr[0] = (g.boundingBox.min.x + g.boundingBox.max.x) / 2 * mb.scale.x + mb.position.x;
@@ -3808,7 +3961,7 @@ body.vr-on .stage { grid-row: 1; }
     return fr;
   }
   try { Object.assign(HAND, JSON.parse(localStorage.getItem("lr4-hand") || "{}")); } catch (e) { /* defaults */ }
-  const handSave = () => { try { localStorage.setItem("lr4-hand", JSON.stringify({ stock: HAND.stock, bit: HAND.bit })); } catch (e) { /* not kept */ } };
+  const handSave = () => { try { localStorage.setItem("lr4-hand", JSON.stringify({ stock: HAND.stock, bit: HAND.bit, follow: HAND.follow })); } catch (e) { /* not kept */ } };
   function handShow() {                              // which stock shows: the job's, else the hand one (Show the stock)
     const on = $("hs-show-stock").checked;
     if (HAND.mesh) HAND.mesh.visible = on && !JOB.stock;
@@ -3841,8 +3994,13 @@ body.vr-on .stage { grid-row: 1; }
     }
   }
   // the hand stock (no job loaded): a StockSimulator in the table's frame, bottom on the spoilboard
+  // Part 32: a stock following the warped spoilboard (Stock > On a warped spoilboard): its sag over box (table frame),
+  // or null (flat on the board's high spot: As built off, Stays flat, a flat board)
+  function stockRest(box) { return AB.set.on && HAND.follow && SPOIL.sim ? Imperfect.restField(SPOIL.sim, box) : null; }
   function handStock() {
-    const s = HAND.stock, fr = SPOIL.frame, key = `${JSON.stringify(s)}|${fr && fr.join()}|${lite}`;
+    const s = HAND.stock, fr = SPOIL.frame, fol = AB.set.on && HAND.follow ? SPOIL.ver : "flat";
+    const key = `${JSON.stringify(s)}|${fr && fr.join()}|${lite}|${fol}`;
+    $("hs-follow").value = HAND.follow ? "1" : "0";
     $("hs-stock-name").textContent = s.on ? `${+(s.x1 - s.x0).toFixed(1)} × ${+(s.y1 - s.y0).toFixed(1)} × ${+s.t.toFixed(2)} mm` : "none";
     for (const [id, v] of [["hs-x0", s.x0], ["hs-x1", s.x1], ["hs-y0", s.y0], ["hs-y1", s.y1], ["hs-t", s.t]]) $(id).value = +v.toFixed(2);
     if (key === HAND.key) return;
@@ -3850,8 +4008,10 @@ body.vr-on .stage { grid-row: 1; }
     if (HAND.mesh) { scene.remove(HAND.mesh); HAND.mesh.traverse((o) => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); }); HAND.mesh = null; }
     HAND.sim = null;
     if (!s.on || !fr) return;
-    HAND.sim = new StockSimulator({ xmin: s.x0, xmax: s.x1, ymin: s.y0, ymax: s.y1, zmin: 0, zmax: s.t }, new Map(), { maxCells: lite ? 1.2e5 : 4e5, snapshots: false });
-    HAND.mesh = jobStockMesh(HAND.sim, fr);
+    HAND.sim = Imperfect.attach(new StockSimulator({ xmin: s.x0, xmax: s.x1, ymin: s.y0, ymax: s.y1, zmin: 0, zmax: s.t }, new Map(), { maxCells: lite ? 1.2e5 : 4e5, snapshots: false }), [0, 0, 0], abState);
+    const rest = stockRest({ x: [s.x0, s.x1], y: [s.y0, s.y1] });
+    Imperfect.follow(HAND.sim, rest);
+    HAND.mesh = jobStockMesh(HAND.sim, fr, undefined, rest && rest.at);
     scene.add(HAND.mesh);
     meshUpdate(HAND.sim, HAND.mesh, true);
     handShow();
@@ -3868,8 +4028,9 @@ body.vr-on .stage { grid-row: 1; }
     if (SPOIL.mesh) { scene.remove(SPOIL.mesh); SPOIL.mesh.traverse((o) => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); }); }
     const st = { xmin: bb.min.x - fr[0], xmax: bb.max.x - fr[0], ymin: bb.min.y - fr[1], ymax: bb.max.y - fr[1], zmin: bb.min.z - fr[2], zmax: 0 };
     const keep = SPOIL.sim && SPOIL.key === key ? SPOIL.sim : null;
-    SPOIL.sim = new StockSimulator(st, new Map(), { maxCells: lite ? 1.5e5 : 6e5, snapshots: false });
+    SPOIL.sim = Imperfect.attach(new StockSimulator(st, new Map(), { maxCells: lite ? 1.5e5 : 6e5, snapshots: false }), [0, 0, 0], abState);
     if (keep) SPOIL.sim.heights.set(HandSetup.resample(keep.heights, keep.nx, keep.ny, SPOIL.sim.nx, SPOIL.sim.ny));
+    else spoilFresh(SPOIL.sim);                      // until this size's kept board comes back (if any)
     SPOIL.key = key;
     SPOIL.mesh = jobStockMesh(SPOIL.sim, fr, MDF_RGB);
     scene.add(SPOIL.mesh);
@@ -3883,9 +4044,38 @@ body.vr-on .stage { grid-row: 1; }
         sim.heights.set(r.nx === sim.nx && r.ny === sim.ny ? r.heights : HandSetup.resample(r.heights, r.nx, r.ny, sim.nx, sim.ny));
         sim.markAllDirty();
         meshUpdate(sim, SPOIL.mesh, true);
+        SPOIL.laid = "laid" in r ? r.laid : spoilLaidGuess(sim);
+        SPOIL.ver++;
         spoilNote();
+        handStock();                                 // a stock following it: laid on this one
       }).catch(() => { /* none kept */ });
     }
+    spoilNote();
+  }
+  // a new spoilboard: flat, or (As built) warped - its high spot at the top (Z 0); SPOIL.laid = that warp (null = flat)
+  const spoilBox = () => ({ x: [0, S.cutX], y: [0, S.cutY] });
+  function spoilFresh(sim) {
+    SPOIL.laid = AB.set.on ? Object.assign({}, AB.set.warp) : null;
+    SPOIL.ver++;
+    if (SPOIL.laid) Imperfect.warpBoard(sim, SPOIL.laid, spoilBox());
+    else { sim.heights.fill(0); sim.markAllDirty(); }
+  }
+  // a board kept before the warp was kept with it: flat or the warp now if it's still as laid, else not known (= cut)
+  function spoilLaidGuess(sim) {
+    if (!Imperfect.boardCut(sim, null, spoilBox())) return null;
+    return AB.set.on && !Imperfect.boardCut(sim, AB.set.warp, spoilBox()) ? Object.assign({}, AB.set.warp) : undefined;
+  }
+  // As built's warp changed (or it went on / off): a board without cuts is laid again with it at once; one with cuts
+  // only if ask (the form) and the user says so - else it stays, the warp waits for the next New spoilboard
+  function spoilRelay(ask) {
+    if (!SPOIL.sim) return;
+    const want = AB.set.on ? AB.set.warp : null;
+    if (JSON.stringify(want) === JSON.stringify(SPOIL.laid)) return;
+    if (Imperfect.boardCut(SPOIL.sim, SPOIL.laid, spoilBox()) &&
+      !(ask && confirm(`Lay a new spoilboard ${want ? "with this warp" : "(flat)"}? Its cuts go.`))) return;
+    spoilFresh(SPOIL.sim);
+    meshUpdate(SPOIL.sim, SPOIL.mesh, true);
+    HandSetup.board.remove(SPOIL.key).catch(() => {});
     spoilNote();
   }
   function spoilNote() {
@@ -3897,9 +4087,9 @@ body.vr-on .stage { grid-row: 1; }
   }
   function spoilSaveSoon() {                         // carving -> kept a moment later (not every frame)
     clearTimeout(SPOIL.saveTimer);
-    SPOIL.saveTimer = setTimeout(() => { if (SPOIL.sim) HandSetup.board.put(SPOIL.key, SPOIL.sim).catch(() => {}); spoilNote(); }, 1500);
+    SPOIL.saveTimer = setTimeout(() => { if (SPOIL.sim) HandSetup.board.put(SPOIL.key, SPOIL.sim, { laid: SPOIL.laid }).catch(() => {}); spoilNote(); }, 1500);
   }
-  function handRefresh() { spoilSetup(); handStock(); if (!HAND.tool) handBit(HAND.bit, false); }
+  function handRefresh() { spoilSetup(); abGeo(); abNote(); handStock(); if (!HAND.tool) handBit(HAND.bit, false); }
   // the touch plate (button): under the bit on what's there - the stock if the bit is over it, else the spoilboard -
   // and wired to the probe at that surface + the plate; again = away. Jobs lay their own (fjPlate / jobSeek)
   function handPlate(on) {
@@ -3907,8 +4097,8 @@ body.vr-on .stage { grid-row: 1; }
     else {
       const p = HOME.pose, tv = meta.travel, x = p.x - tv.x[0], y = p.y - tv.y[0], z0 = jobZ0(), fr = SPOIL.frame || tableFrame();
       let z = null;
-      if (JOB.sim) { const w = HandSetup.topAt(JOB.sim, x - z0[0], y - z0[1]); if (w !== null) z = w - JOB.tl.stock.zmin; }
-      else if (HAND.sim) z = HandSetup.topAt(HAND.sim, x, y);
+      if (JOB.sim) { const w = HandSetup.topAt(JOB.sim, x - z0[0], y - z0[1]); if (w !== null) z = w - JOB.tl.stock.zmin + Imperfect.restAt(JOB.sim, x, y); }
+      else if (HAND.sim) { z = HandSetup.topAt(HAND.sim, x, y); if (z !== null) z += Imperfect.restAt(HAND.sim, x, y); }
       if (z === null || z < 0.01) z = SPOIL.sim ? HandSetup.topAt(SPOIL.sim, x, y) ?? 0 : 0;
       const thick = StrutCam.DEFAULTS.plate;
       HAND.plate = { world: true, x: fr[0] + x, y: fr[1] + y, wz: fr[2] + z, z, thick, tool: 0 };
@@ -4004,15 +4194,21 @@ body.vr-on .stage { grid-row: 1; }
     $("hs-y0").value = +(g.ymin + z0[1]).toFixed(2); $("hs-y1").value = +(g.ymax + z0[1]).toFixed(2);
     if (JOB.tl.stock) $("hs-t").value = +(JOB.tl.stock.zmax - JOB.tl.stock.zmin).toFixed(2);
   });
+  $("hs-follow").addEventListener("change", (e) => {   // the stock laid again, bent onto the board or flat
+    HAND.follow = e.target.value === "1";
+    handSave();
+    handStock();
+    jobSetup(JOB.pageJob);
+  });
   $("hs-bit-use").addEventListener("click", () => { const b = bitForm($("hs-bit")); if (b) { handBit(b); jobSetup(JOB.pageJob); } });
   $("hs-show-stock").addEventListener("change", handShow);
   $("hs-new").addEventListener("click", () => {
     if (!SPOIL.sim || !confirm("Start a new spoilboard? Every cut in this one goes (as swapping or resurfacing it).")) return;
-    SPOIL.sim.heights.fill(0);
-    SPOIL.sim.markAllDirty();
+    spoilFresh(SPOIL.sim);
     meshUpdate(SPOIL.sim, SPOIL.mesh, true);
     HandSetup.board.remove(SPOIL.key).catch(() => {});
     spoilNote();
+    handStock();
   });
   $("hs-surf").addEventListener("click", async () => {   // a surfacing job for this cutting area onto the SD card
     if (!SPOIL.sim) return;
@@ -4028,6 +4224,139 @@ body.vr-on .stage { grid-row: 1; }
     $("hs-plate-note").textContent = `${path} on the SD card: ${d} mm bit, ${Math.round(over * 100)}% step-over, Z ${z.toFixed(2)} ` +
       `(${depth} mm below the spoilboard's level). Take the stock off first; it runs on the bare spoilboard.`;
   });
+  // ---- As built (Part 32, user 2026-10-23): the machine a little out of square / level until it homes (each Y / Z
+  // side its own switch, side 2's stops a little apart, the motors letting go when powered down), a warped spoilboard
+  // and the router out of tram. AB (above) + js/imperfect.js; every stock sim carves through it (Imperfect.attach). ----
+  function abYaml() { return CTL.mode === "fluidnc" && CTL.yaml ? CTL.yaml : yamlBase ? yamlBase.text : null; }
+  function abPulls() {                               // each Y / Z motor's pulloff_mm in the config.yaml in use
+    const y = abYaml();
+    if (AB.set.pull) return Object.assign(abPullsOf(y), AB.set.pull);   // a video's stand-in for a tuned config
+    return abPullsOf(y);
+  }
+  function abPullsOf(y) {
+    if (AB.pullMemo && AB.pullMemo.y === y) return Object.assign({}, AB.pullMemo.p);
+    let v = {};
+    try { if (y) v = parseFluidNCConfig(y).values; } catch (e) { /* V1E's values */ }
+    AB.pullMemo = { y, p: Imperfect.pulloffs(v, Homing.V1E.y.pulloff) };
+    return Object.assign({}, AB.pullMemo.p);
+  }
+  function abStops() {
+    const h = Homing.settings(abYaml());
+    return Imperfect.stops(AB.set, abPulls(), { y: h.y.positive, z: h.z.positive });
+  }
+  function abFromMotors() {                          // FluidNC: side 2 - side 1 from each motor's own steps
+    if (!AB.set.on || !CTL.sim || !CTL.bootM || !CTL.cfg) return null;
+    const ms = CTL.cfg.pins.motors, E = {};
+    for (const a of ["y", "z"]) {
+      const k = [0, 1].map((n) => ms.findIndex((m) => m.axis === a && m.motor === n));
+      E[a] = k.some((i) => i < 0) ? AB.E[a] : k.map((i) => CTL.bootM[i] + CTL.sim.motorSteps(ms[i].step) / CTL.cfg.steps[a].to).reduce((s1, s2) => s2 - s1);
+    }
+    return E;
+  }
+  const abRedraw = () => { if (meta && HOME.pose) { HAND.skip = true; move([HOME.pose.x, HOME.pose.y, HOME.pose.z]); } };
+  function abNote() {
+    const f = (v) => Math.abs(v).toFixed(2), E = AB.E;
+    $("ab-run").hidden = !AB.set.on;
+    if (!AB.set.on) { $("ab-now").textContent = "Off: a perfect machine (square, level, flat, trammed)."; $("ab-stop-note").textContent = ""; return; }
+    const st = abStops(), pl = abPulls(), h = Homing.settings(abYaml());
+    const res = { y: Imperfect.residual(st.y, pl.y, h.y.positive), z: Imperfect.residual(st.z, pl.z, h.z.positive) };
+    const rk = (v) => (Math.abs(v) < 0.005 ? "square" : `racked ${f(v)} mm (the Max side ${v > 0 ? "ahead" : "behind"})`);
+    const lv = (v) => (Math.abs(v) < 0.005 ? "level" : `${f(v)} mm ${v > 0 ? "higher" : "lower"} at the Max end`);
+    let t = `Now: the gantry ${rk(E.y)}, the beam ${lv(E.z)}`;
+    if (AB.geo) t += `; a cutting-area rectangle's diagonals would differ by ${f(Imperfect.squareness(E, AB.geo, { x0: 0, x1: S.cutX, y0: 0, y1: S.cutY }).diff)} mm`;
+    $("ab-now").textContent = t + `. $H leaves it ${rk(res.y)}, ${lv(res.z)}.`;
+    const from = { set: "set here", pulloffs: "what this config's pulloffs make up for", guess: "a GUESS: this config's pulloffs are equal, so $H leaves it that far out" };
+    $("ab-stop-note").textContent = `Stops apart: Y ${st.y.toFixed(2)} mm (${from[st.from.y]}), Z ${st.z.toFixed(2)} mm (${from[st.from.z]}). ` +
+      `pulloff_mm motor0 / motor1: Y ${pl.y.join(" / ")}, Z ${pl.z.join(" / ")}.`;
+  }
+  let abNoteTimer = 0;
+  const abNoteSoon = () => { if (!abNoteTimer) abNoteTimer = setTimeout(() => { abNoteTimer = 0; abNote(); }, 300); };
+  function abForm() {
+    const s = AB.set, v = (id, x) => { $(id).value = x === null || x === undefined || !Number.isFinite(+x) ? "" : +(+x).toFixed(4); };
+    $("ab-on").checked = s.on; $("ab-power").checked = s.power;
+    v("ab-sy", s.stop.y); v("ab-sz", s.stop.z); v("ab-rm", s.rackMax); v("ab-tm", s.tiltMax);
+    v("ab-wx", s.warp.x); v("ab-wy", s.warp.y); v("ab-wb", s.warp.bow); v("ab-tx", s.tram.x); v("ab-ty", s.tram.y);
+    $("ab-ex").value = String(s.exag);
+  }
+  function abRead() {
+    const n = (id) => { const x = parseFloat($(id).value); return Number.isFinite(x) ? x : null; }, d = (id) => n(id) ?? 0;
+    return { on: $("ab-on").checked, power: $("ab-power").checked, stop: { y: n("ab-sy"), z: n("ab-sz") }, rackMax: d("ab-rm"), tiltMax: d("ab-tm"),
+      warp: { x: d("ab-wx"), y: d("ab-wy"), bow: d("ab-wb") }, tram: { x: d("ab-tx"), y: d("ab-ty") }, exag: Number($("ab-ex").value) || 1 };
+  }
+  // a change (the form, LR4AsBuilt.set, a video): merged into the settings and kept; the switches + drawing follow, and
+  // the spoilboard its warp (ask = the form: may ask to lay a cut board again)
+  function abSet(ch, ask) {
+    const cur = JSON.parse(JSON.stringify(AB.set));
+    for (const [k, v] of Object.entries(ch || {})) {
+      if (v && typeof v === "object" && cur[k] && typeof cur[k] === "object") Object.assign(cur[k], v); else cur[k] = v;
+    }
+    AB.set = Imperfect.settings(cur);
+    try { localStorage.setItem("lr4-asbuilt", JSON.stringify(AB.set)); } catch (e) { /* not kept */ }
+    abForm();
+    if (CTL.sim && CTL.bootM && meta) { ctlSwitches(); ctlProbe(); }
+    spoilRelay(ask);
+    handStock();                                     // the stock follows the board (or not) as As built now says
+    abRedraw();
+    abNote();
+  }
+  // power down and up: the gantry comes up racked, the beam off level, not homed (FluidNC restarts)
+  function abPowerCycle() {
+    AB.E = Imperfect.powerUp(AB.set);
+    AB.home = null;
+    if (CTL.mode === "fluidnc") ctlBoot();
+    else {
+      homeCancel();
+      HOME.home = null;
+      $("home-status").textContent = "Powered up: not homed.";
+      dro();
+    }
+    abRedraw();
+    abNote();
+  }
+  for (const id of ["ab-on", "ab-power", "ab-sy", "ab-sz", "ab-rm", "ab-tm", "ab-wx", "ab-wy", "ab-wb", "ab-tx", "ab-ty", "ab-ex"])
+    $(id).addEventListener("change", () => abSet(abRead(), true));
+  $("ab-cycle").addEventListener("click", abPowerCycle);
+  // the squareness test's rectangle: 25 mm in from the cutting area; deep enough that the V-groove is ~2 of the
+  // spoilboard sim's cells wide (Measure reads it to ~0.1 mm then; 1 mm deep would fall between its points): 2.5 mm,
+  // 5 in Lite
+  function abSqRect() {
+    const m = 25, cell = SPOIL.sim ? Math.max(SPOIL.sim.dx, SPOIL.sim.dy) : 1.3;
+    return { x: m, y: m, w: S.cutX - 2 * m, h: S.cutY - 2 * m, z: -Math.max(1, Math.ceil(cell * 3.6) / 2) };
+  }
+  // read the test off the cut: its corner crosses in the job's stock, the hand stock or the spoilboard
+  function abMeasure() {
+    const r = abSqRect(), J = JOB.sim && JOB.sim._asBuilt;
+    const srcs = [JOB.sim && { sim: JOB.sim, off: J ? J.toTable : [0, 0, 0] }, HAND.sim && { sim: HAND.sim, off: [0, 0, 0] }, SPOIL.sim && { sim: SPOIL.sim, off: [0, 0, 0] }];
+    const q = Imperfect.readSquare(srcs.filter(Boolean), { x0: r.x, x1: r.x + r.w, y0: r.y, y1: r.y + r.h });
+    const names = ["front-left", "front-right", "back-right", "back-left"];
+    $("ab-sq-note").textContent = q.missing ? `No cross cut at the ${q.missing.map((k) => names[k]).join(", ")} corner${q.missing.length > 1 ? "s" : ""}: run the squareness test first.` :
+      `Measured off the cut: diagonals ${q.d1.toFixed(2)} / ${q.d2.toFixed(2)} mm, ${Math.abs(q.diff).toFixed(2)} apart` +
+      (Math.abs(q.diff) < 0.1 ? " - square (as near as the sim reads, ~0.1 mm)." : ` - out of square (the front edge ${Math.abs(q.skew * 60).toFixed(1)}' off X).`);
+    return q;
+  }
+  $("ab-meas").addEventListener("click", abMeasure);
+  $("ab-sq").addEventListener("click", async () => {   // a squareness test over the cutting area onto the SD card
+    const r = abSqRect();
+    const text = Imperfect.squareJob(r), path = "/LR4_squareness.gcode";
+    try { await SdCard.store.put(path, text); } catch (e) { /* the live card is enough */ }
+    if (CTL.sim) SdCard.writeLive(CTL.sim, path, text);
+    await sdRefresh();
+    await sdSelect(path);
+    const q = AB.geo && Imperfect.squareness(AB.E, AB.geo, { x0: r.x, x1: r.x + r.w, y0: r.y, y1: r.y + r.h });
+    $("ab-sq-note").textContent = `${path} on the SD card: a ${r.w.toFixed(0)} × ${r.h.toFixed(0)} mm rectangle, ${-r.z} mm deep with a 60° V-bit, ` +
+      `crosses at the corners. Measure corner to corner both ways (or Measure the diagonals once it's cut): equal = square.` +
+      (q ? ` As the machine is now: ${q.d1.toFixed(2)} / ${q.d2.toFixed(2)} mm (${Math.abs(q.diff).toFixed(2)} apart).` : "");
+  });
+  abForm();
+  window.LR4AsBuilt = { get: () => JSON.parse(JSON.stringify(AB.set)), set: abSet, E: () => Object.assign({}, AB.E), powerCycle: abPowerCycle,
+    setE(E) { AB.E = { y: +E.y || 0, z: +E.z || 0 }; abRedraw(); abNote(); }, geo: () => AB.geo, stops: abStops, pulls: abPulls,
+    measure: abMeasure, sqRect: abSqRect, laid: () => SPOIL.laid, tipErr: (x) => Imperfect.tipErr(AB.E, AB.geo, x),
+    tip() { const rb = meshes.find((m) => m.userData.name === "Router_Bit"), p = rb && bitTip(rb), fr = SPOIL.frame; return p && fr ? [p.x - fr[0], p.y - fr[1], p.z - fr[2]] : null; },
+    note: () => $("ab-now").textContent,
+    drawn() {                                        // the drawing's rack (gantry, about Z) and tilt (beam, about Y), radians
+      const q = (k) => { const m = meshes.find((n) => n.userData.motion === k); return m ? m.quaternion : null; }, g = q("gantry"), b = q("beam");
+      return { rack: g ? 2 * Math.atan2(g.z, g.w) : null, tilt: b ? -2 * Math.atan2(b.y, b.w) : null, span: AB.piv && AB.piv.span };
+    } };
   const clock = (s) => (s >= 3600 ? `${Math.floor(s / 3600)}:${String(Math.floor(s / 60) % 60).padStart(2, "0")}` : `${Math.floor(s / 60)}`) +
     `:${String(Math.floor(s % 60)).padStart(2, "0")}`;
   function jobSeek(s, carve = true) {                // the machine to time s; the stock carved up to it
@@ -4322,7 +4651,9 @@ body.vr-on .stage { grid-row: 1; }
   window.LR4Job = { tl: () => JOB.tl, src: () => JOB.src, sim: () => JOB.sim, spoil: () => SPOIL.sim, hand: () => HAND, handSim: () => HAND.sim, running: () => !!FJ.job, held: () => !!(FJ.job && FJ.job.held),
     files: () => SDC.recs.map((r) => r.path), yamlNote: () => yamlBase && yamlBase.note, flashList: () => $("flash-list").textContent, select: sdSelect, add: sdAdd, refresh: sdRefresh, PAGE_SD,
     playbackHeights() {
-      const s = new StockSimulator(JOB.tl.stock, JOB.tl.tools, { maxCells: JOB.cells, snapshots: false });
+      const s = Imperfect.attach(new StockSimulator(JOB.tl.stock, JOB.tl.tools, { maxCells: JOB.cells, snapshots: false }),
+        JOB.sim && JOB.sim._asBuilt ? JOB.sim._asBuilt.toTable : [0, 0, 0], abState);
+      if (JOB.sim && JOB.sim._asBuilt) Imperfect.follow(s, JOB.sim._asBuilt.rest);
       s.setSegments(JOB.tl.segs);
       s.advanceTo(JOB.tl.segs.length);
       return s;
@@ -5684,6 +6015,23 @@ body.vr-on .stage { grid-row: 1; }
     badge(text) { const b = $("rec-badge"); b.hidden = !text; b.textContent = text || ""; },
     caption(text) { const b = $("rec-caption"); b.hidden = !text; b.textContent = text || ""; },
     msg(text) { const b = $("rec-msg"); b.hidden = !text; b.textContent = text || ""; },
+    homingOrder(str) {                               // a video's HOMING=z,x,y: Home sends $HZ, $HX, $HY (Basic: the same order)
+      HOME.order = str ? Homing.order(str) : null;
+      return HOME.order;
+    },
+    gantryCenter() {                                 // the gantry + beam + core's box centre (world mm): the gantry shot
+      const b = new THREE.Box3();
+      for (const m of meshes) if (m.visible && ["gantry", "beam", "core"].includes(m.userData.motion)) { m.updateMatrixWorld(); b.expandByObject(m); }
+      return b.isEmpty() ? null : b.getCenter(new THREE.Vector3()).toArray();
+    },
+    sideCenter(end) {                                // a Y carriage (ymin / ymax: the gantry's parts at that end), world mm
+      const all = new THREE.Box3(), parts = [];
+      for (const m of meshes) if (m.visible && m.userData.motion === "gantry") { m.updateMatrixWorld(); const b = new THREE.Box3().setFromObject(m); all.union(b); parts.push(b); }
+      if (all.isEmpty()) return null;
+      const b = new THREE.Box3(), x = end === "ymax" ? all.max.x : all.min.x;
+      for (const p of parts) if (Math.abs((p.min.x + p.max.x) / 2 - x) < 120) b.union(p);
+      return (b.isEmpty() ? all : b).getCenter(new THREE.Vector3()).toArray();
+    },
     coreCenter() {                                   // the router + core's box centre (world mm)
       const b = new THREE.Box3();
       for (const m of meshes) if (m.visible && m.userData.motion === "core") { m.updateMatrixWorld(); b.expandByObject(m); }
@@ -5723,6 +6071,7 @@ body.vr-on .stage { grid-row: 1; }
       }
       this._ncOut = realNow();
       CTL.recRaw = ctlLive();                        // the frame shows the machine as it is now, not as it runs on
+      CTL.recE = abFromMotors();                     // its rack / tilt at the same moment (Part 32)
       return ncTime();
     },
     ncTime: () => ncTime(),

@@ -8,6 +8,8 @@
 //       PARK=on (drive the gantry back at the end)  HOLD=3 (s on the result)
 //       PENDANT=on (the FluidTouch pendant on the table, its live screen in a corner of the video; off by default)
 //       MODE=basic|fluidnc (fluidnc: the job runs on the page's FluidNC - its own $H, jogs, $SD/Run, M0 holds)
+//       HOMING=z,x,y (Home in that order: FluidNC's axis homing commands $HZ, $HX, $HY one after another, the
+//       config.yaml unchanged; z,xy = $HZ then $HXY; Basic homes in the same order)
 //     the machine (Part 29; the page's My machine, set before anything is filmed):
 //       TABLE=34in (top of the MDF; mm, in or ft)  ROOM=16x20x9ft (the shop: X x Y x ceiling; a unit at the end covers
 //       the bare numbers, ft if none)  BRACES=auto|6  STRUTS=mdf|temp  BASE=sheet|torsion  PETER=solid|honeycomb|none (the choices the page
@@ -26,9 +28,20 @@
 //   (Video Shot: VIEW=name TIME=s ORBIT=s DIST=mm)   the camera: blends there over TIME (1.5), then turns once round
 //       it over ORBIT; DIST = how far from what it looks at. VIEW: workshop, machine, stock, tool (close on the bit,
 //       follows it), core (close on the router / core), iso, front, top, side, back, page (mid-job only: the page's own
-//       camera again, with its probe close-ups), pendant (straight at the pendant's screen; PENDANT=on)
-//   (Video Home: OFFSET=30 DIST=700)  $H in real time, the machine starting OFFSET mm off its switches; the camera
-//       close on the core (DIST mm) and still. Before the first move only.
+//       camera again, with its probe close-ups), pendant (straight at the pendant's screen; PENDANT=on), ymin / ymax
+//       (close on that end's Y carriage: the rack shows there), gantry (the whole gantry, front and above), gantrytop
+//       (straight down on the gantry: its rack)
+//   (Video AsBuilt: ON=on RACK=1.5 TILT=-0.8 STOPY=0.8 STOPZ=0.5 EXAG=50 TRAM=0.5 TRAMY=0 WARPX=0.3 WARPY=-0.2 BOW=0.4
+//       POWER=on RACKMAX=2 TILTMAX=1.5 PULLOFFY=4/3.2 PULLOFFZ=4/3.5)   the machine as built (Part 32; the page's Run > As built): RACK / TILT = the
+//       gantry's rack / the beam's tilt now (mm, the Max side ahead / higher; $H squares them), STOPY / STOPZ = the Max
+//       side's switches that far on (auto = what the config's pulloffs make up for), EXAG = the drawing's factor (a
+//       mm rack is invisible at 1x; cuts stay true), TRAM / TRAMY = the router out of tram (deg), WARP* / BOW = a New
+//       spoilboard's warp (mm), PULLOFFY / PULLOFFZ = motor0 / motor1 pulloff_mm in place of the config.yaml's (a
+//       tuned config: with STOPY / STOPZ auto the stops are then their difference and $H squares it; auto = the
+//       config's). Intro lines are set before FluidNC boots (MODE=fluidnc). Only what the line sets changes.
+//   (Video Home: OFFSET=30 DIST=700 VIEW=core)  $H in real time, the machine starting OFFSET mm off its switches; the
+//       camera still, at a Shot VIEW (core = close on the core, the default; machine / iso / top ... = the whole
+//       machine), DIST mm from it. Before the first move only.
 //   (Video Zero: X=100 Y=150)         work zero this far from the cutting area's front-left corner (the X / Y home
 //       spot; mm, or 4in): after homing the machine jogs there and the job starts from it. The (Stock:) bounds are
 //       relative to work zero, so this also places the stock on the spoilboard. Before the first move only.
@@ -47,16 +60,18 @@
 "use strict";
 
 const SETTINGS = { size: "wxh", machine: "wxh", fps: "num", volume: "num", pause: "num", messagetime: "num", msgtime: "num", hold: "num",
-  sound: "bool", park: "bool", messages: "bool", detail: "word", scenery: "word", voice: "word", pendant: "bool", mode: "word",
+  sound: "bool", park: "bool", messages: "bool", detail: "word", scenery: "word", voice: "word", pendant: "bool", mode: "word", homing: "word",
   table: "len", room: "room", braces: "word", struts: "word", base: "word", peter: "word", router: "bool", skirt: "bool", hose: "bool",
   fan: "bool", main: "colour", accent: "colour" };
 const MACHINE_KEYS = ["table", "room", "braces", "struts", "base", "peter", "router", "skirt", "hose", "fan", "main", "accent"];
 const PRESETS = ["all", "no-hardware", "printed", "frame"];   // web/js/show_tree.js PRESETS
-const KINDS = ["shot", "home", "zero", "title", "text", "wait", "speed", "pendant", "show", "inspect"];
+const KINDS = ["shot", "home", "zero", "title", "text", "wait", "speed", "pendant", "show", "inspect", "asbuilt"];
 const INTRO_ONLY = new Set(["home", "zero"]);
-const SHOTS = new Set(["workshop", "machine", "stock", "tool", "core", "iso", "front", "top", "side", "back", "page", "pendant"]);
+const SHOTS = new Set(["workshop", "machine", "stock", "tool", "core", "iso", "front", "top", "side", "back", "page", "pendant", "ymin", "ymax", "gantry", "gantrytop"]);
+const ASBUILT_NUM = ["rack", "tilt", "exag", "tram", "tramy", "warpx", "warpy", "bow", "rackmax", "tiltmax"];
 const MOTION = /(^|[^A-Z])G0*(0|1|2|3|38\.\d)(?![\d.])/;
 const IN = 25.4;
+const LONG_LINE = 116;                               // see parse()
 
 // "KEY=VALUE KEY=VALUE TEXT=the rest" -> { key: value } (keys lower case; TEXT / NAME take the rest of the line)
 function keyvals(s) {
@@ -91,6 +106,9 @@ function parse(text) {
   for (let n = 0; n < lines.length; n++) {
     const l = lines[n], code = l.replace(/\([^)]*\)/g, " ").split(";")[0].toUpperCase();
     if (!out.firstMove && MOTION.test(code)) out.firstMove = n + 1;
+    // FluidNC (MODE=fluidnc, or the file on a real machine) stops the job on a long line: "14 (Line too long)" at 121
+    // characters (2026-10-23); tests/video_short.gcode's 116 runs
+    if (l.length > LONG_LINE) out.warnings.push(`line ${n + 1}: ${l.length} characters - FluidNC stops on lines this long (error 14), keep it under ${LONG_LINE}`);
     const v = videoOf(l);
     if (!v) continue;
     const line = n + 1, before = !out.firstMove, warn = (t) => out.warnings.push(`line ${line}: ${t}`);
@@ -142,6 +160,19 @@ function check(c, intro) {
     case "show":
       if (kv.preset === undefined && kv.hide === undefined && kv.show === undefined) return "Show wants PRESET=, HIDE= or SHOW=";
       return kv.preset === undefined || PRESETS.includes(kv.preset.toLowerCase()) ? null : `Show PRESET= one of ${PRESETS.join(", ")}`;
+    case "asbuilt": {
+      const keys = Object.keys(kv);
+      if (!keys.length) return "AsBuilt wants ON=, RACK=, TILT=, STOPY=, STOPZ=, EXAG=, TRAM=, WARPX= ...";
+      for (const k of ASBUILT_NUM) if (kv[k] !== undefined && !num(kv[k])) return `AsBuilt ${k.toUpperCase()}= wants a number`;
+      for (const k of ["stopy", "stopz"]) if (kv[k] !== undefined && !num(kv[k]) && !/^auto$/i.test(kv[k])) return `AsBuilt ${k.toUpperCase()}= wants a number or auto`;
+      for (const k of ["pulloffy", "pulloffz"]) if (kv[k] !== undefined && !/^auto$/i.test(kv[k]) && !/^[\d.]+\/[\d.]+$/.test(kv[k])) return `AsBuilt ${k.toUpperCase()}= wants motor0/motor1 (e.g. 4/3.2) or auto`;
+      const bad = keys.filter((k) => !ASBUILT_NUM.includes(k) && !["on", "power", "stopy", "stopz", "pulloffy", "pulloffz"].includes(k));
+      return bad.length ? `AsBuilt doesn't know ${bad.map((k) => k.toUpperCase()).join(", ")}` : null;
+    }
+    case "home": {
+      const v = kv.view && kv.view.toLowerCase();
+      return !v || (SHOTS.has(v) && v !== "page" && v !== "tool") ? null : `Home VIEW= one of ${[...SHOTS].filter((s) => s !== "page" && s !== "tool").join(", ")}`;
+    }
     case "speed":
       if (kv.x !== undefined && (!num(kv.x) || Number(kv.x) <= 0)) return "Speed X= wants a number > 0";
       if (kv.x === undefined && kv.fit === undefined && kv.real === undefined && kv.badge === undefined) return "Speed wants X=, FIT=, REAL= or BADGE=";
@@ -173,6 +204,24 @@ function inspectOf(c, blend = 1.5) {
     view: kv.view ? kv.view.toLowerCase() : kv.xray === undefined ? undefined : /^(off|no|0)$/i.test(kv.xray) ? "solid" : "xray" };
 }
 // the settings -> LR4Machine.apply's argument (only what the file set)
+// an AsBuilt cmd -> { set (LR4AsBuilt.set's argument: only what the line sets), E: { y, z } | undefined (LR4AsBuilt.setE) }
+function asbuiltOf(c) {
+  const kv = c.kv, n = (k) => (kv[k] !== undefined ? Number(kv[k]) : undefined), set = {}, onOff = (v) => !/^(off|no|0)$/i.test(v);
+  if (kv.on !== undefined) set.on = onOff(kv.on);
+  if (kv.power !== undefined) set.power = onOff(kv.power);
+  for (const [k, to] of [["exag", "exag"], ["rackmax", "rackMax"], ["tiltmax", "tiltMax"]]) if (n(k) !== undefined) set[to] = n(k);
+  const stop = {}, tram = {}, warp = {};
+  for (const [k, a] of [["stopy", "y"], ["stopz", "z"]]) if (kv[k] !== undefined) stop[a] = /^auto$/i.test(kv[k]) ? null : n(k);
+  if (n("tram") !== undefined) tram.x = n("tram");
+  if (n("tramy") !== undefined) tram.y = n("tramy");
+  for (const [k, a] of [["warpx", "x"], ["warpy", "y"], ["bow", "bow"]]) if (n(k) !== undefined) warp[a] = n(k);
+  for (const [k, o] of [["stop", stop], ["tram", tram], ["warp", warp]]) if (Object.keys(o).length) set[k] = o;
+  const pull = {}, pulls = [["pulloffy", "y"], ["pulloffz", "z"]].filter(([k]) => kv[k] !== undefined);
+  for (const [k, a] of pulls) if (!/^auto$/i.test(kv[k])) pull[a] = kv[k].split("/").map(Number);
+  if (pulls.length) set.pull = Object.keys(pull).length ? pull : null;
+  const E = kv.rack !== undefined || kv.tilt !== undefined ? { y: n("rack"), z: n("tilt") } : undefined;
+  return { set, E };
+}
 const machineOf = (settings) => Object.fromEntries(MACHINE_KEYS.filter((k) => settings[k] !== undefined).map((k) => [k, settings[k]]));
 
 // the intro when a file has none of its own (record_demo's flags: orbit, home)
@@ -183,5 +232,5 @@ function defaultIntro(o) {
 }
 const hasOwnIntro = (s) => s.intro.some((c) => ["shot", "home", "title", "text", "wait"].includes(c.kind));
 
-module.exports = { parse, keyvals, videoOf, shotOf, titleText, secsOf, zeroOf, showOf, inspectOf, machineOf, roomOf, defaultIntro, hasOwnIntro, mm,
+module.exports = { parse, keyvals, videoOf, shotOf, titleText, secsOf, zeroOf, showOf, inspectOf, asbuiltOf, machineOf, roomOf, defaultIntro, hasOwnIntro, mm,
   SHOTS, MACHINE_KEYS };

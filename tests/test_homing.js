@@ -91,5 +91,12 @@ for (const [name, speed] of [["fast", undefined], ["real", { seek: 1, feed: 1 }]
   ok(pl.segs.every((g) => g.start.x === 100 && g.end.x === 100) && H.mpos(s, pl.home, { x: 100, y: 0, z: 0 }).x === null, "X cycle 0");
 }
 
+{ // Part 32: a homing order (a video's HOMING=) and FluidNC's axis homing commands for it
+  ok(JSON.stringify(H.order("z,x,y")) === '{"z":1,"x":2,"y":3}' && JSON.stringify(H.order("Z, XY")) === '{"z":1,"x":2,"y":2}', "order");
+  ok(H.order("z,x,x") === null && H.order("q") === null && H.order("") === null, "not an order");
+  ok(JSON.stringify(H.commands(H.order("z,x,y"))) === '["$HZ","$HX","$HY"]' && JSON.stringify(H.commands(H.order("z,xy"))) === '["$HZ","$HXY"]' &&
+    JSON.stringify(H.commands(null)) === '["$H"]', "commands");
+}
+
 console.log(`${checks - fails}/${checks} homing checks passed`);
 process.exit(fails ? 1 : 0);

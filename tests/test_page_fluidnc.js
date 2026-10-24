@@ -79,6 +79,8 @@ const HELPERS = `
     async booted(prev) { return T.until(() => window.LR4FluidNC && window.LR4FluidNC !== prev && LR4Ctl.state() ? window.LR4FluidNC : null, 30000); },
     travelX: () => { const t = LR4Ctl.travel(); return t.x[1] - t.x[0]; },
   };
+  // these tests check a perfect machine: Part 32's As built off (kept over reloads; test_page_asbuilt.js turns it on)
+  if (window.LR4AsBuilt) LR4AsBuilt.set({ on: false });
   true`;
 
 async function run(mode) {

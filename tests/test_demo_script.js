@@ -93,5 +93,17 @@ ok(DS.parse("( video  shot : view=CORE time=2 )\nG0 X1").intro[0].kv.view === "C
   ok(m.at.length === 1 && DS.showOf(m.at[0]).preset === "all", "Show mid-job, preset any case");
   ok(DS.roomOf("5000x6000x2700mm").join() === "5000,6000,2700" && DS.roomOf("16ftx20ftx100in")[2] === 2540, "room units");
 }
+{ // Part 32: (Video AsBuilt:) + the ymin / ymax shots
+  const s = DS.parse("(Video AsBuilt: ON=on RACK=1.5 TILT=-0.8 STOPY=auto STOPZ=0.4 EXAG=50 TRAM=0.5 BOW=0.2 POWER=off)\n(Video Shot: VIEW=ymax)\nG0 X1\n" +
+    "(Video AsBuilt: EXAG=1)\n(Video AsBuilt: FOO=1)\n(Video AsBuilt: RACK=x)\n");
+  const q = DS.asbuiltOf(s.intro[0]);
+  ok(s.intro.map((c) => c.kind).join() === "asbuilt,shot" && s.at.length === 1, `AsBuilt intro + mid-job: ${JSON.stringify(s.intro.map((c) => c.kind))} / ${s.at.length}`);
+  ok(JSON.stringify(q) === JSON.stringify({ set: { on: true, power: false, exag: 50, stop: { y: null, z: 0.4 }, tram: { x: 0.5 }, warp: { bow: 0.2 } }, E: { y: 1.5, z: -0.8 } }), `asbuiltOf ${JSON.stringify(q)}`);
+  ok(s.warnings.length === 2 && /FOO/.test(s.warnings[0]) && /RACK= wants a number/.test(s.warnings[1]), `AsBuilt warnings: ${JSON.stringify(s.warnings)}`);
+  ok(DS.SHOTS.has("ymin") && DS.SHOTS.has("ymax"), "ymin / ymax shots");
+  const t = DS.parse("(Video AsBuilt: PULLOFFY=4/3.2 PULLOFFZ=auto)\n(Video AsBuilt: PULLOFFY=4)\n(Video Home: VIEW=machine)\n(Video Home: VIEW=page)\nG0 X1\n");
+  ok(JSON.stringify(DS.asbuiltOf(t.intro[0]).set) === '{"pull":{"y":[4,3.2]}}' && JSON.stringify(DS.asbuiltOf(DS.parse("(Video AsBuilt: PULLOFFY=auto)\nG0 X1").intro[0]).set) === '{"pull":null}', "PULLOFFY / auto");
+  ok(t.warnings.length === 2 && /motor0\/motor1/.test(t.warnings[0]) && /Home VIEW=/.test(t.warnings[1]), `pulloff / Home VIEW warnings: ${JSON.stringify(t.warnings)}`);
+}
 console.log(fails ? `demo_script: ${fails} of ${checks} failed` : `demo_script: all ${checks} passed`);
 process.exit(fails ? 1 : 0);

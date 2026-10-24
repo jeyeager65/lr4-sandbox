@@ -127,6 +127,7 @@ const RUN = (k) => `(async () => {
       document.getElementById("home").click();
       await T.until(() => /^Homed by FluidNC|^Homing failed/.test(document.getElementById("home-status").textContent), 120000);
       out.home = document.getElementById("home-status").textContent;
+      if (/^Homing failed/.test(out.home)) out.homeLog = [...document.querySelectorAll("#ctl-log > div")].slice(-30).map((d) => d.textContent);
       await T.idle();
       await T.until(() => LR4Job.tl() && LR4Job.src().name === "/small_job.nc", 10000);
       return out;
@@ -135,6 +136,7 @@ const RUN = (k) => `(async () => {
     ok(/extra\.nc/.test(f.list2), "a file added while FluidNC runs is on its card");
     ok(!f.files.includes("/extra.nc") && !/extra\.nc/.test(f.list3), `$SD/Delete took it off the store too: ${f.files}`);
     ok(/^Homed by FluidNC/.test(f.home), f.home);
+    if (f.homeLog) console.log(f.homeLog.map((l) => "    " + l).join("\n"));   // FluidNC's lines (the ALARM, which phase)
 
     // the Flash: FluidNC booted the translated copy; config.yaml is the real one. A config.yaml changed on its Flash
     // becomes the one in use (FluidNC restarts with it) and comes back after a reload.

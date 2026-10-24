@@ -36,7 +36,7 @@ const mask = (text) => {
 const calls = [];
 const page = {
   status: () => ({ state: "Idle", mpos: [1, 2.5, -3], feed: 0, rpm: 0, sd: null }),
-  home: () => { calls.push("home"); return Promise.resolve(null); },
+  home: (axes) => { calls.push("home" + (axes || "")); return Promise.resolve(null); },
   jog: (o) => { calls.push("jog " + JSON.stringify(o)); return null; },
   jogCancel: () => calls.push("cancel"), hold: () => calls.push("hold"), resume: () => calls.push("resume"), reset: () => calls.push("reset"),
   files: (dir) => (dir === "/" ? [{ name: "LR4_strut_plates.gcode", size: 1234 }, { name: "fluidtouch", size: -1 }] : []),
@@ -93,6 +93,7 @@ const say = async (t) => {
   const two = await say("$G\n$X\n");                  // two lines in one frame
   ok(two.join("|") === "[GC:G0 G54 G17 G21 G90 G94 M5 M9 T0 F0 S0]|ok|ok", "two lines in one frame");
   ok((await say("$H\n")).join() === "ok" && calls.pop() === "home", "$H -> page, then ok");
+  ok((await say("$HZ\n")).join() === "ok" && calls.pop() === "homeZ" && (await say("$hxy\n")).join() === "ok" && calls.pop() === "homeXY", "$HZ / $HXY -> page.home(those axes)");
   ok((await say("$Report/Interval=50\n"))[0] === "[MSG:INFO: websocket auto report interval set to 50 ms]", "auto reports on");
   await new Promise((r) => setTimeout(r, 130));
   ok(take().filter(([, s]) => s.startsWith("<Idle")).length >= 2, "auto reports arrive");

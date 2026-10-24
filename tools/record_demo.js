@@ -155,6 +155,14 @@ const PAGE_REC = `(() => {
     await val("LR4Demo.recording(true)");
     await sleep(500);
     const homeCmd = (DS.hasOwnIntro(script) ? script.intro : DS.defaultIntro(opt)).find((q) => q.kind === "home");
+    if (opt.homing && !await val(`LR4Demo.homingOrder(${JSON.stringify(String(opt.homing))})`)) console.log(`(Video): HOMING=${opt.homing}: not an order (e.g. z,x,y)`);
+    else if (opt.homing) console.log(`homing order: ${opt.homing}`);
+    const introAll = DS.hasOwnIntro(script) ? script.intro : DS.defaultIntro(opt);
+    for (const q of introAll.filter((c) => c.kind === "asbuilt")) {   // the machine as built, before FluidNC boots on it
+      const a = DS.asbuiltOf(q);
+      await val(`(LR4AsBuilt.set(${JSON.stringify(a.set)}), ${a.E ? `LR4AsBuilt.setE(Object.assign(LR4AsBuilt.E(), ${JSON.stringify(Object.fromEntries(Object.entries(a.E).filter(([, v]) => v !== undefined)))}))` : "0"}, true)`);
+      console.log(`as built: ${await val("LR4AsBuilt.note()")}`);
+    }
     if (NC) {                                        // FluidNC boots where the machine is: a little way off the switches
       if (opt.home && homeCmd) await val(`LR4Demo.nearHome(${Number(homeCmd.kv.offset) || 30})`);
       if (!await val("LR4Demo.fluidnc()")) throw new Error("FluidNC didn't start (is the page cross-origin isolated? serve it with tools/serve.py)");
@@ -212,6 +220,16 @@ const PAGE_REC = `(() => {
       return { t: sc, dist: half * 1.35 / Math.tan(g.fov * Math.PI / 360) };
     };
     let stockView = viewOf(job.stock, job.at), last = null, coreAt = null;
+    const sideAt = {};                               // ymin / ymax shots: that end's Y carriage (fetched as the shot starts)
+    const sideFetch = async (sh) => {
+      if (sh.name === "ymin" || sh.name === "ymax") sideAt[sh.name] = await val(`LR4Demo.sideCenter(${JSON.stringify(sh.name)})`);
+      if (sh.name === "gantry" || sh.name === "gantrytop") sideAt.gantry = await val("LR4Demo.gantryCenter()");
+    };
+    const asbuiltCmd = async (cmd) => {              // (Video AsBuilt:) the machine as built (Part 32)
+      const q = DS.asbuiltOf(cmd);
+      await val(`(LR4AsBuilt.set(${JSON.stringify(q.set)}), ${q.E ? `LR4AsBuilt.setE(Object.assign(LR4AsBuilt.E(), ${JSON.stringify(Object.fromEntries(Object.entries(q.E).filter(([, v]) => v !== undefined)))}))` : "0"}, true)`);
+      console.log(`as built: ${await val("LR4AsBuilt.note()")}`);
+    };
     const pendAt = opt.pendant ? await val("LR4Demo.pendantView()") : null;   // the pendant stays put on the table
     const showCmd = async (cmd) => {                 // (Video Show:) by the Show tree's ids
       const bad = await val(`LR4Show.apply(${JSON.stringify(DS.showOf(cmd))})`);
@@ -226,6 +244,9 @@ const PAGE_REC = `(() => {
       if (sh.name === "stock") return from(stockView.t, [0.42, -0.78, 0.72], d || stockView.dist);
       if (sh.name === "tool") return from((last && last.tip) || stockView.t, [0.42, -0.78, 0.55], d || 320);
       if (sh.name === "core") return from(coreAt || c, [0.55, -0.85, 0.45], d || 700);
+      if (sh.name === "gantry") return from(sideAt.gantry || c, [0, -0.8, 0.65], d || 1800);
+      if (sh.name === "gantrytop") return from(sideAt.gantry || c, [0, -0.001, 1], d || 2000);
+      if (sh.name === "ymin" || sh.name === "ymax") return from(sideAt[sh.name] || c, [sh.name === "ymin" ? -0.75 : 0.75, -0.55, 0.35], d || 450);
       if (sh.name === "pendant") return pendAt ? from(pendAt.t, pendAt.n, d || 420) : from(c, [0, -0.95, 0.5], span * 1.07);
       return from(c, VIEWS[sh.name], d || span * 1.3);
     };
@@ -321,11 +342,14 @@ const PAGE_REC = `(() => {
         const sh = DS.shotOf(cmd), s = mkShot(sh, cam);
         console.log(`shot ${sh.name}${sh.orbit ? ` orbit ${sh.orbit}` : ""}`);
         if (sh.name === "core") coreAt = await val("LR4Demo.coreCenter()");
+        await sideFetch(sh);
         for (let f = 0; f < s.frames; f++) { cam = s.at(f); await frame(cam); }
-      } else if (cmd.kind === "home") {              // close on the core, still; $H in real time
+      } else if (cmd.kind === "home") {              // still (close on the core, or VIEW=); $H in real time
         console.log("homing");
         coreAt = await val("LR4Demo.coreCenter()");
-        const s = mkShot({ name: "core", secs: DS.secsOf(cmd, 1.5), orbit: 0, dist: Number(cmd.kv.dist) || 700 }, cam);
+        const hv = (cmd.kv.view || "core").toLowerCase(), hsh = { name: hv, secs: DS.secsOf(cmd, 1.5), orbit: 0, dist: Number(cmd.kv.dist) || (hv === "core" ? 700 : null) };
+        await sideFetch(hsh);
+        const s = mkShot(hsh, cam);
         for (let f = 0; f < s.frames; f++) { cam = s.at(f); await frame(cam); }
         await hold(0.5, cam);
         await val("LR4Demo.home(true)");
@@ -346,6 +370,7 @@ const PAGE_REC = `(() => {
       } else if (cmd.kind === "text") await caption(cmd);
       else if (cmd.kind === "pendant") await pipCmd(cmd);
       else if (cmd.kind === "show") await showCmd(cmd);
+      else if (cmd.kind === "asbuilt") { /* set before the intro (above) */ }
       else if (cmd.kind === "inspect") cam = await inspectCmd(cmd, cam);
       else if (cmd.kind === "wait") await hold(DS.secsOf(cmd, 1), cam);
       else await paceCmd(cmd);
@@ -379,11 +404,13 @@ const PAGE_REC = `(() => {
         if (cmd.kind === "shot") {
           const sh = DS.shotOf(cmd);
           if (sh.name === "core") coreAt = await val("LR4Demo.coreCenter()");
+          await sideFetch(sh);
           shot = sh.name === "page" ? null : mkShot(sh, s.cam); shotF = 0;
           if (shot && !sh.orbit) { const keep = shot; shot = { frames: Infinity, at: (f) => keep.at(Math.min(f, keep.frames - 1)) }; }
         } else if (cmd.kind === "text") await caption(cmd);
         else if (cmd.kind === "pendant") await pipCmd(cmd);
         else if (cmd.kind === "show") await showCmd(cmd);
+        else if (cmd.kind === "asbuilt") await asbuiltCmd(cmd);
         else if (cmd.kind === "inspect") {             // the job held while it runs; the view stays on the set until ID=off / a Shot
           const r0 = rate, off = /^off$/i.test(cmd.kv.id || "");
           pace.wait = 1; await setRate(1e-9);

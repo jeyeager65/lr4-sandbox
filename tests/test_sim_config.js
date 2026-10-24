@@ -83,7 +83,7 @@ function check(name, src) {
   const r = C.translate(src), s = C.parse(src), t = C.parse(r.text);
   const ch = (n, k) => n && n.children.find((c) => c.key === k), v = (n, k) => { const c = ch(n, k); return c ? c.value : undefined; };
   ok(!/tmc_|I2SO|i2so|uart|stepstick|unipolar|:low|RMT|I2S_STATIC/.test(r.text), `${name}: no TMC / I2SO / UART / active-low left`);
-  ok(v(ch(t, "stepping"), "engine") === "timed" && v(t, "board") === "lr4-sandbox simulator", `${name}: timed engine, board`);
+  ok(v(ch(t, "stepping"), "engine") === "timed" && v(ch(t, "stepping"), "segments") === "20" && v(t, "board") === "lr4-sandbox simulator", `${name}: timed engine, 20 segments, board`);
   const used = new Set(), sa = ch(s, "axes"), ta = ch(t, "axes");
   for (const m of r.pins.motors) {
     const mn = ch(ch(ta, m.axis), "motor" + m.motor), st = ch(mn, "standard_stepper");
