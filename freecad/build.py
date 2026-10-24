@@ -371,7 +371,8 @@ for w in ("FrontWheel_Min", "BackWheel_Min"):
     rows, off = lr4.WHEELS[w]
     ax = 131.0 if w.startswith("Front") else 183.0
     pl = pl_yz_min.multiply(F(rows, off))
-    c, c2 = pl.multVec(V(ax, 150, 11)), pl.multVec(V(ax, 151, 11))
+    c, c2 = pl.multVec(V(ax, 153, 11)), pl.multVec(V(ax, 154, 11))   # centred in the wheel's window (user 2026-10-24:
+                                                                     # at 150 it sat 3 mm off, against one side)
     m.add(f"Bearing_{w}", hw.bearing608(hw.along(c, c2 - c)), group="YZ_Min", colour=hw.STEEL)
 for w in ("FrontWheel_Max", "BackWheel_Max"):          # on the wheels' own M8 holes (lr4.MAX_WHEEL_BEARINGS)
     pl = pl_yz_max.multiply(F(*lr4.WHEELS[w]))
@@ -439,7 +440,7 @@ pl_xb = App.Placement(V(lr4.XBELT_TENSION_SHIFT, 0, 0), App.Rotation()).multiply
 stl("X_Belt", "X_Belt", pl_xb, "Beam", PRINT_ACCENT)
 belt_y = Ym + lr4.XBELT_Y_D                     # tensioner end of the X belt
 x_belt_ends = ((X_s0 - XZ_PLATE / 2 + lr4.XBELT_SCREW_SHIFT[0], *D(*lr4.XBELT_SLOT_D)),   # M3 loops: Z_Stub_Min's
-               (xb_x - 6.0 + lr4.XBELT_TENSION_SHIFT, belt_y, xb_z))                       # slot, tensioner pocket
+               (xb_x - 6.0 + lr4.XBELT_TENSION_SHIFT + lr4.XBELT_MAX_SCREW_SHIFT[0], belt_y, xb_z))   # slot, tensioner pocket
 
 # hose holders: their tab drops into the slot in each brace's back bar (V1E photos: holders on the
 # back of the braces, cradles behind the beam). The cradles reach +X from the brace (handed parts).
@@ -586,7 +587,7 @@ xpts, _ = hw.belt_path(loc(V(*x_belt_ends[0])), [(loc(wheels[0]), 6.7, -1), (loc
 # which sits 1.86 to the run's smooth side - the run dips under it, wraps its far end and comes back on its teeth
 # side, the tail back out to the plate's far face; Max: in the tensioner's pocket (tail length a GUESS)
 x_loops = []                                       # (name, face, into, side, lateral, tail length)
-for nm, i, j, sd, lat in (("Min", 0, 1, 1, -abs(lr4.XBELT_SCREW_SHIFT[1])), ("Max", -1, -2, -1, 0.0)):
+for nm, i, j, sd, lat in (("Min", 0, 1, 1, -abs(lr4.XBELT_SCREW_SHIFT[1])), ("Max", -1, -2, -1, lr4.XBELT_MAX_SCREW_SHIFT[1])):
     e, nx_ = V(*xpts[i], 0), V(*xpts[j], 0)
     into = nx_ - e
     into.normalize()

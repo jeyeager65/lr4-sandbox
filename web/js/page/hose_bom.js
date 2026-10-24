@@ -102,7 +102,7 @@
       roughness: 0.25, metalness: 0.1, side: THREE.DoubleSide });
     hoseMesh = new THREE.Mesh(new THREE.BufferGeometry(), mat);
     hoseMesh.renderOrder = 1;
-    hoseMesh.userData = { name: "Vacuum_Hose", label: `Vacuum hose, Fulton 2-1/2" clear PVC wire (${meta.hose.od} mm OD, GUESS)`,
+    hoseMesh.userData = { name: "Vacuum_Hose", label: `Vacuum hose, 2-1/2" clear PVC wire (${meta.hose.od} mm OD)`,
       source: "hardware", group: "Hose", motion: "hose" };
     scene.add(hoseMesh);
     meshes.push(hoseMesh);

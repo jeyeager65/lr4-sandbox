@@ -174,6 +174,13 @@
         w.push(...pa, z0 + ra, ...pb, z0 + rb, ...pb, z1 + rb, ...pa, z0 + ra, ...pb, z1 + rb, ...pa, z1 + ra);
       }
     }
+    // the bottom (user 2026-10-24: the spoilboard showed none from below), in tiles when it follows a warp
+    const nb = rest ? Math.max(1, Math.ceil(Math.max(x1 - x0, y1 - y0) / 20)) : 1;
+    for (let j = 0; j < nb; j++) for (let i = 0; i < nb; i++) {
+      const xa = x0 + (x1 - x0) * i / nb, xb = x0 + (x1 - x0) * (i + 1) / nb, ya = y0 + (y1 - y0) * j / nb, yb = y0 + (y1 - y0) * (j + 1) / nb;
+      const [r00, r10, r11, r01] = [rz(xa, ya), rz(xb, ya), rz(xb, yb), rz(xa, yb)];
+      w.push(xa, ya, z0 + r00, xb, yb, z0 + r11, xb, ya, z0 + r10, xa, ya, z0 + r00, xa, yb, z0 + r01, xb, yb, z0 + r11);
+    }
     const wg = new THREE.BufferGeometry();
     wg.setAttribute("position", new THREE.Float32BufferAttribute(w, 3));
     wg.setAttribute("aRest", new THREE.BufferAttribute(new Float32Array(w.length / 3), 1));
@@ -263,23 +270,224 @@
     return (geo.userData.touch = { L: V(L), W: V(W), N: V(N),
       pad: V(c).addScaledVector(V(L), at[0]).addScaledVector(V(W), at[1]).addScaledVector(V(N), at[2]) });
   }
+  // Probing (user 2026-10-24): the clip + its magnet come off the stored bolt head onto a flat of the collet nut
+  // (the magnet across the flat, the clip swung out and down 45 deg), then the plate glides from its slot to its
+  // spot on the stock; afterwards the reverse (plate back, then the clip). jobTouch only sets where they go (it is
+  // called every frame in playback); touchAnimTick moves them. The clip rides the core (touchClipPlace, from move()).
+  // First of all the shoe's bottom (skirt + bristles; it snaps on: user) is pulled down off its snaps and slid out,
+  // then it's off; it goes back last.
+  const CLIP_RE = /^TouchPlate_(Clip_|Magnet$)/, SKIRT_RE = /^(Dust_Skirt|Bristles_TPU)/, TOUCH_SECS = 0.9;
+  const TOUCH_ANIM = { out: false, skirt: 0, clip: 0, plate: 0, target: null, onNut: null };
+  function touchSkirtPlace() {                       // the skirt + bristles at TOUCH_ANIM.skirt: down 10, then out 160 (-Y)
+    const k = TOUCH_ANIM.skirt;
+    if (k <= 0 || k >= 1) return;
+    const drop = 10 * ease(Math.min(1, k / 0.35)), out = 160 * ease(Math.max(0, (k - 0.35) / 0.65)), mo = touchMotion();
+    for (const m of meshes) {
+      if (!SKIRT_RE.test(m.userData.name)) continue;
+      const b = (m.userData.base || { t: [0, 0, 0] }).t;
+      m.position.set(b[0] + mo.x, b[1] + mo.y - out, b[2] + mo.z - drop);
+    }
+  }
+  const ease = (k) => (k < 0.5 ? 2 * k * k : 1 - (2 - 2 * k) ** 2 / 2);
+  // A route round the router (user 2026-10-24: a straight line went through it): waypoints [p0 .. pn]; the turn
+  // happens between waypoint 1 and n-1 (out in the open, not in the slot / on the bolt). -> { at(e): {p, r} }
+  function touchRoute(pts) {
+    const s = [0];
+    for (let i = 1; i < pts.length; i++) s.push(s[i - 1] + pts[i].distanceTo(pts[i - 1]));
+    const L = s[s.length - 1] || 1, ra = s[1] / L, rb = s[pts.length - 2] / L;
+    return { at(e) {
+      const d = e * L;
+      let i = 1;
+      while (i < pts.length - 1 && s[i] < d) i++;
+      const f = s[i] > s[i - 1] ? (d - s[i - 1]) / (s[i] - s[i - 1]) : 1;
+      return { p: pts[i - 1].clone().lerp(pts[i], Math.min(1, Math.max(0, f))),
+        r: rb > ra ? Math.min(1, Math.max(0, (e - ra) / (rb - ra))) : e };
+    } };
+  }
+  function touchClear() {                            // (world, parked) the +X side clear of the shoe, mounts and router,
+    let x = -Infinity, z = Infinity;                 // and the shoe's bottom (skirt off)
+    for (const m of meshes) {
+      const n = m.userData.name;
+      if (!/^(Dust_Shoe|Tool_Mount_|Router_Kobalt|Router_Nut|Router_Bit)/.test(n) || !m.visible) continue;
+      const b = new THREE.Box3().setFromObject(m), mo = touchMotion();
+      x = Math.max(x, b.max.x - mo.x);
+      if (/^Dust_Shoe/.test(n)) z = Math.min(z, b.min.z - mo.z);
+    }
+    return { x: x + 15, zShoe: z, y: touchFront() };
+  }
+  function touchFront() {                            // (world y, parked) just in front of the bottom mount, shoe, router
+    let y = Infinity;
+    for (const m of meshes) {
+      if (!/^(Dust_Shoe|Tool_Mount_B|Router_Kobalt|Router_Nut|Router_Bit)/.test(m.userData.name) || !m.visible) continue;
+      y = Math.min(y, new THREE.Box3().setFromObject(m).min.y - touchMotion().y);
+    }
+    return y - 10;
+  }
   function jobTouch(pl) {                           // pl: the probe's tl.plates entry, or null = back on the core
     if (!pl && HAND.plate) pl = HAND.plate;          // the button's plate stays where it was laid (world mm)
     const parts = meshes.filter((m) => TOUCH_PARTS.includes(m.userData.name)), plate = parts.find((m) => m.userData.name === "TouchPlate");
     if (probing !== !!(pl && plate)) { probing = !!(pl && plate); applyVisibility(); }   // skirt off while probing
-    if (!pl || !plate) {                             // back on the core: move() places them again
-      const was = parts.some((m) => m.userData.held);
-      for (const m of parts) { m.userData.held = false; m.quaternion.identity(); }
+    const A = TOUCH_ANIM, was = A.out;
+    if (!pl || !plate) {                             // back on the core: the tick brings them home, move() takes over
+      A.out = false;
       return was;
     }
     const f = touchFrame(plate.geometry), at = pl.world ? [0, 0, 0] : JOB.at;
     const dir = new THREE.Vector3(1, -1, 0).normalize(), up = new THREE.Vector3(0, 0, 1), side = up.clone().cross(dir);
-    const R = new THREE.Matrix4().makeBasis(dir, side, up).multiply(new THREE.Matrix4().makeBasis(f.L, f.W, f.N).transpose());
-    const q = new THREE.Quaternion().setFromRotationMatrix(R);
+    // either face can go up: the one that needs less turning from the stored pose once the strip has tipped over
+    // (user 2026-10-24: it flipped right over to show the face you see in the holder)
+    const turnTo = (s) => new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(dir, side.clone().multiplyScalar(s),
+      up.clone().multiplyScalar(s)).multiply(new THREE.Matrix4().makeBasis(f.L, f.W, f.N).transpose()));
+    const rollOf = (qq) => {                         // the roll left after tipping the strip straight over
+      const Lf = f.L.clone().applyQuaternion(qq), ax = f.L.clone().cross(Lf);
+      const tip = ax.length() > 1e-6 ? new THREE.Quaternion().setFromAxisAngle(ax.normalize(), f.L.angleTo(Lf)) : new THREE.Quaternion();
+      return 2 * Math.acos(Math.min(1, Math.abs(tip.invert().multiply(qq).w)));
+    };
+    const qa = turnTo(1), qb = turnTo(-1), q = rollOf(qa) <= rollOf(qb) ? qa : qb;
+    const R = new THREE.Matrix4().makeRotationFromQuaternion(q);
     const target = new THREE.Vector3(at[0] + pl.x, at[1] + pl.y, at[2] + (pl.world ? pl.wz : pl.z) + Math.max(pl.thick, 0.5) / 2);
     const pos = target.sub(f.pad.clone().applyMatrix4(R));
-    for (const m of parts) { m.userData.held = true; m.quaternion.copy(q); m.position.copy(pos); m.scale.set(1, 1, 1); }
-    return true;
+    if (!A.target || A.target.pos.distanceTo(pos) > 1e-3 || A.target.q.angleTo(q) > 1e-4) A.target = { q, pos, pad: f.pad };   // same spot: keep its route
+    A.out = true;
+    if (A.plate >= 1) touchPlatePlace();             // already out: follow a new spot straight away
+    return !was;
+  }
+  function touchMotion() {                          // the core's offset from the parked pose (move()'s dx, dy, dz)
+    const p = HOME.pose || { x: 0, y: 0, z: 0 };
+    return new THREE.Vector3(p.x, p.y, p.z);
+  }
+  function touchPlatePlace() {                       // the plate + connector + wire at TOUCH_ANIM.plate (0 = stored)
+    const A = TOUCH_ANIM, parts = meshes.filter((m) => TOUCH_PARTS.includes(m.userData.name));
+    if (!A.target || !parts.length) return;
+    const mo = touchMotion(), P = A.target.pad, plate = parts.find((m) => m.userData.name === "TouchPlate") || parts[0];
+    if (!A.platePath || A.platePath.target !== A.target) {   // out of the slot's open end just far enough to come free,
+      const b = new THREE.Vector3(...(plate.userData.base || { t: [0, 0, 0] }).t);   // then angled down onto its spot
+      const c0 = P.clone().add(b).add(mo), c1 = P.clone().applyQuaternion(A.target.q).add(A.target.pos);
+      const f = touchFrame(plate.geometry), u = f.W.clone().setZ(0).normalize();
+      if (u.y > 0) u.negate();                       // the slot opens to the front (lr4.TOUCH_SLOT mouth)
+      // the strip (8 wide) clear of the slot's mouth; then it pivots about the pad (user: "angle it from the crimped
+      // end down") as the pad drops to just above the stock in front of the shoe; then in under the bit, flat
+      const p1 = c0.clone().addScaledVector(u, 20);  // (10 frees the strip; 20 lets the pad and connector tip clear)
+      const p2 = new THREE.Vector3(p1.x, p1.y, c1.z + 3);   // tips over where it is, the pad dropping (no swing to Y0)
+      // the turn (user: "the top should come straight at me"): the strip's top swings straight from up to its final
+      // direction (one tip about a level axis) while the plate rolls about the strip to land flat - not the
+      // shortest turn, which twists it
+      const Ls = f.L.clone(), Lf = f.L.clone().applyQuaternion(A.target.q), ax = Ls.clone().cross(Lf);
+      const tip = ax.length() > 1e-6 ? new THREE.Quaternion().setFromAxisAngle(ax.normalize(), Ls.angleTo(Lf)) : new THREE.Quaternion();
+      const roll = tip.clone().invert().multiply(A.target.q);   // about the stored strip: tip(1) * roll = the final turn
+      A.platePath = { target: A.target, b, tip, roll, route: touchRoute([c0, p1, p2, c1]) };
+    }
+    const at = A.platePath.route.at(ease(A.plate)), er = ease(at.r);
+    const qk = new THREE.Quaternion().slerp(A.platePath.tip, er).multiply(new THREE.Quaternion().slerp(A.platePath.roll, er));
+    for (const m of parts) {                         // every piece turns about the pad (they share the plate's base)
+      const bm = new THREE.Vector3(...(m.userData.base || { t: [0, 0, 0] }).t).sub(A.platePath.b);
+      m.userData.held = true;
+      m.quaternion.copy(qk);
+      m.position.copy(at.p.clone().sub(P.clone().applyQuaternion(qk)).add(bm.applyQuaternion(qk)));
+      m.scale.set(1, 1, 1);
+    }
+  }
+  function touchNut() {                             // the magnet's spot on the collet nut (world, parked), once per build
+    const nut = meshes.find((m) => m.userData.name === "Router_Nut"), mag = meshes.find((m) => m.userData.name === "TouchPlate_Magnet");
+    if (!nut || !mag) return null;
+    if (TOUCH_ANIM.onNut && TOUCH_ANIM.onNut.nut === nut && TOUCH_ANIM.onNut.mag === mag) return TOUCH_ANIM.onNut;
+    const wb = (m) => { m.geometry.computeBoundingBox(); return m.geometry.boundingBox.clone().translate(new THREE.Vector3(...(m.userData.base || { t: [0, 0, 0] }).t)); };
+    const nb = wb(nut), mb = wb(mag), nc = nb.getCenter(new THREE.Vector3()), cs = mb.getCenter(new THREE.Vector3());
+    const p = nut.geometry.attributes.position.array, bt = new THREE.Vector3(...(nut.userData.base || { t: [0, 0, 0] }).t);
+    let rc = 0, ac = 0;                              // the hex's corner direction: its farthest vertex from the axis
+    for (let i = 0; i < p.length; i += 3) {
+      const x = p[i] + bt.x - nc.x, y = p[i + 1] + bt.y - nc.y, r = Math.hypot(x, y);
+      if (r > rc) { rc = r; ac = Math.atan2(y, x); }
+    }
+    const want = Math.atan2(cs.y - nc.y, cs.x - nc.x);   // the flat facing where the clip is stored: it moves least
+    let best = null;
+    for (let k = 0; k < 6; k++) {
+      const a = ac + Math.PI / 6 + k * Math.PI / 3, d = Math.abs(Math.atan2(Math.sin(a - want), Math.cos(a - want)));
+      if (!best || d < best.d) best = { a, d };
+    }
+    const n = new THREE.Vector3(Math.cos(best.a), Math.sin(best.a), 0);
+    let af2 = 0;                                     // the flat itself (the corners are turned off: not rc cos 30)
+    for (let i = 0; i < p.length; i += 3) af2 = Math.max(af2, (p[i] + bt.x - nc.x) * n.x + (p[i + 1] + bt.y - nc.y) * n.y);
+    const sz = mb.getSize(new THREE.Vector3()), rMag = Math.min(sz.x, sz.y, sz.z) / 2;
+    const as = sz.x > sz.y ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(0, 1, 0);   // stored: the rod lies level
+    const ct = nc.clone().addScaledVector(n, af2 + rMag + 0.05);                          // on the flat, nut mid-height
+    let t = new THREE.Vector3(0, 0, 1).cross(n);
+    if (t.dot(as) < 0) t.negate();
+    const tilt = 15 * Math.PI / 180;                 // out, 15 deg below level: its tail clear of the stock (user)
+    const f2 = n.clone().multiplyScalar(Math.cos(tilt)).add(new THREE.Vector3(0, 0, -Math.sin(tilt)));
+    const F = new THREE.Matrix4().makeBasis(t, f2, t.clone().cross(f2));
+    const e2 = new THREE.Vector3(0, 0, -1), E = new THREE.Matrix4().makeBasis(as, e2, as.clone().cross(e2));
+    const q = new THREE.Quaternion().setFromRotationMatrix(F.multiply(E.transpose()));
+    // the jaws reach a little past the magnet: what touches the flat is the clip's nearest point (steel jaws - the
+    // magnet holds through them), 0.2 off it
+    let reach = -rMag;
+    for (const m of meshes) {
+      if (!CLIP_RE.test(m.userData.name)) continue;
+      const pa = m.geometry.attributes.position.array, bm = new THREE.Vector3(...(m.userData.base || { t: [0, 0, 0] }).t), v = new THREE.Vector3();
+      for (let i = 0; i < pa.length; i += 3) {
+        v.set(pa[i], pa[i + 1], pa[i + 2]).add(bm).sub(cs).applyQuaternion(q);
+        reach = Math.min(reach, v.dot(n));
+      }
+    }
+    ct.copy(nc).addScaledVector(n, af2 - reach + 0.2).setZ(nc.z);
+    // stored, the clip is slid along the rod off the magnet's middle (build.py TOUCH_CLIP_POSE: clear of the mount);
+    // on the nut the magnet sits centred in the jaws again: it slides by this much along the rod on the way
+    const jaw = meshes.find((m) => m.userData.name === "TouchPlate_Clip_A"), jb = jaw ? wb(jaw).getCenter(new THREE.Vector3()) : cs;
+    const centre = as.clone().multiplyScalar(jb.clone().sub(cs).dot(as));
+    return (TOUCH_ANIM.onNut = { nut, mag, cs, ct, q, centre });
+  }
+  function touchClipPlace() {                        // the clip + magnet at TOUCH_ANIM.clip (0 = on its bolt: move()'s)
+    const A = TOUCH_ANIM;
+    if (A.clip <= 0) return;
+    const N = touchNut();
+    if (!N) return;
+    if (!N.route) {                                  // a little off the bolt head (along the rod), out along +X past the
+      const cl = touchClear(), c0 = N.cs, c1 = N.ct;  // shoe (user: along X, smaller), down under the shoe's open bottom,
+      const p1 = c0.clone().add(new THREE.Vector3(3, -6, 0));   // in along -X under the nut, up onto it
+      const low = cl.zShoe - 8, xS = Math.max(p1.x, cl.x);
+      N.route = touchRoute([c0, p1, new THREE.Vector3(xS, p1.y, p1.z), new THREE.Vector3(xS, c1.y, low),
+        new THREE.Vector3(c1.x, c1.y, low), c1]);
+    }
+    const at = N.route.at(ease(A.clip)), mo = touchMotion(), qk = new THREE.Quaternion().slerp(N.q, ease(at.r));
+    const ck = at.p;
+    for (const m of meshes) {
+      if (!CLIP_RE.test(m.userData.name)) continue;
+      const b = new THREE.Vector3(...(m.userData.base || { t: [0, 0, 0] }).t);
+      m.quaternion.copy(qk);
+      if (m === N.mag) b.add(N.centre.clone().multiplyScalar(ease(at.r)));   // into the jaws' middle as it turns
+      m.position.copy(b.sub(N.cs).applyQuaternion(qk).add(ck).add(mo));
+    }
+  }
+  function touchAnimTick(dt) {                       // out: skirt, clip, plate; home: plate, clip, skirt
+    const A = TOUCH_ANIM, step = dt / TOUCH_SECS, c0 = A.clip, p0 = A.plate, s0 = A.skirt;
+    if (A.out) {
+      A.skirt = Math.min(1, A.skirt + step);
+      if (A.skirt >= 1) A.clip = Math.min(1, A.clip + step);
+      if (A.clip >= 1) A.plate = Math.min(1, A.plate + step);
+    } else {
+      A.plate = Math.max(0, A.plate - step);
+      if (A.plate <= 0) A.clip = Math.max(0, A.clip - step);
+      if (A.clip <= 0) A.skirt = Math.max(0, A.skirt - step);
+    }
+    if (A.skirt !== s0) {
+      if ((s0 >= 1) !== (A.skirt >= 1)) applyVisibility();   // off once out, back on as it starts home
+      if (A.skirt > 0 && A.skirt < 1) touchSkirtPlace();
+      else if (A.skirt <= 0 && meta) move(HOME.pose ? [HOME.pose.x, HOME.pose.y, HOME.pose.z] : undefined);
+    }
+    if (A.plate !== p0) {
+      if (A.plate > 0) touchPlatePlace();
+      else {                                         // home: move() places them again
+        for (const m of meshes) if (TOUCH_PARTS.includes(m.userData.name)) { m.userData.held = false; m.quaternion.identity(); }
+        if (meta) move(HOME.pose ? [HOME.pose.x, HOME.pose.y, HOME.pose.z] : undefined);
+      }
+    }
+    if (A.clip !== c0) {
+      if (A.clip > 0) touchClipPlace();
+      else {
+        for (const m of meshes) if (CLIP_RE.test(m.userData.name)) m.quaternion.identity();
+        if (meta) move(HOME.pose ? [HOME.pose.x, HOME.pose.y, HOME.pose.z] : undefined);
+      }
+    }
   }
   // the bit as cnc-gcode-tools draws it (StockMeshRenderer.buildToolMesh + fluted: lathe profile, helical flute
   // gullies), run unchanged against a stand-in gl that keeps the arrays, and shaded like it too: its tool shader

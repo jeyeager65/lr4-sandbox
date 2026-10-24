@@ -77,6 +77,19 @@ const steps = [
      free: tball.enabled && !controls.enabled, upZ: camera.up.z };
    document.getElementById('insp-back').click();
    return Object.assign(g, { afterZ: camera.up.z, orbit: controls.enabled && !tball.enabled })`,
+  // probing (the touch plate button): the shoe's bottom off, the clip onto the collet nut, the plate onto the board,
+  // stepped by hand (headless frames are slow); then all of it home again, exactly where it was
+  `const g = (n) => meshes.find((m) => m.userData.name === n), wc = (m) => new THREE.Box3().setFromObject(m).getCenter(new THREE.Vector3());
+   const m0 = wc(g('TouchPlate_Magnet')), p0 = wc(g('TouchPlate')), s0 = wc(g('Dust_Skirt_Kobalt'));
+   handPlate(true); const order = [];
+   for (let i = 0; i < 40; i++) { touchAnimTick(0.1); order.push(TOUCH_ANIM.skirt >= 1 ? (TOUCH_ANIM.clip >= 1 ? 'p' : 'c') : 's'); }
+   const n = wc(g('Router_Nut')), m = wc(g('TouchPlate_Magnet'));
+   const out = { state: [TOUCH_ANIM.skirt, TOUCH_ANIM.clip, TOUCH_ANIM.plate], skirt: g('Dust_Skirt_Kobalt').visible,
+     onNut: Math.hypot(m.x - n.x, m.y - n.y), dz: Math.abs(m.z - n.z), plate: wc(g('TouchPlate')).distanceTo(p0),
+     order: [...new Set(order)].join('') };
+   handPlate(false); for (let i = 0; i < 40; i++) touchAnimTick(0.1);
+   out.home = [wc(g('TouchPlate_Magnet')).distanceTo(m0), wc(g('TouchPlate')).distanceTo(p0), wc(g('Dust_Skirt_Kobalt')).distanceTo(s0)];
+   out.skirtBack = g('Dust_Skirt_Kobalt').visible; return out`,
 ];
 
 const server = spawn("python", ["-m", "http.server", String(PORT)], { cwd: ROOT, stdio: "ignore" });
@@ -94,7 +107,10 @@ ok(!/\[exception\]/.test(out), "page exception: " + (out.match(/\[exception\].*/
 ok(ev.length === steps.length, `${steps.length} results, got ${ev.length}`);
 if (ev.length !== steps.length) console.log(out);
 else {
-  const [a, b, c, d, t, e, f, g] = ev;
+  const [a, b, c, d, t, e, f, g, h] = ev;
+  ok(h.state.every((v) => v === 1) && !h.skirt && h.order === "scp", "probing: skirt off, then clip, then plate: " + JSON.stringify([h.state, h.skirt, h.order]));
+  ok(h.onNut > 8 && h.onNut < 14 && h.dz < 1 && h.plate > 50, "the clip's magnet on the collet nut, the plate out: " + JSON.stringify([h.onNut, h.dz, h.plate]));
+  ok(h.home.every((v) => v < 1e-3) && h.skirtBack, "all of it home again afterwards: " + JSON.stringify([h.home, h.skirtBack]));
   ok(g.head === "Touch plate + clip" && g.parts.includes("TouchPlate_Clip_A") && g.parts.includes("TouchPlate_Magnet") &&
      g.parts.includes("TouchPlate"), "the touch plate + clip row inspects them: " + JSON.stringify([g.head, g.parts]));
   ok(g.free && g.upZ < 0.9, "inspect turns freely (a drag rolls the view off upright): " + JSON.stringify([g.free, g.upZ]));

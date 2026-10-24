@@ -53,7 +53,9 @@ ANCHORED = (("TouchPlate", "Core"),    # touch plate (reshaped, angled), its con
             ("Belt_Y_Min_Front_Loop", "Y_Belt_Min_Lock"), ("Belt_Y_Min_Back_Loop", "Y_Belt_Min_Tension"),
             ("Belt_Y_Max_Front_Loop", "Y_Belt_Max_Lock"), ("Belt_Y_Max_Back_Loop", "Y_Belt_Max_Tension"),
             ("Belt_X_Min_Loop", "XZ_Plate_Min"), ("Belt_X_Max_Loop", "X_Belt"),
-            ("Brace_#__XLoop1", "XZ_Plate_Min"))  # the X Min loop's M3, moved into Z_Stub_Min's slot (named after Brace_1)
+            ("Brace_#__XLoop1", "XZ_Plate_Min"),  # the X Min loop's M3, moved into Z_Stub_Min's slot (named after Brace_1)
+            ("X_Belt__XLoop1", "X_Belt"),          # the X Max loop's M3, moved into the tensioner's pocket
+            ("Bearing_FrontWheel_Min", "FrontWheel_Min"), ("Bearing_BackWheel_Min", "BackWheel_Min"))   # centred
 REF_SHAPE = ("Router_Nut",)            # round -> hex ER11 nut (2026-10-24)
 # OLD_REF: changed in the ref build by work the other builds don't have yet: fitted without the ref build
 OLD_REF = ("TableMDF",                            # Part 33's table (the page draws the table itself; the rec stays as was)
@@ -319,6 +321,13 @@ def hose_fits(tags, metas, infos, F_all, report, temp=False, label="hose"):
         if np.ptp(Y) < 1e-6:
             continue
         C, err = lstsq(F_all, Y)
+        if err > TOL_FIT and REF in tags and len(tags) > 7:   # a size-independent change only in the ref build
+            r = tags.index(REF)                        # (e.g. the hose OD, 2026-10-24): the others' fit, moved to
+            keep = [i for i in range(len(tags)) if i != r]   # pass through the ref's value
+            Co, erro = lstsq(F_all[keep], Y[keep])
+            if erro <= TOL_FIT:
+                Co[0] += Y[r] - F_all[r] @ Co
+                C, err = Co, erro
         fit[json.dumps(path)] = C.round(6).tolist()
         if err > TOL_FIT:
             report.append(f"FIT {label} {path}: max error {err:.3f}")

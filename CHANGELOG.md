@@ -16,6 +16,14 @@ the date the model data was built and the Printables file set it was solved for.
 - The Kobalt dust shoe's screw (through its slot into the bottom mount, nylock in the hex slot); a hex collet nut.
 - Loading and switching Show > Detail show a running count while the part meshes are made.
 - `docs/V1E_DOC_GAPS.md`: what the model needed that the V1E docs don't say.
+- **Probing is animated:** the shoe's bottom snaps off and slides out, the clip comes off its bolt onto a flat of
+  the collet nut (riding down with the router), then the touch plate glides from its slot onto the stock; afterwards
+  the reverse. The touch plate is brushed stainless; the spoilboard has a bottom; the X belt's tensioner screw sits
+  in its pocket.
+- The vacuum hose is 68 mm OD (measured); the Min side's wheel bearings sit centred in their windows.
+- **GitHub Pages caching:** each publish stamps the page's files and what it loads with `?v=<commit>`
+  (`tools/stamp_build.py`), so a visitor never mixes a new page with old cached scripts or data. The local server
+  sends `Cache-Control: no-cache`.
 
 ## 0.37.0 - 2026-10-23
 - **As built (My LR4 tab, off by default):** the machine as a real one is - a little out of square until it homes. Each Y and each Z

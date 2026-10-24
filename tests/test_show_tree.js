@@ -139,7 +139,7 @@ const all = bomWith({ router: true, skirt: true, hose: true, fan: true, pendant:
 ok(JSON.stringify(all) === JSON.stringify(cfg.bom_ref), "all fitted = the reference BOM");
 const bare = bomWith({ router: false, skirt: true, hose: false, fan: false, pendant: false });
 ok(!rows(bare, "Printed parts").some((r) => /^(Dust_|Tool_Mount|TPU_)/.test(r[1])), "no router: no mount / shoe / skirt prints");
-ok(!rows(bare, "Buy: specialty").some((r) => /router|Fulton|blower|Wire sleeve/i.test(r[1])), "no router / hose / fan to buy");
+ok(!rows(bare, "Buy: specialty").some((r) => /router|dust collection hose|blower|Wire sleeve/i.test(r[1])), "no router / hose / fan to buy");
 ok(!rows(bare, "Hardware: where").some((r) => /^(Tool Mount|Jackpot3 Fan)/.test(r[2])), "their fasteners gone");
 const m5 = kitRow(all, "M5 x 30 mm button head screw"), m5b = kitRow(bare, "M5 x 30 mm button head screw");
 ok(m5[1] - m5b[1] === 7 && m5[2] - m5b[2] === 7, `kit: 7 fewer M5 (tool mount + dust shoe): ${m5} / ${m5b}`);

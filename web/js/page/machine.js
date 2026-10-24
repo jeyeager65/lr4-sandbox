@@ -118,6 +118,8 @@
     if (CAPS.list.length) placeSection();             // inspect's section cut follows the set
     readout(X, Y, Z, !!pose);
     HOME.pose = { x: dx, y: dy, z: dz };
+    touchClipPlace();                                 // the clip on the collet nut while probing rides the core
+    touchSkirtPlace();                                // the shoe's bottom on its way off / back (job.js)
     dro();
   }
   let lastPos = null, zHomeMemo = null;

@@ -58,7 +58,7 @@ SPECIALTY = [  # (qty, item, notes) - docs "Specialty Parts"
     (1, "Wire sleeve", "optional"),
 ]
 OTHER = [
-    (1, 'Fulton 2-1/2" x 20 ft clear PVC dust collection hose (steel wire)', "user's; threads into the dust shoe; ground the wire"),
+    (1, '2-1/2" x 20 ft clear PVC dust collection hose (steel wire, 68 mm OD)', "user's; into the dust shoe; ground the wire"),
     (1, "Kobalt 1.25 HP trim router", "user's"),
     (1, "Zip ties (long)", "hose to the core's two tie tunnels, wires to the braces"),
 ]

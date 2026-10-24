@@ -20,7 +20,7 @@
   function loadScript(doc, src) {
     return new Promise((res, rej) => {
       const s = doc.createElement("script");
-      s.src = src;
+      s.src = (typeof lr4v === "function" ? lr4v : (u) => u)(src);   // cache busting on GitHub Pages (index.html)
       s.onload = res;
       s.onerror = () => rej(new Error("could not load " + src));
       doc.head.appendChild(s);
@@ -68,7 +68,7 @@
   async function start(opts = {}) {
     if (!root.crossOriginIsolated) throw new Error("FluidTouch needs a cross-origin isolated page (SharedArrayBuffer)");
     const base = new URL(opts.base || "fluidtouch/", root.location.href).href;
-    const info = await fetch(base + "build.json").then((r) => (r.ok ? r.json() : {})).catch(() => ({}));
+    const info = await fetch((typeof lr4v === "function" ? lr4v : (u) => u)(base + "build.json")).then((r) => (r.ok ? r.json() : {})).catch(() => ({}));
     let fluidnc = opts.fluidnc || null;
     const frameEl = document.createElement("iframe");
     frameEl.hidden = true;
@@ -131,7 +131,7 @@
     try {
       await loadScript(win.document, base + "fluidtouch.js");
       M = await win.createFluidTouch(Object.assign({
-        locateFile: (f) => base + f, print, printErr: print,
+        locateFile: (f) => (typeof lr4v === "function" ? lr4v : (u) => u)(base + f), print, printErr: print,
         onRestart: () => opts.onRestart && opts.onRestart(),
         onPowerOff: () => opts.onPowerOff && opts.onPowerOff(),
       }, net));

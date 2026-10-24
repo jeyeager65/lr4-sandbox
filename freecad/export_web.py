@@ -199,6 +199,8 @@ for o in doc.Objects:
         parts[-1]["finish"] = "steel"
     elif o.Name.startswith(("MGN12_Rail", "MGN12H")):   # linear rails + carriages: ground bearing steel
         parts[-1]["finish"] = "rail_steel"
+    elif o.Name == "TouchPlate":                    # 0.5 mm stainless, brushed
+        parts[-1]["finish"] = "stainless"
     elif o.Name.startswith(("TouchPlate_Clip_A", "TouchPlate_Clip_B", "TouchPlate_Clip_Screw")):   # BU-45: shiny zinc
         parts[-1]["finish"] = "zinc"
     elif o.Name == "TouchPlate_Clip_Spring":        # duller spring steel

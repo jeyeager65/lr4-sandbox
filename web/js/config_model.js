@@ -253,7 +253,7 @@
     router: [["Printed parts", 1, /^(Dust_Shoe|Dust_Skirt|Tool_Mount|TPU_Bristles)/], ["Buy: specialty", 1, /trim router/i],
       ["Hardware: where", 2, /^(Tool Mount|Dust Shoe)/]],
     skirt: [["Printed parts", 1, /^(Dust_Skirt|TPU_Bristles)/]],
-    hose: [["Buy: specialty", 1, /^Fulton|^Wire sleeve/], ["Printed parts", 1, /^(Dust_Shoe|Dust_Skirt|TPU_Bristles)/],   // the shoe goes with the hose
+    hose: [["Buy: specialty", 1, /dust collection hose|^Wire sleeve/], ["Printed parts", 1, /^(Dust_Shoe|Dust_Skirt|TPU_Bristles)/],   // the shoe goes with the hose
       ["Hardware: where", 2, /^Dust Shoe/]],                                                                         // and its slot screw
     fan: [["Buy: specialty", 1, /blower fan/i], ["Hardware: where", 2, /^Jackpot3 Fan/]],
   };

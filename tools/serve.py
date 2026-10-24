@@ -22,6 +22,7 @@ class Isolated(http.server.SimpleHTTPRequestHandler):
     def end_headers(self):
         self.send_header("Cross-Origin-Opener-Policy", "same-origin")
         self.send_header("Cross-Origin-Embedder-Policy", "credentialless")
+        self.send_header("Cache-Control", "no-cache")   # always check for a newer file (edited scripts show on reload)
         super().end_headers()
 
 

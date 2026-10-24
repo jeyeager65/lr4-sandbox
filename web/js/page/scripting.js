@@ -376,6 +376,7 @@
     if (shop) LR4Shop.cutaway(shop, camera.getWorldPosition(camPos));   // hide walls the camera is outside of
     jobTick();
     handTick();
+    touchAnimTick(dt);                               // the touch plate + clip going out / coming home (job.js)
     ctlTick();
     soundTick();
     if (pendant && pendantOn() && (FT.ft || ++frameN % 8 === 0)) pendantScreen();

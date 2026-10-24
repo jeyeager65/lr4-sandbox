@@ -26,7 +26,7 @@ import lr4                                        # noqa: E402
 
 N_X = 41                                          # X positions, home trip .. Max-end stop
 CUT_IN = 1.0                                      # flag a part the hose cuts into deeper than this (mm)
-ALLOW = {"YZ_Plate_Max": 3.0, "Dust_Shoe_Kobalt": 2.5}   # the shoe: the ~73 mm hose threads into its 69 socket
+ALLOW = {"YZ_Plate_Max": 3.0, "Dust_Shoe_Kobalt": 2.5}   # the shoe: the hose's end sits in its 69 socket
 THREADS = 12                                      # numpy releases the GIL in the heavy maths (Ryzen 9 3900X: 12 cores)
 COARSE = 4                                        # centreline samples per span for clearance (bends use 12)
 REPORT = 2.0                                      # list parts closer than this (mm); further ones aren't measured                     # the lower run lies against its back edge (the trays' line is

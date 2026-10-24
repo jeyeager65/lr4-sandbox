@@ -86,6 +86,7 @@
     brass: { c: [0.86, 0.69, 0.36], r: 0.32 },
     zinc: { c: [0.58, 0.60, 0.64], r: 0.34 },          // the touch plate's BU-45 clip + its screw (user: 0.80 / 0.22 too bright)
     spring_steel: { c: [0.60, 0.61, 0.63], r: 0.48 },
+    stainless: { c: [0.70, 0.71, 0.72], r: 0.30, brushed: true },   // the touch plate
     copper: { c: [0.95, 0.64, 0.54], r: 0.30 }};
   function creaseNormals(geo, deg) {                  // smooth across shallow angles, keep sharp edges sharp
     const g = geo.index ? geo.toNonIndexed() : geo;
@@ -719,7 +720,7 @@
   let pendant = null;                                 // { info, geos: { part: geometry }, screen: { geo, canvas, tex, key } }
   async function loadPendant() {
     try {
-      const get = async (f) => { const r = await fetch(PENDANT.dir + f); if (!r.ok) throw new Error(f + ": " + r.status); return r; };
+      const get = async (f) => { const r = await fetch(lr4v(PENDANT.dir + f)); if (!r.ok) throw new Error(f + ": " + r.status); return r; };
       const info = await (await get("pendant.json")).json(), geos = {};
       for (const [part] of PENDANT.parts) {           // binary STLs, already in the pendant frame (pendant_meshes.py)
         const g = new THREE.BufferGeometry();
@@ -961,12 +962,12 @@
 
   async function load() {
     progress("Loading model…", 0, "parts list");
-    const r = await fetch(DATA + "lr4_config.json");
+    const r = await fetch(lr4v(DATA + "lr4_config.json"));   // lr4v: cache busting (index.html)
     if (!r.ok) throw new Error("lr4_config.json " + r.status);
     cfg = await r.json();
     const total = cfg.geometry_bytes || 0;             // gzip of the meshes (fit_config.py / share_data.py)
     let got = 0;
-    const raw = await fetchBytes(DATA + "lr4_config_geometry.bin.gz", (n) => { got += n;
+    const raw = await fetchBytes(lr4v(DATA + "lr4_config_geometry.bin.gz"), (n) => { got += n;
       progress("Downloading geometry…", total ? got / total : null, total ? `${MB(got)} of ${MB(total)}` : MB(got)); });
     progress("Unpacking…", 1, "gzip");
     await nextFrame();

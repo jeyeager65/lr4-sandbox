@@ -39,6 +39,8 @@ jobs:
           mkdir -p _site
           cp -r web/. _site/
           rm -f _site/viewer.html
+          # cache busting: Pages serves everything with max-age=600; ?v=<commit> on the page's files and loads
+          python tools/stamp_build.py _site/index.html "${GITHUB_SHA::7}"
 
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3

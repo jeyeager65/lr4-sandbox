@@ -64,7 +64,7 @@
   function loadScript(doc, src) {
     return new Promise((res, rej) => {
       const s = doc.createElement("script");
-      s.src = src;
+      s.src = (typeof lr4v === "function" ? lr4v : (u) => u)(src);   // cache busting on GitHub Pages (index.html)
       s.onload = res;
       s.onerror = () => rej(new Error("could not load " + src));
       doc.head.appendChild(s);
@@ -96,7 +96,7 @@
   async function start(opts = {}) {
     if (!root.crossOriginIsolated) throw new Error("FluidNC needs a cross-origin isolated page (SharedArrayBuffer)");
     const base = new URL(opts.base || "fluidnc/", root.location.href).href;
-    const info = await fetch(base + "build.json").then((r) => (r.ok ? r.json() : {})).catch(() => ({}));
+    const info = await fetch((typeof lr4v === "function" ? lr4v : (u) => u)(base + "build.json")).then((r) => (r.ok ? r.json() : {})).catch(() => ({}));
     const frame = document.createElement("iframe");   // about:blank: same origin, inherits the page's isolation
     frame.hidden = true;
     frame.setAttribute("aria-hidden", "true");
@@ -122,7 +122,7 @@
     let Module;
     try {
       await loadScript(win.document, base + "program.js");
-      Module = await win.FluidNCModule({ locateFile: (f) => base + f, print: () => {}, printErr: () => {} });
+      Module = await win.FluidNCModule({ locateFile: (f) => (typeof lr4v === "function" ? lr4v : (u) => u)(base + f), print: () => {}, printErr: () => {} });
     } catch (e) { stop(); throw e; }
     const FS = Module.FS;
     // queued output (wasm-sim): FluidNC appends, the page takes it on a timer - so a busy page never stalls FluidNC

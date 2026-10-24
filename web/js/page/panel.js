@@ -181,7 +181,7 @@
     const inTree = new Set(listed);
     for (const m of meshes) m.visible = inTree.has(m) && LR4ShowTree.on(tree, showOff, partId(m))
       && (!INSPECT || INSPECT.set.has(partId(m)))
-      && !(probing && PROBE_OFF.test(m.userData.name)) && !(jobBit && m.userData.name === "Router_Bit");
+      && !(TOUCH_ANIM.skirt >= 1 && PROBE_OFF.test(m.userData.name)) && !(jobBit && m.userData.name === "Router_Bit");   // off once it's slid out (job.js)
     const rb = meshes.find((m) => m.userData.name === "Router_Bit");
     bitOK = !!rb && inTree.has(rb) && LR4ShowTree.on(tree, showOff, partId(rb)) && (!INSPECT || INSPECT.set.has(partId(rb)));
     if (!bitOK && JOB.bits) for (const b of JOB.bits.values()) b.visible = false;

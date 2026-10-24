@@ -172,6 +172,9 @@ XBELT_TENSION_SHIFT = -2.0       # X_Belt tensioner along X from its tongue-on-l
                                  # the strut plate from -4 to 0 (the screw's travel); -2 = mid (2026-10-18)
 XBELT_SLOT_D = (45.96, 102.06)   # XZ_Min DXF: the angled belt pocket (3.4 x 12.9, 7 deg, under a 2 mm neck from the
                                  # top edge) - its centre in D; the belt passes through it
+XBELT_MAX_SCREW_SHIFT = (2.3, 2.7)  # world x, y from the X belt's tensioner end to its M3: the round pocket above the
+                                    # belt's channel in X_Belt (scan of the STL, 2026-10-24; in the channel its head
+                                    # ran 1.6 mm into the tensioner); 2.7 to the run's teeth side
 XBELT_SCREW_SHIFT = (-11.0, -1.86)   # world x, y from that pocket centre to the M3 the X belt's Min end loops round (the
                                      # belt stays in the plate's slot: the screw sits 1.86 to its smooth side, the run
                                      # dips under it so the teeth mesh after the wrap - hw.belt_end_loop lateral): the
@@ -724,7 +727,7 @@ def table_parts(kind, TW, TL, xtable, ytable, cut_x, cut_y, T=None, c=None):
 
 
 # ---- vacuum hose -------------------------------------------------------------------------------
-# Fulton 2-1/2" x 20' clear PVC dust collection hose, steel wire helix (user, 2026-10-18), from the Kobalt
+# 2-1/2" x 20' clear PVC dust collection hose, steel wire helix (user, 2026-10-18), from the Kobalt
 # dust shoe to a vac on the floor off the Min end. Clamped in the Min-end holder; between the clamp and the
 # core it works like a drag chain: the lower run lies in the holder trays out toward the Max end, U-turns
 # up, and the upper run rides on top of it back to the core. The U-turn rolls at half the core's speed, so
@@ -732,7 +735,7 @@ def table_parts(kind, TW, TL, xtable, ytable, cut_x, cut_y, T=None, c=None):
 # live). KEEP hose_route / catmull_rom IN STEP WITH hoseRoute / CatmullRomCurve3 in
 # exports/web/LowRider4.html.
 HOSE = dict(
-    od=73.0,          # 2.5" ID wire hose, ~73 OD (GUESS - MEASURE YOURS); it threads into the shoe's 69 mm socket
+    od=68.0,          # 2.5" ID wire hose, 68 mm OD (user-measured 2026-10-24); it goes into the shoe's 69 mm socket
     cuff_in=9.0,      # how far it goes down into the socket (the 69 mm part is 8.9 deep)
     port_kobalt=(70.6, -58.16, 73.98),   # top of the dust shoe's hose socket (d 60.6, 69 at the top), Kobalt frame
     clear=6.0,        # air under the hose where it crosses the router's top

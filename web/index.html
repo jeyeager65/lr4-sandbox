@@ -8,6 +8,11 @@
      (GitHub Pages): the service worker adds them, after one reload on the first visit. credentialless keeps the
      CDN scripts and fonts loading. tools/serve.py sends the headers itself, and then the worker stays out. -->
 <script>window.coi = { coepCredentialless: () => true, quiet: true };</script>
+<!-- Cache busting: GitHub Pages serves everything with max-age=600 and no way to change it, so a returning visitor
+     could mix new and old files for a while. The Pages workflow (tools/stamp_build.py) sets LR4_BUILD to the commit
+     and adds ?v= to the local script / style tags below; lr4v() does the same for what the page loads itself
+     (data, models, the firmware builds). Blank when served locally: URLs unchanged. -->
+<script>window.LR4_BUILD = ""; window.lr4v = (u) => (window.LR4_BUILD ? u + (u.includes("?") ? "&" : "?") + "v=" + window.LR4_BUILD : u);</script>
 <script src="coi-serviceworker.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=Barlow:wght@400;500&family=IBM+Plex+Mono:wght@400;500&display=swap">
