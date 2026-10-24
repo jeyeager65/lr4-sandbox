@@ -239,6 +239,86 @@ def belt_path(start, wraps, end, step_deg=5.0):
 GT2 = dict(pitch=2.0, tooth_h=0.75, base=1.15, tip=0.75)    # GT2 profile, simplified to a trapezoid
 
 
+def belt_end_loop(face, into, side, block, gap=2.9, screw_r=1.5, thick=1.4, slot=2.2, extra=4.0, n=16, lateral=0.0,
+                  run_phase=0.0, run_sign=1):
+    """A belt end looped round a screw at a holder (V1E LR4 yb1/yb2, xb1/xb2: "loop the belt around an M3 screw",
+    pulling the belt seats the screw on the holder's face; the end comes back through the slot with a couple of
+    teeth showing). 2D, in the belt_path plane: `face` = where the run meets the holder's outer face, `into` = unit
+    direction from there into the holder along the run, `side` = +1 / -1: the screw and the tail lie left / right
+    of `into` - the run's teeth side (the teeth face the screw and mesh in the slot). `block` = the slot's length.
+    `lateral` = the screw this far off the run's line toward the tail side (a holder whose screw seat sits beside the
+    belt's slot; negative = toward the run's other side: the run then dips round it and the tail still comes back on
+    the teeth side, so the teeth mesh).
+    The tail's teeth sit in the run's gaps (meshed: the layers' centre lines thick - tooth height apart): run_phase =
+    the run band's phase + its arc length at the face, run_sign = +1 if that band runs from the face into the
+    holder's side of the machine (its arc grows along `into`), -1 if it ends at the face.
+    The shape is a teardrop: from the face the run eases off its line in a small reverse curve, wraps the screw (more
+    than half way round its far side), and eases back in an S onto the tail's line at the face; where a curve can't
+    fit (the line outside the wrap circle) that side is a straight tangent instead.
+    Returns (points, screw centre, teeth, phase, cuts): the polyline face -> round the screw -> back through the slot
+    to the tail end, the belt_band teeth sense + phase for it, and where belt_loop_band splits it into pieces."""
+    fx, fy = face
+    dx, dy = into
+    tx, ty = -dy * side, dx * side                         # toward the screw / tail
+    rc = screw_r + thick / 2                               # belt centre line round the screw
+    off = min(thick - GT2["tooth_h"], slot - 0.3)          # the tail beside the run in the slot, teeth interlocked
+    # the screw sits on the run's line, pulled against the face (the holders' channels seat it there - LR4 Y holders:
+    # 0.7 mm toward the tail puts its head into the channel wall); the run bends out round it, the tail back in
+    cx, cy = fx - dx * gap + tx * lateral, fy - dy * gap + ty * lateral
+    # local frame on the screw: u toward the face (along `into`), w toward the tail
+    P = lambda u, w: (cx + dx * u + tx * w, cy + dy * u + ty * w)
+    wr, wt = -lateral, -lateral + off                      # the run's and the tail's lines
+
+    def arc(cu, cw, r, a0, a1, k):                         # k points after the start, a0 -> a1 (radians, signed sweep)
+        return [P(cu + r * math.cos(a0 + (a1 - a0) * i / k), cw + r * math.sin(a0 + (a1 - a0) * i / k)) for i in range(1, k + 1)]
+
+    def ease(w, sgn):
+        """the S from the face point (gap, w) onto the screw circle on the sgn side (-1 run, +1 tail): a fillet tangent
+        to the line at the face and to the circle (outside it) -> (points face -> circle, angle on the circle)"""
+        den = 2 * (rc + sgn * -w) if sgn < 0 else 2 * (rc - w)
+        if den > 1e-6:
+            rf = (gap ** 2 - rc ** 2 + w ** 2) / den
+            if rf > 0.05:
+                fu, fw = gap, w + sgn * rf                 # fillet centre beside the line, away from the screw's side
+                ang = math.atan2(fw, fu)                   # the touching point is on the line of centres
+                a0 = math.atan2(-sgn, 0.0)                 # the face point, seen from the fillet centre
+                a1 = math.atan2(-fw, -fu)
+                sweep = (a1 - a0 + math.pi) % (2 * math.pi) - math.pi
+                return [P(gap, w)] + arc(fu, fw, rf, a0, a0 + sweep, 8), ang
+        d = math.hypot(gap, w)                             # straight tangent from the face point
+        ang = math.atan2(w, gap) + sgn * math.acos(min(1.0, rc / d))
+        return [P(gap, w), P(rc * math.cos(ang), rc * math.sin(ang))], ang
+
+    run_pts, a_in = ease(wr, -1)
+    tail_pts, a_out = ease(wt, 1)
+    a_end = a_out
+    while a_end > a_in:                                    # round the far side (through u < 0): angle falls
+        a_end -= 2 * math.pi
+    pts = run_pts + arc(0.0, 0.0, rc, a_in, a_end, n)
+    i_wrap = len(run_pts) - 1
+    i_tail = len(pts) - 1
+    pts += list(reversed(tail_pts))[1:]                    # circle -> S -> the tail's face point (Q)
+    i_q = len(pts) - 1
+    pts.append(P(gap + block + extra, wt))
+    # tooth k of a band is centred at arc k * pitch - phase + base / 2: put the tail's half a pitch past the run's
+    lq = sum(math.dist(a, b) for a, b in zip(pts[:i_q], pts[1:i_q + 1]))   # arc length to the slot mouth (Q)
+    p, b = GT2["pitch"], GT2["base"]
+    ph = (run_phase if run_sign > 0 else b - run_phase) - lq - p / 2
+    return pts, (cx, cy), -side, ph % p, [0, i_wrap, i_tail, i_q, len(pts) - 1]
+
+
+def belt_loop_band(points, cuts, z, teeth=0, phase=0.0, plane=None, **kw):
+    """belt_band for a belt_end_loop polyline, split at its `cuts`: one band per piece - the run's S, the wrap, the
+    tail's S, the tail - so the tight turns don't fold the outline over itself (one band would be an invalid face
+    that doesn't mesh). The teeth stay in step across the pieces. A compound."""
+    out, s = [], 0.0
+    for a, b in zip(cuts, cuts[1:]):
+        seg = points[a:b + 1]
+        out.append(belt_band(seg, z, plane=plane, teeth=teeth, phase=phase + s, **kw))
+        s += sum(math.dist(p, q) for p, q in zip(seg, seg[1:]))
+    return Part.makeCompound(out)
+
+
 def belt_band(points, z, width=10.0, thick=1.4, plane=None, teeth=0, phase=0.0):
     """Belt solid along a 2D centre line (belt_path points) in the plane z = `z` (width centred on it),
     then moved by `plane` (an App.Placement, e.g. to put the path in a vertical plane).
@@ -466,6 +546,63 @@ def button_screw(d, length, pl=None, drive="phillips", head_d=None, head_h=None,
     return _moved(_shank(d, length, thread).fuse(head), pl)
 
 
+def coil_spring(wire_d, od, length, coils, pl=None):
+    """Helical compression spring along +z from 0 to length: wire_d wire, od outside diameter, `coils` turns (open
+    ends - closed end turns fused to the coil came out invalid). Swept round a helix."""
+    r = od / 2 - wire_d / 2
+    pitch = (length - wire_d) / coils
+    helix = Part.makeHelix(pitch, length - wire_d, r)
+    helix.translate(V(0, 0, wire_d / 2))
+    e = helix.Edges[0]
+    prof = Part.Wire(Part.makeCircle(wire_d / 2, e.valueAt(e.FirstParameter), e.tangentAt(e.FirstParameter)))
+    return _moved(Part.Wire(helix.Edges).makePipeShell([prof], True, True), pl)
+
+
+def coil_spring_bent(wire_d, od, p0, d0, p1, d1, coils, side=None, samples=24):
+    """Compression spring whose axis bends from p0 (leaving along unit d0) to p1 (arriving along unit d1) - a cubic
+    Bezier spine - e.g. squeezed between two faces at an angle, each end square to its face. `side` = a unit vector
+    across the bend (default: perpendicular to d0 and d1). Points sampled on the coil, interpolated, swept."""
+    r = od / 2 - wire_d / 2
+    L = (p1 - p0).Length
+    c0, c1 = p0 + d0 * (L / 3), p1 - d1 * (L / 3)
+    spine = lambda t: p0 * (1 - t) ** 3 + c0 * (3 * t * (1 - t) ** 2) + c1 * (3 * t * t * (1 - t)) + p1 * t ** 3
+    dspine = lambda t: ((c0 - p0) * (3 * (1 - t) ** 2) + (c1 - c0) * (6 * t * (1 - t)) + (p1 - c1) * (3 * t * t))
+    X = side or d0.cross(d1)
+    if X.Length < 1e-9:                                # straight: any vector across the axis
+        X = d0.cross(V(1, 0, 0)) if abs(d0.x) < 0.9 else d0.cross(V(0, 1, 0))
+    X = X.normalize()
+    pts = []
+    n = int(coils * samples)
+    for i in range(n + 1):
+        t = i / n
+        T = dspine(t).normalize()
+        N = T.cross(X).normalize()                     # across the axis, in the bend's plane
+        Xi = N.cross(T).normalize()
+        a = 2 * math.pi * coils * t
+        pts.append(spine(t) + N * (r * math.cos(a)) + Xi * (r * math.sin(a)))
+    curve = Part.BSplineCurve()
+    curve.interpolate(pts)
+    e = curve.toShape()
+    prof = Part.Wire(Part.makeCircle(wire_d / 2, e.valueAt(e.FirstParameter), e.tangentAt(e.FirstParameter)))
+    return Part.Wire([e]).makePipeShell([prof], True, True)
+
+
+def round_head_screw(d, length, pl=None, head_d=None, head_h=None, rim=0.0, slot=True, thread=False, pitch=None):
+    """Slotted round head machine screw (ASME B18.6.3 proportions: #6 head 6.6 x 2.9): domed head on z <= 0,
+    shank along +z. rim = straight height under the dome (part of head_h). slot=False leaves the dome plain.
+    thread=True models the thread (pitch in mm; inch screws: 25.4 / TPI, e.g. 6-40 -> 0.635)."""
+    dk, k = head_d or 1.89 * d, head_h or 0.82 * d
+    a, h = dk / 2, k - rim
+    R = (a * a + h * h) / (2 * h)                  # sphere through the rim's top edge and the crown
+    head = Part.makeSphere(R, V(0, 0, -k + R)).common(Part.makeBox(dk, dk, h, V(-a, -a, -k)))
+    if rim > 0:
+        head = head.fuse(Part.makeCylinder(a, rim, V(0, 0, -rim))).removeSplitter()
+    if slot:
+        w, dep = 0.28 * d, 0.55 * k
+        head = head.cut(Part.makeBox(dk + 1, w, dep + 0.01, V(-a - 0.5, -w / 2, -k - 0.01)))
+    return _moved(_shank(d, length, thread, pitch).fuse(head), pl)
+
+
 def hex_bolt(d, length, pl=None, thread=False, thread_len=None):
     """Hex head bolt: head on z <= 0, shank along +z. thread=True models the thread over the last
     thread_len mm (default ISO 4014: 2d + 6, i.e. partly threaded - M8 x 40 has 22 mm of thread)."""
@@ -511,7 +648,7 @@ def leadscrew_t8(length, pl=None, thread=True):
 
 COPPER = (0.80, 0.48, 0.32)
 TOUCH_PLATE_COLOURS = {"plate": (0.72, 0.73, 0.74), "spade": (0.80, 0.12, 0.10), "clip": ZINC,
-                       "wire_plate": (0.80, 0.12, 0.10), "wire_clip": (0.06, 0.06, 0.06)}
+                       "wire_plate": (0.80, 0.12, 0.10), "wire_clip": (0.06, 0.06, 0.06), "spade_metal": STEEL}
 
 
 def alligator_clip(pl=None, grip=0.5, bite=3.0, wire=25.0):
@@ -598,8 +735,32 @@ def alligator_clip(pl=None, grip=0.5, bite=3.0, wire=25.0):
     return _moved(clip, pl), _moved(cw, pl)
 
 
+BU45_PIECES = ("a", "b", "screw", "spring", "wire_core", "wire_insulation", "magnet")
+BU45_COLOURS = {"a": ZINC, "b": ZINC, "screw": ZINC, "spring": STEEL, "wire_core": COPPER,
+                "wire_insulation": (0.06, 0.06, 0.06), "magnet": STEEL}
+
+
+def bu45_clip(folder, pl=None, clip=None):
+    """The detailed Mueller BU-45 clip (D:/FreeCAD/Projects/AlligatorClip, the user's model; its export_brep.py writes
+    `folder`: one .brep per piece + clip.json) holding the touch plate's 3.15 x 12.6 rod magnet in its jaws:
+    {a, b, screw, spring, wire_core, wire_insulation, magnet} (BU45_COLOURS). Frame: origin = the magnet's middle on
+    its axis, x along the rod, the clip hanging to -z (tail end at z ~ -42), the jaws opening across y. `clip`: a
+    Placement in that frame moving the clip but not the magnet (slid along / turned round the rod). Pieces A and B
+    carry hand-made fillets that FreeCAD calls invalid (isValid False) - fine to draw / mesh, but check overlaps as
+    meshes, not solid booleans. The old hand-built `alligator_clip` stays for the tiny touch plate."""
+    import os
+    out = {}
+    for k in BU45_PIECES:
+        s = Part.Shape()
+        s.read(os.path.join(folder, k + ".brep"))       # the export's move comes back as its Placement: compose,
+        if clip is not None and k != "magnet":          # never overwrite it
+            s.Placement = clip.multiply(s.Placement)
+        out[k] = _moved(s, pl)
+    return out
+
+
 def tiny_touch_plate(pl=None, pad=18.0, strip_w=8.0, length=85.0, t=0.5, tab=(6.35, 7.0), clip=True, wire=25.0,
-                     clip_at=None):
+                     clip_at=None, detail=False, hole=(1.0, 4.3), necks=((4.0, 3.9), (6.3, 3.0))):
     """V1 Engineering Tiny Touch Plate (0.5 mm stainless; user-measured 18 x 18 pad, 8 mm strip, 85 long): a
     paddle with a 1/4" tab at the end for the red insulated spade connector on its wire, and (clip=True) the kit's
     copper alligator clip stored biting the pad's top edge (V1E: keep the clip and the plate touching).
@@ -607,11 +768,18 @@ def tiny_touch_plate(pl=None, pad=18.0, strip_w=8.0, length=85.0, t=0.5, tab=(6.
     at z = 0), strip and tab hanging down to z = pad - length. `wire` mm stubs of the two wires.
     clip_at = None: the clip bites the pad's top edge, body up; (z, side): it bites the strip's side edge (side +1 =
     +x, -1 = -x) at height z, its body sticking out sideways.
-    Returns {plate, spade, wire_plate, clip, wire_clip} (TOUCH_PLATE_COLOURS)."""
+    detail=True (lr4, user 2026-10-24, from the V1E kit photos; sizes GUESSED from them): tab -> a short neck
+    (necks[0] = width, length) -> the strip (rounded ends) -> a narrower neck (necks[1]) -> the pad, every step with
+    small S-curves; a `hole` (diameter, centre from the tab's end) in the tab; the 0.110" connector: the tinned
+    receptacle (two rolled curls) pushed onto the tab up to its neck (spade_metal) + crimp + the red insulated sleeve,
+    narrow at the metal, wider at the wire end (spade) - pass tab=(2.8, 6.8).
+    Returns {plate, spade, wire_plate, clip, wire_clip} (+ spade_metal with detail; TOUCH_PLATE_COLOURS)."""
     tw, tl = tab
     zb = pad - length                                      # bottom of the tab
     box = lambda w, z0, z1: Part.makeBox(w, t, z1 - z0, V(-w / 2, -t / 2, z0))
     plate = box(pad, 0.0, pad).fuse([box(strip_w, zb + tl, 0.0), box(tw, zb, zb + tl + 0.5)]).removeSplitter()
+    if detail:
+        return _touch_plate_detail(pl, pad, strip_w, t, tw, tl, zb, wire, hole, necks)
     # insulated female disconnect: red sleeve over the tab, barrel, wire out of its end
     sleeve = Part.makeBox(9.5, 5.0, 13.0, V(-4.75, -2.5, zb + tl - 13.0))   # up to the tab's shoulder
     hole = Part.makeBox(tw + 0.4, t + 0.4, tl + 0.6, V(-(tw + 0.4) / 2, -(t + 0.4) / 2, zb - 0.1))   # the tab's slot
@@ -630,6 +798,57 @@ def tiny_touch_plate(pl=None, pad=18.0, strip_w=8.0, length=85.0, t=0.5, tab=(6.
                 s_.translate(V(side * strip_w / 2, 0, zc))
         out["clip"] = cl
         out["wire_clip"] = cw
+    return {k: _moved(v, pl) for k, v in out.items()}
+
+
+def _touch_plate_detail(pl, pad, strip_w, t, tw, tl, zb, wire, hole, necks):
+    """tiny_touch_plate(detail=True): the stepped outline with its curves + tab hole, the receptacle + sleeve."""
+    (n1w, n1l), (n2w, n2l) = necks
+    zs = zb + tl                                           # tab -> neck 1 (the receptacle stops here)
+    z1 = zs + n1l                                          # neck 1 -> strip
+    z2 = -n2l                                              # strip -> neck 2 (neck 2 -> pad at z 0)
+    box = lambda w, za, zz: Part.makeBox(w, t, zz - za, V(-w / 2, -t / 2, za))
+    plate = box(pad, 0.0, pad).fuse([box(n2w, z2 - 0.5, 0.5), box(strip_w, z1, z2), box(n1w, zs, z1 + 0.5),
+                                     box(tw, zb, zs + 0.5)]).removeSplitter()
+    # corner (|x|, z) -> radius: inside corners get material (S-curves with the outside ones next to them)
+    corners = [((n2w / 2, 0.0), 1.0), ((pad / 2, 0.0), 0.8), ((pad / 2, pad), 0.8),
+               ((n2w / 2, z2), 0.35), ((strip_w / 2, z2), 0.35), ((strip_w / 2, z1), 0.8), ((n1w / 2, z1), 0.4),
+               ((n1w / 2, zs), 0.3), ((tw / 2, zs), 0.25), ((tw / 2, zb), 0.3)]
+
+    def through(s, x, z):                                  # the edges through the thickness (along y) at (+-x, z)
+        out = []
+        for e in s.Edges:
+            a, b = e.Vertexes[0].Point, e.Vertexes[-1].Point
+            if abs(a.x - b.x) < 1e-6 and abs(a.z - b.z) < 1e-6 and abs(abs(a.x) - x) < 1e-3 and abs(a.z - z) < 1e-3:
+                out.append(e)
+        return out
+    for (x, z), r in corners:                              # one corner pair at a time: edges re-found after each
+        es = through(plate, x, z)
+        if es:
+            plate = plate.makeFillet(r, es)
+    hd, hz = hole
+    plate = plate.cut(Part.makeCylinder(hd / 2, t + 2, V(0, -t / 2 - 1, zb + hz), V(0, 1, 0)))
+    # 0.110" female receptacle (GUESS from the photo: 3.9 wide, 2.0 thick, 9.3 long): two curls side by side, rolled
+    # over the tab's edges from a flat back, open at the neck end
+    lr, cr = 9.3, 1.0
+    zt = zs - 0.3                                          # its open end, just short of the neck's step (and its fillet)
+    zr = zt - lr
+    rec = Part.makeBox(tw + 1.1, 0.35, lr, V(-(tw + 1.1) / 2, -cr, zr))   # the flat back
+    for sx in (-1, 1):                                     # each curl: a tube, its bore round the tab's edge
+        rec = rec.fuse(Part.makeCylinder(cr, lr, V(sx * 0.95, 0, zr)).cut(Part.makeCylinder(cr - 0.3, lr, V(sx * 0.95, 0, zr))))
+    rec = rec.cut(Part.makeBox(tw + 0.2, t + 0.15, lr + 1, V(-(tw + 0.2) / 2, -(t + 0.15) / 2, zr - 0.5)))   # the tab's slot
+    zc = zr - 1.5                                          # crimp: a short silver neck, then the red sleeve
+    rec = rec.fuse(Part.makeBox(2.4, 1.6, 1.6, V(-1.2, -0.8, zc))).removeSplitter()   # 0.1 into the curls
+    # red sleeve (photo): narrow (4.0) next to the metal, then wider (5.0) to the wire end, its end rounded
+    s1, s2 = (4.0, 5.7), (5.0, 4.5)
+    sleeve = Part.makeCylinder(s1[0] / 2, s1[1] + 0.2, V(0, 0, zc + 0.2), V(0, 0, -1))
+    zw = zc - s1[1]
+    big = Part.makeCylinder(s2[0] / 2, s2[1], V(0, 0, zw), V(0, 0, -1))
+    big = big.makeFillet(0.8, [e for e in big.Edges if abs(e.Vertexes[0].Point.z - (zw - s2[1])) < 1e-6])
+    sleeve = sleeve.fuse(big).removeSplitter()
+    ze = zw - s2[1]
+    out = {"plate": plate, "spade": sleeve, "spade_metal": rec,
+           "wire_plate": Part.makeCylinder(0.9, wire, V(0, 0, ze), V(0, 0, -1))}
     return {k: _moved(v, pl) for k, v in out.items()}
 
 
@@ -790,7 +1009,8 @@ def _rrect(depth, width, r, z0, h, dy=0.0):
 
 
 KOBALT_K7TR03 = dict(            # Kobalt K7TR-03 7 A trim router (user-measured 2026-10-19; z from the collet nut's bottom)
-    nut=(16.0, 13.0),               # ER11 nut: diameter, height (photo; button centre 25 up, 12 above the nut's top)
+    nut=(16.9, 13.0),               # ER11 nut: across the flats (user-measured 2026-10-24), height (photo; button centre 25 up)
+    nut_hex=True,                   # hex nut, `nut` diameter = across the flats (user 2026-10-24); False = round
     spindle=(12.0, 4.0),            # threaded spindle between nut and nose: diameter, length (photo)
     nose=(30.4, 11.0),              # cast nose under the grip (fits the dust shoe's 31 mm collar): diameter, length
     grip=(65.8, 100.0),             # polished cylinder: diameter, length (28 .. 128 up)
@@ -844,8 +1064,13 @@ def kobalt_k7tr03(pl=None, switch_deg=0.0, **dims):
     g0 = nh + sl + ol                                       # grip bottom (28)
     g1 = g0 + gl                                            # grip top / cast seam (128)
     hb = top - H                                            # blue's bottom along the sides (169)
-    nut = Part.makeCylinder(nd / 2, nh, V(0, 0, 0))
-    nut = nut.makeChamfer(1.0, [e for e in nut.Edges if abs(e.Vertexes[0].Point.z) < 1e-6])
+    rc = nd / 2 / math.cos(math.pi / 6) if d.get("nut_hex") else nd / 2   # across the corners
+    nut = Part.makeCylinder(rc * (0.96 if d.get("nut_hex") else 1.0), nh, V(0, 0, 0))
+    nut = nut.makeChamfer(1.2 if d.get("nut_hex") else 1.0, [e for e in nut.Edges if abs(e.Vertexes[0].Point.z) < 1e-6])
+    if d.get("nut_hex"):                                    # hex prism, its corners turned off by the chamfered round
+        hexf = Part.Face(Part.makePolygon([V(rc * math.cos(math.pi / 3 * i), rc * math.sin(math.pi / 3 * i), 0)
+                                           for i in range(7)]))
+        nut = hexf.extrude(V(0, 0, nh)).common(nut)
     body = Part.makeCylinder(sd / 2, sl + 0.5, V(0, 0, nh))
     nose = Part.makeCylinder(od / 2, ol, V(0, 0, nh + sl))
     nose = nose.makeChamfer(1.0, [e for e in nose.Edges if abs(e.Vertexes[0].Point.z - nh - sl) < 1e-6])

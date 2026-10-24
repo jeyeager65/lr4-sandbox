@@ -27,7 +27,7 @@ for (const a of tree.asms) for (const k of a.kinds) {
   ok(new Set(ids).size === ids.length, "unique ids in " + k.id);
   ok(k.n === k.parts.reduce((s, q) => s + q.n, 0), "count " + k.id);
 }
-ok(tree.asms.map((a) => a.id).join() === "table,yz-min,yz-max,beam,core,router,hose,electronics,pendant", "assemblies " + tree.asms.map((a) => a.id));
+ok(tree.asms.map((a) => a.id).join() === "table,yz-min,yz-max,beam,core,router,touch,hose,electronics,pendant", "assemblies " + tree.asms.map((a) => a.id));
 
 // moves
 ok(where("Belt_Y_Min_Front").join() === "table.hardware", "Y belt with the table: " + where("Belt_Y_Min_Front"));
@@ -142,10 +142,11 @@ ok(!rows(bare, "Printed parts").some((r) => /^(Dust_|Tool_Mount|TPU_)/.test(r[1]
 ok(!rows(bare, "Buy: specialty").some((r) => /router|Fulton|blower|Wire sleeve/i.test(r[1])), "no router / hose / fan to buy");
 ok(!rows(bare, "Hardware: where").some((r) => /^(Tool Mount|Jackpot3 Fan)/.test(r[2])), "their fasteners gone");
 const m5 = kitRow(all, "M5 x 30 mm button head screw"), m5b = kitRow(bare, "M5 x 30 mm button head screw");
-ok(m5[1] - m5b[1] === 6 && m5[2] - m5b[2] === 6, `kit: 6 fewer M5 (tool mount): ${m5} / ${m5b}`);
-ok(kitRow(all, "M5 nylock nut")[1] - kitRow(bare, "M5 nylock nut")[1] === 6, "kit: 6 fewer M5 nylocks");
+ok(m5[1] - m5b[1] === 7 && m5[2] - m5b[2] === 7, `kit: 7 fewer M5 (tool mount + dust shoe): ${m5} / ${m5b}`);
+ok(kitRow(all, "M5 nylock nut")[1] - kitRow(bare, "M5 nylock nut")[1] === 7, "kit: 7 fewer M5 nylocks");
 ok(!kitRow(bare, "M3 x 20 mm button head screw"), "kit: no M3 x 20 without the fan");
-ok(/^177 fasteners/.test(bare.find((q) => q.title.startsWith("Hardware: where")).note), "where note recounted (185 - 6 tool mount - 2 fan)");
+ok(/^177 fasteners/.test(bare.find((q) => q.title.startsWith("Hardware: where")).note),
+   "where note recounted (186 - 6 tool mount - 1 dust shoe - 2 fan)");
 const skirt = bomWith({ router: true, skirt: false, hose: true, fan: true });
 ok(!rows(skirt, "Printed parts").some((r) => /^(Dust_Skirt|TPU_)/.test(r[1])) && rows(skirt, "Printed parts").some((r) => r[1] === "Dust_Shoe_Kobalt"),
   "no skirt: shoe stays");

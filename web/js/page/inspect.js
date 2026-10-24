@@ -27,6 +27,7 @@
     document.body.classList.add("inspecting");
     document.getElementById("insp").hidden = false;
     applyVisibility();
+    freeTurn(true);                                   // turns any way (a trackball), not just round Z
     const d = camera.position.clone().sub(controls.target);
     fitView([d.x, d.y, d.z]);
     INSPECT.step = radius * 0.35;                     // explode: the slider's full travel moves a part this far per step
@@ -41,7 +42,9 @@
     document.getElementById("insp").hidden = true;
     applyVisibility();
     center.copy(s.center); radius = s.radius;
-    camera.position.copy(s.pos); controls.target.copy(s.target); controls.update();
+    camera.position.copy(s.pos); controls.target.copy(s.target);
+    freeTurn(false);                                  // upright again
+    upright();
   }
   function inspectScene() {                           // the set (after applyVisibility's tree), scenery, the parts list
     if (shop) shop.visible = !INSPECT;

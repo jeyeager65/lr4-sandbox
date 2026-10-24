@@ -160,6 +160,15 @@ for o in doc.Objects:
             import MeshPart
             fm = MeshPart.meshFromShape(Shape=plain_shape(o), LinearDeflection=TESSELLATE_FASTENERS, AngularDeflection=0.35)
             pts, facets = fm.Topology
+            import numpy as np                            # a bad face meshes a stray point far off (the BU-45 clip's
+            P = np.array([tuple(p) for p in pts])         # A; its shape's BoundBox includes it): drop facets reaching
+            lo, hi = np.percentile(P, 1, axis=0) - 2.0, np.percentile(P, 99, axis=0) + 2.0   # outside the points' own box
+            ok = np.all((P >= lo) & (P <= hi), axis=1)
+            if not ok.all() and o.Name.startswith("TouchPlate_Clip_"):   # only there: it trims real corners elsewhere
+                facets = [f for f in facets if all(ok[i] for i in f)]
+                used = sorted({i for f in facets for i in f})
+                ren = {i: n for n, i in enumerate(used)}
+                pts, facets = [pts[i] for i in used], [tuple(ren[i] for i in f) for f in facets]
         else:
             pts, facets = o.Shape.tessellate(TESSELLATE)
         source = "made" if o.Name.startswith(("StrutPlate", "TableMDF", "TableBase", "TableRib_", "RailStrip_", "Spoilboard", "XZ_Plate")) else "hardware"
@@ -190,6 +199,12 @@ for o in doc.Objects:
         parts[-1]["finish"] = "steel"
     elif o.Name.startswith(("MGN12_Rail", "MGN12H")):   # linear rails + carriages: ground bearing steel
         parts[-1]["finish"] = "rail_steel"
+    elif o.Name.startswith(("TouchPlate_Clip_A", "TouchPlate_Clip_B", "TouchPlate_Clip_Screw")):   # BU-45: shiny zinc
+        parts[-1]["finish"] = "zinc"
+    elif o.Name == "TouchPlate_Clip_Spring":        # duller spring steel
+        parts[-1]["finish"] = "spring_steel"
+    elif o.Name == "TouchPlate_Clip_Wire":          # bare copper core at the crimp
+        parts[-1]["finish"] = "copper"
     elif near(hw.ALUMINIUM):
         parts[-1]["finish"] = "aluminium_plate" if o.Name.startswith("XZ_Plate") else "aluminium"
     elif near(hw.STEEL):

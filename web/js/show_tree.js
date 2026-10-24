@@ -11,7 +11,7 @@
 (function (root) {
   "use strict";
   const ASM = [["table", "Table + Y rail"], ["yz-min", "YZ Min side"], ["yz-max", "YZ Max side"], ["beam", "Beam"],
-    ["core", "Core"], ["router", "Router + dust shoe"], ["hose", "Vacuum hose + cables"],
+    ["core", "Core"], ["router", "Router + dust shoe"], ["touch", "Touch plate + clip"], ["hose", "Vacuum hose + cables"],
     ["electronics", "Electronics + switches"], ["pendant", "FluidTouch pendant"]];
   const KINDS = [["printed", "Printed"], ["cut", "Cut"], ["hardware", "Hardware"], ["electronics", "Electronics"]];
   const GROUP_ASM = { Table: "table", YZ_Min: "yz-min", YZ_Max: "yz-max", Beam: "beam", Core: "core", Shoe: "router",
@@ -30,6 +30,7 @@
   function asmOf(p) {                                 // a part that isn't a bolt
     if (p.group === "Belts") return /^Belt_X/.test(p.name) ? "beam" : "table";
     if (p.group === "Core" && ROUTER.test(p.name)) return "router";
+    if (/^TouchPlate/.test(p.name)) return "touch";   // its own row: Inspect the plate, magnet + clip together
     return GROUP_ASM[p.group] || MOTION_ASM[p.motion] || "beam";
   }
   function kindOf(p) {

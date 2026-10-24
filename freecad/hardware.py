@@ -413,6 +413,16 @@ def extra_specs(plan, extra):
         plan.add("Belt_Y_Loops__M3" if nm.startswith("Y") else "Belt_X_Loops__M3", sp, KIT[3.0], None,
                  "yb1/yb2/xb1: belt looped round an M3")
     # Jackpot3 lid -> box: 2 x M3 x 10 in the lid's corner holes (tilted, from the lid STEP), from outside into the box
+    # the Kobalt dust shoe to the bottom mount (user 2026-10-24; not in the V1E docs - docs/V1E_DOC_GAPS.md #1): an M5
+    # from the shoe's slot into the mount's short angled hole, nylock in the mount's hex slot
+    if extra.get("shoe_screw") and "Dust_Shoe_Kobalt" in P and "Tool_Mount_B_Kobalt" in P:
+        a, b = (V(*q) for q in extra["shoe_screw"])
+        d = a - b
+        d.normalize()                                      # from the shoe side into the mount
+        sp = plan.place(b - d * 12.0, d, 5.0, 30.0, "button", "Dust_Shoe_Kobalt", "Tool_Mount_B_Kobalt",
+                        label="Dust_Shoe_Kobalt -> Tool_Mount_B_Kobalt")
+        plan.add("Dust_Shoe_Kobalt__M5_to_Tool_Mount_B_Kobalt", sp, KIT[5.0], NUTS[5.0] if sp.get("nut") else None,
+                 "the dust shoe's slot screw (not in the V1E docs)")
     for p, d in extra.get("lid_screws", ()):
         sp = plan.place(V(*p), V(*d), 3.0, 10.0, "button", "Jackpot3_Lid", None, label="Jackpot3_Lid -> Jackpot3_Box")
         plan.add("Jackpot3_Lid__M3_to_Jackpot3_Box", sp, KIT[3.0], None, "Jackpot3 box: M3 x 10 (lid)")

@@ -68,7 +68,9 @@ THREADS = True         # model screw / leadscrew threads (revolved rings) and GT
 PETER_PLATES = ("Min", "Max")   # Peter Plates covers (Printables 1044487) on these YZ plates; () = none (user 2026-10-19)
 PETER_STYLE = "solid"  # "solid" (stepper openings filled) or "honeycomb" (open infill in a 4 mm border; print with no
                        # top / bottom layers - lets the steppers breathe). The web viewer shows both.
-TOUCH_CLIP = False     # its alligator clip (Mueller BU-45) on the magnet - left out until there's a good model (user)
+TOUCH_CLIP = True      # its alligator clip (Mueller BU-45, the user's model: freecad/models/alligator_clip) holding the magnet
+TOUCH_CLIP_POSE = (1.5, 0, 0, 0.0, True)   # clip on the rod: slid 1.5 out, swung 0 deg, turned round (screw head out,
+                                           # user 2026-10-24); clears the top mount (0,0,0,0,False = 4.4 mm^2 into it)
 TOUCH_PLATE = True     # V1E Tiny Touch Plate stored in the top tool mount's slot, alligator clip on its pad (user)
 JP3_FAN = True         # optional 5015 blower in the Jackpot3 lid (V1E shop, 24 V) - user 2026-10-19
 JP3_FAN_OUTLET = (-1, 0, 0)   # which way its outlet points (of the two the lid holes allow): toward the Min end (user)
@@ -436,8 +438,8 @@ pl_xb = App.Placement(V(lr4.XBELT_TENSION_SHIFT, 0, 0), App.Rotation()).multiply
     App.Placement(xb_pivot, App.Rotation(V(0, 1, 0), 180)).multiply(App.Placement(-xb_pivot, App.Rotation()))).multiply(pl_xb)
 stl("X_Belt", "X_Belt", pl_xb, "Beam", PRINT_ACCENT)
 belt_y = Ym + lr4.XBELT_Y_D                     # tensioner end of the X belt
-x_belt_ends = ((X_s0 - XZ_PLATE / 2, *D(*lr4.XBELT_SLOT_D)),       # M3 loops: XZ_Min slot, tensioner pocket
-               (xb_x - 6.0 + lr4.XBELT_TENSION_SHIFT, belt_y, xb_z))
+x_belt_ends = ((X_s0 - XZ_PLATE / 2 + lr4.XBELT_SCREW_SHIFT[0], *D(*lr4.XBELT_SLOT_D)),   # M3 loops: Z_Stub_Min's
+               (xb_x - 6.0 + lr4.XBELT_TENSION_SHIFT, belt_y, xb_z))                       # slot, tensioner pocket
 
 # hose holders: their tab drops into the slot in each brace's back bar (V1E photos: holders on the
 # back of the braces, cradles behind the beam). The cradles reach +X from the brace (handed parts).
@@ -479,6 +481,7 @@ stage("beam")
 stl("Core", "Core", pl_core, "Core", PRINT_MAIN)
 for f in ("Tool_Mount_T_Kobalt", "Tool_Mount_B_Kobalt", "Dust_Shoe_Kobalt", "Dust_Skirt_Kobalt"):
     stl(f, f, pl_kobalt, "Core", PRINT_ACCENT if "Mount" in f else PRINT_MAIN, folder=KOB)
+hw_extra["shoe_screw"] = tuple(tuple(pl_kobalt.multVec(V(*q))) for q in lr4.SHOE_SCREW_HOLE)   # hole ends, world
 # router: Kobalt K7TR-03 (measured), axis on the mount bore centre, height and turn from the dust shoe's notch for
 # its spindle lock button (user 2026-10-19; was a Makita-style guess with the cord facing -X)
 rt = hw.kobalt_k7tr03(pl_kobalt.multiply(App.Placement(V(*lr4.ROUTER_AXIS_IN_KOBALT, lr4.ROUTER["nut_z"]), App.Rotation())),
@@ -506,23 +509,32 @@ if TOUCH_PLATE:
     # frame's -x edge faces the slot's mouth (u, the front)
     tpl = pl_kobalt.multiply(App.Placement(App.Matrix(-u.x, nrm.x, 0, org.x, -u.y, nrm.y, 0, org.y, 0, 0, -1, org.z,
                                                       0, 0, 0, 1)))
+    rx_, ry_, rz_, dz_ = lr4.TOUCH_TILT                    # angled a little about the slot, resting on its connector
+    tpl = tpl.multiply(App.Placement(V(0, 0, dz_), App.Rotation())).multiply(
+        App.Placement(V(), App.Rotation(rz_, ry_, rx_), V(0, 0, org.z - sum(ts["z"]) / 2)))
     tp = hw.tiny_touch_plate(tpl, clip=False, wire=8.0, **lr4.TOUCH_PLATE)
-    for k_, nm in (("plate", "TouchPlate"), ("spade", "TouchPlate_Spade"), ("wire_plate", "TouchPlate_Wire")):
+    for k_, nm in (("plate", "TouchPlate"), ("spade", "TouchPlate_Spade"), ("spade_metal", "TouchPlate_Spade_Metal"),
+                   ("wire_plate", "TouchPlate_Wire")):
         m.add(nm, tp[k_], group="Core", colour=hw.TOUCH_PLATE_COLOURS[k_])
     # rod magnet end-on on the +X top-mount bolt's head (it faces the front), the clip hanging from its outer end
     md, mt = tst["magnet"]
     bd_ = pl_kobalt.Rotation.multVec(V(*tst["bolt_d"]))   # into the core (+Y): the head is on the -d side
     hh = 0.55 * 5.0                                        # M5 button head height (hw.button_screw)
     mc = pl_kobalt.multVec(V(*tst["bolt"])) - bd_ * hh     # rod's back end on the head's crown
-    m.add("TouchPlate_Magnet", Part.makeCylinder(md / 2, mt, mc, bd_ * -1), group="Core", colour=hw.STEEL)
-    cm = mc - bd_ * (mt - 4.5) - V(0, 0, md / 2)            # the rod's underside, 4.5 from its end: the bite edge
-    ex, ez = bd_ * -1, V(0, 0, -1)                          # clip: edge along the rod, body hanging down
-    ey = ez.cross(ex)
-    cpl = App.Placement(App.Matrix(ex.x, ey.x, ez.x, cm.x, ex.y, ey.y, ez.y, cm.y, ex.z, ey.z, ez.z, cm.z, 0, 0, 0, 1))
-    if TOUCH_CLIP:
-        cl, cw = hw.alligator_clip(cpl, grip=md, bite=md, wire=3.0)
-        m.add("TouchPlate_Clip", cl, group="Core", colour=hw.TOUCH_PLATE_COLOURS["clip"])
-        m.add("TouchPlate_Clip_Wire", cw, group="Core", colour=hw.TOUCH_PLATE_COLOURS["wire_clip"])
+    if TOUCH_CLIP:                                          # the clip with the magnet in its jaws (hw.bu45_clip frame:
+        ex, ez = bd_ * -1, V(0, 0, 1)                       # magnet middle, x along the rod, the clip hanging to -z)
+        ey, cm = ez.cross(ex), mc - bd_ * (mt / 2)
+        cpl = App.Placement(App.Matrix(ex.x, ey.x, ez.x, cm.x, ex.y, ey.y, ez.y, cm.y, ex.z, ey.z, ez.z, cm.z, 0, 0, 0, 1))
+        cp = App.Placement(V(*TOUCH_CLIP_POSE[:3]), App.Rotation(V(1, 0, 0), TOUCH_CLIP_POSE[3]))
+        if TOUCH_CLIP_POSE[4]:                              # turned round about the vertical through the magnet's middle
+            cp = cp.multiply(App.Placement(V(), App.Rotation(V(0, 0, 1), 180)))
+        clip = hw.bu45_clip(os.path.join(HERE, "models", "alligator_clip"), cpl, clip=cp)   # magnet stays on the bolt
+        for k_, nm in (("magnet", "TouchPlate_Magnet"), ("a", "TouchPlate_Clip_A"), ("b", "TouchPlate_Clip_B"),
+                       ("screw", "TouchPlate_Clip_Screw"), ("spring", "TouchPlate_Clip_Spring"),
+                       ("wire_core", "TouchPlate_Clip_Wire"), ("wire_insulation", "TouchPlate_Clip_Insulation")):
+            m.add(nm, clip[k_], group="Core", colour=hw.BU45_COLOURS[k_])
+    else:
+        m.add("TouchPlate_Magnet", Part.makeCylinder(md / 2, mt, mc, bd_ * -1), group="Core", colour=hw.STEEL)
 # TPU bristle strips bent into the skirt's groove (lr4.SKIRT_GROOVE): spine up at the groove ceiling, one strip
 # from each end of the gap, squeezed ~1.5 % so the two meet in the middle
 sg = lr4.SKIRT_GROOVE
@@ -569,9 +581,30 @@ for nm, e in zip(("Min end (XZ_Min slot)", "Max end (tensioner)"), x_belt_ends):
 r_pul = 16 * 2.0 / math.pi / 2 - 0.25 + 0.7
 xpts, _ = hw.belt_path(loc(V(*x_belt_ends[0])), [(loc(wheels[0]), 6.7, -1), (loc(wheels[1]), r_pul, 1),
                                                  (loc(wheels[2]), 6.7, -1)], loc(V(*x_belt_ends[1])))
+# xb1/xb2: each end loops round its M3 (hw.belt_end_loop): the run stops 2.9 short of the path's end, the teeth
+# mesh after the wrap (user 2026-10-24). Min: through the XZ_Min plate's slot to the screw in Z_Stub_Min's slot,
+# which sits 1.86 to the run's smooth side - the run dips under it, wraps its far end and comes back on its teeth
+# side, the tail back out to the plate's far face; Max: in the tensioner's pocket (tail length a GUESS)
+x_loops = []                                       # (name, face, into, side, lateral, tail length)
+for nm, i, j, sd, lat in (("Min", 0, 1, 1, -abs(lr4.XBELT_SCREW_SHIFT[1])), ("Max", -1, -2, -1, 0.0)):
+    e, nx_ = V(*xpts[i], 0), V(*xpts[j], 0)
+    into = nx_ - e
+    into.normalize()
+    face = e + into * 2.9
+    xpts[i] = (face.x, face.y)
+    blk = m.shape("XZ_Plate_Min").BoundBox.XMax - xpl.multVec(face).x if nm == "Min" else 6.0
+    x_loops.append((nm, face, into, sd, lat, blk))
 # teeth toward the pulley (it is wrapped anticlockwise: +1 = left of the path), in step from the Min end
 seg_len = lambda q: sum(math.dist(a, b) for a, b in zip(q, q[1:]))
 xl = [seg_len(xpts[:2]), seg_len(xpts[1:-1]), seg_len(xpts[-2:])]
+x_loop_screws = []                                 # where each screw sits (hw_extra["loops"] below)
+for nm, face, into, sd, lat, blk in x_loops:       # the tails' teeth in the runs' gaps
+    rph, rsg = (0.0, 1) if nm == "Min" else (sum(xl), -1)
+    lp, sc, tt, lph, cuts = hw.belt_end_loop((face.x, face.y), (into.x, into.y), sd, blk, lateral=lat, run_phase=rph,
+                                       run_sign=rsg)
+    x_loop_screws.append(sc)
+    m.add(f"Belt_X_{nm}_Loop", hw.belt_loop_band(lp, cuts, 0.0, plane=xpl, teeth=tt if THREADS else 0, phase=lph), group="Belts",
+          colour=hw.BLACK)
 for nm, seg, ph in (("Min", xpts[:2], 0.0), ("Wrap", xpts[1:-1], xl[0]), ("Max", xpts[-2:], xl[0] + xl[1])):
     m.add(f"Belt_X_{nm}", hw.belt_band(seg, 0.0, plane=xpl, teeth=1 if THREADS else 0, phase=ph), group="Belts",
           colour=hw.BLACK)
@@ -584,8 +617,8 @@ belt_runs += [dict(obj="Belt_X_Min", fixed=xpts[0], moving=xpts[1], z=0.0, plane
 # the belt ends loop round an M3 (xb1/xb2): in the XZ_Min plate's slot and in the tensioner's pocket, screw along
 # the belt's width, head up
 xw = ez * -1 if ez.z > 0 else ez
-hw_extra["loops"] += [("X Min end", tuple(xpl.multVec(V(*xpts[0], 0))), tuple(xw), "XZ_Plate_Min slot"),
-                      ("X Max end", tuple(xpl.multVec(V(*xpts[-1], 0))), tuple(xw), "X_Belt tensioner")]
+hw_extra["loops"] += [("X Min end", tuple(xpl.multVec(V(*x_loop_screws[0], 0))), tuple(xw), "Z_Stub_Min slot"),
+                      ("X Max end", tuple(xpl.multVec(V(*x_loop_screws[1], 0))), tuple(xw), "X_Belt tensioner")]
 print(f"X belt path, slot screw to tensioner (mm): {sum(math.dist(a, b) for a, b in zip(xpts, xpts[1:])):.1f}"
       f" - calculator X belt {calc['xbelt']}")
 # core bearings: one in each of the core's 8 slots, on the M8 hole's own axis, centred in the slot
@@ -641,9 +674,16 @@ for side, plate, bx in (("Min", pl_yz_min, FX0 + lr4.BELT_SLOT_IN), ("Max", pl_y
                   dict(obj=f"Belt_Y_{side}_Back", fixed=pts[-1], moving=pts[-2], z=i1.z, plane=None, teeth=s,
                        phase_fixed=sum(yl), ext=-T_Y[0] + 5.0, axis="y")]
     belt_len[side] = sum(math.dist(a, b) for a, b in zip(pts, pts[1:]))
-    for end, q, part in (("front", (bx, y_lock - 2.9), f"Y_Belt_{side}_Lock"),
-                         ("back", (bx, y_tens + 2.9), f"Y_Belt_{side}_Tension")):
-        hw_extra["loops"].append((f"Y {side} {end}", (q[0], q[1], i1.z), (0, 0, -1), part))   # yb1/yb6: belt round an M3
+    # yb1/yb2/yb6: each end loops round its M3 just past the block and comes back through the slot (hw.belt_end_loop)
+    for end, face, nxt, sd, part, rph, rsg in (("front", pts[0], pts[1], s, f"Y_Belt_{side}_Lock", 0.0, 1),
+                                               ("back", pts[-1], pts[-2], -s, f"Y_Belt_{side}_Tension", sum(yl), -1)):
+        bb = m.shape(part).BoundBox
+        into = V(nxt[0] - face[0], nxt[1] - face[1], 0)
+        into.normalize()
+        lp, sc, tt, lph, cuts = hw.belt_end_loop(face, (into.x, into.y), sd, bb.YLength, run_phase=rph, run_sign=rsg)
+        m.add(f"Belt_Y_{side}_{end.title()}_Loop", hw.belt_loop_band(lp, cuts, i1.z, teeth=tt if THREADS else 0, phase=lph),
+              group="Belts", colour=hw.BLACK)
+        hw_extra["loops"].append((f"Y {side} {end}", (sc[0], sc[1], i1.z), (0, 0, -1), part))   # its M3
 print("Y belt path, holder screw to holder screw (mm):", {k: round(v, 1) for k, v in belt_len.items()},
       "- calculator Y belt", calc["ybelt"])
 

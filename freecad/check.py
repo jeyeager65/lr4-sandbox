@@ -15,6 +15,8 @@ import time
 import FreeCAD as App
 from fclib import mesh
 
+TOUCH_CLIP_PARTS = ("TouchPlate_Clip_A", "TouchPlate_Clip_B", "TouchPlate_Clip_Screw", "TouchPlate_Clip_Spring",
+                    "TouchPlate_Clip_Wire", "TouchPlate_Clip_Insulation")   # build.py TOUCH_CLIP (hw.bu45_clip)
 PAIRS = [
     # YZ assemblies
     ("YZ_Plate_Min", "FrontWheel_Min"), ("YZ_Plate_Min", "BackWheel_Min"), ("YZ_Plate_Min", "ZStop_Min"),
@@ -105,8 +107,8 @@ PAIRS = [
                 "X_Rail_Lower", "X_Belt", "Belt_X_Min", "Belt_X_Max", "Core", "Jackpot3_Box", "Jackpot3_Lid", "PSU_24V",
                 "XZ_Plate_Min", "XZ_Plate_Max", "Cable_Sleeve", "Router_Cord_Run", "Vac_Hose")],
     # Tiny Touch Plate in the top mount's slot (2026-10-19)
-    *[(a, b) for a in ("TouchPlate", "TouchPlate_Spade", "TouchPlate_Clip", "TouchPlate_Wire", "TouchPlate_Clip_Wire",
-                       "TouchPlate_Magnet")
+    *[(a, b) for a in ("TouchPlate", "TouchPlate_Spade", "TouchPlate_Spade_Metal", "TouchPlate_Wire", "TouchPlate_Magnet",
+                       *TOUCH_CLIP_PARTS)
       for b in ("Tool_Mount_T_Kobalt", "Tool_Mount_B_Kobalt", "Core", "Router_Kobalt", "Router_Head", "Router_Cap",
                 "Router_Switch", "Router_Cord", "Router_Cord_Run", "Dust_Shoe_Kobalt", "Vac_Hose", "X_Stepper",
                 "Tool_Mount_T_Kobalt__clamp", "Tool_Mount_B_Kobalt__clamp", "Tool_Mount_T_Kobalt__M5_to_Core")],

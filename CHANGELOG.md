@@ -6,6 +6,16 @@ the date the model data was built and the Printables file set it was solved for.
 ## Unreleased
 - **The page's source is split up (no change in what it does):** `web/index.html` is the markup only; its styles are
   `web/css/page.css` and its script is `web/js/page/*.js` (12 files by area, loaded in order, sharing one scope).
+- **Touch plate + clip:** the kit's Mueller BU-45 alligator clip (a detailed model, `freecad/models/alligator_clip/`)
+  holds the touch plate magnet on its bolt head; the plate has its real outline (tab, necks, hole) and the 0.110"
+  connector, stored a little tilted so it clears the mounts. A **Touch plate + clip** row in Show opens it in Inspect.
+- **Inspect turns freely** (any axis, not just round Z); the view buttons and Back stand it up again. Close-ups no
+  longer clip small parts.
+- **Belt ends** loop round their M3s as on the real machine (teeth meshed after the wrap); the X belt's Min end
+  screw sits in the Z stub's slot.
+- The Kobalt dust shoe's screw (through its slot into the bottom mount, nylock in the hex slot); a hex collet nut.
+- Loading and switching Show > Detail show a running count while the part meshes are made.
+- `docs/V1E_DOC_GAPS.md`: what the model needed that the V1E docs don't say.
 
 ## 0.37.0 - 2026-10-23
 - **As built (My LR4 tab, off by default):** the machine as a real one is - a little out of square until it homes. Each Y and each Z

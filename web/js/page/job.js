@@ -228,7 +228,7 @@
   // the stock for the probe: pad centred under the bit, the strip angled front-right off the front edge (user). Its frame comes
   // from the mesh: thinnest axis = the plate's normal, longest = the strip, the wider end = the pad. While held,
   // move() leaves the three meshes alone.
-  const TOUCH_PARTS = ["TouchPlate", "TouchPlate_Spade", "TouchPlate_Wire"];
+  const TOUCH_PARTS = ["TouchPlate", "TouchPlate_Spade", "TouchPlate_Spade_Metal", "TouchPlate_Wire"];
   function touchFrame(geo) {                         // geometry coords: { L (pad -> tab), W, N, pad centre }
     if (geo.userData.touch) return geo.userData.touch;
     const p = geo.attributes.position.array, n = p.length / 3, c = [0, 0, 0];

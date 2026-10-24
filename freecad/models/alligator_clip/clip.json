@@ -1,0 +1,88 @@
+{
+ "source": "D:/FreeCAD/Projects/AlligatorClip/AlligatorClip.FCStd (Mueller BU-45, model by the user)",
+ "frame": "origin = magnet middle on its axis, x along the rod, clip hangs to -z, jaws open across y",
+ "magnet": [
+  3.15,
+  12.6
+ ],
+ "open_deg": -1.74,
+ "pieces": {
+  "a": {
+   "object": "A",
+   "box": [
+    -4.68,
+    -2.74,
+    -36.7,
+    4.61,
+    5.55,
+    2.2
+   ]
+  },
+  "b": {
+   "object": "B",
+   "box": [
+    -4.0,
+    -5.75,
+    -25.63,
+    4.0,
+    3.57,
+    2.58
+   ]
+  },
+  "screw": {
+   "object": "Screw",
+   "box": [
+    -3.32,
+    -2.69,
+    -32.01,
+    3.32,
+    3.28,
+    -25.38
+   ]
+  },
+  "spring": {
+   "object": "Spring",
+   "box": [
+    -3.08,
+    -5.74,
+    -13.05,
+    3.05,
+    5.01,
+    -6.64
+   ]
+  },
+  "wire_core": {
+   "object": "Wire_core",
+   "box": [
+    -2.77,
+    -1.52,
+    -41.7,
+    2.77,
+    -0.36,
+    -25.92
+   ]
+  },
+  "wire_insulation": {
+   "object": "Wire_insulation_crimped",
+   "box": [
+    -0.8,
+    -1.94,
+    -41.7,
+    0.8,
+    -0.34,
+    -32.7
+   ]
+  },
+  "magnet": {
+   "object": "Magnet",
+   "box": [
+    -6.3,
+    -1.58,
+    -1.57,
+    6.3,
+    1.57,
+    1.57
+   ]
+  }
+ }
+}

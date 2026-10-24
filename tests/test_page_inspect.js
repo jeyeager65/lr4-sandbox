@@ -64,6 +64,19 @@ const steps = [
    const shown = LR4Inspect.shown();
    LR4Show.apply({ preset: 'all' }); LR4Machine.apply({ hose: true, fan: true });
    return { m, sb, clips: shown.filter((n) => /^Y_Clip_/.test(n)).length, core: shown.includes('Core'), xz: shown.includes('XZ_Plate_Min'), brace: shown.includes('Brace_1') }`,
+  // the touch plate + clip row; inspect turns freely (a drag down rolls the view over the top), Back stands it up.
+  // (Synthetic pointers can't be captured: setPointerCapture is stubbed. No // comments inside a step - it's joined
+  // onto one line.)
+  `LR4Inspect.open('touch'); const c = document.querySelector('canvas'), r = c.getBoundingClientRect();
+   c.setPointerCapture = c.releasePointerCapture = () => {};
+   const x = r.left + r.width / 2, y0 = r.top + r.height * 0.2, y1 = r.top + r.height * 0.9;
+   const pe = (t, y) => c.dispatchEvent(new PointerEvent(t, { clientX: x, clientY: y, pointerId: 7, pointerType: 'mouse', button: 0, buttons: 1, bubbles: true }));
+   pe('pointerdown', y0); for (let k = 1; k <= 10; k++) { pe('pointermove', y0 + (y1 - y0) * k / 10); tball.update(); }
+   pe('pointerup', y1); for (let k = 0; k < 30; k++) tball.update();
+   const g = { head: document.getElementById('insp-h').textContent, parts: LR4Inspect.shown().filter((n) => /^TouchPlate/.test(n)),
+     free: tball.enabled && !controls.enabled, upZ: camera.up.z };
+   document.getElementById('insp-back').click();
+   return Object.assign(g, { afterZ: camera.up.z, orbit: controls.enabled && !tball.enabled })`,
 ];
 
 const server = spawn("python", ["-m", "http.server", String(PORT)], { cwd: ROOT, stdio: "ignore" });
@@ -81,7 +94,11 @@ ok(!/\[exception\]/.test(out), "page exception: " + (out.match(/\[exception\].*/
 ok(ev.length === steps.length, `${steps.length} results, got ${ev.length}`);
 if (ev.length !== steps.length) console.log(out);
 else {
-  const [a, b, c, d, t, e, f] = ev;
+  const [a, b, c, d, t, e, f, g] = ev;
+  ok(g.head === "Touch plate + clip" && g.parts.includes("TouchPlate_Clip_A") && g.parts.includes("TouchPlate_Magnet") &&
+     g.parts.includes("TouchPlate"), "the touch plate + clip row inspects them: " + JSON.stringify([g.head, g.parts]));
+  ok(g.free && g.upZ < 0.9, "inspect turns freely (a drag rolls the view off upright): " + JSON.stringify([g.free, g.upZ]));
+  ok(g.orbit && Math.abs(g.afterZ - 1) < 1e-9, "Back stands the view up again: " + JSON.stringify([g.orbit, g.afterZ]));
   const has = (list, re) => list.some((n) => re.test(n));
   ok(a.id === "core" && a.overlay && a.head === "Core", "Core's row opens the inspect view: " + JSON.stringify([a.id, a.head]));
   ok(a.shown.length < a.all / 4 && has(a.shown, /^Core$/) && has(a.shown, /^Bearing_Core_Lower/) && has(a.shown, /^X_Stepper$/)

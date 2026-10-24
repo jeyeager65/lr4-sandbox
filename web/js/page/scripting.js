@@ -381,7 +381,7 @@
     if (pendant && pendantOn() && (FT.ft || ++frameN % 8 === 0)) pendantScreen();
     ftPopDraw();
     if (vr.active()) vr.tick(dt);
-    else { smApply(dt); camStep(); controls.update(); }
+    else { smApply(dt); camStep(); controlsTick(); }
     lighting();
     renderer.render(scene, camera);
   }

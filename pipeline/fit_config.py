@@ -44,6 +44,20 @@ TEMP = "_temp"          # size_builds.py --temp: the STRUTS = "temp" builds in p
 FEATURES = ["1", "TW", "TL", "strut", "pitch", "cutY", "cutX"]   # cutX: belt run reach (travel)
 TOL_RIGID = 0.02        # mm: same shape (bbox size; see same_shape)
 TOL_FIT = 0.05          # mm: fitted position vs the build
+# Changes that don't depend on size, so only the ref build needs re-running (not all 25):
+# ANCHORED: parts fixed to a fitted part: placed by that part's fit + their ref offset (temp builds included)
+# REF_SHAPE: a reshaped part whose centre didn't move: rigid, its mesh from the ref build, older builds' centres still fit
+ANCHORED = (("TouchPlate", "Core"),    # touch plate (reshaped, angled), its connector, magnet + BU-45 clip (2026-10-24)
+            ("Dust_Shoe_Kobalt__", "Core"),   # the dust shoe's slot screw (2026-10-24)
+            # belt ends looped round their M3s (2026-10-24): each loop on its holder
+            ("Belt_Y_Min_Front_Loop", "Y_Belt_Min_Lock"), ("Belt_Y_Min_Back_Loop", "Y_Belt_Min_Tension"),
+            ("Belt_Y_Max_Front_Loop", "Y_Belt_Max_Lock"), ("Belt_Y_Max_Back_Loop", "Y_Belt_Max_Tension"),
+            ("Belt_X_Min_Loop", "XZ_Plate_Min"), ("Belt_X_Max_Loop", "X_Belt"),
+            ("Brace_#__XLoop1", "XZ_Plate_Min"))  # the X Min loop's M3, moved into Z_Stub_Min's slot (named after Brace_1)
+REF_SHAPE = ("Router_Nut",)            # round -> hex ER11 nut (2026-10-24)
+# OLD_REF: changed in the ref build by work the other builds don't have yet: fitted without the ref build
+OLD_REF = ("TableMDF",                            # Part 33's table (the page draws the table itself; the rec stays as was)
+           "Belt_X_Min", "Belt_X_Max")            # X runs now stop 2.9 short of their loop screws (the loops overlap them)
 # merged screws -> one part per screw, named after the part it holds (nearest in XY): name -> (owners, label)
 SPLIT = {
     "TableMDF__Screws": (r"^(Y_Clip_\d+|Y_Belt_(Min|Max)[FB])$", "Screw"),
@@ -236,6 +250,8 @@ def fit_key(key, samples, infos, temp=False, C_given=None, given=None):
         kind = given["kind"]
     elif key.startswith("StrutPlate_") and "__" not in key:
         kind = "plate"
+    elif key in REF_SHAPE:
+        kind = "rigid"
     else:
         kind = "rigid" if all(same_shape(s[4], bp) for s in samples) else "stretch"
     fam = key.startswith("Hose:") or any((s[1] or 0) != 0 for s in samples)   # Brace_1-only parts aren't one
@@ -399,6 +415,8 @@ def main():
 
     def check(rec, key, samples):
         F = np.array([infos[s[0]]["f"] for s in samples])
+        if rec.get("anchor"):                            # placed by its anchor's fit (ANCHORED)
+            return
         if len(F) < 6 or np.linalg.matrix_rank(F) < 6:
             report.append(f"UNDERDETERMINED {key}{' (temp)' if rec.get('struts') == 'temp' else ''}: {len(F)} samples, "
                           f"rank {np.linalg.matrix_rank(F)}")
@@ -410,17 +428,34 @@ def main():
     # otherwise one rec per variant ("struts": "mdf" / "temp"; the page draws the set for its toggle). A temp rec of
     # the same shape reuses the MDF rec's mesh (its refs are that mesh's).
     n_shared = n_split = 0
-    for key in sorted(set(data) | set(data_t)):
+    anchored = lambda k: any(k.startswith(pre) for pre, _ in ANCHORED)
+    for key in sorted(set(data) | set(data_t), key=lambda k: (anchored(k), k)):   # anchored last: after their anchors
         sm = [(t, idx, j, name, p) for t in tags for (idx, j, name, p) in data.get(key, {}).get(t, [])]
         st = [(t, idx, j, name, p) for t in tags_t for (idx, j, name, p) in data_t.get(key, {}).get(t, [])]
+        anchor = next((a for pre, a in ANCHORED if key.startswith(pre)), None)
+        if anchor:
+            sm, st = [s for s in sm if s[0] == REF], []
+        elif key in OLD_REF:
+            sm = [s for s in sm if s[0] != REF]
+        elif sm and len(tags) > 1 and {s[0] for s in sm} == {REF} and not st:
+            # only in a ref build newer than the rest (e.g. Part 33's table parts, which the page draws itself): left
+            # out, as before that build - re-run all the size builds to fit them
+            report.append(f"REF ONLY (left out; re-run the size builds): {key}")
+            continue
         rec_m = base_m = rec_t = base_t = None
         if sm:
             rec_m, base_m, _ = fit_key(key, sm, infos)
+        if rec_m and anchor:                             # the anchor's fit, shifted by the ref offset
+            ar = next(r for r in out_parts if r["key"] == anchor and r.get("struts") != "temp")
+            C = np.array(ar["C"])
+            C[:, 0] += np.array(rec_m["c_ref"]) - C @ infos[REF]["f"]
+            rec_m.update(kind="rigid", C=C.round(6).tolist(), err=ar["err"], sizes=ar["sizes"], anchor=anchor)
         if st:
             rec_t, base_t, _ = fit_key(key, st, infos, temp=True)
         if rec_m and rec_t:
             # one rec if the MDF one (its kind: a stretch rec also covers a rigid one) places the temp builds too
-            same = rec_m.get("family") == rec_t.get("family") and same_shape(base_m[4], base_t[4]) and \
+            same = rec_m.get("family") == rec_t.get("family") and \
+                (same_shape(base_m[4], base_t[4]) or key in REF_SHAPE) and \
                 (rec_m["kind"] == rec_t["kind"] or rec_m["kind"] == "stretch")
             err = fit_key(key, st, infos, temp=True, C_given=rec_m["C"], given=rec_m)[2] if same and \
                 rec_m["kind"] != "plate" else math.inf
@@ -436,7 +471,7 @@ def main():
                         if k_ in rec_m:
                             rec_t[k_] = rec_m[k_]
                     rec_t["mesh_of"] = key
-        elif rec_m and tags_t:
+        elif rec_m and tags_t and not anchor:
             rec_m["struts"] = "mdf"
         elif rec_t:
             rec_t["struts"] = "temp"

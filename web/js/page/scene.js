@@ -83,7 +83,10 @@
     rail_steel: { c: [0.56, 0.58, 0.61], r: 0.30 },
     leadscrew: { c: [0.80, 0.81, 0.83], r: 0.30, thread: true },
     thread: { c: [0.76, 0.77, 0.79], r: 0.30, thread: true },
-    brass: { c: [0.86, 0.69, 0.36], r: 0.32 }};
+    brass: { c: [0.86, 0.69, 0.36], r: 0.32 },
+    zinc: { c: [0.58, 0.60, 0.64], r: 0.34 },          // the touch plate's BU-45 clip + its screw (user: 0.80 / 0.22 too bright)
+    spring_steel: { c: [0.60, 0.61, 0.63], r: 0.48 },
+    copper: { c: [0.95, 0.64, 0.54], r: 0.30 }};
   function creaseNormals(geo, deg) {                  // smooth across shallow angles, keep sharp edges sharp
     const g = geo.index ? geo.toNonIndexed() : geo;
     const P = g.attributes.position.array, nt = P.length / 9, fn = new Float32Array(nt * 3);
@@ -190,6 +193,28 @@
   const controls = new THREE.OrbitControls(camera, canvas);
   controls.enableDamping = true;
   controls.dampingFactor = 0.12;
+  // Inspect turns freely (user 2026-10-24: OrbitControls keeps Z up, so a part can't be laid on its side, e.g. the
+  // touch plate clip as in a photo): a trackball sharing the orbit's target; fit / view buttons and leaving Inspect
+  // stand it upright again. The near plane follows the distance so a small part can be looked at close up.
+  const tball = new THREE.TrackballControls(camera, canvas);
+  tball.target = controls.target;
+  Object.assign(tball, { enabled: false, rotateSpeed: 3.0, zoomSpeed: 1.2, panSpeed: 0.8, dynamicDampingFactor: 0.15,
+    keys: [] });                                      // no A / S / D mode keys: the page has its own shortcuts
+  function freeTurn(on) {
+    if (tball.enabled === on) return;
+    tball.enabled = on; controls.enabled = !on;
+    if (on) tball.handleResize();
+    else upright();
+  }
+  function upright() {
+    camera.up.set(0, 0, 1);
+    controls.update();
+  }
+  function controlsTick() {
+    (tball.enabled ? tball : controls).update();
+    const near = tball.enabled ? Math.min(5, Math.max(0.1, camera.position.distanceTo(controls.target) / 100)) : 5;
+    if (camera.near !== near) { camera.near = near; camera.updateProjectionMatrix(); }
+  }
   // light: the studio environment lights every surface (soft, directional ambient), a weak sky / ground fill, and a
   // sun that casts soft shadows (fitted to the table in updateShop)
   scene.environment = envMap;
@@ -303,7 +328,7 @@
     const d = new THREE.Vector3(...dir).normalize();
     camera.position.copy(center).addScaledVector(d, dist || radius * 2.3);
     controls.target.copy(center);
-    controls.update();
+    upright();
   }
 
   // loading popup: a title, a bar (0..1, or null to leave it) and a detail line
@@ -376,16 +401,32 @@
       if (LIGHT.mark) LIGHT.mark();                  // Lighting's default follows Lite
       resize();
     };
-    box.querySelectorAll("button").forEach((b) => b.addEventListener("click", () => {
-      if ((b.dataset.v === "lite") === lite) return;
+    let busy = false;
+    // switching remakes every mesh: the loading popup with the same count as at load (user 2026-10-24: it sat for
+    // seconds with no sign of life)
+    box.querySelectorAll("button").forEach((b) => b.addEventListener("click", async () => {
+      if (busy || (b.dataset.v === "lite") === lite) return;
+      busy = true;
       lite = b.dataset.v === "lite";
       saved = b.dataset.v;
       try { localStorage.setItem("detail", saved); } catch (e) { /* not kept */ }
-      for (const e of geoCache.values()) e.geo.dispose();
-      geoCache.clear();
-      dropSrcGeometry();
-      mark();
-      rebuild();
+      const title = lite ? "Switching to Lite…" : "Switching to Full detail…";
+      statusEl.hidden = false;
+      progress(title, 0, "Preparing the part meshes");
+      await nextFrame();
+      try {
+        for (const e of geoCache.values()) e.geo.dispose();
+        geoCache.clear();
+        dropSrcGeometry();
+        mark();
+        await warmGeometry((f, detail) => progress(title, f * 0.9, detail));
+        progress(title, 0.9, `Placing the ${cfg.parts.length} parts`);
+        await nextFrame();
+        rebuild();
+      } finally {
+        statusEl.hidden = true;
+        busy = false;
+      }
     }));
     mark();
   }
@@ -903,6 +944,21 @@
     frame(dir, INSPECT ? (radius / Math.sin(half)) * 1.05 : undefined);
   }
 
+  // every part's mesh made once (recGeometry caches it; the user's STLs parsed) with a count in the popup, so placing
+  // the parts is quick (user 2026-10-24: "Placing the 368 parts" sat with no progress - this was most of it)
+  async function warmGeometry(report) {
+    const recs = cfg.parts.filter((r) => r.mesh || r.src);
+    let t = performance.now();
+    for (const [k, r] of recs.entries()) {
+      recGeometry(r);
+      if (performance.now() - t > 50) {
+        report(k / recs.length, `Preparing the part meshes: ${k} of ${recs.length}`);
+        await nextFrame();
+        t = performance.now();
+      }
+    }
+  }
+
   async function load() {
     progress("Loading model…", 0, "parts list");
     const r = await fetch(DATA + "lr4_config.json");
@@ -919,6 +975,7 @@
     // the build in named stages, the popup saying which (user 2026-10-23: it sat on "Building the machine" for seconds)
     const stages = [
       ["Setting up the panels", () => { setupShow(); setupColours(); setupDetail(); }],
+      ["Preparing the part meshes", warmGeometry],
       [`Placing the ${cfg.parts.length} parts`, setupSize],
       ["Bill of materials", () => { setupVariants(); setupBom(); setupAbout(); }],
       ["Workshop and lights", () => { setupScenery(); setupLighting(); updateShop(); fitView([1, -1.15, 0.85]); }],
@@ -926,7 +983,7 @@
     for (const [i, [what, run]] of stages.entries()) {
       progress("Building the machine…", i / stages.length, what);
       await nextFrame();
-      run();
+      await run((f, detail) => progress("Building the machine…", (i + f) / stages.length, detail));
     }
     progress("Building the machine…", 1, "Done");
     building = false;

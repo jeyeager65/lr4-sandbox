@@ -171,7 +171,12 @@ X_MOTOR_FACE, X_BELT_NP = 169.39, (173.4, 183.4)
 XBELT_TENSION_SHIFT = -2.0       # X_Belt tensioner along X from its tongue-on-lug position: clear of the brace and
                                  # the strut plate from -4 to 0 (the screw's travel); -2 = mid (2026-10-18)
 XBELT_SLOT_D = (45.96, 102.06)   # XZ_Min DXF: the angled belt pocket (3.4 x 12.9, 7 deg, under a 2 mm neck from the
-                                 # top edge) - its centre in D; the belt's M3 loop sits here
+                                 # top edge) - its centre in D; the belt passes through it
+XBELT_SCREW_SHIFT = (-11.0, -1.86)   # world x, y from that pocket centre to the M3 the X belt's Min end loops round (the
+                                     # belt stays in the plate's slot: the screw sits 1.86 to its smooth side, the run
+                                     # dips under it so the teeth mesh after the wrap - hw.belt_end_loop lateral): the
+                                     # round end of the U slot in Z_Stub_Min's top (user 2026-10-24: "it needs to go back
+                                     # in the slot in the red printed piece"; xb2: pushed to the bottom; scan of the STL)
 KOBALT_IN_CORE = (194.0, 263.67, 92.5)   # Kobalt frame -> Core: cx = kx + 194.0, cy = 263.67 - kz,
                                  # cz = ky + 92.5 (mount ear holes = Core's 4 M5 holes, 61 x 87.9;
                                  # cx offset = where the mounts first touch the core, overlap scan)
@@ -265,13 +270,22 @@ KOBALT_NOTCH = dict(deg=38.5, button_z=43.0)    # button centre (boss d 16.8: bo
 ROUTER = dict(nut_z=43.0 - 25.0, bit_out=20.0, cord_out=15.0, switch_deg=90.0)   # nut bottom (Kobalt z), bit stick-out (a
 # default, user 2026-10-21: varies with the bit - a deeper cut = a longer bit further out; was 16 from a photo; set
 ROUTER["tip_z"] = ROUTER["nut_z"] - ROUTER["bit_out"]           # yours), cord stub (the rest is routed - CORD)
+# the dust shoe's screw (not in the V1E docs - docs/V1E_DOC_GAPS.md #1): an M5 through the shoe's slot into a short
+# hole in the bottom mount, angled 35 deg in plan (the axis-aligned hole finder misses it), nylock in its hex slot.
+# Kobalt frame, from the STLs (mesh.holes_near, 2026-10-24): the hole's ends; the shoe is past the second
+SHOE_SCREW_HOLE = ((26.0, -34.0, 64.2), (28.6, -32.1, 64.2))
 ROUTER_AXIS_IN_KOBALT = (-0.8, 0.0)   # mount bore centre in the Kobalt frame (circle fit, both rings: d 66.7)
 # Tiny Touch Plate storage (user 2026-10-19: it clips into the top router holder): Tool_Mount_T_Kobalt has a sprung
 # tab on its outer wall leaving a 1.2 mm slot, ~10 mm deep, full height (Kobalt z 115.5-135.0), open toward the
 # front with a detent (0.3 mm) at the mouth. The plate's 8 mm strip snaps in edge-first; the pad rests on the
 # mount's top. Slot mid-plane in the Kobalt frame (ray scan of the STL): mouth end / closed end, and its z range.
 TOUCH_SLOT = dict(mouth=(20.0, 36.05), closed=(12.0, 36.75), z=(115.48, 134.98), strip_x=15.5)
-TOUCH_PLATE = dict(pad=18.0, strip_w=8.0, length=85.0)   # user-measured (0.5 stainless, V1E)
+TOUCH_PLATE = dict(pad=18.0, strip_w=8.0, length=85.0,   # user-measured (0.5 stainless, V1E)
+                   detail=True, tab=(2.8, 6.8))          # stepped outline + 0.110" receptacle (2026-10-24); tab, necks,
+                                                         # hole GUESSED from the kit photos (hw.tiny_touch_plate)
+TOUCH_TILT = (-1.5, 0.0, 0.0, 1.0)    # as stored: deg about the plate's local x / y / z (pivot: the slot), then mm along it
+                                      # (+ = down): the receptacle rests on the top mount (1.2 = into it), the pad clear of the bottom
+                                      # one (user 2026-10-24: angle it; 0,0,0,0 = 11 mm^2 into Tool_Mount_B)
 # As stored (user's photo of a Kobalt LR4, 2026-10-19): pad DOWN beside the bottom mount, the strip up through the top
 # mount's slot, the red spade just above it (under the head). The kit's N52 rod magnet (3.15 x 12.6) sticks end-on
 # to the head of the top mount's +X bolt into the core, pointing forward; the alligator clip hangs from it, its jaws
