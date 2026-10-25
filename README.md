@@ -109,7 +109,7 @@ after one reload); where it can't run, the page says so.
 - MPos is greyed until it has homed: like the real controller, it doesn't know where the machine is until then.
 
 **Run G-code** runs the strut plate job (V1E's build order: the machine runs on its printed temporary struts and
-cuts its own MDF strut plates; **Use the temporary struts**) or any G-code file from the page's **SD card** (**Add
+cuts its own MDF strut plates; **Load the strut plate job**, which puts it on the temporary struts) or any G-code file from the page's **SD card** (**Add
 G-code files…**, or drop them on it; ▶ runs one) through FluidNC (`$SD/Run`), from the page or from the FluidTouch
 pendant. The stock is carved as the motors move (with the file's own bits, from
 [cnc-gcode-tools](https://github.com/jeyeager65/cnc-gcode-tools) `(Stock: ...)` / `(ToolDef ...)` comments, or the

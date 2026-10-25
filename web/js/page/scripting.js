@@ -373,7 +373,7 @@
     const now = performance.now(), dt = Math.min((now - lastT) / 1000, 0.1);
     lastT = now;
     if (building) return;
-    if (shop) LR4Shop.cutaway(shop, camera.getWorldPosition(camPos));   // hide walls the camera is outside of
+    if (shop) LR4Shop.cutaway(shop, camera.getWorldPosition(camPos), vr.active() ? 20000 : camera.far);   // hide walls the camera is outside of (VR's far is in metres: the sky as built)
     jobTick();
     handTick();
     touchAnimTick(dt);                               // the touch plate + clip going out / coming home (job.js)

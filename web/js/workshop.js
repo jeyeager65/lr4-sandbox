@@ -7,16 +7,16 @@
 // windows, a 4 ft steel shelf (5 shelves of bins) a few feet from the benches. A shop vac by the garage door, four 4 ft
 // strip lights on the ceiling (one along each bench, two along the shop over the machine). Inside: OSB walls (user:
 // bare studs now, OSB going on), concrete floor. Outside: lap siding in grey-green "Scottish Thistle", white trim and
-// corner boards, architectural shingles; sky, grass and trees. Drawn here only (no V1E or model data), all
+// corner boards, architectural shingles; sky and grass. Drawn here only (no V1E or model data), all
 // procedural - canvas textures, boxes, planes. mm, Z up, the floor at `floor`.
 // Inside walls and the ceiling are one-sided, facing in; each wall has an outside skin WALL_T further out, facing out.
-// cutaway(): from close by (the desktop orbit view) the walls the camera is outside of vanish with the roof, dollhouse
+// cutaway(): the sky and grass round the camera, inside its far plane; from close by (the desktop orbit view) the walls the camera is outside of vanish with the roof, dollhouse
 // style; from far away (past CLOSE_AT x the building's diagonal) it's the closed building; standing inside (VR at 1:1)
 // it's a room. Not in the page's parts: no picking, fit or touch.
 // The room is the user's building size (centered on the machine), blank = DEFAULT.
 //   LR4Shop.room(table, machine, size) -> { x0, x1, y0, y1, h, gaps: { left, right, front, back, top } }
 //   LR4Shop.build(THREE, { room, table, machine, floor, empty }) -> THREE.Group (empty: no benches, pegboard, computer,
-//   shelf or shop vac - the building, doors, windows, lights and fire extinguisher only); LR4Shop.dispose(group); LR4Shop.cutaway(group, cam)
+//   shelf or shop vac - the building, doors, windows, lights and fire extinguisher only); LR4Shop.dispose(group); LR4Shop.cutaway(group, cam, far)
 //   table / machine: { x0, x1, y0, y1 } (+ machine.z1 = its top above the floor); size: { w, d, h } mm, each optional
 (function (root) {
   "use strict";
@@ -148,7 +148,7 @@
         const t = canvasTex(THREE, 4, 256, (g, w, h) => {
           const gr = g.createLinearGradient(0, 0, 0, h);   // canvas top = v 1 = zenith
           gr.addColorStop(0, "#5f93cf"); gr.addColorStop(0.42, "#a9c8e8"); gr.addColorStop(0.5, "#e4edf3");
-          gr.addColorStop(0.53, "#b9c2b0"); gr.addColorStop(1, "#7d8a6e");
+          gr.addColorStop(0.508, "#698748"); gr.addColorStop(1, "#678547");   // below: the grass, to the horizon
           g.fillStyle = gr; g.fillRect(0, 0, w, h);
         });
         t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
@@ -538,6 +538,7 @@
         return [yt - Rr - (s - Lv - A), zLevel];
       };
       const sb = GARAGE_OPEN * (Lv + 0.35 * A);        // the bottom edge, open: a third of the way round the curve
+      const door = grp.userData.door = { parts: [], y: Y1, z: zLevel };   // cutaway() hides these from above / outside
       for (let i = 0; i < 4; i++) {
         const [ya, za] = P(sb + i * hs), [yb, zb] = P(sb + (i + 1) * hs);
         const map = doorTex.garage.clone();             // this section's quarter of the door's face
@@ -547,7 +548,7 @@
           [white, white, white, white, face, face]);
         m.position.set(cx, (ya + yb) / 2, (za + zb) / 2);
         m.rotation.set(Math.PI / 2 + Math.atan2(-(yb - ya), zb - za), 0, 0);
-        grp.add(m);
+        grp.add(m); door.parts.push(m);
       }
       const track = std({ color: 0xb9bcbf, roughness: 0.45, metalness: 0.7 });
       for (const sx of [-1, 1]) {
@@ -567,11 +568,11 @@
       const bar = new THREE.Mesh(new THREE.CylinderGeometry(16, 16, garageW + 200, 12), steel);   // torsion bar
       bar.rotation.set(0, 0, Math.PI / 2);
       bar.position.set(cx, Y1 - 90, zLevel + 60);
-      grp.add(bar);
+      grp.add(bar); door.parts.push(bar);
       const spring = new THREE.Mesh(new THREE.CylinderGeometry(32, 32, 700, 16), std({ color: 0x2b2f33, roughness: 0.4, metalness: 0.5 }));
       spring.rotation.set(0, 0, Math.PI / 2);
       spring.position.set(cx - 250, Y1 - 90, zLevel + 60);
-      grp.add(spring);
+      grp.add(spring); door.parts.push(spring);
     }
 
     // outside corners: white corner boards
@@ -609,28 +610,19 @@
       grp.add(rb); roof.push(rb);
     }
 
-    // outside: sky dome, grass, a driveway from the garage door, a few trees - something to see through the windows
+    // outside: sky dome, grass, a driveway from the garage door - something to see through the windows (no trees: user 2026-10-24)
     const OUT = 15000;                                  // inside the desktop camera's far plane (20 m)
     const sky = new THREE.Mesh(new THREE.SphereGeometry(OUT, 32, 16), new THREE.MeshBasicMaterial({ map: T.sky, side: THREE.BackSide,
       toneMapped: false, depthWrite: false }));
     sky.rotation.x = Math.PI / 2;                       // the dome's pole up Z
     sky.position.set(cx, cy, Z0);
     grp.add(sky);
-    grp.userData.sky = sky;                             // cutaway() keeps it round the camera (far plane 20 m)
-    add(new THREE.CircleGeometry(OUT, 64), std({ map: tex(T.grass, OUT / 1500, OUT / 1500), roughness: 1 }), cx, cy, Z0 - 8);
+    grp.userData.sky = sky;                             // cutaway() keeps it round the camera, scaled to its far plane
+    const grass = add(new THREE.CircleGeometry(OUT, 64), std({ map: tex(T.grass, OUT / 1500, OUT / 1500), roughness: 1 }), cx, cy, Z0 - 8);
+    grp.userData.grass = { mesh: grass, x: cx, y: cy, tile: 3000, rep: OUT / 1500 };   // cutaway() keeps it under the camera (texture tile 3 m)
     const drive = Math.min(9000, OUT - (Y1 - cy) - 2000), dw = garageW + 1200;
     add(new THREE.PlaneGeometry(dw, drive), std({ map: tex(T.concrete, dw / TILE.concrete, drive / TILE.concrete), roughness: 0.95 }),
       cx, Y1 + WALL_T + drive / 2, Z0 - 3);
-    const trunk = std({ color: 0x6b4a2f }), leaves = [std({ color: 0x3f6b3a }), std({ color: 0x4d7d3f }), std({ color: 0x365d33 })];
-    const rt = rng(23);                                // the trees' own stream: furniture changes don't move them
-    for (let i = 0; i < 14; i++) {
-      const a = rt() * Math.PI * 2, dist = Math.min(OUT - 1500, Math.max(W, D) / 2 + 5500 + rt() * 6000);
-      const tx = cx + Math.cos(a) * dist, ty = cy + Math.sin(a) * dist;
-      if (ty > Y1 && Math.abs(tx - cx) < dw / 2 + 2000) continue;   // keep the driveway clear
-      const ht = 4000 + rt() * 5000;
-      add(new THREE.CylinderGeometry(120, 180, ht * 0.35, 8), trunk, tx, ty, Z0 + ht * 0.175, Math.PI / 2);
-      add(new THREE.ConeGeometry(ht * 0.22, ht * 0.75, 10), leaves[i % 3], tx, ty, Z0 + ht * 0.6, Math.PI / 2);
-    }
 
     // ceiling: four 4 ft strip lights (the user's) - one along each workbench (across the shop), over its front edge,
     // and two running the other way (along the shop), in line with the bench lights' inner ends (nearest the middle),
@@ -652,7 +644,7 @@
 
   // close by: a wall the camera is outside of is hidden with its skin, trim, glass and doors, and the roof is off
   // (dollhouse); far away (closeAt from the center): the closed building. The sky dome follows the camera.
-  function cutaway(grp, cam) {
+  function cutaway(grp, cam, far = 20000) {
     const ud = grp.userData, c = ud.center || [0, 0, 0];
     const closed = ud.closeAt > 0 && Math.hypot(cam.x - c[0], cam.y - c[1], cam.z - c[2]) > ud.closeAt;
     for (const w of ud.walls || []) {
@@ -661,7 +653,25 @@
       if (w.ext) w.ext.visible = show;
     }
     for (const m of ud.roof || []) m.visible = closed;
-    if (ud.sky) ud.sky.position.set(cam.x, cam.y, ud.sky.position.z);   // the dome round the camera: never past the far plane
+    // the open garage door's sections (+ torsion bar) lie under the ceiling, over the table: like the roof they go when
+    // the camera is above them or outside the garage wall (the tracks stay, to show where it is) (user 2026-10-24)
+    if (ud.door) {
+      const show = closed || (cam.z < ud.door.z && cam.y < ud.door.y);
+      for (const m of ud.door.parts) m.visible = show;
+    }
+    // the dome and the grass round the camera, scaled to stay inside the far plane (built for 20 m): zoomed far out,
+    // the ground still reaches the horizon (the dome's lower half is grass coloured). The grass texture's repeat and
+    // offset follow so it stays put on the ground, 3 m tiles.
+    const k = far / 20000;
+    if (ud.sky) { ud.sky.position.set(cam.x, cam.y, cam.z); ud.sky.scale.setScalar(k); }   // centered at the eye: its horizon is the real one
+    const g = ud.grass;
+    if (g) {
+      g.mesh.position.x = cam.x; g.mesh.position.y = cam.y;
+      g.mesh.scale.set(k, k, 1);
+      const map = g.mesh.material.map, rep = g.rep * k;
+      map.repeat.set(rep, rep);
+      map.offset.set((cam.x - g.x) / g.tile - rep / 2, (cam.y - g.y) / g.tile - rep / 2);
+    }
   }
 
   function dispose(grp) {

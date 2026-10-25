@@ -3,7 +3,25 @@
 The version is the sandbox page's (`VERSION` in `web/js/page/job.js`, shown in its footer). The footer also shows
 the date the model data was built and the Printables file set it was solved for.
 
-## Unreleased
+## 0.39.0 - 2026-10-24
+- **New page layout, part 1 (the shell):** a top bar with the size, a **Design | Run** switch, **Get the files** and ⚙
+  (theme Auto / Light / Dark, sounds, SpaceMouse, keyboard shortcuts, Reset settings). Design = today's My LR4 / Show /
+  Build panel. Run = a sender layout: the Machine column (controller, tool position, jog, Home) | the view | the Job
+  column (SD card, On the table, Flash, web UIs), and the FluidNC console under the view - folded to one line (state,
+  last message, input) by default, open (drag its top edge) or big. The columns fold to strips (by themselves below
+  1200 px); with the left one folded the work position floats on the view. "?" buttons open the longer explanations.
+  The mode, theme, folds and console size are kept per browser.
+- The workshop scene has no trees outside any more, and zoomed far out the ground reaches the horizon (the grass and
+  the sky follow the camera, and the far limit grows as you zoom out - the building used to get cut off). The open
+  garage door hides, like the roof, when the camera is above it or outside the garage wall, so it no longer covers the table.
+- **Stock and the strut plate job:** turning on the temporary struts no longer loads the strut plate job (and its MDF
+  stock); **Load the strut plate job** (Run > Job) or its SD card file does. On the table > Stock now names a loaded
+  job's own stock ("..., from the job"), and **Take it off** removes that too (the job stays loaded). A new **Unload**
+  button by Run / Stop / Preview clears the loaded file: its stock, moves and bits come off the table.
+- **Jogs carve where they go on slow computers:** hand moves (jogs, the console, the pendant) carve from the motors
+  sampled every 4 ms, not once a frame - with slow frames a plunge then a slot came out as one diagonal, or not at all.
+  An M6 whose hold beats the page's frame now still asks for the bit (it showed "Paused (M0)").
+- **View only:** ⛶ at the top right of the 3D view (or V) hides everything else; the same button or Esc brings it back.
 - **The page's source is split up (no change in what it does):** `web/index.html` is the markup only; its styles are
   `web/css/page.css` and its script is `web/js/page/*.js` (12 files by area, loaded in order, sharing one scope).
 - **Touch plate + clip:** the kit's Mueller BU-45 alligator clip (a detailed model, `freecad/models/alligator_clip/`)

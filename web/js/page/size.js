@@ -62,6 +62,8 @@
       `aria-label="Front and bottom strut plates, ${L} mm long, ${S.n} braces">${parts.join("")}</svg>`;
   }
   function updateText() {
+    $("tb-size").textContent = U.unit === "in" ? `${+(S.cutX / IN).toFixed(2)} × ${+(S.cutY / IN).toFixed(2)} in cutting area`
+      : `${Math.round(S.cutX)} × ${Math.round(S.cutY)} mm cutting area`;
     $("sub").textContent = `V1E LowRider 4 for a ${+(S.cutX / IN).toFixed(2)} × ${+(S.cutY / IN).toFixed(2)} in cutting area, ` +
       `on a ${frac(S.TW / IN)} × ${frac(S.TL / IN)} in ${S.base === "torsion" ? "torsion box" : "MDF sheet"} table. Every printed part is the official STL, placed from its holes.`;
     const sel = $("braces"), want = String(U.braces);

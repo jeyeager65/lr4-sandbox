@@ -2,7 +2,7 @@
 // The page's scripts share one global scope (js/page/*.js, loaded in order by index.html): names declared
 // at the top level here are seen by the later files.
   // ---- version + feedback: the issue link carries the size, data date and the loaded files' checksums ----
-  const VERSION = "0.38.0";
+  const VERSION = "0.39.0";
   function setupAbout() {
     const bits = [`lr4-sandbox ${VERSION}`];
     if (cfg.built) bits.push(`model data built ${cfg.built}`);
@@ -85,7 +85,7 @@
   // (Stock:) header is carved as it goes. Work zero = the cutting area's front-left corner, stock top. Touching the
   // position sliders pauses it. ----
   const JOB = { tl: null, sim: null, group: null, done: null, at: null, t: 0, k: 0, playing: false,
-    key: "", seq: 0, src: null, file: null, pageJob: null, last: 0, preview: null };   // preview: Preview is on (table.js)
+    key: "", seq: 0, src: null, file: null, pageJob: null, usePage: false, stockOff: null, last: 0, preview: null };   // preview: Preview is on (table.js)
   const PAGE_SD = "/LR4_strut_plates.gcode";                       // the SD card (below) and its strut plate file
   const SDC = { recs: [], sel: null, saved: null, saveTimer: 0 };
   const FJ = { job: null, pts: [], timer: 0, lastMsg: "" };        // a job running on FluidNC (fjRun)
@@ -576,11 +576,13 @@
     jobPlaying(false);
     $("job-pop").hidden = true;
   }
-  // after a size / settings change (camNote): the strut plate job (Temporary struts) unless a file is playing
+  // after a size / settings change (camNote): the picked file, or the strut plate job (Temporary struts) once it was
+  // asked for (JOB.usePage: Load the strut plate job / its SD card file) - the temporary struts alone load nothing
+  // (user 2026-10-24: the job's MDF stock turned up on the spoilboard)
   function jobSetup(j) {
     JOB.pageJob = j || null;
     sdSavePage(j);
-    const page = U.struts === "temp" && j ? { kind: "page", name: "The strut plate G-code above", text: j.gcode } : null;
+    const page = U.struts === "temp" && j && JOB.usePage ? { kind: "page", name: "The strut plate G-code above", text: j.gcode } : null;
     const src = JOB.file || page;
     $("job-off").hidden = !!src;
     $("job-back").hidden = !(JOB.file && page);
@@ -589,7 +591,7 @@
     const head = handHeader(src);
     const spot = jobSpot();
     const key = `${src.kind}|${src.name}|${src.text.length}|${src.text.slice(-200)}|${S.cutX},${S.cutY},${S.n},${lite},${tableTop}|` +
-      `${spot ? [spot.x, spot.y, spot.z].map((v) => v.toFixed(3)) : "-"}|${head}|${JOB.zero ? JOB.zero.join(",") : ""}`;
+      `${spot ? [spot.x, spot.y, spot.z].map((v) => v.toFixed(3)) : "-"}|${head}|${JOB.zero ? JOB.zero.join(",") : ""}|${JOB.stockOff || ""}`;
     if (key === JOB.key) return null;
     return jobLoad(src, key, head);
   }
@@ -614,7 +616,7 @@
     JOB.spoilAt = 0;
     const t1 = tl.tools.get(tl.segs[0].toolNumber);
     if (t1 && !keep) handBit(HandSetup.fromDef(t1), false);
-    if (tl.stock && tl.tools.size) {
+    if (tl.stock && tl.tools.size && JOB.stockOff !== src.name) {   // stockOff: its stock taken off (On the table)
       JOB.cells = lite ? 1.2e5 : 4e5;
       JOB.sim = Imperfect.attach(new StockSimulator(tl.stock, tl.tools, { maxCells: JOB.cells }), [z0[0], z0[1], -zmin], abState);
       const rest = stockRest({ x: [tl.stock.xmin + z0[0], tl.stock.xmax + z0[0]], y: [tl.stock.ymin + z0[1], tl.stock.ymax + z0[1]] });

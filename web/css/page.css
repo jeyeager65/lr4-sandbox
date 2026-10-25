@@ -33,17 +33,115 @@
   color-scheme: dark;
 }
 html, body { height: 100%; }
+/* the page shell (Part 35): a top bar over Design (panel | view) or Run (left column | view + console | right
+   column). html[data-mode] = the mode, html.l-off / .r-off = folded columns, html.con-open / .con-big = the console
+   (js/page/ui.js; the first paint reads them in index.html's head) */
 body {
-  background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 14px;
-  display: grid; grid-template-columns: minmax(280px, 330px) 1fr; overflow: hidden;
+  background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 14px; overflow: hidden;
+  display: grid; grid-template-areas: "top top" "panel stage";
+  grid-template-columns: minmax(280px, 330px) minmax(0, 1fr); grid-template-rows: var(--top-h) minmax(0, 1fr);
 }
+:root { --top-h: 48px; --lw: 290px; --rw: 330px; --con-h: 160px; }
+:root.l-off { --lw: 44px; }
+:root.r-off { --rw: 44px; }
+:root[data-mode="run"] body {
+  grid-template-areas: "top top top" "left stage right" "left con right";
+  grid-template-columns: var(--lw) minmax(0, 1fr) var(--rw); grid-template-rows: var(--top-h) minmax(0, 1fr) auto;
+}
+.topbar { grid-area: top; }
+.panel { grid-area: panel; }
+.stage { grid-area: stage; }
+.side-l { grid-area: left; }
+.side-r { grid-area: right; }
+.console { grid-area: con; }
+.side, .console, .mini-dro { display: none; }
+:root[data-mode="run"] .panel { display: none; }
+:root[data-mode="run"] .side { display: flex; }
+:root[data-mode="run"] .console { display: grid; }
+:root[data-mode="run"].l-off .mini-dro { display: flex; }
+
+.topbar { position: relative; z-index: 6; display: flex; align-items: center; gap: 10px; min-width: 0;
+  padding: 0 10px 0 max(12px, env(safe-area-inset-left, 0px)); background: var(--panel); border-bottom: 1px solid var(--line); }
+.tb-icon { width: 26px; height: 26px; flex: 0 0 auto; }
+.tb-name { font-family: var(--font-display); font-weight: 700; font-size: 18px; white-space: nowrap; }
+.tb-name span { color: var(--accent); }
+.tb-size { color: var(--muted); font-family: var(--font-data); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.modes { position: absolute; left: 50%; transform: translateX(-50%); display: inline-flex; gap: 2px; padding: 3px;
+  border: 1px solid var(--line); border-radius: 8px; background: var(--bg); }
+.modes button { border: 0; border-radius: 6px; padding: 5px 22px; font: 600 14px var(--font-display); letter-spacing: 0.04em; color: var(--muted); }
+.modes button[aria-pressed="true"] { background: var(--panel); color: var(--ink); box-shadow: 0 1px 3px rgb(0 0 0 / 0.18); }
+.modes #t-run[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
+.tb-right { margin-left: auto; display: flex; gap: 6px; align-items: center; }
+.set-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 10px; }
+.lbl { font-family: var(--font-display); font-weight: 600; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+.set-links { margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--line); }
+
+/* Run's columns: each folds to a strip with its unfold button (below 1200 px they start folded) */
+.side { background: var(--panel); min-width: 0; min-height: 0; flex-direction: column; }
+.side-l { border-right: 1px solid var(--line); }
+.side-r { border-left: 1px solid var(--line); }
+.colhead { display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 8px 8px 6px 16px; }
+.col-btn { padding: 2px 9px; font-size: 15px; line-height: 1.2; color: var(--muted); }
+.col-body { overflow-y: auto; min-height: 0; flex: 1; display: flex; flex-direction: column; gap: 20px; padding: 4px 16px 24px; }
+:root.l-off .side-l .col-body, :root.r-off .side-r .col-body, :root.l-off .side-l .colhead .lbl, :root.r-off .side-r .colhead .lbl { display: none; }
+:root.l-off .side-l .colhead, :root.r-off .side-r .colhead { justify-content: center; padding: 8px 0; }
+.mini-dro { position: absolute; left: 12px; bottom: 12px; gap: 14px; padding: 7px 12px; border: 1px solid var(--line); border-radius: 6px;
+  background: color-mix(in srgb, var(--panel) 90%, transparent); backdrop-filter: blur(4px); font-family: var(--font-data); font-size: 14px; }
+.mini-dro em { font-style: normal; color: var(--muted); margin-right: 5px; font-size: 12px; }
+.mini-dro ~ .pick { bottom: 54px; }
+:root:not(.l-off) .mini-dro ~ .pick, :root[data-mode="design"] .mini-dro ~ .pick { bottom: 10px; }
+
+/* the console: always dark; folded = one line (state, last message, input), open = the log, big = half the window */
+.console {
+  --c-bg: #111417; --c-2: #1d2126; --c-ink: #e6e9ec; --c-muted: #8d969f; --c-line: #2a3036;
+  background: var(--c-bg); color: var(--c-ink); min-width: 0; font-size: 12px; align-items: center; gap: 0 10px; padding: 0 10px 6px;
+  grid-template-columns: auto auto minmax(0, 1fr) minmax(180px, 2fr) auto;
+  grid-template-areas: "ttl st last form tools";
+}
+:root.con-open .console, :root.con-big .console {
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  grid-template-areas: "grip grip grip grip" "ttl st . tools" "body body body body" "form form form form" "btns btns btns btns";
+}
+.con-grip { grid-area: grip; height: 8px; cursor: ns-resize; position: relative; touch-action: none; }
+.con-grip::after { content: ""; position: absolute; left: 50%; top: 3px; width: 40px; height: 3px; margin-left: -20px; border-radius: 3px; background: #3a4048; }
+.con-ttl { grid-area: ttl; font-family: var(--font-display); font-weight: 600; letter-spacing: 0.06em; padding-top: 6px; }
+.con-st { grid-area: st; font-family: var(--font-data); color: var(--c-muted); padding-top: 6px; white-space: nowrap; }
+.con-st.err { color: #ff8a80; }
+.con-last { grid-area: last; font-family: var(--font-data); color: var(--c-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-top: 6px; }
+.con-last.err { color: #ff8a80; }
+.con-tools { grid-area: tools; display: flex; gap: 4px; padding-top: 6px; }
+.con-body { grid-area: body; min-width: 0; }
+.console .ctl-form { grid-area: form; margin-top: 6px; }
+.con-btns { grid-area: btns; margin-top: 6px; }
+.console :is(button, input) { color: var(--c-ink); border-color: var(--c-line); }
+.console input { background: var(--c-2); }
+.console button:hover { border-color: var(--c-muted); }
+.con-tools button { padding: 2px 8px; font-size: 12px; }
+#con-big[aria-pressed="true"] { border-color: var(--accent); }
+.console .ctl-log { height: var(--con-h); background: var(--c-2); border-color: var(--c-line); }
+:root.con-big .console .ctl-log { height: calc(50dvh - 120px); }
+.console .ctl-log .dim, .console .ctl-state { color: var(--c-muted); }
+.console .ctl-log .err { color: #ff8a80; }
+.console .ctl-log .in { color: #ff8a80; }
+.console .ctl-state { margin-top: 2px; }
+:root:not(.con-open):not(.con-big) .console :is(.con-grip, .con-body, .con-btns, #con-clear, #con-big) { display: none; }
+:root.con-open .con-last, :root.con-big .con-last { display: none; }
+
+/* "?" help: one popover (js/page/ui.js), its text from the hidden .help block named by data-help */
+.q { display: inline-grid; place-items: center; width: 17px; height: 17px; padding: 0; margin-left: 4px; border-radius: 50%;
+  border: 1px solid currentColor; font: 700 10px/1 var(--font-body); color: var(--muted); vertical-align: 1px; letter-spacing: 0; text-transform: none; }
+.q:hover, .q[aria-expanded="true"] { color: var(--accent); border-color: var(--accent); }
+.help-pop { position: fixed; z-index: 20; width: min(340px, calc(100vw - 24px)); max-height: 60dvh; overflow-y: auto; padding: 4px 14px;
+  background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-left: 3px solid var(--accent); border-radius: 6px;
+  box-shadow: 0 10px 32px rgb(0 0 0 / 0.25); font-size: 13px; line-height: 1.5; }
+.help-pop p { margin: 8px 0; }
+
 .panel {
   background: var(--panel); border-right: 1px solid var(--line); overflow-y: auto;
   padding-block: 18px 24px;
   padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: 16px;
   display: flex; flex-direction: column; gap: 20px; min-width: 0;
 }
-h1 { font-family: var(--font-display); font-weight: 700; font-size: 30px; line-height: 1; margin: 0; letter-spacing: 0.01em; text-wrap: balance; }
 .sub { color: var(--muted); margin-top: 6px; line-height: 1.4; }
 h2 {
   font-family: var(--font-display); font-weight: 600; font-size: 12px; text-transform: uppercase;
@@ -110,15 +208,15 @@ dialog.about::backdrop { background: rgb(0 0 0 / 0.45); }
 dialog.about h2 { font-size: 14px; color: var(--ink); }
 dialog.about p { margin: 0 0 10px; color: var(--muted); font-size: 13px; }
 /* on the canvas: view toolbar + settings popover (top left), the selected part (bottom left) */
-.toolbar { position: absolute; left: 12px; top: 12px; right: 12px; display: flex; flex-wrap: wrap; gap: 4px; pointer-events: none; }
-.toolbar button, .pick, .view-pop { background: color-mix(in srgb, var(--panel) 90%, transparent); backdrop-filter: blur(4px); }
+.toolbar { position: absolute; left: 12px; top: 12px; right: 56px; display: flex; flex-wrap: wrap; gap: 4px; pointer-events: none; }
+.toolbar button, .pick { background: color-mix(in srgb, var(--panel) 90%, transparent); backdrop-filter: blur(4px); }
 .toolbar button { pointer-events: auto; padding: 5px 9px; }
 .toolbar select { pointer-events: auto; width: auto; display: none; }
 p.foot:empty { display: none; }
 #room-box { margin-top: 10px; }
 #v-more { font-size: 15px; line-height: 1; padding: 4px 8px; }
 #v-more[aria-expanded="true"] { border-color: var(--accent); }
-.view-pop { position: absolute; left: 12px; top: 52px; width: min(330px, calc(100% - 24px)); max-height: calc(100% - 64px); overflow-y: auto;
+.view-pop { position: absolute; right: 8px; top: calc(var(--top-h) - 2px); width: min(330px, calc(100vw - 24px)); max-height: calc(100dvh - 64px); overflow-y: auto; background: var(--panel);
   border: 1px solid var(--line); border-radius: 6px; padding: 4px 14px 14px; box-shadow: 0 10px 32px rgb(0 0 0 / 0.22); }
 .pick { position: absolute; left: 12px; bottom: 10px; max-width: min(420px, calc(100% - 24px)); display: flex; align-items: flex-start; gap: 10px;
   border: 1px solid var(--line); border-left: 3px solid var(--accent); border-radius: 4px; padding: 6px 6px 6px 10px; }
@@ -183,7 +281,7 @@ canvas { display: block; width: 100%; height: 100%; touch-action: none; }
 .ft-pop b { font-family: var(--font-display); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
 .ft-pop button { cursor: pointer; }
 .ft-pop canvas { display: block; width: 100%; height: auto; aspect-ratio: 5 / 3; background: #000; cursor: pointer; touch-action: none; }
-body.rec .meas-main, body.rec .panel, body.rec .hint, body.rec .toolbar, body.rec .view-pop, body.rec .pick, body.rec .insp { display: none; }  /* recording (LR4Demo.recording): the 3D view, whole window */
+body.rec :is(.meas-main, .panel, .hint, .toolbar, .view-pop, .pick, .insp, .topbar, .side, .console, .mini-dro) { display: none; }  /* recording (LR4Demo.recording): the 3D view, whole window */
 body.inspecting .job-pop, body.inspecting .rec-msg, body.inspecting .rec-badge { display: none !important; }  /* inspect: no M0 popup / message bar / speed badge (back with Back) */
 body.rec .stage { position: fixed; inset: 0; }
 .rec-badge {                          /* the demo video's speed (LR4Demo.badge): "1× real time" / "62×" */
@@ -342,11 +440,23 @@ label.btn:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; 
 .ctl-form input { flex: 1; min-width: 0; font-family: var(--font-data); }
 #dl-status { font-size: 12px; color: var(--muted); min-height: 1.3em; margin-top: 6px; }
 @media (max-width: 760px) {
-  body { grid-template-columns: 1fr; grid-template-rows: minmax(0, 58%) minmax(0, 42%); }
-  .stage { grid-row: 1; }
-  .panel { grid-row: 2; border-right: 0; border-top: 1px solid var(--line); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
-  h1 { font-size: 24px; }
-  .toolbar { left: 8px; top: 8px; right: 8px; }
+  :root { --top-h: 44px; }
+  body { grid-template-areas: "top" "stage" "panel"; grid-template-columns: 1fr; grid-template-rows: var(--top-h) minmax(0, 52%) minmax(0, 1fr); }
+  .panel { border-right: 0; border-top: 1px solid var(--line); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+  .tb-name span, .tb-size { display: none; }
+  .modes { position: static; transform: none; margin-left: auto; }
+  .modes button { padding: 4px 12px; font-size: 13px; }
+  .tb-right { margin-left: 0; }
+  #tb-files { display: none; }
+  /* Run on a phone, until Part 39: the view on top, the console, then both columns, one page that scrolls */
+  :root[data-mode="run"] body { display: block; overflow-y: auto; height: 100%; }
+  :root[data-mode="run"] .topbar { position: sticky; top: 0; height: var(--top-h); }
+  :root[data-mode="run"] .stage { position: sticky; top: var(--top-h); height: 46dvh; z-index: 4; }
+  :root[data-mode="run"] .side { border: 0; border-top: 1px solid var(--line); }
+  :root[data-mode="run"] .side .col-body { display: flex !important; overflow: visible; }
+  .col-btn, :root[data-mode="run"] .mini-dro { display: none !important; }
+  .toolbar { left: 8px; top: 8px; right: 48px; }
+  .v-only { right: 8px; top: 8px; }
   .toolbar button { padding: 4px 7px; font-size: 12px; }
   .toolbar select { display: block; padding: 4px 7px; font-size: 12px; }   /* the five views in one menu */
   #v-iso, #v-front, #v-top, #v-side, #v-back { display: none; }
@@ -356,15 +466,23 @@ label.btn:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; 
   .pick { left: 8px; bottom: 8px; }
   .insp { right: 8px; top: 74px; max-height: calc(100% - 140px); }
 }
-/* VR on: no side panel, the stage fills the window, a popup card instead (js/vr.js toggles body.vr-on) */
-body.vr-on { grid-template-columns: 1fr; grid-template-rows: 1fr; }
-/* panel collapsed (toolbar ☰): the model fills the window, on phones too */
-body.panel-off { grid-template-columns: 1fr; grid-template-rows: 1fr; }
-body.panel-off .panel { display: none; }
-body.panel-off .stage { grid-row: 1; }
+/* panel collapsed (toolbar ☰): the model fills the window under the top bar (Run: the console stays), on phones too */
+body.panel-off { grid-template-areas: "top" "stage"; grid-template-columns: 1fr; grid-template-rows: var(--top-h) minmax(0, 1fr); }
+:root[data-mode="run"] body.panel-off { display: grid; grid-template-areas: "top" "stage" "con"; grid-template-columns: 1fr;
+  grid-template-rows: var(--top-h) minmax(0, 1fr) auto; }
+:root[data-mode="run"] body.panel-off .stage { position: relative; top: 0; height: auto; }
+body.panel-off :is(.panel, .side) { display: none !important; }
+/* view only (⛶ top right of the view, V): the 3D view fills the window; the same button brings the panels back */
+.v-only { position: absolute; right: 12px; top: 12px; padding: 4px 8px; font-size: 16px; line-height: 1;
+  background: color-mix(in srgb, var(--panel) 90%, transparent); backdrop-filter: blur(4px); }
+.v-only[aria-pressed="true"] { border-color: var(--accent); }
+body.view-only .stage { position: fixed; inset: 0; }
+body.view-only :is(.topbar, .panel, .side, .console, .toolbar, .view-pop, .hint, .pick, .mini-dro, .meas-main) { display: none !important; }
+body.rec .v-only, body.vr-on .v-only { display: none; }
+/* VR on: the stage fills the window, a popup card instead (js/vr.js toggles body.vr-on) */
+body.vr-on .stage { position: fixed; inset: 0; }
 #v-panel[aria-pressed="true"] { border-color: var(--accent); }
-body.vr-on .meas-main, body.vr-on .panel, body.vr-on .hint, body.vr-on .toolbar, body.vr-on .view-pop, body.vr-on .pick, body.vr-on .insp { display: none; }
-body.vr-on .stage { grid-row: 1; }
+body.vr-on :is(.meas-main, .panel, .hint, .toolbar, .view-pop, .pick, .insp, .topbar, .side, .console, .mini-dro) { display: none !important; }
 .vr-pop {
   position: absolute; right: 16px; top: 16px; width: min(400px, calc(100% - 32px));
   background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-left: 4px solid var(--accent);

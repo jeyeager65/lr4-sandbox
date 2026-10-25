@@ -213,8 +213,11 @@
   }
   function controlsTick() {
     (tball.enabled ? tball : controls).update();
-    const near = tball.enabled ? Math.min(5, Math.max(0.1, camera.position.distanceTo(controls.target) / 100)) : 5;
-    if (camera.near !== near) { camera.near = near; camera.updateProjectionMatrix(); }
+    // the far plane follows it out (zoomed far out, the whole building and the ground to the horizon; the workshop's
+    // sky and grass scale with it), and the near plane with the far one: the same depth precision as 5 mm / 20 m
+    const d = camera.position.distanceTo(controls.target), far = Math.max(20000, Math.round(d * 2 + 12000));
+    const near = tball.enabled ? Math.min(5, Math.max(0.1, d / 100)) : 5 * far / 20000;
+    if (camera.near !== near || camera.far !== far) { camera.near = near; camera.far = far; camera.updateProjectionMatrix(); }
   }
   // light: the studio environment lights every surface (soft, directional ambient), a weak sky / ground fill, and a
   // sun that casts soft shadows (fitted to the table in updateShop)

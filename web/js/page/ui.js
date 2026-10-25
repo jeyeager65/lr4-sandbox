@@ -10,7 +10,7 @@
   });
   document.getElementById("pick-clear").addEventListener("click", () => select(null));
 
-  // ---- panel tabs (the last one kept per browser) and the view settings popover ----
+  // ---- Design's tabs (the last one kept per browser) and the ⚙ settings popover ----
   const tabs = [...document.querySelectorAll('.tabs [role="tab"]')];
   function showTab(t, focus) {
     for (const b of tabs) {
@@ -64,6 +64,155 @@
     try { localStorage.setItem("lr4-vr-pop", min ? "min" : "open"); } catch (e) { /* not kept */ }
   });
   try { if (localStorage.getItem("lr4-vr-pop") === "min") minVrPop(true); } catch (e) { /* open */ }
+
+  // ---- the page shell (Part 35): Design | Run, the theme, Run's columns and console, "?" help. The mode, theme and
+  // folds live on <html> (data-mode, data-theme, l-off / r-off, con-open / con-big); index.html's head sets them from
+  // localStorage before the first paint, this keeps them and the buttons in step. ----
+  {
+    const root = document.documentElement;
+    const kv = { get: (k) => { try { return localStorage.getItem(k); } catch (e) { return null; } },
+                 set: (k, v) => { try { localStorage.setItem(k, v); } catch (e) { /* not kept */ } } };
+    const modeBtns = { design: $("t-design"), run: $("t-run") };
+    function setMode(m, save = true) {
+      root.dataset.mode = m;
+      for (const [k, b] of Object.entries(modeBtns)) b.setAttribute("aria-pressed", String(k === m));
+      if (save) kv.set("lr4-mode", m);
+    }
+    for (const [k, b] of Object.entries(modeBtns)) b.addEventListener("click", () => setMode(k));
+    if (kv.get("lr4-mode") === null && kv.get("lr4-tab") === "t-run") setMode("run");   // the old Run tab
+    else setMode(root.dataset.mode === "run" ? "run" : "design", false);
+    $("tb-files").addEventListener("click", () => { setMode("design"); showPanel(true); showTab($("t-build")); });
+
+    const themeBtns = [...document.querySelectorAll("#theme button")];
+    function setTheme(t) {
+      if (t === "light" || t === "dark") root.dataset.theme = t;
+      else delete root.dataset.theme;
+      for (const b of themeBtns) b.setAttribute("aria-pressed", String(b.dataset.v === (root.dataset.theme || "auto")));
+    }
+    for (const b of themeBtns) b.addEventListener("click", () => { setTheme(b.dataset.v); kv.set("lr4-theme", b.dataset.v); });
+    setTheme(root.dataset.theme);
+    $("set-keys").addEventListener("click", () => { showViewPop(false); $("keys-dlg").showModal(); });
+
+    // ⛶ view only: nothing but the 3D view (not kept: a reload brings the panels back)
+    const vOnly = $("v-only");
+    function viewOnly(on) {
+      document.body.classList.toggle("view-only", on);
+      vOnly.setAttribute("aria-pressed", String(on));
+      vOnly.title = on ? "Show the panels again (Esc)" : "Only the view: hide the panels (Esc brings them back)";
+      vOnly.setAttribute("aria-label", on ? "Show the panels" : "Only the view");
+      if (on) showViewPop(false);
+    }
+    vOnly.addEventListener("click", () => viewOnly(!document.body.classList.contains("view-only")));
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && document.body.classList.contains("view-only") && !document.querySelector("dialog[open]")) viewOnly(false);
+    });
+
+    // Run's columns fold to strips; below 1200 px they fold by themselves (the user's folds are kept for wide windows)
+    const narrow = matchMedia("(max-width: 1199px)");
+    const userOff = { l: kv.get("lr4-col-l") === "off", r: kv.get("lr4-col-r") === "off" };
+    function fold(side, off) {
+      root.classList.toggle(side + "-off", off);
+      const b = $("col-" + side), name = side === "l" ? "Machine" : "Job";
+      b.setAttribute("aria-expanded", String(!off));
+      b.textContent = (side === "l") === off ? "»" : "«";
+      b.title = off ? "Unfold the column" : "Fold the column";
+      b.setAttribute("aria-label", `${off ? "Unfold" : "Fold"} the ${name} column`);
+    }
+    for (const side of ["l", "r"]) $("col-" + side).addEventListener("click", () => {
+      const off = !root.classList.contains(side + "-off");
+      fold(side, off);
+      if (!narrow.matches) { userOff[side] = off; kv.set("lr4-col-" + side, off ? "off" : "on"); }
+    });
+    const fitCols = () => { for (const side of ["l", "r"]) fold(side, narrow.matches || userOff[side]); };
+    narrow.addEventListener("change", fitCols);
+    fitCols();
+    // left folded: the work position floats on the view
+    const md = { x: $("md-x"), y: $("md-y"), z: $("md-z") };
+    const mdSync = () => { for (const a of "xyz") md[a].textContent = $("w" + a).textContent; };
+    new MutationObserver(mdSync).observe($("wx").parentElement.parentElement, { subtree: true, childList: true, characterData: true });
+    mdSync();
+
+    // the console: folded = one line (state, last message, input), open = the log (drag the top edge), big = half the window
+    const con = { mode: "fold", h: +kv.get("lr4-con-h") || 0 };
+    function conMode(m, save = true) {
+      con.mode = m;
+      root.classList.toggle("con-open", m === "open");
+      root.classList.toggle("con-big", m === "big");
+      const f = $("con-fold");
+      f.textContent = m === "fold" ? "▴" : "▾";
+      f.title = m === "fold" ? "Open the console" : "Fold the console";
+      f.setAttribute("aria-label", f.title);
+      f.setAttribute("aria-expanded", String(m !== "fold"));
+      $("con-big").setAttribute("aria-pressed", String(m === "big"));
+      if (save) kv.set("lr4-con", m);
+      const log = $("ctl-log");
+      log.scrollTop = log.scrollHeight;
+    }
+    $("con-fold").addEventListener("click", () => conMode(con.mode === "fold" ? "open" : "fold"));
+    $("con-big").addEventListener("click", () => conMode(con.mode === "big" ? "open" : "big"));
+    $("con-clear").addEventListener("click", () => { $("ctl-log").textContent = ""; $("con-last").textContent = ""; });
+    if (con.h) root.style.setProperty("--con-h", con.h + "px");
+    { const m = kv.get("lr4-con"); conMode(m === "open" || m === "big" ? m : "fold", false); }
+    const grip = $("con-grip");
+    grip.addEventListener("pointerdown", (e) => {
+      const y0 = e.clientY, h0 = $("ctl-log").getBoundingClientRect().height;
+      grip.setPointerCapture(e.pointerId);
+      const move = (ev) => {
+        con.h = Math.round(Math.min(innerHeight * 0.7, Math.max(48, h0 + y0 - ev.clientY)));
+        root.style.setProperty("--con-h", con.h + "px");
+        if (con.mode === "big") conMode("open");
+      };
+      const up = () => {
+        grip.removeEventListener("pointermove", move);
+        grip.removeEventListener("pointerup", up);
+        grip.removeEventListener("pointercancel", up);
+        kv.set("lr4-con-h", String(con.h));
+      };
+      grip.addEventListener("pointermove", move);
+      grip.addEventListener("pointerup", up);
+      grip.addEventListener("pointercancel", up);
+    });
+    // the folded line: FluidNC's state (from the status line) and the log's last line
+    new MutationObserver(() => {
+      const last = $("ctl-log").lastElementChild, l = $("con-last");
+      l.textContent = last ? last.textContent : "";
+      l.classList.toggle("err", !!last && last.classList.contains("err"));
+    }).observe($("ctl-log"), { childList: true });
+    new MutationObserver(() => {
+      const m = /^<([A-Za-z]+)/.exec($("ctl-state").textContent), st = $("con-st");
+      st.textContent = m ? m[1] : "";
+      st.classList.toggle("err", !!m && m[1] === "Alarm");
+    }).observe($("ctl-state"), { childList: true, characterData: true, subtree: true });
+
+    // "?" help: one popover next to its button, the text from the hidden .help block it names (Esc / outside closes)
+    const pop = document.createElement("div");
+    pop.className = "help-pop";
+    pop.id = "help-pop";
+    pop.setAttribute("role", "dialog");
+    pop.hidden = true;
+    document.body.appendChild(pop);
+    let helpBtn = null;
+    function help(b) {
+      if (helpBtn) helpBtn.setAttribute("aria-expanded", "false");
+      helpBtn = b;
+      pop.hidden = !b;
+      if (!b) return;
+      pop.innerHTML = $(b.dataset.help).innerHTML;
+      pop.setAttribute("aria-label", b.getAttribute("aria-label"));
+      b.setAttribute("aria-expanded", "true");
+      const r = b.getBoundingClientRect(), w = pop.offsetWidth, h = pop.offsetHeight;
+      pop.style.left = Math.max(12, Math.min(innerWidth - w - 12, r.left - 20)) + "px";
+      pop.style.top = (r.bottom + 6 + h > innerHeight - 8 ? Math.max(8, r.top - 6 - h) : r.bottom + 6) + "px";
+    }
+    for (const b of document.querySelectorAll(".q[data-help]")) {
+      b.setAttribute("aria-expanded", "false");
+      b.setAttribute("aria-controls", "help-pop");
+      b.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); help(helpBtn === b ? null : b); });
+    }
+    document.addEventListener("pointerdown", (e) => { if (helpBtn && !pop.contains(e.target) && e.target !== helpBtn) help(null); });
+    document.addEventListener("keydown", (e) => { if (e.key === "Escape" && helpBtn) { const b = helpBtn; help(null); b.focus(); } });
+    for (const el of document.querySelectorAll(".col-body, .panel")) el.addEventListener("scroll", () => help(null), { passive: true });
+  }
   document.getElementById("about-btn").addEventListener("click", () => document.getElementById("about-dlg").showModal());
 
   // ---- SpaceMouse (3Dconnexion) over WebHID, Chrome / Edge. Object mode: push the cap and the model goes
@@ -257,6 +406,7 @@
     else if (k === "m") click("v-meas");
     else if (k === "p") saveImage();
     else if (k === "h") click("v-panel");
+    else if (k === "v") click("v-only");
     else if (k === "?") $("keys-dlg").showModal();
     else if (k === " " && JOB.preview && !$("job-on").hidden) click("job-play");
     else if (k === "Escape" && MEAS.main) mainMeasure(false);

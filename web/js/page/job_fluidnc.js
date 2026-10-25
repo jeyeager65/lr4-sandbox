@@ -109,8 +109,11 @@
     const w = J.T.last;
     if (w) { $("wx").textContent = w.x.toFixed(3); $("wy").textContent = w.y.toFixed(3); $("wz").textContent = w.z.toFixed(3); }
     for (; J.k < tl.events.length && tl.events[J.k].index <= J.T.i; J.k++) {
-      const e = tl.events[J.k];                      // a tool change (M6): hold it there for the bit
-      if (e.kind === "tool" && !J.held) { CTL.sim.realtime("!"); J.toolStop = e; }
+      const e = tl.events[J.k];                      // a tool change (M6): hold it there for the bit - also when the
+      if (e.kind === "tool") {                       // hold beat this tick there (slow frames): fjHold's own tick then
+        J.toolStop = e;                              // still finds it, so the popup asks for the bit, not "Paused (M0)"
+        if (!J.held) CTL.sim.realtime("!");
+      }
     }
   }
   function fjPlate(pl) {                             // the touch plate on the stock (pl: a tl.plates entry) or away
@@ -190,7 +193,7 @@
   function sdRow(r) {                                // one file on the card's tree
     const row = document.createElement("div"), name = document.createElement("button"), size = document.createElement("small");
     row.className = "sd-row"; row.setAttribute("role", "option");
-    const sel = JOB.file ? JOB.file.kind === "sd" && JOB.file.name === r.path : r.path === PAGE_SD && pageLive();
+    const sel = JOB.file ? JOB.file.kind === "sd" && JOB.file.name === r.path : r.path === PAGE_SD && pageLive() && JOB.usePage;
     row.setAttribute("aria-selected", String(sel));
     name.type = "button"; name.className = "sd-name"; name.textContent = r.path.split("/").pop(); name.title = `Load ${r.path}`;
     size.textContent = r.bytes.length >= 1e6 ? `${(r.bytes.length / 1e6).toFixed(1)} MB` : `${Math.ceil(r.bytes.length / 1e3)} KB`;
@@ -237,7 +240,8 @@
     if (UI_FILE.test(path)) return;                  // web UIs open under Controller > Web UIs
     const r = SDC.recs.find((q) => q.path === path);
     if (!r) return;
-    JOB.file = path === PAGE_SD && pageLive() ? null : { kind: "sd", name: path, text: sdText(r) };
+    JOB.usePage = path === PAGE_SD && pageLive();
+    JOB.file = JOB.usePage ? null : { kind: "sd", name: path, text: sdText(r) };
     try { localStorage.setItem("lr4-sd-sel", path); } catch (e) { /* not kept */ }
     sdRefresh();
     await jobSetup(JOB.pageJob);
@@ -301,8 +305,16 @@
     try { p = localStorage.getItem("lr4-sd-sel"); } catch (e) { /* none */ }
     if (p && p !== PAGE_SD && !UI_FILE.test(p) && SDC.recs.some((r) => r.path === p)) sdSelect(p);
   });
+  $("job-unload").addEventListener("click", () => {   // no job loaded: its stock, moves and bits off (user 2026-10-24)
+    if (FJ.job) { $("job-status").textContent = "A job is running on FluidNC: stop it first."; return; }
+    Object.assign(JOB, { file: null, usePage: false, stockOff: null });
+    try { localStorage.removeItem("lr4-sd-sel"); } catch (e) { /* nothing kept */ }
+    jobSetup(JOB.pageJob);
+    sdRefresh();
+  });
   $("job-back").addEventListener("click", () => {
     JOB.file = null;
+    JOB.usePage = true;
     try { localStorage.setItem("lr4-sd-sel", PAGE_SD); } catch (e) { /* not kept */ }
     jobSetup(JOB.pageJob);
     sdRefresh();
@@ -311,8 +323,12 @@
     const b = document.querySelector('#strut-variant button[data-v="mdf"]');
     if (b) b.click();
   });
-  $("job-temp").addEventListener("click", () => {    // the same switch as Config > Parts > Strut plates
+  $("job-temp").addEventListener("click", () => {    // the strut plate job, on the temporary struts (switched like My LR4 > Strut plates)
+    JOB.file = null;
+    JOB.usePage = true;
+    try { localStorage.setItem("lr4-sd-sel", PAGE_SD); } catch (e) { /* not kept */ }
     const b = document.querySelector('#strut-variant button[data-v="temp"]');
-    if (b) b.click();
+    if (b && b.getAttribute("aria-pressed") !== "true") b.click();
+    else { jobSetup(JOB.pageJob); sdRefresh(); }
   });
 

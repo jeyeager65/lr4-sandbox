@@ -15,7 +15,7 @@ const steps = [
   // on the Run tab (Machine hidden): what the menu reads, and what shows in VR
   `LR4Pendant.set(true); document.getElementById('t-run').click(); const v = LR4VR.page; v.preview('one'); const s = v.state();
    const shown = (q) => getComputedStyle(document.querySelector(q)).display !== 'none';
-   return { machineHidden: document.getElementById('tab-machine').hidden, groups: s.groups.length, peter: s.peter.length,
+   return { machineHidden: getComputedStyle(document.querySelector('.panel')).display === 'none', groups: s.groups.length, peter: s.peter.length,
      unit: s.unit, toolbar: shown('.toolbar'), panel: shown('.panel'), vrpop: shown('#vr-pop'),
      pendant: Object.values(LR4Demo.boxes('^Pendant_')).filter((b) => b[2]).length, chip: s.groups.some((g) => g.id === 'g-pendant'),
      fits: LR4VR.layout(s).buttons.filter((b) => b.act.a === 'group').every((b) => b.y + b.h <= 634) }`,
@@ -45,7 +45,7 @@ ok(ev.length === 3, `3 results, got ${ev.length}`);
 if (ev.length !== 3) console.log(out);
 if (ev.length === 3) {
   const [a, b, c] = ev;
-  ok(a.machineHidden, "Machine tab hidden while on Run");
+  ok(a.machineHidden, "Design panel hidden while on Run");
   ok(a.groups > 5, `menu sees the part groups (${a.groups})`);
   ok(a.peter > 0, "menu sees the Peter Plate choices");
   ok(!a.toolbar && !a.panel && a.vrpop, "in VR: no toolbar / panel, the VR card shows");

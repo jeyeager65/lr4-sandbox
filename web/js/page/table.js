@@ -47,6 +47,12 @@
     const on = $("hs-show-stock").checked;
     if (HAND.mesh) HAND.mesh.visible = on && !JOB.stock;
     if (JOB.stock) JOB.stock.visible = on;
+    stockName();
+  }
+  function stockName() {                             // On the table > Stock: what's on the table, the job's own too
+    const s = HAND.stock, js = JOB.tl && JOB.stock && !JOB.handStock ? JOB.tl.stock : null;
+    $("hs-stock-name").textContent = js ? `${+(js.xmax - js.xmin).toFixed(1)} × ${+(js.ymax - js.ymin).toFixed(1)} × ${+(js.zmax - js.zmin).toFixed(2)} mm, from the job`
+      : s.on ? `${+(s.x1 - s.x0).toFixed(1)} × ${+(s.y1 - s.y0).toFixed(1)} × ${+s.t.toFixed(2)} mm` : "none";
   }
   function bitForm(box, b) {                         // fill / read a bit form (On the table > Bit, the tool-change popup)
     const q = (k) => box.querySelector(`[data-k="${k}"]`);
@@ -82,7 +88,7 @@
     const s = HAND.stock, fr = SPOIL.frame, fol = AB.set.on && HAND.follow ? SPOIL.ver : "flat";
     const key = `${JSON.stringify(s)}|${fr && fr.join()}|${lite}|${fol}`;
     $("hs-follow").value = HAND.follow ? "1" : "0";
-    $("hs-stock-name").textContent = s.on ? `${+(s.x1 - s.x0).toFixed(1)} × ${+(s.y1 - s.y0).toFixed(1)} × ${+s.t.toFixed(2)} mm` : "none";
+    stockName();
     for (const [id, v] of [["hs-x0", s.x0], ["hs-x1", s.x1], ["hs-y0", s.y0], ["hs-y1", s.y1], ["hs-t", s.t]]) $(id).value = +v.toFixed(2);
     if (key === HAND.key) return;
     HAND.key = key;
@@ -197,22 +203,43 @@
   // every move carves (once a frame): the tip's path since the last frame, with the router's bit, into the stock (the
   // job's, seen in its work frame, else the hand one) and the spoilboard - except a job's own moves (carved from the
   // job: jobSeek, fjTick) and the page's own jumps (HAND.skip: a scrub, a reload, measuring the router)
+  // hand moves (jogs, the console, the pendant) carve from the motors, sampled every 4 ms as a running job's moves are
+  // (job_fluidnc.js fjSample), not once a frame: with slow frames one sample a frame made a plunge then a slot one
+  // diagonal, or nothing yet when the move had ended (test_page_hand on a software renderer, ~1 s a frame). The sims
+  // are cut as the samples come; the frame only redraws them. Not while a job / Preview runs (they carve their own);
+  // videos (CTL.recRaw: the pose at each frame's machine time) still carve frame to frame in handTick.
+  function handCarve(a, b) {                         // tool tip a -> b, mm from the cutting area's front-left corner
+    const d = HAND.dirty;
+    if (JOB.sim) {
+      const z0 = jobZ0(), zm = JOB.tl.stock.zmin;
+      if (JOB.sim.sweep(a.x - z0[0], a.y - z0[1], a.z + zm, b.x - z0[0], b.y - z0[1], b.z + zm, HAND.tool)) d.job = true;
+    } else if (HAND.sim && HAND.sim.sweep(a.x, a.y, a.z, b.x, b.y, b.z, HAND.tool)) d.hand = true;
+    if (SPOIL.sim && Math.min(a.z, b.z) < 0 && SPOIL.sim.sweep(a.x, a.y, a.z, b.x, b.y, b.z, HAND.tool)) d.spoil = true;
+  }
+  function handSample() {
+    if (!meta || !CTL.sim || CTL.sim.stopped || !CTL.boot || CTL.recRaw || FJ.job || JOB.playing || JOB.preview || !HAND.tool) { HAND.at = null; return; }
+    const tv = meta.travel, p = ctlLive().map((v, i) => Math.min(Math.max(v, tv["xyz"[i]][0]), tv["xyz"[i]][1]));   // held as ctlTick holds it
+    const q = { x: p[0] - tv.x[0], y: p[1] - tv.y[0], z: p[2] + meta.tip_above_table, sim: CTL.sim }, a = HAND.at;
+    if (!a || a.sim !== CTL.sim) { HAND.at = q; return; }   // a new FluidNC (restart, power cycle): a new start, no line across
+    if (Math.abs(a.x - q.x) + Math.abs(a.y - q.y) + Math.abs(a.z - q.z) <= 0.01) return;
+    handCarve(a, q);
+    HAND.at = q;
+  }
   function handTick() {
+    if (!HAND.timer) { HAND.dirty = {}; HAND.timer = setInterval(handSample, 4); }   // started with the frames (every script loaded)
     if (!meta || !HOME.pose) return;
     const tv = meta.travel, p = HOME.pose, now = { x: p.x - tv.x[0], y: p.y - tv.y[0], z: p.z + meta.tip_above_table };
     const prev = HAND.last;
     HAND.last = now;
-    if (HAND.skip || JOB.playing || FJ.job || !prev || !HAND.tool || JOB.preview) { HAND.skip = false; return; }
-    if (prev.x === now.x && prev.y === now.y && prev.z === now.z) return;
-    let cut = false;
-    if (JOB.sim) {
-      const z0 = jobZ0(), zm = JOB.tl.stock.zmin;
-      if (JOB.sim.sweep(prev.x - z0[0], prev.y - z0[1], prev.z + zm, now.x - z0[0], now.y - z0[1], now.z + zm, HAND.tool)) { jobUpdateMesh(false); cut = true; }
-    } else if (HAND.sim && HAND.sim.sweep(prev.x, prev.y, prev.z, now.x, now.y, now.z, HAND.tool)) { meshUpdate(HAND.sim, HAND.mesh, false); cut = true; }
-    if (SPOIL.sim && Math.min(prev.z, now.z) < 0 && SPOIL.sim.sweep(prev.x, prev.y, prev.z, now.x, now.y, now.z, HAND.tool)) {
-      meshUpdate(SPOIL.sim, SPOIL.mesh, false); spoilSaveSoon(); cut = true;
-    }
-    return cut;
+    if (CTL.recRaw && !HAND.skip && !JOB.playing && !FJ.job && prev && HAND.tool && !JOB.preview &&
+        (prev.x !== now.x || prev.y !== now.y || prev.z !== now.z)) handCarve(prev, now);
+    HAND.skip = false;
+    const d = HAND.dirty;
+    HAND.dirty = {};
+    if (d.job) jobUpdateMesh(false);
+    if (d.hand) meshUpdate(HAND.sim, HAND.mesh, false);
+    if (d.spoil) { meshUpdate(SPOIL.sim, SPOIL.mesh, false); spoilSaveSoon(); }
+    return !!(d.job || d.hand || d.spoil);
   }
   // a tool change (M6, both modes): the popup asks for the bit - the file's ToolDef, or the one picked before for this
   // file, or what's in the router - and Resume puts it in (a bit the file doesn't define is kept for the file)
@@ -254,6 +281,9 @@
     const num = (k) => parseFloat($(k).value), s = { on: id === "hs-use", x0: num("hs-x0"), x1: num("hs-x1"), y0: num("hs-y0"), y1: num("hs-y1"), t: num("hs-t") };
     if (s.on && !(s.x1 > s.x0 && s.y1 > s.y0 && s.t > 0)) { $("hs-plate-note").textContent = "Stock: each 'to' must be past its 'from', and the thickness above 0."; return; }
     HAND.stock = s.on ? s : Object.assign({}, HAND.stock, { on: false });
+    // Take it off takes a loaded job's own stock (its (Stock: ...) comment) off too: the job stays, with nothing to cut
+    // (user 2026-10-24: the strut plate MDF couldn't be removed); Put it on the table brings stock back
+    JOB.stockOff = !s.on && JOB.src && JOB.tl && JOB.tl.stock && !JOB.handStock ? JOB.src.name : null;
     handSave();
     handStock();
     jobSetup(JOB.pageJob);                           // a loaded job without its own stock takes it
