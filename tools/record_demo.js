@@ -111,9 +111,9 @@ const PAGE_REC = `(() => {
       await sleep(1000);
       if (await val("!!document.getElementById('status') && document.getElementById('status').hidden")) {
         await sleep(1500);
-        // and the part files (?parts=) placed: the files panel says "All N files loaded" (or there is none)
-        if (await val(`document.getElementById('status').hidden && (document.getElementById('files-sec').hidden ||
-            /All \\d+ files loaded/.test(document.getElementById('files-sec').textContent))`)) return;
+        // and the part files (?parts=) placed: the top bar's Parts chip says "Parts N/N ✓" (or there is none)
+        if (await val(`document.getElementById('status').hidden && (document.getElementById('parts-chip').hidden ||
+            /✓/.test(document.getElementById('parts-chip').textContent))`)) return;
       }
       if (Date.now() - t0 > 180000) throw new Error("page didn't load: " + await val("document.getElementById('status').innerText"));
     }

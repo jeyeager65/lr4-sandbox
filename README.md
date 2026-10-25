@@ -39,12 +39,14 @@ page and the scripts bring their own hardware models (steppers, bearings, rails,
 
 ### Adding them to the page
 
-1. Open the page. Until it has the files, it draws only the hardware, and the **Your part files** panel at the top
-   of the side panel lists what's missing, with a Printables link for each download.
-2. Drop the four zips anywhere on the page. You can also drop a folder or loose STL / DXF files, or use
-   **Choose files…** / **Choose a folder…** in the panel.
-3. The panel counts them in ("✓ All 40 part files loaded") and the printed parts appear. **Manage** opens the panel
-   again later; **Forget files** clears them.
+1. Open the page. Until it has the files, each missing printed part is a plain grey box (its hardware hidden), and
+   a **Your part files** card over the view has a Download button per Printables source with "n of m" for each.
+2. Drop the four zips anywhere on the page, in Design or Run. You can also drop a folder or loose STL / DXF files, or
+   use **Choose files…** / **Choose a folder…** on the card. In Chrome / Edge, **Look in my Downloads folder…** finds
+   the zips there (pick the folder once; later visits re-check it with one click).
+3. The card counts them in and closes itself when everything is there; the printed parts replace the boxes. The
+   **Parts** chip in the top bar ("Parts 40/40 ✓", or amber "· add files") opens the card again; **Forget files**
+   (under What's loaded) clears them. **Skip for now** stops the card opening by itself.
 
 ![A first visit: the hardware only, and the missing files listed](docs/img/files.webp)
 

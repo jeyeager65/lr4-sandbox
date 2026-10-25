@@ -534,6 +534,13 @@
     srcCache.set(ck, e);
     return e;
   }
+  // Part 38: a part whose file isn't loaded: a plain box over its bounding box at the reference size (lo_ref / hi_ref:
+  // no V1E geometry), placed like the part (base t / s); null where nothing would be drawn anyway (Peter Plates "none")
+  function standInGeo(rec) {
+    if (!rec.src || !rec.lo_ref || !rec.hi_ref || (rec.src.kind === "peter" && peterStyle === "none")) return null;
+    const [a, b] = [rec.lo_ref, rec.hi_ref], g = new THREE.BoxGeometry(...[0, 1, 2].map((i) => Math.max(b[i] - a[i], 0.5)));
+    return g.translate(...[0, 1, 2].map((i) => (a[i] + b[i]) / 2));
+  }
   function dropSrcGeometry() {                        // the user's files changed: rebuild their parts' geometry
     for (const e of srcCache.values()) if (e) e.geo.dispose();
     srcCache.clear();
@@ -824,10 +831,21 @@
     updatePlatePolys();
     let tris = 0;
     const inst = LR4Model.instances(cfg, S);
+    const missing = new Set();                       // the parts drawn as stand-ins (their names and ref names)
     for (const o of inst) {
       if (o.name === "TableMDF") continue;           // Part 33: the table is drawn from table_model.js (tableMeshes)
       const g = recGeometry(o.rec);
-      if (!g) continue;
+      if (!g) {
+        const sg = standInGeo(o.rec);
+        if (sg) {
+          const ud = Object.assign({}, o.rec.meta, { name: o.name, base: { t: o.t, s: o.s }, standin: true, ownGeo: true,
+            label: `${o.name !== o.rec.meta.name ? pretty(o.name) : o.rec.meta.label} (file missing)` });
+          delete ud.variant; delete ud.finish;
+          addMesh(sg, material([0.62, 0.64, 0.66], null), ud);
+          missing.add(o.name).add(o.rec.meta.name);
+        }
+        continue;
+      }
       const { geo, fin, hasUV, tris: n } = g;
       const ud = Object.assign({}, o.rec.meta, { name: o.name, base: { t: o.t, s: o.s } });
       if (DUST_PARTS.test(o.name)) ud.group = "Shoe";   // own toggle, so the bit shows with the hose on (user 2026-10-20)
@@ -837,6 +855,11 @@
       if (ud.clip) { ud.clip = Object.assign({}, ud.clip, { p: o.clipP }); mat.clippingPlanes = [new THREE.Plane()]; }
       addMesh(geo, mat, ud);
       tris += n;
+    }
+    if (missing.size) {                              // the hardware joined to a missing part hides with it (its threads too)
+      const off = new Set();
+      for (const m of meshes) if (m.userData.joins && m.userData.joins.some((n) => missing.has(n))) { m.userData.missingHw = true; off.add(m.userData.name); }
+      for (const m of meshes) if (m.userData.of && off.has(m.userData.of)) m.userData.missingHw = true;
     }
     for (const { rec, geo } of S.struts === "temp" ? [] : plateMeshes()) {   // temp struts: no MDF plates yet
       addMesh(geo, material(rec.meta.color, null), Object.assign({}, rec.meta, { name: rec.key, ownGeo: true }));

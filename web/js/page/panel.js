@@ -24,21 +24,27 @@
     try {
       for (const f of await LR4Files.store.all()) if (needed.has(f.path)) userFiles.set(f.path, f);
     } catch (e) { console.warn("IndexedDB", e); }
-    document.getElementById("files-sec").hidden = false;
+    document.getElementById("parts-chip").hidden = false;
     const drop = document.getElementById("drop");
     const fromList = (list) => [...list].map((f) => ({ name: f.webkitRelativePath || f.name, read: () => f.arrayBuffer() }));
     for (const id of ["f-files", "f-dir"]) document.getElementById(id).addEventListener("change", (e) => {
       addFiles(fromList(e.target.files));
       e.target.value = "";
     });
-    window.addEventListener("dragover", (e) => { e.preventDefault(); drop.classList.add("over"); });
+    // Part 38: the whole window takes part files, any time, either mode (the SD card, Flash and web UI lists take
+    // their own drops: no overlay there, and the part files skip it)
+    const ownDrop = (e) => !!(e.target.closest && e.target.closest("#sd-box, #flash-box, #ui-box"));
+    const hasFiles = (e) => [...(e.dataTransfer && e.dataTransfer.types || [])].includes("Files");
+    window.addEventListener("dragover", (e) => { e.preventDefault(); drop.classList.toggle("over", hasFiles(e) && !ownDrop(e)); });
     window.addEventListener("dragleave", (e) => { if (!e.relatedTarget) drop.classList.remove("over"); });
     window.addEventListener("drop", async (e) => {
       e.preventDefault();
       drop.classList.remove("over");
+      if (ownDrop(e)) return;
       const entries = [...e.dataTransfer.items].map((it) => it.webkitGetAsEntry && it.webkitGetAsEntry()).filter(Boolean);
       addFiles(entries.length ? await fromEntries(entries) : fromList(e.dataTransfer.files));
     });
+    welcomeSetup();
     document.getElementById("f-forget").addEventListener("click", async () => {
       try { await LR4Files.store.clear(); } catch (e) { /* nothing kept */ }
       userFiles.clear();
@@ -76,6 +82,7 @@
       const got = await LR4Files.identify(items, match, zip, (name) => progress("Reading your files…", null, `${++n}: ${name.split("/").pop()}`));
       const keep = got.filter((g) => !(userFiles.get(g.path) && userFiles.get(g.path).ok && !g.ok));   // never trade a match for a near miss
       for (const g of keep) userFiles.set(g.path, g);
+      if (keep.length) WELCOME.loadedSome = true;
       try { await LR4Files.store.put(keep); } catch (e) { console.warn("IndexedDB", e); }
       progress("Building the machine…", 1, `${keep.length} file(s) used`);
       await nextFrame();
@@ -110,19 +117,86 @@
     }
     const total = needed.size;
     const head = have === total && !diff ? `<p class="sub">All ${total} files loaded.</p>`
-      : `<p class="sub">${have} of ${total} files loaded${have < total ? " - the missing parts are left out of the model. Download them from Printables (the links below) and drop them here" : ""}.</p>`;
+      : `<p class="sub">${have} of ${total} files loaded${have < total ? " - the missing parts show as grey boxes" : ""}.</p>`;
     const warn = diff ? `<p class="warn">${diff} file(s) differ from the ones this page was solved for (as of ${esc(F.tested)}) - placed anyway, check they fit.</p>` : "";
     host.innerHTML = head + warn + html;
-    // all there: one line above the tabs ("Manage" opens the box); anything missing or different: the box stays open
-    const ok = have === total && !diff, open = document.getElementById("files-manage").getAttribute("aria-expanded") === "true";
-    document.getElementById("files-line").hidden = !ok;
-    document.getElementById("files-body").hidden = ok && !open;
-    document.getElementById("files-sum").textContent = `✓ All ${total} part files loaded`;
+    // Part 38: the welcome card's Download buttons (n of m per Printables source) and the top bar's Parts chip
+    document.getElementById("wc-src").innerHTML = Object.entries(bySrc).map(([src, paths]) => {
+      const S = F.sources[src], n = paths.filter((p) => userFiles.has(p)).length, all = n === paths.length;
+      return `<div class="wc-row${all ? " ok" : ""}"><a class="btn" href="${esc(S.url)}" target="_blank" rel="noopener">${esc(S.title)} ↗</a>` +
+        `<em>${n} of ${paths.length}${all ? " ✓" : ""}</em></div>`;
+    }).join("");
+    const chip = document.getElementById("parts-chip"), ok = have === total;
+    chip.textContent = ok ? `Parts ${have}/${total} ✓` : `Parts ${have}/${total} · add files`;
+    chip.classList.toggle("warn", !ok || !!diff);
+    if (ok && WELCOME.loadedSome) welcome(false);    // everything there after a load: the card closes itself
   }
-  document.getElementById("files-manage").addEventListener("click", (e) => {
-    e.target.setAttribute("aria-expanded", String(e.target.getAttribute("aria-expanded") !== "true"));
+  // ---- the welcome card (Part 38): over the view on a first visit with files missing (until Skip for now), and from
+  // the Parts chip any time. Downloads folder (Chrome / Edge: showDirectoryPicker): picked once, its handle kept in
+  // IndexedDB; the page reads the zips there whose names look like the Printables sources (and any loose STL / DXF
+  // it needs), now or on a later visit with one click (the browser asks for permission again). ----
+  const WELCOME = { loadedSome: false, dir: null };
+  const kvGet = (k) => { try { return localStorage.getItem(k); } catch (e) { return null; } };
+  const kvSet = (k, v) => { try { localStorage.setItem(k, v); } catch (e) { /* not kept */ } };
+  function welcome(on) {
+    const w = document.getElementById("welcome");
+    w.hidden = !on;
+    document.getElementById("parts-chip").setAttribute("aria-expanded", String(on));
+  }
+  const DIR_DB = { name: "lr4-sandbox-dirs", store: "dirs" };
+  function dirDb(mode, fn) {
+    return new Promise((res, rej) => {
+      const r = indexedDB.open(DIR_DB.name, 1);
+      r.onupgradeneeded = () => r.result.createObjectStore(DIR_DB.store);
+      r.onerror = () => rej(r.error);
+      r.onsuccess = () => {
+        const d = r.result, t = d.transaction(DIR_DB.store, mode), q = fn(t.objectStore(DIR_DB.store));
+        t.oncomplete = () => { d.close(); res(q && q.result); };
+        t.onerror = () => { d.close(); rej(t.error); };
+      };
+    });
+  }
+  const SRC_NAME = /lowrider|lr4|kobalt|jackpot|peter/i;   // the Printables zips' names (a GUESS at how they're named)
+  async function scanDir(dir) {                       // the folder's top level: likely zips + loose files the page needs
+    const note = document.getElementById("f-dl-note"), base = new Set([...needed.keys()].map((p) => p.split("/").pop().toLowerCase()));
+    const items = [];
+    note.textContent = `Looking in ${dir.name}…`;
+    for await (const [name, h] of dir.entries()) {
+      if (h.kind !== "file") continue;
+      if ((/\.zip$/i.test(name) && SRC_NAME.test(name)) || base.has(name.toLowerCase()))
+        items.push({ name, read: () => h.getFile().then((f) => f.arrayBuffer()) });
+    }
+    note.textContent = items.length ? `${dir.name}: reading ${items.length} file(s)…` : `Nothing for the page in ${dir.name} (the Printables zips' names have LowRider, Kobalt, Jackpot or Peter in them).`;
+    if (items.length) { await addFiles(items); note.textContent = `Read ${items.length} file(s) from ${dir.name}.`; }
+  }
+  function welcomeSetup() {
+    const chip = document.getElementById("parts-chip");
+    chip.addEventListener("click", () => welcome(document.getElementById("welcome").hidden));
+    document.getElementById("wc-x").addEventListener("click", () => welcome(false));
+    document.getElementById("wc-skip").addEventListener("click", () => { kvSet("lr4-welcome", "skip"); welcome(false); });
+    const dl = document.getElementById("f-dl"), again = document.getElementById("f-dl-again");
+    if (window.showDirectoryPicker && window.indexedDB) {
+      dl.hidden = false;
+      dl.addEventListener("click", async () => {
+        let dir;
+        try { dir = await showDirectoryPicker({ id: "lr4-downloads", startIn: "downloads" }); } catch (e) { return; }   // cancelled
+        WELCOME.dir = dir;
+        try { await dirDb("readwrite", (st) => st.put(dir, "downloads")); again.hidden = false; } catch (e) { /* not kept */ }
+        scanDir(dir);
+      });
+      again.addEventListener("click", async () => {
+        const dir = WELCOME.dir;
+        if (!dir) return;
+        try { if ((await dir.requestPermission({ mode: "read" })) !== "granted") return; } catch (e) { return; }
+        scanDir(dir);
+      });
+      dirDb("readonly", (st) => st.get("downloads")).then((dir) => { if (dir) { WELCOME.dir = dir; again.hidden = false; again.textContent = `Check ${dir.name} again`; } }).catch(() => {});
+    }
     renderFiles();
-  });
+    const missing = [...needed.keys()].some((p) => !userFiles.has(p));
+    const dev = new URLSearchParams(location.search).get("parts");   // tests / videos load the files themselves
+    if (missing && !dev && kvGet("lr4-welcome") !== "skip") welcome(true);
+  }
 
   // ---- My machine (Part 26): what's on the machine. Off = gone from the model AND the BOM (and the Show tree). The
   // skirt and the hose need the router (the hose threads into its shoe); the shoe goes with the hose (user 2026-10-23:
@@ -170,7 +244,7 @@
   let probing = false, jobBit = false, bitOK = true;   // bitOK: the job's bit shows where the model's would (Show, inspect)
   const PROBE_OFF = /^(Dust_Skirt|Bristles_TPU)/;
   function applyVisibility() {
-    const listed = meshes.filter((m) => m.userData.name && fitted(m) && variantOK(m));
+    const listed = meshes.filter((m) => m.userData.name && fitted(m) && variantOK(m) && !m.userData.missingHw);   // Part 38: not with its missing part
     const key = listed.map((m) => m.userData.name).join();
     if (key !== treeKey) { treeKey = key; tree = LR4ShowTree.build(listed.map((m) => m.userData)); renderShow(); }
     if (INSPECT) {                                     // its set, again (the parts change with the size / options)
@@ -292,7 +366,7 @@
   function assignRoles() {
     for (const m of meshes) {
       const p = m.userData;
-      if (p.source !== "printed") continue;
+      if (p.source !== "printed" || p.standin) continue;   // stand-ins (Part 38) stay grey
       for (const [role, c] of Object.entries(PRINT_ROLE))
         if (p.color.every((v, i) => Math.abs(v - c[i]) < 0.02)) p.role = role;
     }

@@ -39,6 +39,7 @@
     <button type="button" id="t-design" aria-pressed="true">Design</button><button type="button" id="t-run" aria-pressed="false">Run</button>
   </div>
   <div class="tb-right">
+    <button type="button" class="parts-chip" id="parts-chip" hidden aria-controls="welcome" title="Your part files: the official STLs, read in this browser">Parts</button>
     <button type="button" class="run-only" id="pw-btn" aria-expanded="false" aria-controls="pw-pop" title="FluidTouch pendant screen and web UIs (WebUI, FigUI) served by FluidNC">Pendant &amp; WebUI ▾</button>
     <button type="button" id="tb-files" title="BOM, cut list, strut plates, config.yaml">Get the files</button>
     <button id="v-more" type="button" aria-expanded="false" aria-controls="view-pop" title="Settings" aria-label="Settings">⚙</button>
@@ -86,22 +87,6 @@
 
 <aside class="panel">
   <div class="sub" id="sub">V1E LowRider 4, built to your cutting area. Every printed part is the official STL, placed from its holes.</div>
-
-  <section id="files-sec" aria-label="Your part files" hidden>
-    <div class="files-line" id="files-line" hidden><span id="files-sum"></span>
-      <button type="button" id="files-manage" aria-expanded="false" aria-controls="files-body">Manage</button></div>
-    <div id="files-body">
-      <h2 id="h-files">Your part files</h2>
-      <div class="drop" id="drop">Drop the Printables zips, a folder or the STL / DXF files here<br>
-        <small>Read in this browser only - nothing is uploaded. Kept here for next time.</small></div>
-      <div class="buttons">
-        <label class="btn"><input type="file" id="f-files" multiple accept=".zip,.stl,.dxf" hidden>Choose files…</label>
-        <label class="btn"><input type="file" id="f-dir" webkitdirectory hidden>Choose a folder…</label>
-        <button type="button" id="f-forget">Forget files</button>
-      </div>
-      <div id="files-list" role="status"></div>
-    </div>
-  </section>
 
   <div class="steps" id="steps">
     <details class="step" id="st-size">
@@ -364,6 +349,26 @@
     <button id="v-shot" type="button" title="Save the view as a PNG (P)" aria-label="Save the view as a picture">📷</button>
     <button id="v-vr" type="button" hidden title="PC VR headset (SteamVR / OpenXR)">Enter VR</button>
   </div>
+  <section class="welcome" id="welcome" role="dialog" aria-labelledby="wc-h" hidden>
+    <div class="wc-head"><h2 id="wc-h">Your part files</h2><button type="button" id="wc-x" aria-label="Close" title="Close">✕</button></div>
+    <p class="wc-why">The official LowRider 4 STLs can't ship with this page, so it uses the ones you download. They're
+      read in this browser only, nothing is uploaded, and they're kept here for next time. Run and G-code work without them;
+      missing parts show as grey boxes.</p>
+    <div class="wc-step"><b>1</b><div><div class="lbl">Download them from Printables</div><div class="wc-src" id="wc-src"></div></div></div>
+    <div class="wc-step"><b>2</b><div><div class="lbl">Drop them anywhere on this page</div>
+      <p class="foot">The zips as they come, a folder, or the STL / DXF files.</p>
+      <div class="buttons">
+        <label class="btn"><input type="file" id="f-files" multiple accept=".zip,.stl,.dxf" hidden>Choose files…</label>
+        <label class="btn"><input type="file" id="f-dir" webkitdirectory hidden>Choose a folder…</label>
+        <button type="button" id="f-dl" hidden title="Pick your Downloads folder once: the page finds the Printables zips in it, now and on later visits">Look in my Downloads folder…</button>
+        <button type="button" id="f-dl-again" hidden title="Look in the folder you picked last time again">Check Downloads again</button>
+      </div>
+      <p class="foot" id="f-dl-note" role="status"></p></div></div>
+    <details class="wc-more"><summary>What's loaded</summary><div id="files-list" role="status"></div>
+      <div class="buttons"><button type="button" id="f-forget">Forget files</button></div></details>
+    <div class="buttons wc-foot"><button type="button" id="wc-skip">Skip for now</button></div>
+  </section>
+  <div class="drop-over" id="drop" aria-hidden="true"><div>Drop the zips, a folder or the STL / DXF files<br><small>read in this browser only</small></div></div>
   <section class="layers-pop" id="layers-pop" aria-labelledby="h-show" hidden>
     <div class="layers-head"><h2 id="h-show">Layers</h2><button type="button" id="layers-x" aria-label="Close" title="Close (Esc)">✕</button></div>
     <p class="foot">The view only - the BOM keeps every part. A bolt joining two assemblies is under both and shows with either.</p>

@@ -3,6 +3,19 @@
 The version is the sandbox page's (`VERSION` in `web/js/page/job.js`, shown in its footer). The footer also shows
 the date the model data was built and the Printables file set it was solved for.
 
+## 0.42.0 - 2026-10-25
+- **New page layout, part 4 (part files):** the files box in the side panel became a **welcome card over the view**
+  on a first visit: why the page needs the files, **1 Download** (a button per Printables source, "n of m ✓"),
+  **2 Drop them anywhere on this page** (or Choose files / Choose a folder), What's loaded, Skip for now. It closes
+  itself once everything is loaded. Run and G-code work without the files.
+- **The whole window takes part files** any time, in Design or Run (the SD card, Flash and web UI lists still take
+  their own drops).
+- A **Parts chip** in the top bar: "Parts 40/40 ✓", or amber "Parts 12/40 · add files"; it opens the card.
+- **Missing parts are grey boxes** (from their bounding boxes, no V1E geometry), "file missing" when selected; the
+  hardware that joins them is hidden with them.
+- **Downloads folder** (Chrome / Edge): pick it once and the page reads the Printables zips there; later visits
+  re-check it with one click.
+
 ## 0.41.0 - 2026-10-25
 - **New page layout, part 3 (Design):** the My LR4 / Show / Build tabs became six numbered steps that open in any
   order, one at a time: **1 Size** (cutting area, braces, strut plates), **2 Options**, **3 Table**, **4 As built**,

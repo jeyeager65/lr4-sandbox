@@ -216,9 +216,6 @@ label.check:has(input:disabled) { color: var(--muted); }
 .layers-head h2 { margin: 0; }
 #layers-x { border: 0; padding: 2px 6px; color: var(--muted); }
 #v-layers[aria-expanded="true"] { border-color: var(--accent); }
-.files-line { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 13px; color: var(--muted); }
-.files-line button { padding: 3px 8px; font-size: 12px; }
-.files-line:not([hidden]) + #files-body { margin-top: 12px; }
 details.more summary { color: var(--muted); }
 .about-line { margin: 0; }
 button.link { border: 0; padding: 0; font: inherit; color: var(--ink); text-decoration: underline; text-decoration-color: var(--accent);
@@ -407,12 +404,9 @@ h1 span { color: var(--accent); }
 select { width: 100%; border: 1px solid var(--line); border-radius: 4px; background: var(--bg); color: var(--ink);
   font: 13px var(--font-body); padding: 6px; }
 select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-.drop { border: 1.5px dashed var(--line); border-radius: 6px; padding: 14px 12px; text-align: center; font-size: 13px; line-height: 1.5; margin-bottom: 8px; }
-.drop small { color: var(--muted); }
-.drop.over { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
-label.btn { display: inline-block; font: inherit; font-size: 13px; background: var(--panel); color: var(--ink); border: 1px solid var(--line);
+label.btn, a.btn { display: inline-block; font: inherit; font-size: 13px; background: var(--panel); color: var(--ink); border: 1px solid var(--line);
   border-radius: 4px; padding: 6px 10px; cursor: pointer; }
-label.btn:hover { border-color: var(--muted); }
+label.btn:hover, a.btn:hover { border-color: var(--muted); }
 label.btn:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
 .files-src { margin: 10px 0 0; font-size: 13px; line-height: 1.45; }
 .files-src b { font-weight: 600; }
@@ -645,3 +639,32 @@ button:disabled { opacity: 0.42; cursor: default; }
 .con-chk { display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--c-muted); margin-right: 6px; }
 .con-chk input { margin: 0; accent-color: var(--accent); }
 :root:not(.con-open):not(.con-big) .console .con-chk { display: none; }
+
+/* part files (Part 38): the Parts chip in the top bar, the welcome card over the view, the whole-window drop */
+.parts-chip { border-radius: 999px; padding: 4px 12px; font: 600 12px var(--font-display); letter-spacing: 0.04em; white-space: nowrap; }
+.parts-chip.warn { background: var(--warn-bg); color: var(--warn); border-color: color-mix(in srgb, var(--warn) 40%, transparent); }
+.parts-chip[aria-expanded="true"] { border-color: var(--accent); }
+.welcome { position: absolute; left: 50%; top: 54px; transform: translateX(-50%); z-index: 7; width: min(460px, calc(100% - 24px));
+  max-height: calc(100% - 70px); overflow-y: auto; padding: 14px 18px 16px; background: var(--panel); border: 1px solid var(--line);
+  border-radius: 8px; box-shadow: 0 14px 40px rgb(0 0 0 / 0.3); display: flex; flex-direction: column; gap: 12px; }
+.wc-head { display: flex; align-items: center; justify-content: space-between; }
+.wc-head h2 { margin: 0; font-size: 13px; color: var(--ink); }
+#wc-x { border: 0; padding: 2px 6px; color: var(--muted); }
+.wc-why { margin: 0; font-size: 13px; line-height: 1.5; color: var(--muted); }
+.wc-step { display: grid; grid-template-columns: 26px 1fr; gap: 10px; }
+.wc-step > b { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; background: var(--accent); color: var(--accent-ink); font: 700 12px var(--font-data); }
+.wc-step .lbl { margin: 3px 0 6px; color: var(--ink); }
+.wc-step .foot { margin: 0 0 6px; }
+.wc-src { display: flex; flex-direction: column; gap: 5px; }
+.wc-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.wc-row a.btn { text-decoration: none; }
+.wc-row em { font: 12px var(--font-data); font-style: normal; color: var(--muted); white-space: nowrap; }
+.wc-row.ok em { color: var(--ok); }
+.wc-more summary { cursor: pointer; font-size: 13px; color: var(--muted); }
+.wc-more .buttons { margin-top: 8px; }
+.wc-foot { justify-content: flex-end; }
+.drop-over { position: fixed; inset: 0; z-index: 30; display: none; place-items: center; pointer-events: none;
+  background: color-mix(in srgb, var(--accent) 12%, transparent); outline: 3px dashed var(--accent); outline-offset: -12px; }
+.drop-over.over { display: grid; }
+.drop-over div { padding: 18px 26px; border-radius: 8px; background: var(--panel); text-align: center; font: 600 16px var(--font-display); line-height: 1.5; }
+.drop-over small { color: var(--muted); font: 12px var(--font-body); }

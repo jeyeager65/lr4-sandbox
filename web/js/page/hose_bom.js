@@ -301,6 +301,6 @@
     m.material.emissiveIntensity = 0.45;
     const p = m.userData, grp = asmLabel(m);
     box.querySelector("strong").textContent = p.label;
-    box.querySelector("p").textContent = `${SOURCE[p.source] || p.source} · ${grp}`;
+    box.querySelector("p").textContent = p.standin ? `File missing: a stand-in box · ${grp} (Parts in the top bar)` : `${SOURCE[p.source] || p.source} · ${grp}`;
   }
 
