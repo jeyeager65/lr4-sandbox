@@ -48,7 +48,7 @@
       <div class="buttons" id="ft-row">
         <button type="button" id="ft-pop-btn" disabled title="FluidTouch's screen in a window over the view (or click the pendant's screen in the view)">Pendant screen</button>
       </div>
-      <p class="foot" id="ft-off-note">The pendant is off: turn it on under Design > My LR4 > FluidTouch pendant.</p></div>
+      <p class="foot" id="ft-off-note">The pendant is off: turn it on under Design > 2 Options > FluidTouch pendant.</p></div>
     <div class="pw-sec" id="ui-box">
       <div class="lbl">Web UIs <button type="button" class="q" data-help="help-ui" aria-label="About web UIs" title="About web UIs">?</button></div>
       <div class="help" id="help-ui" hidden><p>WebUI, FigUI or any web UI on FluidNC's SD card or Flash (.html or .html.gz), served by FluidNC's
@@ -103,207 +103,203 @@
     </div>
   </section>
 
-  <div class="tabs" role="tablist" aria-label="Design">
-    <button type="button" role="tab" id="t-machine" aria-controls="tab-machine" aria-selected="true">My LR4</button>
-    <button type="button" role="tab" id="t-show" aria-controls="tab-show" aria-selected="false" tabindex="-1">Show</button>
-    <button type="button" role="tab" id="t-build" aria-controls="tab-build" aria-selected="false" tabindex="-1">Build</button>
-  </div>
-
-  <!-- tab panels: hide the panel, never the controls inside (js/vr.js reads them by id and checks their own hidden) -->
-  <div class="tabpanel" role="tabpanel" id="tab-machine" aria-labelledby="t-machine">
-    <section aria-labelledby="h-size">
-      <h2 id="h-size">Cutting area</h2>
-      <div class="seg" role="group" aria-label="Units">
-        <button type="button" id="u-in" aria-pressed="true">Inches</button>
-        <button type="button" id="u-mm" aria-pressed="false">mm</button>
-      </div>
-      <div class="pair">
-        <div class="field"><label for="cut-x">X, along the beam</label>
-          <div class="unit-input"><input id="cut-x" type="number" step="any" min="1" value="26"><span class="u">in</span></div></div>
-        <div class="field"><label for="cut-y">Y, along the table</label>
-          <div class="unit-input"><input id="cut-y" type="number" step="any" min="1" value="50"><span class="u">in</span></div></div>
-      </div>
-      <div class="field"><label for="braces">Braces</label><select id="braces"></select></div>
-      <div id="warnings"></div>
-    </section>
-
-    <section aria-labelledby="h-opts">
-      <h2 id="h-opts">On the machine</h2>
-      <p class="foot">What you're building: off = not on the machine and not in the BOM. To hide parts from the view only, use Show.</p>
-      <div class="opts" id="opts">
-        <label class="check"><input type="checkbox" id="opt-router" checked> Router + dust shoe (Kobalt mount)</label>
-        <label class="check sub"><input type="checkbox" id="opt-skirt" checked> Dust skirt + bristles</label>
-        <label class="check sub"><input type="checkbox" id="opt-hose" checked> Dust shoe + vacuum hose, router cord + cable sleeve</label>
-        <label class="check"><input type="checkbox" id="opt-fan" checked> Jackpot3 lid fan</label>
-        <label class="check" title="The FluidTouch touchscreen pendant (github.com/jeyeager65/FluidTouch) on the table's front, running its real firmware in the page"><input type="checkbox" id="ft-on"> FluidTouch pendant</label>
-      </div>
-      <div class="variant" id="strut-variant" hidden><span>Strut plates</span>
-        <button type="button" data-v="mdf" aria-pressed="true">Permanent (MDF)</button>
-        <button type="button" data-v="temp" aria-pressed="false">Temporary (printed)</button></div>
-      <div class="variant" id="peter-variant" hidden><span>Peter Plates</span>
-        <button type="button" data-v="solid" aria-pressed="false">Solid</button>
-        <button type="button" data-v="honeycomb" aria-pressed="false">Honeycomb</button>
-        <button type="button" data-v="none" aria-pressed="false">None</button></div>
-    </section>
-
-    <section aria-labelledby="h-shop">
-      <h2 id="h-shop">Table</h2>
-      <div class="variant" id="table-variant" title="The spoilboard and the two rail strips (3/4 in MDF) sit on this"><span>Base</span>
-        <button type="button" data-v="sheet" aria-pressed="true">MDF sheet</button>
-        <button type="button" data-v="torsion" aria-pressed="false">Torsion box</button></div>
-      <div class="field"><label for="table-top">Table height (top of the spoilboard; legs are drawn only)</label>
-        <div class="unit-input"><input id="table-top" type="number" step="any" min="1"><span class="u">in</span></div></div>
-    </section>
-
-    <section aria-labelledby="h-ab">
-      <h2 id="h-ab">As built</h2>
-      <label class="check"><input type="checkbox" id="ab-on"> A real machine: a little out of square until it homes</label>
-      <p class="foot">Off = a perfect machine. On: Run shows how far out it is, with Power cycle and a squareness test.</p>
-      <details class="cam" id="ab-box">
-        <summary>Errors</summary>
-        <p class="foot">Each Y and Z motor has its own switch: <code>$H</code> pulls each side to its switch and off by its
-          own <code>pulloff_mm</code>, which squares the gantry and levels the beam. Side 1 = motor0 = the Min end (a GUESS).</p>
-        <div class="trio">
-          <label>Y stops apart<input id="ab-sy" type="number" step="any" placeholder="auto" title="mm the Max side's Y switch trips past the Min side's (empty = what your pulloffs make up for)"></label>
-          <label>Z stops apart<input id="ab-sz" type="number" step="any" placeholder="auto" title="mm the Max side's Z switch trips past the Min side's (empty = what your pulloffs make up for)"></label>
+  <div class="steps" id="steps">
+    <details class="step" id="st-size">
+      <summary><span class="st-n">1</span><span class="st-t" id="h-size">Size</span><span class="st-dot" id="dot-size" hidden aria-label="needs a look"></span><span class="st-sum" id="sum-size"></span></summary>
+      <div class="st-body">
+        <div class="seg" role="group" aria-label="Units">
+          <button type="button" id="u-in" aria-pressed="true">Inches</button>
+          <button type="button" id="u-mm" aria-pressed="false">mm</button>
         </div>
-        <p class="foot" id="ab-stop-note"></p>
-        <label class="check"><input type="checkbox" id="ab-power"> Powered down, the motors let go (racked / off level at each power-up)</label>
-        <div class="trio">
-          <label>Rack up to<input id="ab-rm" type="number" step="any" min="0" title="mm, side 2 ahead of side 1"></label>
-          <label>Beam tilt up to<input id="ab-tm" type="number" step="any" min="0" title="mm, side 2 above side 1"></label>
+        <div class="pair">
+          <div class="field"><label for="cut-x">X, along the beam</label>
+            <div class="unit-input"><input id="cut-x" type="number" step="any" min="1" value="26"><span class="u">in</span></div></div>
+          <div class="field"><label for="cut-y">Y, along the table</label>
+            <div class="unit-input"><input id="cut-y" type="number" step="any" min="1" value="50"><span class="u">in</span></div></div>
         </div>
-        <p class="foot">Not fixed by homing: a <b>warped spoilboard</b> (changing it lays a new one - asked first if it has cuts; surfacing flattens it) and a
-          <b>router out of tram</b> (lines when surfacing; shim the router mount).</p>
-        <div class="trio">
-          <label>Warp X<input id="ab-wx" type="number" step="any" title="mm the +X end is higher than the -X end"></label>
-          <label>Warp Y<input id="ab-wy" type="number" step="any" title="mm the back is higher than the front"></label>
-          <label>Bow<input id="ab-wb" type="number" step="any" title="mm the middle is above the edges (negative = dished)"></label>
-          <label>Tram X°<input id="ab-tx" type="number" step="any" title="the bit's bottom tilted down toward +X, degrees"></label>
-          <label>Tram Y°<input id="ab-ty" type="number" step="any" title="the bit's bottom tilted down toward +Y, degrees"></label>
-          <label>Draw ×<select id="ab-ex" title="the drawing's rack / tilt, exaggerated (cuts are always true)"><option>1</option><option>10</option><option>25</option><option>50</option><option>100</option></select></label>
+        <div class="field"><label for="braces">Braces</label><select id="braces"></select></div>
+        <div id="warnings"></div>
+        <div class="variant" id="strut-variant" hidden><span>Strut plates</span>
+          <button type="button" data-v="mdf" aria-pressed="true">Permanent (MDF)</button>
+          <button type="button" data-v="temp" aria-pressed="false">Temporary (printed)</button></div>
+        <button type="button" class="st-next" data-next="st-opts">Next: Options</button>
+      </div>
+    </details>
+    <details class="step" id="st-opts">
+      <summary><span class="st-n">2</span><span class="st-t" id="h-opts">Options</span><span class="st-dot" id="dot-opts" hidden aria-label="needs a look"></span><span class="st-sum" id="sum-opts"></span></summary>
+      <div class="st-body">
+        <p class="foot">What you're building: off = not on the machine and not in the BOM. To hide parts from the view only, use Layers (on the view).</p>
+        <div class="opts" id="opts">
+          <label class="check"><input type="checkbox" id="opt-router" checked> Router + dust shoe (Kobalt mount)</label>
+          <label class="check sub"><input type="checkbox" id="opt-skirt" checked> Dust skirt + bristles</label>
+          <label class="check sub"><input type="checkbox" id="opt-hose" checked> Dust shoe + vacuum hose, router cord + cable sleeve</label>
+          <label class="check"><input type="checkbox" id="opt-fan" checked> Jackpot3 lid fan</label>
+          <label class="check" title="The FluidTouch touchscreen pendant (github.com/jeyeager65/FluidTouch) on the table's front, running its real firmware in the page"><input type="checkbox" id="ft-on"> FluidTouch pendant</label>
         </div>
-      </details>
-    </section>
-
-    <section aria-labelledby="h-colours">
-      <h2 id="h-colours">Print colours</h2>
-      <div class="swatches">
-        <label><input id="c-main" type="color" value="#292a2e"> Main</label>
-        <label><input id="c-accent" type="color" value="#cc1f1a"> Accent</label>
-        <button id="c-reset" type="button">Reset</button>
+        <div class="variant" id="peter-variant" hidden><span>Peter Plates</span>
+          <button type="button" data-v="solid" aria-pressed="false">Solid</button>
+          <button type="button" data-v="honeycomb" aria-pressed="false">Honeycomb</button>
+          <button type="button" data-v="none" aria-pressed="false">None</button></div>
+        <button type="button" class="st-next" data-next="st-shop">Next: Table</button>
       </div>
-    </section>
-  </div>
-
-  <div class="tabpanel" role="tabpanel" id="tab-show" aria-labelledby="t-show" hidden>
-    <section aria-labelledby="h-show">
-      <h2 id="h-show">Parts shown</h2>
-      <p class="foot">The view only - the BOM keeps every part. A bolt joining two assemblies is under both and shows with either.</p>
-      <div class="presets" id="show-presets" role="group" aria-label="Presets"></div>
-      <div class="tree" id="show-tree" role="group" aria-label="Parts shown"></div>
-      <button type="button" id="unhide" hidden></button>
-    </section>
-    <section aria-labelledby="h-scene">
-      <h2 id="h-scene">Scene</h2>
-      <div class="variant" id="detail"><span>Detail</span>
-        <button type="button" data-v="full" aria-pressed="false">Full</button>
-        <button type="button" data-v="lite" aria-pressed="false">Lite</button></div>
-      <p class="foot" id="detail-note"></p>
-      <div class="variant" id="lighting"><span>Lighting</span>
-        <button type="button" data-v="real" aria-pressed="false">Realistic</button>
-        <button type="button" data-v="simple" aria-pressed="false">Simple</button></div>
-      <p class="foot" id="lighting-note"></p>
-      <div class="variant" id="scenery"><span>Background</span>
-        <button type="button" data-v="shop" aria-pressed="true">Workshop</button>
-        <button type="button" data-v="empty" aria-pressed="false">Empty shop</button>
-        <button type="button" data-v="plain" aria-pressed="false">Plain</button></div>
-      <div id="room-box">
-        <div class="trio">
-          <div class="field"><label for="room-w">Building X</label>
-            <div class="unit-input"><input id="room-w" type="number" step="any" min="0" placeholder="–"><span class="ru">ft</span></div></div>
-          <div class="field"><label for="room-d">Building Y</label>
-            <div class="unit-input"><input id="room-d" type="number" step="any" min="0" placeholder="–"><span class="ru">ft</span></div></div>
-          <div class="field"><label for="room-h">Ceiling</label>
-            <div class="unit-input"><input id="room-h" type="number" step="any" min="0" placeholder="–"><span class="ru">ft</span></div></div>
+    </details>
+    <details class="step" id="st-shop">
+      <summary><span class="st-n">3</span><span class="st-t" id="h-shop">Table</span><span class="st-dot" id="dot-shop" hidden aria-label="needs a look"></span><span class="st-sum" id="sum-shop"></span></summary>
+      <div class="st-body">
+        <div class="variant" id="table-variant" title="The spoilboard and the two rail strips (3/4 in MDF) sit on this"><span>Base</span>
+          <button type="button" data-v="sheet" aria-pressed="true">MDF sheet</button>
+          <button type="button" data-v="torsion" aria-pressed="false">Torsion box</button></div>
+        <div class="field"><label for="table-top">Table height (top of the spoilboard; legs are drawn only)</label>
+          <div class="unit-input"><input id="table-top" type="number" step="any" min="1"><span class="u">in</span></div></div>
+        <button type="button" class="st-next" data-next="st-ab">Next: As built</button>
+      </div>
+    </details>
+    <details class="step" id="st-ab">
+      <summary><span class="st-n">4</span><span class="st-t" id="h-ab">As built</span><span class="st-dot" id="dot-ab" hidden aria-label="needs a look"></span><span class="st-sum" id="sum-ab"></span></summary>
+      <div class="st-body">
+        <label class="check"><input type="checkbox" id="ab-on"> A real machine: a little out of square until it homes</label>
+        <p class="foot">Off = a perfect machine. On: Run shows how far out it is, with Power cycle and a squareness test.</p>
+        <details class="cam" id="ab-box">
+          <summary>Errors</summary>
+          <p class="foot">Each Y and Z motor has its own switch: <code>$H</code> pulls each side to its switch and off by its
+            own <code>pulloff_mm</code>, which squares the gantry and levels the beam. Side 1 = motor0 = the Min end (a GUESS).</p>
+          <div class="trio">
+            <label>Y stops apart<input id="ab-sy" type="number" step="any" placeholder="auto" title="mm the Max side's Y switch trips past the Min side's (empty = what your pulloffs make up for)"></label>
+            <label>Z stops apart<input id="ab-sz" type="number" step="any" placeholder="auto" title="mm the Max side's Z switch trips past the Min side's (empty = what your pulloffs make up for)"></label>
+          </div>
+          <p class="foot" id="ab-stop-note"></p>
+          <label class="check"><input type="checkbox" id="ab-power"> Powered down, the motors let go (racked / off level at each power-up)</label>
+          <div class="trio">
+            <label>Rack up to<input id="ab-rm" type="number" step="any" min="0" title="mm, side 2 ahead of side 1"></label>
+            <label>Beam tilt up to<input id="ab-tm" type="number" step="any" min="0" title="mm, side 2 above side 1"></label>
+          </div>
+          <p class="foot">Not fixed by homing: a <b>warped spoilboard</b> (changing it lays a new one - asked first if it has cuts; surfacing flattens it) and a
+            <b>router out of tram</b> (lines when surfacing; shim the router mount).</p>
+          <div class="trio">
+            <label>Warp X<input id="ab-wx" type="number" step="any" title="mm the +X end is higher than the -X end"></label>
+            <label>Warp Y<input id="ab-wy" type="number" step="any" title="mm the back is higher than the front"></label>
+            <label>Bow<input id="ab-wb" type="number" step="any" title="mm the middle is above the edges (negative = dished)"></label>
+            <label>Tram X°<input id="ab-tx" type="number" step="any" title="the bit's bottom tilted down toward +X, degrees"></label>
+            <label>Tram Y°<input id="ab-ty" type="number" step="any" title="the bit's bottom tilted down toward +Y, degrees"></label>
+            <label>Draw ×<select id="ab-ex" title="the drawing's rack / tilt, exaggerated (cuts are always true)"><option>1</option><option>10</option><option>25</option><option>50</option><option>100</option></select></label>
+          </div>
+        </details>
+        <button type="button" class="st-next" data-next="st-look">Next: Look</button>
+      </div>
+    </details>
+    <details class="step" id="st-look">
+      <summary><span class="st-n">5</span><span class="st-t" id="h-look">Look</span><span class="st-dot" id="dot-look" hidden aria-label="needs a look"></span><span class="st-sum" id="sum-look"></span></summary>
+      <div class="st-body">
+      <section aria-labelledby="h-colours">
+        <h3 id="h-colours">Print colors</h3>
+        <div class="swatches">
+          <label><input id="c-main" type="color" value="#292a2e"> Main</label>
+          <label><input id="c-accent" type="color" value="#cc1f1a"> Accent</label>
+          <button id="c-reset" type="button">Reset</button>
         </div>
-        <p class="foot" id="room-note"></p>
-        <div id="room-warn"></div>
-      </div>
-    </section>
-  </div>
-
-  <div class="tabpanel" role="tabpanel" id="tab-build" aria-labelledby="t-build" hidden>
-    <section aria-labelledby="h-bom">
-      <h2 id="h-bom">Bill of materials</h2>
-      <div class="bom-open"><button id="bom-btn" type="button" disabled>Open the full BOM</button><span id="bom-sum">Loading…</span></div>
-    </section>
-
-    <section aria-labelledby="h-calc">
-      <h2 id="h-calc">Cut list (V1E calculator)</h2>
-      <table id="calc"><tbody></tbody></table>
-    </section>
-
-    <section class="plates" aria-labelledby="h-plates">
-      <h2 id="h-plates">Strut plates</h2>
-      <div id="plate-draw"></div>
-      <div class="buttons">
-        <button type="button" id="dl-dxf">Download DXF</button>
-        <button type="button" id="dl-svg">Download SVG</button>
-        <button type="button" id="dl-nc">Download G-code</button>
-      </div>
-      <div id="dl-status" role="status"></div>
-      <details class="cam" id="cam-box">
-        <summary>G-code settings (FluidNC, 1/8" bit)</summary>
-        <div class="trio">
-          <div class="field"><label for="cam-t">Stock thickness</label>
-            <div class="unit-input"><input id="cam-t" type="number" step="any" min="1"><span>mm</span></div></div>
-          <div class="field"><label for="cam-step">Depth per pass</label>
-            <div class="unit-input"><input id="cam-step" type="number" step="any" min="0.1"><span>mm</span></div></div>
-          <div class="field"><label for="cam-plate">Touch plate (0 = none)</label>
-            <div class="unit-input"><input id="cam-plate" type="number" step="any" min="0"><span>mm</span></div></div>
-          <div class="field"><label for="cam-feed">Feed</label>
-            <div class="unit-input"><input id="cam-feed" type="number" step="any" min="0.1"><span>mm/s</span></div></div>
-          <div class="field"><label for="cam-plunge">Plunge</label>
-            <div class="unit-input"><input id="cam-plunge" type="number" step="any" min="0.1"><span>mm/s</span></div></div>
-          <div class="field"><label for="cam-dial">Router dial <span id="cam-rpm"></span></label>
-            <div class="unit-input"><input id="cam-dial" type="number" step="0.5" min="1" max="6"></div></div>
-          <div class="field"><label for="cam-tabs">Tabs per plate</label>
-            <div class="unit-input"><input id="cam-tabs" type="number" step="1" min="0"></div></div>
-          <div class="field"><label for="cam-tabh">Tab height</label>
-            <div class="unit-input"><input id="cam-tabh" type="number" step="any" min="0"><span>mm</span></div></div>
-          <div class="field wide"><label for="cam-router">Router</label><select id="cam-router"></select></div>
+      </section>
+      <section aria-labelledby="h-scene">
+        <h3 id="h-scene">Scene</h3>
+        <div class="variant" id="detail"><span>Detail</span>
+          <button type="button" data-v="full" aria-pressed="false">Full</button>
+          <button type="button" data-v="lite" aria-pressed="false">Lite</button></div>
+        <p class="foot" id="detail-note"></p>
+        <div class="variant" id="lighting"><span>Lighting</span>
+          <button type="button" data-v="real" aria-pressed="false">Realistic</button>
+          <button type="button" data-v="simple" aria-pressed="false">Simple</button></div>
+        <p class="foot" id="lighting-note"></p>
+        <div class="variant" id="scenery"><span>Background</span>
+          <button type="button" data-v="shop" aria-pressed="true">Workshop</button>
+          <button type="button" data-v="empty" aria-pressed="false">Empty shop</button>
+          <button type="button" data-v="plain" aria-pressed="false">Plain</button></div>
+        <div id="room-box">
+          <div class="trio">
+            <div class="field"><label for="room-w">Building X</label>
+              <div class="unit-input"><input id="room-w" type="number" step="any" min="0" placeholder="–"><span class="ru">ft</span></div></div>
+            <div class="field"><label for="room-d">Building Y</label>
+              <div class="unit-input"><input id="room-d" type="number" step="any" min="0" placeholder="–"><span class="ru">ft</span></div></div>
+            <div class="field"><label for="room-h">Ceiling</label>
+              <div class="unit-input"><input id="room-h" type="number" step="any" min="0" placeholder="–"><span class="ru">ft</span></div></div>
+          </div>
+          <p class="foot" id="room-note"></p>
+          <div id="room-warn"></div>
         </div>
-        <div class="buttons"><button type="button" id="cam-reset">Defaults</button></div>
-      </details>
-      <p class="foot" id="cam-note"></p>
-      <details class="cam more">
-        <summary>About these files</summary>
-        <p class="foot">Vector76's strut plate generator, ported to the browser and checked against the original OpenSCAD output
-        at 58 sizes. 1/4" MDF, 1/8" bit (3.5 mm dogbones), 1" EMT wings (11.5 mm). The DXF is closed polylines in mm.
-        The G-code follows V1E's milling basics: bolt holes first, then each outline with tabs, 0.25 mm into the spoil board.
-        Check it in a G-code viewer before you cut.</p>
-      </details>
-    </section>
-
-    <section aria-labelledby="h-fluidnc">
-      <h2 id="h-fluidnc">FluidNC config</h2>
-      <div class="buttons">
-        <button type="button" id="dl-yaml">Download config.yaml</button>
-        <label class="btn"><input type="file" id="f-yaml" accept=".yaml,.yml" hidden>Use my own config.yaml…</label>
-        <button type="button" id="copy-yaml">Copy text</button>
+      </section>
+        <button type="button" class="st-next" data-next="st-files">Next: Get the files</button>
       </div>
-      <div id="yaml-status" role="status"></div>
-      <details class="cam more">
-        <summary>About this config</summary>
-        <p class="foot" id="yaml-note">V1 Engineering's Jackpot3 LowRider config (<a href="https://github.com/V1EngineeringInc/FluidNC_Configs/blob/3bb36506b0fcd2b0caca7c108ec150ccbb0c055c/LowRider%20CNC/Jackpot3/JP3_LR/config.yaml"
-        target="_blank" rel="noopener">FluidNC_Configs, JP3_LR</a>, AGPL-3.0, read from GitHub when you click) with the X and Y
-        max_travel_mm set for this machine: <b id="yaml-xy"></b> (home switch to the far stop, less pulloff_mm: FluidNC
-        counts the travel from the pulled-off spot). Everything else is V1E's (Z travel, homing, pins, motor
-        currents). Or bring your own config.yaml and only its two travel lines change. Check it against your machine before use.
-        <span id="yaml-short"></span></p>
-      </details>
-    </section>
+    </details>
+    <details class="step" id="st-files">
+      <summary><span class="st-n">6</span><span class="st-t" id="h-files">Get the files</span><span class="st-dot" id="dot-files" hidden aria-label="needs a look"></span><span class="st-sum" id="sum-files"></span></summary>
+      <div class="st-body">
+      <section aria-labelledby="h-bom">
+        <h3 id="h-bom">Bill of materials</h3>
+        <div class="bom-open"><button id="bom-btn" type="button" disabled>Open the full BOM</button><span id="bom-sum">Loading…</span></div>
+      </section>
+      <section aria-labelledby="h-calc">
+        <h3 id="h-calc">Cut list (V1E calculator)</h3>
+        <table id="calc"><tbody></tbody></table>
+      </section>
+      <section class="plates" aria-labelledby="h-plates">
+        <h3 id="h-plates">Strut plates</h3>
+        <div id="plate-draw"></div>
+        <div class="buttons">
+          <button type="button" id="dl-dxf">Download DXF</button>
+          <button type="button" id="dl-svg">Download SVG</button>
+          <button type="button" id="dl-nc">Download G-code</button>
+        </div>
+        <div id="dl-status" role="status"></div>
+        <details class="cam" id="cam-box">
+          <summary>G-code settings (FluidNC, 1/8" bit)</summary>
+          <div class="trio">
+            <div class="field"><label for="cam-t">Stock thickness</label>
+              <div class="unit-input"><input id="cam-t" type="number" step="any" min="1"><span>mm</span></div></div>
+            <div class="field"><label for="cam-step">Depth per pass</label>
+              <div class="unit-input"><input id="cam-step" type="number" step="any" min="0.1"><span>mm</span></div></div>
+            <div class="field"><label for="cam-plate">Touch plate (0 = none)</label>
+              <div class="unit-input"><input id="cam-plate" type="number" step="any" min="0"><span>mm</span></div></div>
+            <div class="field"><label for="cam-feed">Feed</label>
+              <div class="unit-input"><input id="cam-feed" type="number" step="any" min="0.1"><span>mm/s</span></div></div>
+            <div class="field"><label for="cam-plunge">Plunge</label>
+              <div class="unit-input"><input id="cam-plunge" type="number" step="any" min="0.1"><span>mm/s</span></div></div>
+            <div class="field"><label for="cam-dial">Router dial <span id="cam-rpm"></span></label>
+              <div class="unit-input"><input id="cam-dial" type="number" step="0.5" min="1" max="6"></div></div>
+            <div class="field"><label for="cam-tabs">Tabs per plate</label>
+              <div class="unit-input"><input id="cam-tabs" type="number" step="1" min="0"></div></div>
+            <div class="field"><label for="cam-tabh">Tab height</label>
+              <div class="unit-input"><input id="cam-tabh" type="number" step="any" min="0"><span>mm</span></div></div>
+            <div class="field wide"><label for="cam-router">Router</label><select id="cam-router"></select></div>
+          </div>
+          <div class="buttons"><button type="button" id="cam-reset">Defaults</button></div>
+        </details>
+        <p class="foot" id="cam-note"></p>
+        <details class="cam more">
+          <summary>About these files</summary>
+          <p class="foot">Vector76's strut plate generator, ported to the browser and checked against the original OpenSCAD output
+          at 58 sizes. 1/4" MDF, 1/8" bit (3.5 mm dogbones), 1" EMT wings (11.5 mm). The DXF is closed polylines in mm.
+          The G-code follows V1E's milling basics: bolt holes first, then each outline with tabs, 0.25 mm into the spoil board.
+          Check it in a G-code viewer before you cut.</p>
+        </details>
+      </section>
+      <section aria-labelledby="h-fluidnc">
+        <h3 id="h-fluidnc">FluidNC config</h3>
+        <div class="buttons">
+          <button type="button" id="dl-yaml">Download config.yaml</button>
+          <label class="btn"><input type="file" id="f-yaml" accept=".yaml,.yml" hidden>Use my own config.yaml…</label>
+          <button type="button" id="copy-yaml">Copy text</button>
+        </div>
+        <div id="yaml-status" role="status"></div>
+        <details class="cam more">
+          <summary>About this config</summary>
+          <p class="foot" id="yaml-note">V1 Engineering's Jackpot3 LowRider config (<a href="https://github.com/V1EngineeringInc/FluidNC_Configs/blob/3bb36506b0fcd2b0caca7c108ec150ccbb0c055c/LowRider%20CNC/Jackpot3/JP3_LR/config.yaml"
+          target="_blank" rel="noopener">FluidNC_Configs, JP3_LR</a>, AGPL-3.0, read from GitHub when you click) with the X and Y
+          max_travel_mm set for this machine: <b id="yaml-xy"></b> (home switch to the far stop, less pulloff_mm: FluidNC
+          counts the travel from the pulled-off spot). Everything else is V1E's (Z travel, homing, pins, motor
+          currents). Or bring your own config.yaml and only its two travel lines change. Check it against your machine before use.
+          <span id="yaml-short"></span></p>
+        </details>
+      </section>
+      </div>
+    </details>
   </div>
 
   <footer class="foot about-line" id="about"><span id="version"></span><br>
@@ -337,6 +333,7 @@
     <dt>Space</dt><dd>Play / pause the job's Preview</dd>
     <dt>H</dt><dd>Hide / show the panel</dd>
     <dt>V</dt><dd>Only the view (Esc brings the panels back)</dd>
+    <dt>L</dt><dd>Layers: what the view shows</dd>
     <dt>Double-click</dt><dd>Inspect an assembly (Esc goes back)</dd>
     <dt>?</dt><dd>This list</dd>
   </dl>
@@ -354,6 +351,7 @@
   <div class="status" id="status" role="status" aria-live="polite"><div id="status-title">Loading model…</div><div class="bar"><div id="status-bar"></div></div><div class="detail" id="status-detail">&nbsp;</div></div>
   <div class="toolbar" role="toolbar" aria-label="View">
     <button id="v-panel" type="button" aria-pressed="false" aria-label="Hide the panel" title="Hide the panel">☰</button>
+    <button id="v-layers" type="button" aria-expanded="false" aria-controls="layers-pop" title="Layers: what the view shows (L)">Layers</button>
     <select id="v-views" aria-label="View"><option value="" hidden selected>View</option><option value="v-iso">Iso</option>
       <option value="v-front">Front</option><option value="v-top">Top</option><option value="v-side">Side</option><option value="v-back">Back</option></select>
     <button id="v-iso" type="button">Iso</button>
@@ -366,6 +364,13 @@
     <button id="v-shot" type="button" title="Save the view as a PNG (P)" aria-label="Save the view as a picture">📷</button>
     <button id="v-vr" type="button" hidden title="PC VR headset (SteamVR / OpenXR)">Enter VR</button>
   </div>
+  <section class="layers-pop" id="layers-pop" aria-labelledby="h-show" hidden>
+    <div class="layers-head"><h2 id="h-show">Layers</h2><button type="button" id="layers-x" aria-label="Close" title="Close (Esc)">✕</button></div>
+    <p class="foot">The view only - the BOM keeps every part. A bolt joining two assemblies is under both and shows with either.</p>
+    <div class="presets" id="show-presets" role="group" aria-label="Presets"></div>
+    <div class="tree" id="show-tree" role="group" aria-label="Parts shown"></div>
+    <button type="button" id="unhide" hidden></button>
+  </section>
   <button type="button" class="v-only" id="v-only" aria-pressed="false" title="Only the view: hide the panels (Esc brings them back)" aria-label="Only the view">⛶</button>
   <div class="pv-banner" id="pv-banner" hidden>Preview · on a copy · the machine isn't moving</div>
   <div class="alarm-card" id="alarm-card" role="alert" hidden><span class="bang">!</span><div>
@@ -373,7 +378,7 @@
     <div class="buttons"><button type="button" class="pri" id="alarm-unlock">Unlock ($X)</button><button type="button" id="alarm-home">Home all</button><button type="button" id="alarm-x" aria-label="Dismiss" title="Dismiss">✕</button></div></div></div>
   <div class="mini-dro" id="mini-dro" aria-label="Work position, mm"><span><em>X</em><b id="md-x">–</b></span><span><em>Y</em><b id="md-y">–</b></span><span><em>Z</em><b id="md-z">–</b></span></div>
   <div class="pick" id="pick" role="status" hidden><div><strong></strong><p></p></div>
-    <button type="button" id="pick-clear" aria-label="Clear the selection" title="Clear">✕</button></div>
+    <button type="button" id="pick-insp" title="Inspect it on its own (double-click a part does too)">Inspect</button><button type="button" id="pick-clear" aria-label="Clear the selection" title="Clear">✕</button></div>
   <div class="insp" id="insp" hidden>
     <button type="button" id="insp-back">← Back to the machine</button>
     <div class="insp-tools" id="insp-tools">
@@ -466,7 +471,7 @@
   </div>
   <div class="help" id="help-ctl" hidden>
     <p><b>FluidNC</b>, the real firmware, runs in your browser and drives the machine with the config.yaml in use (V1E's
-    JP3_LR until you load your own, under Build): home it, jog it, zero it, run files from its SD card, or type G-code in
+    JP3_LR until you load your own, under Design > 6 Get the files): home it, jog it, zero it, run files from its SD card, or type G-code in
     the console. It runs a copy with plain stepper drivers ($CD shows that copy).</p>
     <p>Click a Work or Machine value to type where to go: Enter sends <code>G90 G0</code> (work) or <code>G53 G0</code>
     (machine). Zero sets work zero where the bit is (<code>G10 L20 P1</code>). Feed and Rapid are FluidNC's realtime
@@ -526,7 +531,7 @@
         <button type="button" id="ab-meas" title="Find the test's four corner crosses in the carved spoilboard / stock and measure both diagonals">Measure the diagonals</button>
       </div>
       <p class="foot" id="ab-sq-note" role="status"></p>
-      <p class="foot">As built is on (My LR4 > As built).</p>
+      <p class="foot">As built is on (Design > 4 As built).</p>
     </div>
   </div>
 </aside>

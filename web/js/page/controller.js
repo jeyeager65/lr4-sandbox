@@ -112,7 +112,7 @@
     const added = [];
     for (const f of files) {
       const path = FLASH.tree.cur + SdCard.pathOf(f.name);
-      if (path === FLASH_YAML || path === "/sim_config.yaml") { $("flash-status").textContent = `${path} is the page's: load your config.yaml under Build.`; continue; }
+      if (path === FLASH_YAML || path === "/sim_config.yaml") { $("flash-status").textContent = `${path} is the page's: load your config.yaml under Design > Get the files.`; continue; }
       const bytes = new Uint8Array(await f.arrayBuffer());
       await SdCard.flash.store.put(path, bytes);
       SdCard.flash.writeLive(CTL.sim, path, bytes);

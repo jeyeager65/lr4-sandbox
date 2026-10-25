@@ -3,6 +3,15 @@
 The version is the sandbox page's (`VERSION` in `web/js/page/job.js`, shown in its footer). The footer also shows
 the date the model data was built and the Printables file set it was solved for.
 
+## 0.41.0 - 2026-10-25
+- **New page layout, part 3 (Design):** the My LR4 / Show / Build tabs became six numbered steps that open in any
+  order, one at a time: **1 Size** (cutting area, braces, strut plates), **2 Options**, **3 Table**, **4 As built**,
+  **5 Look** (print colors, scene), **6 Get the files** (BOM, cut list, strut plates + G-code settings,
+  config.yaml). A closed step shows a one-line summary; **Next** opens the next one; the open step is remembered.
+  Size warnings put a red dot on step 1 while it's closed. **Get the files** in the top bar opens step 6.
+- **Layers** on the view (or L) holds the parts tree (presets, show / hide, ⤢ Inspect), in both Design and Run.
+- The selected-part chip has an **Inspect** button.
+
 ## 0.40.0 - 2026-10-24
 - **New page layout, part 2 (Run):** the Machine column has FluidNC's **state pill** (its menu: Unlock $X, Soft reset,
   Power cycle), **Hold / Resume** (one button) and **Stop**, greyed out until a job runs, a **Work | Machine** readout

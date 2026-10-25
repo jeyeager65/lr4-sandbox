@@ -188,13 +188,34 @@ label.check:has(input:disabled) { color: var(--muted); }
 .tree input { accent-color: var(--accent); margin: 0; cursor: pointer; }
 .tree label { display: contents; cursor: pointer; }
 .tree em { font-style: normal; font-family: var(--font-data); font-size: 12px; color: var(--muted); }
-/* panel tabs: the panel is three tasks - set up the machine, get what you need to build it, run it */
-.tabs { display: flex; border-bottom: 1px solid var(--line); margin-bottom: -6px; }
-.tabs button { flex: 1; border: 0; border-bottom: 2px solid transparent; border-radius: 0; margin-bottom: -1px; padding: 8px 4px;
-  font: 600 13px var(--font-display); letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
-.tabs button:hover { color: var(--ink); }
-.tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); }
-.tabpanel { display: flex; flex-direction: column; gap: 20px; }
+/* Design's steps (Part 37): numbered <details>, one open at a time; closed = number, title, one-line summary */
+.steps { display: flex; flex-direction: column; border-top: 1px solid var(--line); margin: 0 -16px; }
+.step { border-bottom: 1px solid var(--line); }
+.step > summary { list-style: none; cursor: pointer; display: grid; grid-template-columns: 24px auto auto 1fr; align-items: center;
+  gap: 2px 8px; padding: 11px 16px; }
+.step > summary::-webkit-details-marker { display: none; }
+.step > summary:hover { background: color-mix(in srgb, var(--ink) 4%, transparent); }
+.st-n { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font: 700 12px var(--font-data);
+  border: 1px solid var(--line); color: var(--muted); }
+.step[open] .st-n { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.st-t { font: 600 15px var(--font-display); letter-spacing: 0.02em; }
+.st-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
+.st-sum { grid-column: 2 / -1; color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.step[open] .st-sum { display: none; }
+.st-body { display: flex; flex-direction: column; gap: 12px; padding: 0 16px 16px 48px; }
+.st-body section { gap: 0; }
+.st-body section + section { margin-top: 10px; }
+.st-body h3 { font: 600 12px var(--font-display); text-transform: uppercase; letter-spacing: 0.12em; color: var(--muted); margin: 0 0 8px; }
+.st-next { align-self: flex-start; margin-top: 4px; color: var(--muted); }
+.st-next::after { content: " →"; }
+/* Layers: the parts tree in a popover on the view (both modes) */
+.layers-pop { position: absolute; left: 12px; top: 54px; z-index: 6; width: min(330px, calc(100% - 24px)); max-height: calc(100% - 120px);
+  overflow-y: auto; padding: 10px 14px 14px; background: var(--panel); border: 1px solid var(--line); border-radius: 6px;
+  box-shadow: 0 10px 32px rgb(0 0 0 / 0.25); }
+.layers-head { display: flex; align-items: center; justify-content: space-between; }
+.layers-head h2 { margin: 0; }
+#layers-x { border: 0; padding: 2px 6px; color: var(--muted); }
+#v-layers[aria-expanded="true"] { border-color: var(--accent); }
 .files-line { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 13px; color: var(--muted); }
 .files-line button { padding: 3px 8px; font-size: 12px; }
 .files-line:not([hidden]) + #files-body { margin-top: 12px; }

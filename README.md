@@ -17,7 +17,7 @@ features and checks every fastener.
 
 | | |
 |---|---|
-| **LowRider 4 Sandbox** (`web/index.html`) | The page. **My LR4:** enter a cutting area and it builds the machine in 3D (every printed part, rail, belt, bolt, the strut plates and the vacuum hose); choose what's on it (router + shoe, hose, lid fan, pendant, Peter Plates, strut plates). **Show:** a tree of every part by assembly and kind, with presets, to hide parts from the view, and an inspect view for one assembly at a time. **Build:** the cut list (V1E's calculator), the strut plate outlines, DXF / SVG / G-code downloads, the full BOM and a `config.yaml` for your size. **Run:** play G-code on the machine, or drive it with FluidNC in the browser. Plus machine sounds, a workshop round it, VR, share links and scripted demo videos. |
+| **LowRider 4 Sandbox** (`web/index.html`) | The page. **Design:** enter a cutting area and it builds the machine in 3D (every printed part, rail, belt, bolt, the strut plates and the vacuum hose); choose what's on it (router + shoe, hose, lid fan, pendant, Peter Plates, strut plates). **Layers** (on the view): a tree of every part by assembly and kind, with presets, to hide parts from the view, and an inspect view for one assembly at a time. **Get the files:** the cut list (V1E's calculator), the strut plate outlines, DXF / SVG / G-code downloads, the full BOM and a `config.yaml` for your size. **Run:** play G-code on the machine, or drive it with FluidNC in the browser. Plus machine sounds, a workshop round it, VR, share links and scripted demo videos. |
 | **FreeCAD model** (`freecad/`) | Scripts that assemble the LowRider 4 in [FreeCAD](https://www.freecad.org/) from the official STLs. Every part is placed by its measured mating features (hole patterns, pockets), and every fastener is checked for seat, engagement and collisions. Outputs: an FCStd assembly, a BOM, strut plate DXF/SVG and G-code. |
 | **Pipeline** (`pipeline/`) | Builds the model at many sizes and fits how each part moves with the size. That is how the page can draw any size without FreeCAD. |
 | **FluidNC in the browser** (`web/fluidnc/`) | FluidNC's wasm port, built from a fork's `wasm-sim` branch with simulated limit switches, a touch plate probe and a time scale. |
@@ -61,27 +61,30 @@ Unzip each download into its folder under `parts/` (the table above), for exampl
 
 ## Using the page
 
-### My LR4, Show and Build
+### Design and Layers
 
-**My LR4:** enter the cutting area (inches or mm) and the page rebuilds the machine: brace count, rails, belts,
-table, hose routing. Options take parts off the machine and the BOM (router + dust shoe, skirt, hose, lid fan,
-pendant), and pick the strut plates (MDF or the printed temporary ones) and the Peter Plates style (Open, Closed,
-Honeycomb or None). Also here: the table height and the print colours.
+**Design** is six steps that open in any order (a closed step shows a one-line summary):
+**1 Size** - enter the cutting area (inches or mm) and the page rebuilds the machine: brace count, rails, belts,
+table, hose routing; the strut plates (MDF or the printed temporary ones); warnings show here (a red dot while it's
+closed). **2 Options** take parts off the machine and the BOM (router + dust shoe, skirt, hose, lid fan, pendant)
+and pick the Peter Plates style (Open, Closed, Honeycomb or None). **3 Table** - the base and the table height.
+**4 As built** - a real machine's faults (below). **5 Look** - the print colors and the scene. **6 Get the files**
+(also in the top bar).
 
-**Show** only hides parts from the view, never from the BOM: a tree of assembly > printed / cut / hardware /
+**Layers** (on the view, or L) only hides parts from the view, never from the BOM: a tree of assembly > printed / cut / hardware /
 electronics > part (a bolt is listed under both assemblies it joins), with presets (All, No hardware, Printed parts
-only, Frame only). **Scene** sets the detail (Full, or Lite for slower devices), the lighting (Realistic: the
+only, Frame only). **Look** > **Scene** sets the detail (Full, or Lite for slower devices), the lighting (Realistic: the
 workshop's own lights, soft shadows on Full detail and filmic colour; or Simple: even light, lightest on the GPU) and
 the background (the workshop, the same shop empty, or plain).
 
-**Inspect** (⤢ on a Show row, or double-click a part) shows one assembly or part alone with the bolts and bearings
+**Inspect** (⤢ on a Layers row, **Inspect** on a selected part, or double-click a part) shows one assembly or part alone with the bolts and bearings
 that hold it, and its parts list with screw and nut counts. Its tools: an exploded view (along the bolt lines), a
 section cut (X, Y or Z, either side), X-ray (the printed parts see-through, the hardware solid), Lines (edges only)
 and a measuring tool that snaps to corners and hole centres. Esc or **Back to the machine** returns.
 
 ![Inspect: the core, exploded, with its parts list](docs/img/inspect.webp)
 
-**Build** has the cut list from V1E's LowRider 4 calculator, the strut plates (DXF / SVG, or G-code to cut them on
+**Get the files** has the cut list from V1E's LowRider 4 calculator, the strut plates (DXF / SVG, or G-code to cut them on
 the machine itself), the full BOM with hardware counts for your size, and V1E's JP3_LR `config.yaml` with
 `max_travel_mm` set for your size (or your own config.yaml, adjusted the same way).
 
@@ -94,7 +97,7 @@ decimals, as FluidNC reports them.
 ### Run: FluidNC
 
 **Run** boots the real FluidNC firmware in the page, with your config.yaml (V1E's JP3_LR until
-you load your own under Build). The browser build has no stepper drivers or real pins, so it runs a translated
+you load your own under Design > Get the files). The browser build has no stepper drivers or real pins, so it runs a translated
 copy: every motor becomes a plain stepper and the limit and probe pins move to known pins; rates, acceleration,
 travel, homing and limits are kept as in your file. (`$CD` in the console shows that copy; the page's config.yaml
 download is always your real file.) FluidNC needs a cross-origin isolated page (`tools/serve.py`, or GitHub Pages
@@ -146,7 +149,7 @@ service workers can't run FluidNC mode; everything else works.
 
 ### Workshop
 
-**Show** > **Scene** > **Background** > **Workshop** shows the machine in a workshop: by default the maintainer's
+**Look** > **Scene** > **Background** > **Workshop** shows the machine in a workshop: by default the maintainer's
 16 x 20 ft shop with an 8' 4" ceiling (benches, shelf, an open garage door, four 4 ft LED strips that light the
 scene). **Empty shop** is the same building with only the garage door, the lights and the fire extinguisher. Zoom in
 and the near walls open up;

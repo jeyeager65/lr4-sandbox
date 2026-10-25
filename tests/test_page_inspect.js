@@ -15,7 +15,7 @@ const ok = (cond, msg) => { if (!cond) { fails++; console.log("FAIL " + msg); } 
 
 const steps = [
   // the Core assembly from its row: the set only, the list
-  `document.getElementById('t-show').click(); const all = LR4Inspect.shown().length;
+  `document.getElementById('v-layers').click(); const all = LR4Inspect.shown().length;
    document.querySelector('#show-tree .ins[data-id=core]').click();
    const rows = [...document.querySelectorAll('#insp-list tr')].map((r) => [r.cells[0].textContent, r.cells[1].textContent]);
    return { all, id: LR4Inspect.id(), shown: LR4Inspect.shown(), overlay: !document.getElementById('insp').hidden,

@@ -10,26 +10,55 @@
   });
   document.getElementById("pick-clear").addEventListener("click", () => select(null));
 
-  // ---- Design's tabs (the last one kept per browser) and the ⚙ settings popover ----
-  const tabs = [...document.querySelectorAll('.tabs [role="tab"]')];
-  function showTab(t, focus) {
-    for (const b of tabs) {
-      const on = b === t;
-      b.setAttribute("aria-selected", String(on));
-      b.tabIndex = on ? 0 : -1;
-      document.getElementById(b.getAttribute("aria-controls")).hidden = !on;
-    }
-    if (focus) t.focus();
-    try { localStorage.setItem("lr4-tab", t.id); } catch (e) { /* not kept */ }
+  // ---- Design's steps (Part 37): six <details> that open in any order, one at a time (the open one kept per
+  // browser); a closed step shows a one-line summary, step 1 a red dot while its warnings say something; "Next: ..."
+  // opens the next. The controls inside are never hidden themselves (js/vr.js reads them by id). ----
+  const steps = [...document.querySelectorAll("#steps > details.step")];
+  function showStep(d, scroll) {
+    for (const s of steps) if (s !== d) s.open = false;
+    if (d) { d.open = true; if (scroll) d.scrollIntoView({ block: "start", behavior: "smooth" }); }
   }
-  tabs.forEach((b, i) => {
-    b.addEventListener("click", () => showTab(b));
-    b.addEventListener("keydown", (e) => {
-      const d = { ArrowRight: 1, ArrowLeft: -1 }[e.key];
-      if (d) { e.preventDefault(); showTab(tabs[(i + d + tabs.length) % tabs.length], true); }
-    });
+  for (const d of steps) d.addEventListener("toggle", () => {
+    if (d.open) { showStep(d); try { localStorage.setItem("lr4-step", d.id); } catch (e) { /* not kept */ } }
+    else if (!steps.some((s) => s.open)) { try { localStorage.setItem("lr4-step", ""); } catch (e) { /* not kept */ } }
+    stepSums();
   });
-  try { const t = document.getElementById(localStorage.getItem("lr4-tab")); if (tabs.includes(t)) showTab(t); } catch (e) { /* Machine */ }
+  for (const b of document.querySelectorAll(".st-next")) b.addEventListener("click", () => showStep($(b.dataset.next), true));
+  {
+    let id = null;
+    try { id = localStorage.getItem("lr4-step"); } catch (e) { /* step 1 */ }
+    const d = id === null ? steps[0] : steps.find((s) => s.id === id);
+    if (d) showStep(d);
+  }
+  const pressed = (id) => { const b = document.querySelector(`#${id} button[aria-pressed="true"]`); return b ? b.textContent.trim() : ""; };
+  const checkedOpts = () => [...document.querySelectorAll("#opts input:checked")].map((i) => i.parentElement.textContent.trim().split(/ [+(]/)[0]);
+  function stepSums() {                              // the closed steps' one-liners, from the controls themselves
+    const u = $("u-mm").getAttribute("aria-pressed") === "true" ? "mm" : "in", sv = $("strut-variant");
+    const s = {
+      size: `${$("cut-x").value} × ${$("cut-y").value} ${u}` + ($("braces").selectedOptions[0] ? ` · ${$("braces").selectedOptions[0].textContent}` : "") +
+        (!sv.hidden && pressed("strut-variant") ? ` · ${pressed("strut-variant").replace(/ \(.*/, "")} struts` : ""),
+      opts: [...checkedOpts(), !$("peter-variant").hidden && pressed("peter-variant") ? `${pressed("peter-variant")} Peter plates` : ""].filter(Boolean).join(", ") || "Bare machine",
+      shop: `${pressed("table-variant")}${$("table-top").value ? ` · top at ${$("table-top").value} ${u}` : ""}`,
+      ab: $("ab-on").checked ? "A real machine (out of square until homed)" : "Perfect",
+      look: [pressed("scenery"), pressed("lighting"), pressed("detail")].filter(Boolean).join(" · "),
+      files: "BOM, cut list, strut plates, config.yaml",
+    };
+    for (const [k, v] of Object.entries(s)) $("sum-" + k).textContent = v;
+    $("dot-size").hidden = $("st-size").open || !$("warnings").textContent.trim();
+  }
+  {
+    const panel = document.querySelector(".panel");
+    for (const ev of ["input", "change", "click"]) panel.addEventListener(ev, () => requestAnimationFrame(stepSums));
+    new MutationObserver(stepSums).observe($("warnings"), { childList: true, subtree: true, characterData: true });
+    for (const id of ["strut-variant", "peter-variant"]) new MutationObserver(stepSums).observe($(id), { attributes: true, subtree: true });
+    stepSums();
+  }
+  // ---- Layers (Part 37): the parts tree (show / hide per group, ⤢ = Inspect) in a popover on the view ----
+  const layersPop = $("layers-pop"), layersBtn = $("v-layers");
+  function showLayers(on) { layersPop.hidden = !on; layersBtn.setAttribute("aria-expanded", String(on)); }
+  layersBtn.addEventListener("click", () => showLayers(layersPop.hidden));
+  $("layers-x").addEventListener("click", () => showLayers(false));
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !layersPop.hidden) { showLayers(false); layersBtn.focus(); } });
   const viewPop = document.getElementById("view-pop"), viewMore = document.getElementById("v-more");
   function showViewPop(on) { viewPop.hidden = !on; viewMore.setAttribute("aria-expanded", String(on)); }
   viewMore.addEventListener("click", () => showViewPop(viewPop.hidden));
@@ -81,7 +110,7 @@
     for (const [k, b] of Object.entries(modeBtns)) b.addEventListener("click", () => setMode(k));
     if (kv.get("lr4-mode") === null && kv.get("lr4-tab") === "t-run") setMode("run");   // the old Run tab
     else setMode(root.dataset.mode === "run" ? "run" : "design", false);
-    $("tb-files").addEventListener("click", () => { setMode("design"); showPanel(true); showTab($("t-build")); });
+    $("tb-files").addEventListener("click", () => { setMode("design"); showPanel(true); showStep($("st-files"), true); });
 
     const themeBtns = [...document.querySelectorAll("#theme button")];
     function setTheme(t) {
@@ -416,6 +445,7 @@
     else if (k === "p") saveImage();
     else if (k === "h") click("v-panel");
     else if (k === "v") click("v-only");
+    else if (k === "l") click("v-layers");
     else if (k === "?") $("keys-dlg").showModal();
     else if (k === " " && JOB.preview && !$("job-on").hidden) click("job-play");
     else if (k === "Escape" && MEAS.main) mainMeasure(false);

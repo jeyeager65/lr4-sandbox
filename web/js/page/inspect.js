@@ -83,6 +83,8 @@
     const hit = ray.intersectObjects(meshes.filter((m) => m.visible && !m.userData.shadowOnly), false)[0];
     if (hit && !MEAS.on) inspect(INSPECT ? partId(hit.object) : asmOf(hit.object));
   });
+  // the selection chip's Inspect (Part 37): the part's assembly, or the part itself while inspecting
+  document.getElementById("pick-insp").addEventListener("click", () => { if (selected) inspect(INSPECT ? partId(selected) : asmOf(selected)); });
   window.LR4Inspect = { open: inspect, close: inspectEnd, id: () => INSPECT && INSPECT.id,
     shown: () => meshes.filter((m) => m.visible && !m.userData.shadowOnly).map((m) => m.userData.name) };
 
