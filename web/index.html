@@ -36,7 +36,7 @@
   <div class="tb-name">LowRider 4 <span>Sandbox</span></div>
   <span class="tb-size" id="tb-size"></span>
   <div class="modes" role="group" aria-label="Mode">
-    <button type="button" id="t-design" aria-pressed="true">Design</button><button type="button" id="t-run" aria-pressed="false">Run</button>
+    <button type="button" id="t-design" aria-pressed="true">Configure</button><button type="button" id="t-run" aria-pressed="false">Run</button>
   </div>
   <div class="tb-right">
     <button type="button" class="parts-chip" id="parts-chip" hidden aria-controls="welcome" title="Your part files: the official STLs, read in this browser">Parts</button>
@@ -49,7 +49,7 @@
       <div class="buttons" id="ft-row">
         <button type="button" id="ft-pop-btn" disabled title="FluidTouch's screen in a window over the view (or click the pendant's screen in the view)">Pendant screen</button>
       </div>
-      <p class="foot" id="ft-off-note">The pendant is off: turn it on under Design > 2 Options > FluidTouch pendant.</p></div>
+      <p class="foot" id="ft-off-note">The pendant is off: turn it on under Configure > 2 Options > FluidTouch pendant.</p></div>
     <div class="pw-sec" id="ui-box">
       <div class="lbl">Web UIs <button type="button" class="q" data-help="help-ui" aria-label="About web UIs" title="About web UIs">?</button></div>
       <div class="help" id="help-ui" hidden><p>WebUI, FigUI or any web UI on FluidNC's SD card or Flash (.html or .html.gz), served by FluidNC's
@@ -476,7 +476,7 @@
   </div>
   <div class="help" id="help-ctl" hidden>
     <p><b>FluidNC</b>, the real firmware, runs in your browser and drives the machine with the config.yaml in use (V1E's
-    JP3_LR until you load your own, under Design > 6 Get the files): home it, jog it, zero it, run files from its SD card, or type G-code in
+    JP3_LR until you load your own, under Configure > 6 Get the files): home it, jog it, zero it, run files from its SD card, or type G-code in
     the console. It runs a copy with plain stepper drivers ($CD shows that copy).</p>
     <p>Click a Work or Machine value to type where to go: Enter sends <code>G90 G0</code> (work) or <code>G53 G0</code>
     (machine). Zero sets work zero where the bit is (<code>G10 L20 P1</code>). Feed and Rapid are FluidNC's realtime
@@ -540,14 +540,14 @@
         <button type="button" id="ab-meas" title="Find the test's four corner crosses in the carved spoilboard / stock and measure both diagonals">Measure the diagonals</button>
       </div>
       <p class="foot" id="ab-sq-note" role="status"></p>
-      <p class="foot">As built is on (Design > 4 As built).</p>
+      <p class="foot">As built is on (Configure > 4 As built).</p>
     </div>
   </div>
 </aside>
 
 <aside class="side side-r" id="run-right" aria-label="Job">
   <div class="colhead">
-    <span class="seg" id="src-seg" role="group" aria-label="Files on"><button type="button" id="src-sd" aria-pressed="true">SD card</button><button type="button" id="src-flash" aria-pressed="false">Flash</button></span>
+    <span class="lbl col-lbl">Files</span>
     <span class="lbl pv-lbl">👁 Preview</span>
     <button type="button" class="sheet-x" data-sheet="files" aria-label="Close" title="Close">✕</button>
     <button type="button" class="col-btn" id="col-r" aria-expanded="true" aria-controls="run-right-body" title="Fold the column" aria-label="Fold the Job column">»</button></div>
@@ -577,18 +577,16 @@
       <button type="button" id="job-prev" aria-pressed="false" title="Back to the machine: the model goes back where FluidNC is">Exit preview</button>
     </div>
     <div class="run-main" id="run-main">
-      <section aria-labelledby="h-job">
-        <h2 id="h-job">Job <button type="button" class="q" data-help="help-job" aria-label="About jobs" title="About jobs">?</button></h2>
+      <section class="job-sec" id="job-sec" aria-labelledby="h-job">
+        <h2 class="vh" id="h-job">Job</h2>
         <div class="help" id="help-job" hidden><p>▶ on a file starts it on FluidNC (<code>$SD/Run</code>) after a check
           (homed, work zero, the stock, the bit); 👁 previews it fast from where FluidNC is, on a copy of the stock.
-          Clicking a file's name loads it without starting: its stock and bits go on the table.</p></div>
-        <div id="job-off">
-          <p class="foot">V1E's build order: the machine runs on the printed temporary struts first and cuts its own MDF
-            strut plates. Load that job here, or pick a file below.</p>
-          <div class="buttons"><button type="button" id="job-temp" title="Switches to the temporary struts if needed; the job's MDF goes on the table">Load the strut plate job</button></div>
-        </div>
+          Clicking a file's name loads it without starting: its stock and bits go on the table and it shows up here.</p></div>
+        <p class="foot job-off" id="job-off">No job loaded: pick a file below. The strut plates for this size are on the card
+          (LR4_strut_plates_<i>length</i>mm…): <button type="button" class="link" id="job-temp" title="Load the strut plate file (made by the page for this size and the G-code settings in Configure > Get the files)">load them</button>.</p>
         <div class="box job-box" id="job-on" hidden>
-          <div class="job-head"><b id="job-name"></b><span class="pill" id="job-pill" hidden></span></div>
+          <div class="job-head"><b id="job-name"></b><span class="pill" id="job-pill" hidden></span>
+            <button type="button" class="q" data-help="help-job" aria-label="About jobs" title="About jobs">?</button></div>
           <div class="bar" id="job-bar" hidden><i id="job-bar-i"></i></div>
           <p class="dhint" id="job-prog" hidden></p>
           <div class="buttons">
@@ -596,31 +594,31 @@
             <button type="button" id="job-pv" title="Play the job fast from where FluidNC is, on a copy of the stock: what Run would do. FluidNC doesn't move">👁 Preview</button>
             <button type="button" id="job-unload" title="Unload the file: its stock, moves and bits come off the table (the file stays on the SD card)">Unload</button>
           </div>
-          <label class="check"><input type="checkbox" id="job-moves"> Show the moves</label>
-          <label class="check"><input type="checkbox" id="job-closeup" checked> Close-up while probing</label>
+          <div class="job-opts">
+            <label class="check"><input type="checkbox" id="job-moves"> Show the moves</label>
+            <label class="check"><input type="checkbox" id="job-closeup" checked> Close-up while probing</label>
+          </div>
         </div>
         <p class="foot" id="job-src"></p>
         <p class="foot" id="job-status" role="status"></p>
-        <div class="buttons">
-          <button type="button" id="job-back" hidden>Back to the strut plate job</button>
-          <button type="button" id="job-install" hidden>Install the plates (Permanent)</button>
-        </div>
       </section>
+      <div class="src-head">
+        <span class="seg" id="src-seg" role="group" aria-label="Files on"><button type="button" id="src-sd" aria-pressed="true">SD card</button><button type="button" id="src-flash" aria-pressed="false">Flash</button></span>
+      </div>
       <section class="src-pane" id="sd-box" aria-label="SD card">
-        <div class="lbl">SD card · <span id="sd-count">0 files</span> <button type="button" class="q" data-help="help-sd" aria-label="About the SD card" title="About the SD card">?</button></div>
+        <div class="sd-bar"><nav class="sd-path" id="sd-path" aria-label="SD card folder"></nav><small id="sd-count">0 files</small><button type="button" class="q" data-help="help-sd" aria-label="About the SD card" title="About the SD card">?</button></div>
         <div class="help" id="help-sd" hidden><p>G-code files kept in this browser: ▶ starts one on FluidNC, which sees
-          the same card ($SD/List); 👁 previews it; the name loads it without starting. Drop files here or add them. The strut plate G-code is kept as /LR4_strut_plates.gcode.
-          Click a folder to add files and folders into it (again to go back to the top).</p></div>
+          the same card ($SD/List); 👁 previews it; the name loads it without starting. Drop files here or add them. The page keeps the strut plates for this size on it as LR4_strut_plates_<i>length</i>mm_<i>braces</i>br_<i>area</i>.gcode (the last size's goes when the size changes, unless you changed it).
+          The list shows one folder: click a folder to go into it, a name in the line above to go back up. Add and New folder go into the folder you're in; or drop files on a folder.</p></div>
         <div class="sd-list" id="sd-list" role="listbox" aria-label="Files on the SD card"></div>
         <div class="buttons">
           <label class="btn">Add G-code files…<input type="file" id="job-file" accept=".gcode,.nc,.ngc,.tap,.gc,.txt" multiple hidden></label>
           <button type="button" id="sd-mkdir">New folder</button>
-          <small class="sd-where" id="sd-where"></small>
         </div>
         <p class="foot" id="sd-status" role="status"></p>
       </section>
       <section class="src-pane" id="flash-box" aria-label="Flash" hidden>
-        <div class="lbl">Flash (LocalFS) <button type="button" class="q" data-help="help-flash" aria-label="About the Flash" title="About the Flash">?</button></div>
+        <div class="sd-bar"><nav class="sd-path" id="flash-path" aria-label="Flash folder"></nav><small>LocalFS</small><button type="button" class="q" data-help="help-flash" aria-label="About the Flash" title="About the Flash">?</button></div>
         <div class="help" id="help-flash" hidden><p>FluidNC's Flash, kept in this browser: config.yaml is the one in use (V1E's, or yours from Build,
           which comes back after a reload). FluidNC boots a translated copy, sim_config.yaml, with plain stepper drivers;
           if config.yaml changes on its Flash, the page uses that one and restarts FluidNC.</p></div>
@@ -628,7 +626,6 @@
         <div class="buttons">
           <label class="btn">Add files…<input type="file" id="flash-file" multiple hidden></label>
           <button type="button" id="flash-mkdir">New folder</button>
-          <small class="sd-where" id="flash-where"></small>
         </div>
         <p class="foot" id="flash-status" role="status"></p>
       </section>
@@ -676,6 +673,7 @@
   </div>
 </aside>
 
+<div class="row-menu" id="row-menu" role="menu" hidden></div>
 <div class="start-pop" id="start-pop" role="dialog" aria-labelledby="start-h" hidden>
   <b id="start-h">Start?</b>
   <ul class="chk" id="start-chk"></ul>

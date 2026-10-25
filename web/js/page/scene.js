@@ -786,10 +786,10 @@
         motion: "table", source: "made", color: [0.84, 0.70, 0.50], ownGeo: true }]);
     pendantScreen(true);
     out.push([pendant.screen.geo, new THREE.MeshBasicMaterial({ map: pendant.screen.tex, toneMapped: false }),
-      ud("Pendant_screen", "Pendant screen (FluidTouch, when the Run tab's controller is FluidNC)", { color: [0, 0, 0] })]);
+      ud("Pendant_screen", "Pendant screen (FluidTouch)", { color: [0, 0, 0] })]);
     return out;
   }
-  // the placeholder screen: what FluidTouch's status bar + DRO would show; redrawn when the text changes
+  // the pendant's screen: FluidTouch's own frames once it runs; dark until then, as the real panel is before it boots
   function pendantScreen(force) {
     if (!pendant) return;
     if (FT.ft && !FT.ft.stopped) {                   // FluidTouch's own screen, copied when it redraws
@@ -800,29 +800,10 @@
       pendant.screen.tex.needsUpdate = true;
       return;
     }
-    const st = CTL.sim ? CTL.state || "…" : "Starting", m = CTL.mpos;
-    const pos = m && m.every((v) => Number.isFinite(v)) ? m.map((v) => v.toFixed(2)) : ["–", "–", "–"];
-    const key = [st, ...pos, CTL.homed].join("|");
-    if (!force && key === pendant.screen.key) return;
-    pendant.screen.key = key;
-    const { canvas, tex } = pendant.screen, g = canvas.getContext("2d"), W = canvas.width, H = canvas.height;
-    g.fillStyle = "#16181c"; g.fillRect(0, 0, W, H);
-    g.fillStyle = "#23262c"; g.fillRect(0, 0, W, 60);
-    g.font = "600 28px system-ui, sans-serif"; g.textBaseline = "middle";
-    g.fillStyle = "#e8e8e8"; g.fillText("FluidTouch", 20, 30);
-    const col = /^Alarm/.test(st) ? "#ff5a4f" : /^(Run|Jog|Home)/.test(st) ? "#4fc3ff" : /^Hold/.test(st) ? "#ffb02e" : "#5ad16b";
-    g.fillStyle = col; g.fillRect(W - 230, 12, 210, 36);
-    g.fillStyle = "#101114"; g.textAlign = "center"; g.fillText(st.split(":")[0].toUpperCase(), W - 125, 31); g.textAlign = "left";
-    g.font = "500 22px system-ui, sans-serif"; g.fillStyle = "#8b9099";
-    g.fillText(CTL.homed ? "Machine position (MPos), mm" : "Machine position (MPos), mm - not homed", 40, 100);
-    g.font = "600 64px ui-monospace, Consolas, monospace";
-    ["X", "Y", "Z"].forEach((a, i) => {
-      const y = 175 + i * 82;
-      g.fillStyle = "#8b9099"; g.fillText(a, 50, y);
-      g.fillStyle = !CTL.homed ? "#9aa0a8" : "#f2f2f2"; g.textAlign = "right"; g.fillText(pos[i], 520, y); g.textAlign = "left";
-    });
-    g.font = "400 18px system-ui, sans-serif"; g.fillStyle = "#6b7079";
-    g.fillText(CTL.sim ? "Starting FluidTouch…" : "FluidTouch runs on this screen once FluidNC is running", 40, H - 24);
+    if (!force && pendant.screen.key === "off") return;
+    pendant.screen.key = "off";
+    const { canvas, tex } = pendant.screen, g = canvas.getContext("2d");
+    g.fillStyle = "#050607"; g.fillRect(0, 0, canvas.width, canvas.height);
     tex.needsUpdate = true;
   }
   loadPendant();

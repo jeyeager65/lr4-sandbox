@@ -5,7 +5,7 @@
 //  - VR preview: a controller tip pressed into the glass touches it, pulled back lets go;
 //  - jog from the pendant (Control > Jog X+ Y+, clicked in the view);
 //  - from the pendant alone, twice (every tap a mouse click on the screen in the view; then VR-preview pokes, the pendant
-//    carried): $H (Control > Home All), then Files > LR4_strut_plates.gcode > play; the page follows the
+//    carried): $H (Control > Home All), then Files > LR4_strut_plates_<length>mm_....gcode > play; the page follows the
 //    job (FluidNC's $SD/Run waits until the page is ready), each M0 resumed from the pendant's HOLD dialog, to Done,
 //    carving the same stock as Playback (as test_page_sdjob.js).
 // Screenshots: build/pendant_*.png.

@@ -17,7 +17,7 @@ features and checks every fastener.
 
 | | |
 |---|---|
-| **LowRider 4 Sandbox** (`web/index.html`) | The page. **Design:** enter a cutting area and it builds the machine in 3D (every printed part, rail, belt, bolt, the strut plates and the vacuum hose); choose what's on it (router + shoe, hose, lid fan, pendant, Peter Plates, strut plates). **Layers** (on the view): a tree of every part by assembly and kind, with presets, to hide parts from the view, and an inspect view for one assembly at a time. **Get the files:** the cut list (V1E's calculator), the strut plate outlines, DXF / SVG / G-code downloads, the full BOM and a `config.yaml` for your size. **Run:** play G-code on the machine, or drive it with FluidNC in the browser. Plus machine sounds, a workshop round it, VR, share links and scripted demo videos. |
+| **LowRider 4 Sandbox** (`web/index.html`) | The page. **Configure:** enter a cutting area and it builds the machine in 3D (every printed part, rail, belt, bolt, the strut plates and the vacuum hose); choose what's on it (router + shoe, hose, lid fan, pendant, Peter Plates, strut plates). **Layers** (on the view): a tree of every part by assembly and kind, with presets, to hide parts from the view, and an inspect view for one assembly at a time. **Get the files:** the cut list (V1E's calculator), the strut plate outlines, DXF / SVG / G-code downloads, the full BOM and a `config.yaml` for your size. **Run:** play G-code on the machine, or drive it with FluidNC in the browser. Plus machine sounds, a workshop round it, VR, share links and scripted demo videos. |
 | **FreeCAD model** (`freecad/`) | Scripts that assemble the LowRider 4 in [FreeCAD](https://www.freecad.org/) from the official STLs. Every part is placed by its measured mating features (hole patterns, pockets), and every fastener is checked for seat, engagement and collisions. Outputs: an FCStd assembly, a BOM, strut plate DXF/SVG and G-code. |
 | **Pipeline** (`pipeline/`) | Builds the model at many sizes and fits how each part moves with the size. That is how the page can draw any size without FreeCAD. |
 | **FluidNC in the browser** (`web/fluidnc/`) | FluidNC's wasm port, built from a fork's `wasm-sim` branch with simulated limit switches, a touch plate probe and a time scale. |
@@ -41,7 +41,7 @@ page and the scripts bring their own hardware models (steppers, bearings, rails,
 
 1. Open the page. Until it has the files, each missing printed part is a plain grey box (its hardware hidden), and
    a **Your part files** card over the view has a Download button per Printables source with "n of m" for each.
-2. Drop the four zips anywhere on the page, in Design or Run. You can also drop a folder or loose STL / DXF files, or
+2. Drop the four zips anywhere on the page, in Configure or Run. You can also drop a folder or loose STL / DXF files, or
    use **Choose files…** / **Choose a folder…** on the card. In Chrome / Edge, **Look in my Downloads folder…** finds
    the zips there (pick the folder once; later visits re-check it with one click).
 3. The card counts them in and closes itself when everything is there; the printed parts replace the boxes. The
@@ -63,9 +63,9 @@ Unzip each download into its folder under `parts/` (the table above), for exampl
 
 ## Using the page
 
-### Design and Layers
+### Configure and Layers
 
-**Design** is six steps that open in any order (a closed step shows a one-line summary):
+**Configure** is six steps that open in any order (a closed step shows a one-line summary):
 **1 Size** - enter the cutting area (inches or mm) and the page rebuilds the machine: brace count, rails, belts,
 table, hose routing; the strut plates (MDF or the printed temporary ones); warnings show here (a red dot while it's
 closed). **2 Options** take parts off the machine and the BOM (router + dust shoe, skirt, hose, lid fan, pendant)
@@ -99,7 +99,7 @@ decimals, as FluidNC reports them.
 ### Run: FluidNC
 
 **Run** boots the real FluidNC firmware in the page, with your config.yaml (V1E's JP3_LR until
-you load your own under Design > Get the files). The browser build has no stepper drivers or real pins, so it runs a translated
+you load your own under Configure > Get the files). The browser build has no stepper drivers or real pins, so it runs a translated
 copy: every motor becomes a plain stepper and the limit and probe pins move to known pins; rates, acceleration,
 travel, homing and limits are kept as in your file. (`$CD` in the console shows that copy; the page's config.yaml
 download is always your real file.) FluidNC needs a cross-origin isolated page (`tools/serve.py`, or GitHub Pages
@@ -119,8 +119,9 @@ Run has a Machine column on the left, the Job column on the right and the consol
 - **The console** takes any G-code or `$` command and shows FluidNC's replies (folded to one line until you open it).
 - **Speed** runs the machine at 1x to 20x.
 
-**Run G-code** runs the strut plate job (V1E's build order: the machine runs on its printed temporary struts and
-cuts its own MDF strut plates; **Load the strut plate job**, which puts it on the temporary struts) or any G-code file from the page's **SD card** (**Add
+**Run G-code** runs any G-code file from the page's **SD card**, including the strut plate job the page keeps there
+for your size (`LR4_strut_plates_<length>mm_<braces>br_<area>.gcode`; V1E's build order cuts these MDF plates on the
+printed temporary struts - the strut plates choice in Configure only changes the model you see) (**Add
 G-code files…**, or drop them on it; ▶ starts one after a short check: homed, work zero, the stock, the bit) through FluidNC (`$SD/Run`), from the page or from the FluidTouch
 pendant. The stock is carved as the motors move (with the file's own bits, from
 [cnc-gcode-tools](https://github.com/jeyeager65/cnc-gcode-tools) `(Stock: ...)` / `(ToolDef ...)` comments, or the

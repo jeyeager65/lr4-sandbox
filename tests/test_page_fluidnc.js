@@ -313,7 +313,7 @@ async function run(mode) {
       await T.until(() => document.getElementById("job-prev").getAttribute("aria-pressed") === "true", 10000);
       out.on = { play: document.getElementById("job-play").textContent, speed: !document.getElementById("pv-box").hidden, back: document.getElementById("job-prev").textContent,
         banner: !document.getElementById("pv-banner").hidden, lines: document.getElementById("pv-lines").childElementCount };
-      for (const t0 = Date.now(); Date.now() - t0 < 15000 && sum(LR4Job.sim()) > out.stock0 - 1000;) {
+      for (const t0 = Date.now(); Date.now() - t0 < 40000 && sum(LR4Job.sim()) > out.stock0 - 1000;) {   // (~6 s of it: the touch plate out and home again)
         if (!document.getElementById("job-pop").hidden) document.getElementById("job-resume").click();
         await T.sleep(200);
       }

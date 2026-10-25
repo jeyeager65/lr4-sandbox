@@ -3,6 +3,34 @@
 The version is the sandbox page's (`VERSION` in `web/js/page/job.js`, shown in its footer). The footer also shows
 the date the model data was built and the Printables file set it was solved for.
 
+## 0.43.3 - 2026-10-25
+- **Homing no longer fails on a busy PC** (FluidNC wasm-sim 8755cc99): the simulated switches missed a re-press after homing's pull-off when the PC was busy or the machine fast (ALARM 9 / 8, or the two motors a step apart); now 0 of 15 at 10x with the CPU busy, was 3 of 15 (`node tests/stress_homing.js`).
+- **Resume waits for the touch plate:** at the probe's holds, Resume (the popup, the Hold button or the pendant) waits until the plate, clip and shoe bottom have finished moving (the popup says so); in Preview the plate now goes home at the Remove Probe pause too, not after it. The animation keeps to about real time on a slow GPU.
+- The pendant's screen is dark until FluidTouch starts (it showed a drawn stand-in of FluidTouch's status and position).
+- **The strut plates choice is visual only** (Permanent / Temporary in Configure > Size): it changes the model, not how
+  anything runs. The strut plate job is an ordinary file on the SD card that the page keeps up to date for the size
+  and the G-code settings; loading it no longer switches to the temporary struts, and the Install the plates / Back
+  to the strut plate job buttons are gone.
+- **The strut plate file is named by its strut length** (then the braces and the cutting area), e.g.
+  `LR4_strut_plates_830mm_5br_26x50in.gcode`. A new size replaces the page's file for the last size (unless you
+  changed it on the card), so the card keeps one; the old `LR4_strut_plates.gcode` goes too.
+- **The Job column, files first:** no Job / Job & files headings and no explanation paragraph. A loaded job is a card
+  at the top (name, progress while it runs, Start / Preview / Unload); with none loaded, one line says so (and offers
+  the strut plate job). Then SD card | Flash, the folder line as a plain path (`/`, `/jobs/`) and the files. Each file
+  has ▶ and 👁; Download and Delete moved under ⋯ (folders too: ⋯ > Delete), so names have the room. The selected
+  Configure button is red like Run.
+
+## 0.43.2 - 2026-10-25
+- The **Design** mode is now **Configure** (Configure | Run): you set the machine up, you don't design it.
+
+## 0.43.1 - 2026-10-25
+- **File lists (SD card / Flash):** the SD card | Flash switch sits right above the list. A folder line over the list
+  always says where you are ("📂 SD card /", "SD card / jobs /"; click a name to go back up). The list shows one
+  folder at a time - folders first, with their file counts; click one to go into it - so a long card stays
+  manageable. Add and New folder go into the
+  folder you're in; files dropped on a folder go into it. File rows are two lines: the whole name (wrapping after
+  `_` / `.` / `-`), then the size and the buttons.
+
 ## 0.43.0 - 2026-10-25
 - **New page layout, part 5 (phones):** Run on a phone is the view on top, then Hold / Stop, the Work | Machine
   readout, **Home / Zero / Jog / Files** and the loaded job. **Jog** and **Files** (the SD card and On the table) open

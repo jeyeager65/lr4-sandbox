@@ -7,7 +7,7 @@
   // the touch plate goes on the stock at the hold before a probe and comes off at the one after it, as you would; a
   // change to a bit the file doesn't define holds it (!) so the bit can be given. The job's work zero is wherever it
   // starts (the strut job: G10 L20 at the homed spot), so it needs $H first. ----
-  const fjPath = () => (!JOB.src ? null : JOB.src.kind === "sd" ? JOB.src.name : JOB.src.kind === "page" ? PAGE_SD : null);
+  const fjPath = () => (JOB.src && JOB.src.kind === "sd" ? JOB.src.name : null);
   // Part 36: the job box (▶ Start = the check, then $SD/Run; 👁 Preview; the running job's progress), Preview's player
   // in place of the right column (job-play = its Play / Pause; clicked outside Preview it still runs the job: tests,
   // videos), Hold / Resume + Stop in the left column (runState)
@@ -75,11 +75,6 @@
       $("job-status").textContent = "Reading the job from where the machine is…";
       await jobSetup(JOB.pageJob);
       if (!JOB.tl || FJ.job) return false;
-    }
-    if (JOB.src.kind === "page") {                   // make sure the card has this very file
-      try { await SdCard.store.put(PAGE_SD, JOB.src.text); SDC.saved = JOB.src.text; } catch (e) { /* the live card is enough */ }
-      SdCard.writeLive(sim, PAGE_SD, JOB.src.text);
-      sdRefresh();
     }
     if (JOB.sim) JOB.sim.reset();
     jobUpdateMesh(true);
@@ -171,12 +166,11 @@
     jobCloseUp(null);
     $("job-pop").hidden = true;
     $("job-status").textContent = text;
-    $("job-install").hidden = !(text === "Done." && JOB.src && JOB.src.kind === "page");
     fjButtons();
   }
   // for tests/test_page_sdjob.js: the job, its carving, and Preview's carve of the same moves to compare with
   window.LR4Job = { tl: () => JOB.tl, src: () => JOB.src, sim: () => JOB.sim, spoil: () => SPOIL.sim, hand: () => HAND, handSim: () => HAND.sim, running: () => !!FJ.job, held: () => !!(FJ.job && FJ.job.held),
-    files: () => SDC.recs.map((r) => r.path), yamlNote: () => yamlBase && yamlBase.note, flashList: () => $("flash-list").textContent, select: sdSelect, add: sdAdd, refresh: sdRefresh, PAGE_SD,
+    files: () => SDC.recs.map((r) => r.path), yamlNote: () => yamlBase && yamlBase.note, flashList: () => $("flash-list").textContent, select: sdSelect, add: sdAdd, refresh: sdRefresh, get PAGE_SD() { return PAGE_SD; },
     playbackHeights() {
       const s = Imperfect.attach(new StockSimulator(JOB.tl.stock, JOB.tl.tools, { maxCells: JOB.cells, snapshots: false }),
         JOB.sim && JOB.sim._asBuilt ? JOB.sim._asBuilt.toTable : [0, 0, 0], abState);
@@ -200,13 +194,13 @@
   // ---- the SD card (js/sd_card.js): G-code files kept in this browser. A name loads it; ▶ runs it
   // (FluidNC, which boots with the same files on its card); the strut plate G-code is kept on it as PAGE_SD. ----
   const sdText = (r) => new TextDecoder().decode(r.bytes);
-  SDC.tree = { cur: "", closed: new Set() };
+  SDC.tree = { cur: "" };
   function sdRow(r) {                                // one file on the card's tree
     const row = document.createElement("div"), name = document.createElement("button"), size = document.createElement("small");
     row.className = "sd-row"; row.setAttribute("role", "option");
-    const sel = JOB.file ? JOB.file.kind === "sd" && JOB.file.name === r.path : r.path === PAGE_SD && pageLive() && JOB.usePage;
+    const sel = !!JOB.file && JOB.file.kind === "sd" && JOB.file.name === r.path;
     row.setAttribute("aria-selected", String(sel));
-    name.type = "button"; name.className = "sd-name"; name.textContent = r.path.split("/").pop(); name.title = `Load ${r.path}`;
+    name.type = "button"; name.className = "sd-name"; breakable(name, r.path.split("/").pop()); name.title = `Load ${r.path}`;
     size.textContent = r.bytes.length >= 1e6 ? `${(r.bytes.length / 1e6).toFixed(1)} MB` : `${Math.ceil(r.bytes.length / 1e3)} KB`;
     row.append(name, size);
     if (UI_FILE.test(r.path)) {                      // a web UI, not a job: it opens from the top bar's Pendant & WebUI
@@ -220,15 +214,9 @@
       pv.addEventListener("click", () => sdPreview(r.path));
       go.textContent = "▶"; go.title = `Start ${r.path} on FluidNC`; go.setAttribute("aria-label", go.title);
       go.addEventListener("click", () => sdStart(r.path, go));
-      row.append(pv, go);
+      row.append(go, pv);
     }
-    const dl = document.createElement("button"), del = document.createElement("button");
-    dl.type = del.type = "button"; dl.className = del.className = "sd-act";
-    dl.textContent = "⬇"; dl.title = `Download ${r.path}`; dl.setAttribute("aria-label", dl.title);
-    dl.addEventListener("click", () => save(r.path.split("/").pop(), r.bytes, "sd-status"));
-    del.textContent = "✕"; del.title = `Delete ${r.path}`; del.setAttribute("aria-label", del.title);
-    del.addEventListener("click", () => sdDelete(r.path));
-    row.append(dl, del);
+    row.append(rowMore(r.path, [["Download", () => save(r.path.split("/").pop(), r.bytes, "sd-status")], ["Delete", () => sdDelete(r.path)]]));
     return row;
   }
   async function sdRefresh() {
@@ -236,8 +224,8 @@
     try { SDC.recs = await SdCard.store.all(); dirs = await SdCard.store.dirs(); }
     catch (e) { SDC.recs = []; $("sd-status").textContent = "This browser keeps no files for the page (site data blocked?)."; }
     $("sd-count").textContent = `${SDC.recs.length} file${SDC.recs.length === 1 ? "" : "s"}`;
-    cardTree($("sd-list"), SDC.recs, dirs, SDC.tree, sdRow, sdDeleteDir, sdRefresh);
-    $("sd-where").textContent = cardWhere(SDC.tree);
+    cardTree($("sd-list"), SDC.recs, dirs, SDC.tree, sdRow, sdDeleteDir, sdRefresh, sdAdd);
+    cardPath($("sd-path"), "SD card", SDC.tree, sdRefresh);
     uiRefresh();
   }
   async function sdDeleteDir(d) {                    // a folder and everything in it
@@ -248,18 +236,16 @@
     sdRefresh();
   }
   $("sd-mkdir").addEventListener("click", () => cardMkdir(SdCard, SDC.tree, sdRefresh, "sd-status"));
-  const pageLive = () => U.struts === "temp" && !!JOB.pageJob;   // the strut job is the page's own (Temporary struts)
   async function sdSelect(path) {
     if (UI_FILE.test(path)) return;                  // web UIs open from Pendant & WebUI
     const r = SDC.recs.find((q) => q.path === path);
     if (!r) return;
-    JOB.usePage = path === PAGE_SD && pageLive();
-    JOB.file = JOB.usePage ? null : { kind: "sd", name: path, text: sdText(r) };
+    JOB.file = { kind: "sd", name: path, text: sdText(r) };
     try { localStorage.setItem("lr4-sd-sel", path); } catch (e) { /* not kept */ }
     sdRefresh();
     await jobSetup(JOB.pageJob);
   }
-  const isLoaded = (path) => JOB.tl && JOB.src && (JOB.src.kind === "sd" ? JOB.src.name === path : path === PAGE_SD);
+  const isLoaded = (path) => !!(JOB.tl && JOB.src && JOB.src.kind === "sd" && JOB.src.name === path);
   async function sdStart(path, by) {                 // ▶: load the file, then the Start check by its row
     if (FJ.job) { $("sd-status").textContent = "A job is running on FluidNC: stop it first."; return; }
     if (!isLoaded(path)) await sdSelect(path);
@@ -348,17 +334,38 @@
     if (JOB.file && JOB.file.kind === "sd" && d.remove.includes(JOB.file.name)) { JOB.file = null; jobSetup(JOB.pageJob); }
     sdRefresh();
   }
-  function sdSavePage(j) {                           // the strut plate G-code onto the card (debounced: sizes drag)
+  // the strut plate G-code onto the card (debounced: sizes drag) under this size's name; the page's file for the last
+  // size goes (unless it was changed on the card), so the card keeps one, not one per size. Writes run one after
+  // another (SDC.saving) and each reads the card as it is then: a size change mid-write can't leave two behind.
+  function sdSavePage(j) {
     clearTimeout(SDC.saveTimer);
-    if (!j || j.gcode === SDC.saved) return;
-    SDC.saveTimer = setTimeout(async () => {
-      try {
-        await SdCard.store.put(PAGE_SD, j.gcode);
-        SdCard.writeLive(CTL.sim, PAGE_SD, j.gcode);
-        SDC.saved = j.gcode;
-        sdRefresh();
-      } catch (e) { /* no storage: the page job still plays */ }
+    if (!j) return;
+    SDC.saveTimer = setTimeout(() => {
+      SDC.saving = (SDC.saving || Promise.resolve()).then(() => sdWritePage(j)).catch((e) => console.warn("strut plate file", e));
     }, 600);
+  }
+  async function sdWritePage(j) {
+    if (j !== JOB.pageJob) return;                   // a newer job came meanwhile: its own write follows
+    const path = pageSdPath(), old = PAGE_SD;
+    if (j.gcode === SDC.saved && path === old) return;
+    await SdCard.store.put(path, j.gcode);
+    SdCard.writeLive(CTL.sim, path, j.gcode);
+    if (old !== path) {
+      const was = (await SdCard.store.all()).find((r) => r.path === old);
+      if (was && (old === PAGE_OLD || sdText(was) === SDC.saved) && !(FJ.job && FJ.job.path === old)) {
+        await SdCard.store.remove(old); SdCard.removeLive(CTL.sim, old);
+      }
+      try { if (localStorage.getItem("lr4-sd-sel") === old) localStorage.setItem("lr4-sd-sel", path); } catch (e) { /* not kept */ }
+    }
+    PAGE_SD = path;
+    SDC.saved = j.gcode;
+    // the strut plate file loaded (not running): it follows the new size / settings, as the card's copy did
+    if (JOB.file && JOB.file.kind === "sd" && (JOB.file.name === old || JOB.file.name === path) && !FJ.job && !JOB.preview &&
+        (JOB.file.name !== path || JOB.file.text !== j.gcode)) {
+      JOB.file = { kind: "sd", name: path, text: j.gcode };
+      jobSetup(JOB.pageJob);
+    }
+    await sdRefresh();
   }
   $("job-file").addEventListener("change", (e) => { const f = [...e.target.files]; e.target.value = ""; if (f.length) sdAdd(f); });
   {
@@ -371,32 +378,19 @@
   sdRefresh().then(() => {                           // the file picked last time
     let p = null;
     try { p = localStorage.getItem("lr4-sd-sel"); } catch (e) { /* none */ }
-    if (p && p !== PAGE_SD && !UI_FILE.test(p) && SDC.recs.some((r) => r.path === p)) sdSelect(p);
+    if (p && !UI_FILE.test(p) && SDC.recs.some((r) => r.path === p)) sdSelect(p);
   });
   $("job-unload").addEventListener("click", () => {   // no job loaded: its stock, moves and bits off (user 2026-10-24)
     if (FJ.job) { $("job-status").textContent = "A job is running on FluidNC: stop it first."; return; }
-    Object.assign(JOB, { file: null, usePage: false, stockOff: null });
+    Object.assign(JOB, { file: null, stockOff: null });
     try { localStorage.removeItem("lr4-sd-sel"); } catch (e) { /* nothing kept */ }
     jobSetup(JOB.pageJob);
     sdRefresh();
   });
-  $("job-back").addEventListener("click", () => {
-    JOB.file = null;
-    JOB.usePage = true;
-    try { localStorage.setItem("lr4-sd-sel", PAGE_SD); } catch (e) { /* not kept */ }
-    jobSetup(JOB.pageJob);
-    sdRefresh();
-  });
-  $("job-install").addEventListener("click", () => {
-    const b = document.querySelector('#strut-variant button[data-v="mdf"]');
-    if (b) b.click();
-  });
-  $("job-temp").addEventListener("click", () => {    // the strut plate job, on the temporary struts (switched like My LR4 > Strut plates)
-    JOB.file = null;
-    JOB.usePage = true;
-    try { localStorage.setItem("lr4-sd-sel", PAGE_SD); } catch (e) { /* not kept */ }
-    const b = document.querySelector('#strut-variant button[data-v="temp"]');
-    if (b && b.getAttribute("aria-pressed") !== "true") b.click();
-    else { jobSetup(JOB.pageJob); sdRefresh(); }
+  $("job-temp").addEventListener("click", async () => {   // the strut plate file for this size, as picking it on the card
+    clearTimeout(SDC.saveTimer);                     // this size's file on the card first (after any write under way)
+    SDC.saving = (SDC.saving || Promise.resolve()).then(() => JOB.pageJob && sdWritePage(JOB.pageJob)).catch((e) => console.warn("strut plate file", e));
+    await SDC.saving;
+    sdSelect(PAGE_SD);
   });
 

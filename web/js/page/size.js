@@ -62,10 +62,12 @@
       `aria-label="Front and bottom strut plates, ${L} mm long, ${S.n} braces">${parts.join("")}</svg>`;
   }
   function updateText() {
-    $("tb-size").textContent = U.unit === "in" ? `${+(S.cutX / IN).toFixed(2)} × ${+(S.cutY / IN).toFixed(2)} in cutting area`
-      : `${Math.round(S.cutX)} × ${Math.round(S.cutY)} mm cutting area`;
-    $("sub").textContent = `V1E LowRider 4 for a ${+(S.cutX / IN).toFixed(2)} × ${+(S.cutY / IN).toFixed(2)} in cutting area, ` +
-      `on a ${frac(S.TW / IN)} × ${frac(S.TL / IN)} in ${S.base === "torsion" ? "torsion box" : "MDF sheet"} table. Every printed part is the official STL, placed from its holes.`;
+    const area = U.unit === "in" ? `${+(S.cutX / IN).toFixed(2)} × ${+(S.cutY / IN).toFixed(2)} in`
+      : `${Math.round(S.cutX)} × ${Math.round(S.cutY)} mm`;   // the size's own units, here and in the line below
+    $("tb-size").textContent = `${area} cutting area`;
+    $("sub").textContent = `V1E LowRider 4 for a ${area} cutting area, on a ` +
+      (U.unit === "in" ? `${frac(S.TW / IN)} × ${frac(S.TL / IN)} in` : `${Math.round(S.TW)} × ${Math.round(S.TL)} mm`) +
+      ` ${S.base === "torsion" ? "torsion box" : "MDF sheet"} table. Every printed part is the official STL, placed from its holes.`;
     const sel = $("braces"), want = String(U.braces);
     const pitch = (n) => { const mm = (S.strut - 18) / (n - 1); return U.unit === "in" ? `${frac(mm / IN)}"` : `${mm.toFixed(1)} mm`; };
     sel.innerHTML = `<option value="0">Auto: ${S.auto} braces, ${pitch(S.auto)} pitch</option>` +

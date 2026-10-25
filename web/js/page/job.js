@@ -2,7 +2,7 @@
 // The page's scripts share one global scope (js/page/*.js, loaded in order by index.html): names declared
 // at the top level here are seen by the later files.
   // ---- version + feedback: the issue link carries the size, data date and the loaded files' checksums ----
-  const VERSION = "0.43.0";
+  const VERSION = "0.43.3";
   function setupAbout() {
     const bits = [`lr4-sandbox ${VERSION}`];
     if (cfg.built) bits.push(`model data built ${cfg.built}`);
@@ -85,8 +85,14 @@
   // (Stock:) header is carved as it goes. Work zero = the cutting area's front-left corner, stock top. Touching the
   // position sliders pauses it. ----
   const JOB = { tl: null, sim: null, group: null, done: null, at: null, t: 0, k: 0, playing: false,
-    key: "", seq: 0, src: null, file: null, pageJob: null, usePage: false, stockOff: null, last: 0, preview: null };   // preview: Preview is on (table.js)
-  const PAGE_SD = "/LR4_strut_plates.gcode";                       // the SD card (below) and its strut plate file
+    key: "", seq: 0, src: null, file: null, pageJob: null, stockOff: null, last: 0, preview: null };   // preview: Preview is on (table.js)
+  // the strut plate file on the SD card: the strut length first (what the plates are), the braces, then the cutting
+  // area in the size's units (user 2026-10-25), e.g. /LR4_strut_plates_741mm_5br_26x50in.gcode; sdSavePage keeps it
+  // (and PAGE_SD) up to date
+  const PAGE_OLD = "/LR4_strut_plates.gcode";                       // before 0.43.3: one name for every size
+  const pageSdPath = () => `/${baseName()}_` + (U.unit === "in" ? `${+(S.cutX / IN).toFixed(2)}x${+(S.cutY / IN).toFixed(2)}in`
+    : `${Math.round(S.cutX)}x${Math.round(S.cutY)}mm`) + ".gcode";
+  let PAGE_SD = PAGE_OLD;
   const SDC = { recs: [], sel: null, saved: null, saveTimer: 0 };
   const FJ = { job: null, pts: [], timer: 0, lastMsg: "" };        // a job running on FluidNC (fjRun)
   const MDF_RGB = [0.66, 0.52, 0.36];
@@ -352,6 +358,23 @@
     if (A.plate >= 1) touchPlatePlace();             // already out: follow a new spot straight away
     return !was;
   }
+  // the probe animation still moving (out to the stock, or home again)? Every resume waits for it (user 2026-10-25:
+  // the job carried on while the plate, clip and shoe bottom were still on their way back): touchSettled() resolves
+  // once it's still (30 s at most, so nothing hangs)
+  const touchBusy = () => { const A = TOUCH_ANIM; return A.out ? A.plate < 1 : A.plate > 0 || A.clip > 0 || A.skirt > 0; };
+  function touchSettled() {
+    const t0 = realNow();
+    return new Promise((res) => { (function wait() { if (!touchBusy() || realNow() - t0 > 30000) res(); else setTimeout(wait, 50); })(); });
+  }
+  async function resumeWhenSettled(go) {             // the popup's Resume / the Hold button: wait, saying so, then go
+    if (touchBusy()) {
+      const b = $("job-resume"), t = b.textContent;
+      b.disabled = true; b.textContent = "Wait: the touch plate is moving…";
+      await touchSettled();
+      b.disabled = false; b.textContent = t;
+    }
+    go();
+  }
   function touchMotion() {                          // the core's offset from the parked pose (move()'s dx, dy, dz)
     const p = HOME.pose || { x: 0, y: 0, z: 0 };
     return new THREE.Vector3(p.x, p.y, p.z);
@@ -576,16 +599,14 @@
     jobPlaying(false);
     $("job-pop").hidden = true;
   }
-  // after a size / settings change (camNote): the picked file, or the strut plate job (Temporary struts) once it was
-  // asked for (JOB.usePage: Load the strut plate job / its SD card file) - the temporary struts alone load nothing
-  // (user 2026-10-24: the job's MDF stock turned up on the spoilboard)
+  // after a size / settings change (camNote): the picked file. The strut plate job is just a file on the SD card
+  // (PAGE_SD, kept up to date for this size by sdSavePage) - the strut plates choice is visual only and changes how
+  // nothing runs (user 2026-10-25)
   function jobSetup(j) {
     JOB.pageJob = j || null;
     sdSavePage(j);
-    const page = U.struts === "temp" && j && JOB.usePage ? { kind: "page", name: "The strut plate G-code above", text: j.gcode } : null;
-    const src = JOB.file || page;
+    const src = JOB.file;
     $("job-off").hidden = !!src;
-    $("job-back").hidden = !(JOB.file && page);
     if (meta) handRefresh();                         // the spoilboard / hand stock / bit for this size
     if (!src || !meta) { jobClear(); $("job-on").hidden = true; $("job-src").textContent = ""; return; }
     const head = handHeader(src);
@@ -650,7 +671,7 @@
       (JOB.fits ? "" : "Some moves are outside this machine's travel: the bit stops at its limits. ") +
       (longAt < 0 ? "" : `Line ${longAt + 1} is too long for FluidNC (over 127 bytes): Run will stop there with ` +
         "error 14 (Line too long). Shorten or split it.");
-    $("job-name").textContent = $("pv-name").textContent = src.kind === "page" ? "Strut plates (the page's G-code)" : src.name.split("/").pop();
+    $("job-name").textContent = $("pv-name").textContent = src.name.split("/").pop();
     $("pv-total").textContent = clock(tl.total);
     $("job-on").hidden = false;
     if (keep) fjReload(); else if (FJ.job) fjDone("The file changed: the page stopped following the job.");

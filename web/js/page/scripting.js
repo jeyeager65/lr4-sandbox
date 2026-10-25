@@ -370,13 +370,14 @@
   let frameN = 0;
   let building = true;                                // load(): no frames until the build's stages are done (each
   function tick() {                                   // frame mid-build was a full draw: slow, and nothing to see yet)
-    const now = performance.now(), dt = Math.min((now - lastT) / 1000, 0.1);
+    const now = performance.now(), raw = (now - lastT) / 1000, dt = Math.min(raw, 0.1);
     lastT = now;
     if (building) return;
     if (shop) LR4Shop.cutaway(shop, camera.getWorldPosition(camPos), vr.active() ? 20000 : camera.far);   // hide walls the camera is outside of (VR's far is in metres: the sky as built)
     jobTick();
     handTick();
-    touchAnimTick(dt);                               // the touch plate + clip going out / coming home (job.js)
+    touchAnimTick(Math.min(raw, 0.5));               // the touch plate + clip going out / coming home (job.js): in about
+                                                     // real time on a slow GPU too (a job's Resume waits for it)
     ctlTick();
     soundTick();
     if (pendant && pendantOn() && (FT.ft || ++frameN % 8 === 0)) pendantScreen();

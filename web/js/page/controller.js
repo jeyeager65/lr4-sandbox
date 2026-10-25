@@ -33,45 +33,92 @@
       } catch (e) { /* not kept */ }
     }, 600);
   }
-  // ---- folders on the SD card and the Flash (user 2026-10-23): both lists are a tree. A folder row: ▾/▸ folds it,
-  // its name makes it where Add / New folder go (again: back to the top), ✕ deletes it and everything in it. ----
-  // cardTree(list, files, dirs, st = { cur, closed: Set }, fileRow(r) -> row, onDelDir(path), refresh)
-  function cardTree(list, files, dirs, st, fileRow, onDelDir, refresh) {
+  // ---- folders on the SD card and the Flash (user 2026-10-23; one folder at a time since 2026-10-25, the lists can be
+  // long): the list shows the current folder (folders first, then files); a folder's name goes into it, files dropped
+  // on it go into it (onDropIn), ✕ deletes it and everything in it. The folder bar above (cardPath) shows where you
+  // are and goes back up; Add / New folder go into the current folder (as on the machine: no search across folders). ----
+  // cardTree(list, files, dirs, st = { cur }, fileRow(r) -> row, onDelDir(path), refresh, onDropIn(files))
+  function cardTree(list, files, dirs, st, fileRow, onDelDir, refresh, onDropIn) {
     const all = new Set(dirs);
     for (const r of files) for (const p of SdCard.parents(r.path)) all.add(p);
     if (st.cur && !all.has(st.cur)) st.cur = "";
     const parent = (p) => p.slice(0, p.lastIndexOf("/"));
     const base = (p) => p.slice(p.lastIndexOf("/") + 1);
+    const inside = (d) => files.filter((f) => f.path.startsWith(d + "/")).length;
     list.innerHTML = "";
-    const pad = (row, depth) => { row.style.paddingLeft = `${6 + depth * 16}px`; };
-    const go = (dir, depth) => {
-      for (const d of [...all].filter((p) => parent(p) === dir).sort()) {
-        const row = document.createElement("div"), fold = document.createElement("button"), name = document.createElement("button"), del = document.createElement("button");
-        row.className = "sd-row sd-dir"; pad(row, depth);
-        if (list.getAttribute("role") === "listbox") row.setAttribute("role", "option");
-        row.setAttribute("aria-current", String(st.cur === d));
-        const shut = st.closed.has(d);
-        fold.type = name.type = del.type = "button"; fold.className = "sd-fold"; name.className = "sd-name"; del.className = "sd-act";
-        fold.textContent = shut ? "▸" : "▾"; fold.title = shut ? `Open ${d}` : `Fold ${d}`; fold.setAttribute("aria-label", fold.title);
-        fold.addEventListener("click", () => { if (shut) st.closed.delete(d); else st.closed.add(d); refresh(); });
-        name.textContent = base(d) + "/";
-        name.title = st.cur === d ? `Adding to ${d}: click to add to the top instead` : `Add files and folders to ${d}`;
-        name.addEventListener("click", () => { st.cur = st.cur === d ? "" : d; refresh(); });
-        del.textContent = "✕"; del.title = `Delete ${d} and everything in it`; del.setAttribute("aria-label", del.title);
-        del.addEventListener("click", () => { if (confirm(`Delete ${d} and everything in it?`)) onDelDir(d); });
-        row.append(fold, name, del);
-        list.appendChild(row);
-        if (!shut) go(d, depth + 1);
+    delete list.dataset.empty;
+    for (const d of [...all].filter((x) => parent(x) === st.cur).sort()) {
+      const row = document.createElement("div"), name = document.createElement("button"), n = document.createElement("small");
+      row.className = "sd-row sd-dir";
+      if (list.getAttribute("role") === "listbox") row.setAttribute("role", "option");
+      name.type = "button"; name.className = "sd-name";
+      name.textContent = base(d) + "/";
+      name.title = `Go into ${d}`;
+      name.addEventListener("click", () => { st.cur = d; refresh(); });
+      const k = inside(d);
+      n.textContent = k ? `${k} file${k === 1 ? "" : "s"}` : "empty";
+      if (onDropIn) {                                 // drop files on a folder: into it
+        row.addEventListener("dragover", (e) => { e.preventDefault(); e.stopPropagation(); row.classList.add("drop-in"); });
+        row.addEventListener("dragleave", () => row.classList.remove("drop-in"));
+        row.addEventListener("drop", (e) => {
+          e.preventDefault(); e.stopPropagation(); row.classList.remove("drop-in");
+          if (!e.dataTransfer.files.length) return;
+          st.cur = d;
+          onDropIn([...e.dataTransfer.files]);
+        });
       }
-      for (const r of files.filter((f) => parent(f.path) === dir)) {
-        const row = fileRow(r);
-        pad(row, depth);
-        list.appendChild(row);
-      }
-    };
-    go("", 0);
+      row.append(name, n, rowMore(d, [[`Delete ${base(d)}/ and everything in it`, () => { if (confirm(`Delete ${d} and everything in it?`)) onDelDir(d); }]]));
+      list.appendChild(row);
+    }
+    for (const r of files.filter((f) => parent(f.path) === st.cur)) list.appendChild(fileRow(r));
+    if (!list.childElementCount) list.dataset.empty = st.cur ? "This folder is empty: drop files here or Add them." : "No files yet.";
   }
-  const cardWhere = (st) => (st.cur ? `Adding to ${st.cur}` : "");
+  // ⋯ on a row: the rarely used actions (Download, Delete) in one small menu under it, so the name keeps the room.
+  // items = [[label, run], ...]; one #row-menu for every list; outside / Esc closes it
+  function rowMore(what, items) {
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "sd-act sd-more"; b.textContent = "⋯";
+    b.title = `More for ${what}`; b.setAttribute("aria-label", b.title); b.setAttribute("aria-haspopup", "menu");
+    b.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const m = $("row-menu");
+      if (!m.hidden && m.owner === b) { m.hidden = true; return; }
+      m.textContent = ""; m.owner = b;
+      for (const [label, run] of items) {
+        const it = document.createElement("button");
+        it.type = "button"; it.setAttribute("role", "menuitem"); it.textContent = label;
+        it.addEventListener("click", () => { m.hidden = true; run(); });
+        m.append(it);
+      }
+      m.hidden = false;
+      const r = b.getBoundingClientRect(), w = m.offsetWidth, hh = m.offsetHeight;
+      m.style.left = `${Math.max(8, Math.min(r.right - w, innerWidth - w - 8))}px`;
+      m.style.top = `${r.bottom + hh + 8 < innerHeight ? r.bottom + 4 : Math.max(8, r.top - hh - 4)}px`;
+    });
+    return b;
+  }
+  document.addEventListener("pointerdown", (e) => { const m = $("row-menu"); if (!m.hidden && !e.target.closest("#row-menu, .sd-more")) m.hidden = true; });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") $("row-menu").hidden = true; });
+  // a file name that wraps after _ . - (a <wbr> after each), not mid-word; its textContent stays the name
+  function breakable(el, text) {
+    el.textContent = "";
+    for (const part of text.split(/(?<=[_.-])/)) el.append(part, document.createElement("wbr"));
+  }
+  // the folder bar over a list: the card's name (the top) / each folder down to the current one, each a button back up
+  function cardPath(nav, label, st, refresh) {
+    nav.textContent = "";
+    const parts = st.cur ? st.cur.split("/").slice(1) : [];
+    const step = (text, path) => {
+      const b = document.createElement("button");
+      b.type = "button"; b.textContent = text;
+      if (path === st.cur) { b.setAttribute("aria-current", "location"); b.title = "Files and New folder go in here"; }
+      else { b.title = `Go to ${path || "the top"}`; b.addEventListener("click", () => { st.cur = path; refresh(); }); }
+      nav.append(b);
+    };
+    step("/", "");
+    parts.forEach((q, i) => { step(q, "/" + parts.slice(0, i + 1).join("/")); nav.append(document.createTextNode("/")); });
+    nav.title = `${label}${st.cur || "/"}: Add files and New folder go here`;
+  }
   async function cardMkdir(card, st, refresh, status) {   // New folder: in the folder picked, or at the top
     const name = (prompt(`New folder in ${st.cur || "the top"}:`) || "").trim();
     if (!name) return;
@@ -83,36 +130,32 @@
     $(status).textContent = `Made ${path}.`;
     refresh();
   }
-  FLASH.tree = { cur: "", closed: new Set() };
+  FLASH.tree = { cur: "" };
   async function flashRefresh() {                    // the Flash's files and folders under the controller
     let recs = [], dirs = [];
     try { recs = await SdCard.flash.store.all(); dirs = await SdCard.flash.store.dirs(); } catch (e) { /* none */ }
     cardTree($("flash-list"), recs, dirs, FLASH.tree, (r) => {
-      const row = document.createElement("div"), name = document.createElement("span"), dl = document.createElement("button");
+      const row = document.createElement("div"), name = document.createElement("span");
       row.className = "sd-row"; name.className = "sd-name"; name.title = r.path;
-      name.textContent = r.path.split("/").pop() + (r.path === FLASH_YAML ? (r.origin === "user" ? " (yours)" : " (V1E's)") : "");
-      dl.type = "button"; dl.className = "sd-act"; dl.textContent = "⬇"; dl.title = `Download ${r.path}`; dl.setAttribute("aria-label", dl.title);
-      dl.addEventListener("click", () => save(r.path.split("/").pop(), r.bytes, "flash-status"));
-      row.append(name, dl);
-      if (r.path !== FLASH_YAML) {                   // config.yaml stays: the page boots FluidNC with it
-        const del = document.createElement("button");
-        del.type = "button"; del.className = "sd-act"; del.textContent = "✕"; del.title = `Delete ${r.path}`; del.setAttribute("aria-label", del.title);
-        del.addEventListener("click", async () => { await SdCard.flash.store.remove(r.path); SdCard.flash.removeLive(CTL.sim, r.path); flashRefresh(); });
-        row.append(del);
-      }
+      breakable(name, r.path.split("/").pop() + (r.path === FLASH_YAML ? (r.origin === "user" ? " (yours)" : " (V1E's)") : ""));
+      const size = document.createElement("small"), items = [["Download", () => save(r.path.split("/").pop(), r.bytes, "flash-status")]];
+      size.textContent = r.bytes.length >= 1e6 ? `${(r.bytes.length / 1e6).toFixed(1)} MB` : `${Math.ceil(r.bytes.length / 1e3)} KB`;
+      if (r.path !== FLASH_YAML)                     // config.yaml stays: the page boots FluidNC with it
+        items.push(["Delete", async () => { await SdCard.flash.store.remove(r.path); SdCard.flash.removeLive(CTL.sim, r.path); flashRefresh(); }]);
+      row.append(name, size, rowMore(r.path, items));
       return row;
     }, async (d) => {
       if (recs.some((r) => r.path === FLASH_YAML && r.path.startsWith(d + "/"))) return;
       await SdCard.flash.store.removeTree(d); SdCard.flash.removeTreeLive(CTL.sim, d); flashRefresh();
-    }, flashRefresh);
-    $("flash-where").textContent = cardWhere(FLASH.tree);
+    }, flashRefresh, flashAdd);
+    cardPath($("flash-path"), "Flash", FLASH.tree, flashRefresh);
     uiRefresh();
   }
   async function flashAdd(files) {
     const added = [];
     for (const f of files) {
       const path = FLASH.tree.cur + SdCard.pathOf(f.name);
-      if (path === FLASH_YAML || path === "/sim_config.yaml") { $("flash-status").textContent = `${path} is the page's: load your config.yaml under Design > Get the files.`; continue; }
+      if (path === FLASH_YAML || path === "/sim_config.yaml") { $("flash-status").textContent = `${path} is the page's: load your config.yaml under Configure > Get the files.`; continue; }
       const bytes = new Uint8Array(await f.arrayBuffer());
       await SdCard.flash.store.put(path, bytes);
       SdCard.flash.writeLive(CTL.sim, path, bytes);
@@ -583,6 +626,7 @@
       $("home-status").textContent = "FluidNC is homing ($H from the pendant)…";
       return null;
     }
+    if (t === "~" && FJ.job && touchBusy()) return touchSettled();   // the pendant's cycle start waits for the plate too
     const m = /^\$SD\/Run=(\S+)/i.exec(t);
     return m ? fjFromPendant(m[1]).catch(() => {}) : null;
   }
@@ -688,7 +732,8 @@
   }
   function runHold() {
     if (!CTL.sim || !FJ.job) return;
-    CTL.sim.realtime(FJ.job.held || /^Hold/.test(CTL.state) ? "~" : "!");
+    if (FJ.job.held || /^Hold/.test(CTL.state)) resumeWhenSettled(() => CTL.sim && CTL.sim.realtime("~"));
+    else CTL.sim.realtime("!");
   }
   function runStop() {                               // Stop = soft reset: FluidNC drops the job (ALARM:3 if it was moving)
     if (CTL.sim && FJ.job) { CTL.sim.realtime(0x18); fjDone("Stopped (reset)."); }

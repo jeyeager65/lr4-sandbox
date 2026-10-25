@@ -16,7 +16,7 @@ const LOOK = `(() => {
   const pos = (sel) => { const e = document.querySelector(sel); return e ? getComputedStyle(e).position : ""; };
   const box = (sel) => { const r = document.querySelector(sel).getBoundingClientRect(); return [r.top, r.bottom].map(Math.round); };
   return { w: innerWidth, h: innerHeight, steps: shown("#steps"), phRow: shown("#ph-row"), hz: shown(".side-l .hz"), jog: shown("#pos-jog"), jogPos: pos("#pos-jog"),
-    sd: shown("#sd-box"), job: shown("#h-job"), right: pos("#run-right"), pw: shown("#pw-btn"), flash: shown("#src-flash"), ftOpt: shown(".no-phone"),
+    sd: shown("#sd-box"), job: shown("#job-sec"), right: pos("#run-right"), pw: shown("#pw-btn"), flash: shown("#src-flash"), ftOpt: shown(".no-phone"),
     con: pos("#ctl-box"), conBox: box("#ctl-box"), pill: shown("#st-pill"), dro: shown("#dro"), hscroll: document.documentElement.scrollWidth > innerWidth + 1 };
 })()`;
 

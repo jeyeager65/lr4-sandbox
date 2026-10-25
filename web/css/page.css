@@ -69,8 +69,7 @@ body {
 .modes { position: absolute; left: 50%; transform: translateX(-50%); display: inline-flex; gap: 2px; padding: 3px;
   border: 1px solid var(--line); border-radius: 8px; background: var(--bg); }
 .modes button { border: 0; border-radius: 6px; padding: 5px 22px; font: 600 14px var(--font-display); letter-spacing: 0.04em; color: var(--muted); }
-.modes button[aria-pressed="true"] { background: var(--panel); color: var(--ink); box-shadow: 0 1px 3px rgb(0 0 0 / 0.18); }
-.modes #t-run[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
+.modes button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); box-shadow: 0 1px 3px rgb(0 0 0 / 0.18); }   /* the mode you are in: the accent */
 .tb-right { margin-left: auto; display: flex; gap: 6px; align-items: center; }
 .set-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 10px; }
 .lbl { font-family: var(--font-display); font-weight: 600; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
@@ -433,9 +432,10 @@ label.btn:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; 
 .ctl-log .err { color: var(--warn); }
 .ctl-state { font-family: var(--font-data); font-size: 12px; color: var(--muted); margin: 8px 0 0; word-break: break-all; min-height: 1.35em; }
 .ctl-form { display: flex; gap: 6px; margin-top: 6px; }
-.sd-list { margin-top: 6px; border: 1px solid var(--line); border-radius: 4px; max-height: 220px; overflow: auto; }
+.sd-list { margin-top: 6px; border: 1px solid var(--line); border-radius: 4px; max-height: min(50dvh, 420px); overflow: auto; }
 .sd-list.drop { outline: 2px dashed var(--accent); }
-.sd-list:empty::before { content: "No files yet."; display: block; padding: 8px; color: var(--muted); font-size: 13px; }
+.sd-list:empty::before { content: attr(data-empty); display: block; padding: 8px; color: var(--muted); font-size: 13px; }
+.sd-list:not([data-empty]):empty::before { content: "No files yet."; }
 #ui-list:empty::before { content: "No .html or .html.gz files on the SD card or Flash yet."; }
 .sd-row { display: flex; align-items: center; gap: 6px; padding: 4px 6px; border-top: 1px solid var(--line); font-size: 13px; }
 .sd-row:first-child { border-top: 0; }
@@ -589,9 +589,9 @@ button:disabled { opacity: 0.42; cursor: default; }
 .job-box .bar { height: 6px; margin: 8px 0 4px; border-radius: 3px; background: var(--line); overflow: hidden; }
 .job-box .bar i { display: block; height: 100%; width: 0; background: var(--run); transition: width 0.4s; }
 .job-box .buttons { margin-top: 8px; }
-.side-r .colhead .seg button { padding: 4px 12px; }
+.src-head .seg button { padding: 4px 12px; }
 .pv-lbl { display: none; }
-:root.pv-on .side-r .colhead .seg { display: none; }
+:root.pv-on .side-r .colhead .col-lbl { display: none; }
 :root.pv-on:not(.r-off) .side-r .pv-lbl { display: inline; }
 .src-pane[hidden], .pv-box[hidden], .run-main[hidden] { display: none; }
 .run-main { display: flex; flex-direction: column; gap: 20px; }
@@ -678,7 +678,7 @@ button:disabled { opacity: 0.42; cursor: default; }
   :root[data-mode="run"] .side .col-body { display: flex !important; overflow: visible; gap: 12px; padding-top: 10px; }
   :root[data-mode="run"] .side .colhead { justify-content: space-between !important; padding: 8px 16px 0 !important; }
   :root[data-mode="run"] .side-l .colhead > :is(.st-pill, .lbl) { display: inline-flex !important; }
-  :root.ph-files .side-r .colhead > :is(#src-seg, .sheet-x) { display: inline-flex !important; }
+  :root.ph-files .side-r .colhead > :is(.col-lbl, .sheet-x) { display: inline-flex !important; }
   :root.ph-files.pv-on .side-r .colhead > .pv-lbl { display: inline !important; }
   .tb-name { display: none; }
   .side-l .hz, .side-l .ovr, .side-l #ctl-src { display: none; }
@@ -687,7 +687,7 @@ button:disabled { opacity: 0.42; cursor: default; }
   .ph-row button[aria-expanded="true"] { border-color: var(--accent); color: var(--accent); }
   .dro .dv { font-size: 19px; }
   /* the right column inline shows only the job; Files = all of it as a sheet */
-  :root:not(.ph-files) .side-r :is(.colhead, #sd-box, #setup-sec) { display: none !important; }
+  :root:not(.ph-files) .side-r :is(.colhead, .src-head, #sd-box, #setup-sec) { display: none !important; }
   .sheet-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
   .sheet-head b, .side-r .colhead .lbl { font: 600 13px var(--font-display); letter-spacing: 0.06em; }
   :root.ph-files .side-r .sheet-x, .sheet-head .sheet-x { display: inline-block; border: 0; padding: 4px 8px; color: var(--muted); }
@@ -710,3 +710,42 @@ button:disabled { opacity: 0.42; cursor: default; }
   .welcome { position: fixed; left: 0; right: 0; top: auto; bottom: 0; transform: none; width: auto; max-height: 82dvh; z-index: 16;
     border-radius: 12px 12px 0 0; padding-bottom: max(16px, env(safe-area-inset-bottom, 0px)); }
 }
+
+/* file lists (2026-10-25): SD card | Flash right above the list, the folder bar (always where you are), Find for long
+   cards: one folder at a time; a file row is two lines - the whole name, then its size and buttons */
+.src-head { display: flex; align-items: center; margin-bottom: -14px; }
+.src-head + .src-pane, .src-head ~ .src-pane { margin-top: 0; }
+.sd-bar { display: flex; align-items: center; gap: 6px; min-width: 0; margin-top: 8px; }
+.sd-bar small { color: var(--muted); font: 11px var(--font-data); white-space: nowrap; margin-left: auto; }
+.sd-path { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 2px; min-width: 0; font: 600 13px var(--font-data); color: var(--muted); }
+.sd-path button { border: 0; padding: 1px 3px; font: inherit; color: var(--accent); background: none; text-decoration: underline; text-underline-offset: 2px; }
+.sd-path button[aria-current] { color: var(--ink); text-decoration: none; cursor: default; }
+.sd-path::before { content: "📂"; margin-right: 4px; font-weight: 400; }
+.sd-row:not(.sd-dir) { flex-wrap: wrap; row-gap: 2px; padding: 5px 6px 4px 8px; }
+.sd-row:not(.sd-dir) .sd-name { flex: 1 0 100%; white-space: normal; overflow-wrap: break-word; line-height: 1.3; }
+.sd-row:not(.sd-dir) > small { margin-right: auto; font-size: 11px; }
+.sd-row:not(.sd-dir) > .sd-name + .sd-act { margin-left: auto; }
+.sd-row:not(.sd-dir) button.sd-act { padding: 1px 9px; font-size: 12px; }
+.sd-row.sd-dir > small { color: var(--muted); font-size: 11px; white-space: nowrap; }
+.sd-row.sd-dir.drop-in { background: color-mix(in srgb, var(--accent) 16%, transparent); outline: 2px dashed var(--accent); outline-offset: -2px; }
+.sd-row.sd-dir .sd-name::before { content: "📁 "; font-weight: 400; }
+
+/* the Job column, "files first" (2026-10-25): no headings but On the table; the loaded job as a card on top (only when
+   one is loaded), then SD card | Flash, the folder line and the files; rare row actions under ⋯ */
+.vh { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.side-r .colhead .col-lbl { display: none; }
+.side-r .colhead { justify-content: flex-end; }
+.job-sec { gap: 6px; }
+.job-off { margin: 0; }
+.job-off button.link { font-size: inherit; color: var(--accent); }
+.job-sec .foot:empty, .job-sec > .buttons:not(:has(:not([hidden]))) { display: none; }
+.job-box { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
+.job-head .q { margin-left: auto; }
+.job-opts { display: flex; flex-wrap: wrap; gap: 0 14px; }
+.job-opts label.check { margin-top: 6px; font-size: 12px; }
+.row-menu { position: fixed; z-index: 21; min-width: 150px; padding: 4px; display: flex; flex-direction: column; background: var(--panel);
+  border: 1px solid var(--line); border-radius: 6px; box-shadow: 0 10px 28px rgb(0 0 0 / 0.25); }
+.row-menu[hidden] { display: none; }
+.row-menu button { text-align: left; border-color: transparent; padding: 6px 10px; font-size: 13px; }
+.row-menu button:hover { border-color: var(--line); }
+.sd-row button.sd-more { padding: 1px 8px; font-weight: 700; letter-spacing: 0.05em; }

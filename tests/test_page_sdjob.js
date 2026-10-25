@@ -35,7 +35,11 @@ const RUN = (k) => `(async () => {
       out.plates.push(LR4Ctl.plate());
       await T.sleep(300);
       document.getElementById("job-resume").click();
-      await T.until(() => !LR4Job.held(), 10000);
+      // the touch plate's animation (out to the stock / home again) first: FluidNC stays held until it's still
+      out.waits = out.waits || [];
+      out.waits.push({ busy: touchBusy(), held: LR4Job.held(), btn: document.getElementById("job-resume").disabled });
+      await T.until(() => !LR4Job.held(), 40000);
+      out.waits[out.waits.length - 1].settled = !touchBusy();
     }
     if (performance.now() - t0 > 900000) break;
   }
@@ -79,6 +83,13 @@ const RUN = (k) => `(async () => {
       document.getElementById("job-temp").click();
       await T.until(() => LR4Job.files().includes(LR4Job.PAGE_SD), 10000);
       const out = { files0: LR4Job.files() };
+      const strutFiles = () => LR4Job.files().filter((f) => f.startsWith("/LR4_strut_plates_"));
+      const cx = document.getElementById("cut-x"), setX = (v) => { cx.value = v; cx.dispatchEvent(new Event("input")); cx.dispatchEvent(new Event("change")); };
+      setX("30");                                        // a new size: its own strut file, the old one gone
+      await T.until(() => strutFiles().some((f) => /_30x50in\\.gcode$/.test(f)), 15000);
+      out.resized = strutFiles();
+      setX("26");
+      await T.until(() => strutFiles().some((f) => /_26x50in\\.gcode$/.test(f)) && strutFiles().length === 1, 15000);
       await LR4Job.add([new File([${JSON.stringify(SMALL)}], "small job.nc")]);
       await T.until(() => LR4Job.src() && LR4Job.src().name === "/small_job.nc" && LR4Job.tl(), 10000);
       out.files1 = LR4Job.files();
@@ -98,7 +109,8 @@ const RUN = (k) => `(async () => {
       out.note = /set up by hand/.test(document.getElementById("job-src").textContent);
       return out;
     })()`);
-    ok(c.files0.includes("/LR4_strut_plates.gcode"), `strut G-code on the card: ${c.files0}`);
+    ok(c.resized && c.resized.length === 1 && /_30x50in\.gcode$/.test(c.resized[0]), `a new size replaces the strut file: ${c.resized}`);
+    ok(c.files0.some((f) => /^\/LR4_strut_plates_\d+mm_\d+br_26x50in\.gcode$/.test(f)), `strut G-code on the card, named by strut length, braces, area: ${c.files0}`);
     ok(c.files1.includes("/small_job.nc"), `added file cleaned to /small_job.nc: ${c.files1}`);
     ok(!c.stock0 && Math.abs(c.tool0) < 1e-9 && c.guess.join() === "0,60,0,40", `no stock, the router's bit; sized to the job ${c.guess}`);
     ok(c.stock1 && c.stock1.xmin === -10 && c.stock1.zmin === -12 && c.tool && Math.abs(c.tool.diameter - 3.175) < 1e-9 && c.note,
@@ -131,7 +143,7 @@ const RUN = (k) => `(async () => {
       await T.until(() => LR4Job.tl() && LR4Job.src().name === "/small_job.nc", 10000);
       return out;
     })()`);
-    ok(/LR4_strut_plates\.gcode/.test(f.list) && /small_job\.nc/.test(f.list), `$SD/List: ${f.list}`);
+    ok(/LR4_strut_plates_\d+mm_\d+br_26x50in\.gcode/.test(f.list) && /small_job\.nc/.test(f.list), `$SD/List: ${f.list}`);
     ok(/extra\.nc/.test(f.list2), "a file added while FluidNC runs is on its card");
     ok(!f.files.includes("/extra.nc") && !/extra\.nc/.test(f.list3), `$SD/Delete took it off the store too: ${f.files}`);
     ok(/^Homed by FluidNC/.test(f.home), f.home);
@@ -183,13 +195,15 @@ const RUN = (k) => `(async () => {
       await T.sleep(500);
       await T.until(() => LR4Ctl.homed() && /^Homed by FluidNC|^Homing failed/.test(document.getElementById("home-status").textContent), 120000);
       await T.idle();
-      LR4Job.select(LR4Job.PAGE_SD); await T.sleep(500); await T.until(() => LR4Job.tl() && LR4Job.src().kind === "page", 10000); return LR4Job.src().name; })()`);
+      LR4Job.select(LR4Job.PAGE_SD); await T.sleep(500); await T.until(() => LR4Job.tl() && LR4Job.src().name === LR4Job.PAGE_SD, 10000); return LR4Job.src().name; })()`);
     ok(/strut/i.test(s2), `strut job picked: ${s2}`);
     const s3 = await page.val(RUN(10));
     console.log(`  strut job 10x: ${s3.secs.toFixed(0)} s, holds ${JSON.stringify(s3.holds)}, plate ${s3.plates}, cut ${s3.cut} / ${s3.cutRef} cells`);
     if (s3.status !== "Done.") console.log("  console: " + s3.log.join("\n  console: "));
     ok(s3.started && s3.status === "Done.", `strut job at 10x: ${s3.status}`);
     ok(s3.holds.length === 2 && /Attach Probe/.test(s3.holds[0]) && /Remove Probe/.test(s3.holds[1]), `M0 holds: ${s3.holds}`);
+    ok((s3.waits || []).every((w) => !w.busy || (w.held && w.btn)) && (s3.waits || []).every((w) => w.settled),
+      `Resume waits for the touch plate's animation (busy at Resume -> still held, button off; moving on only once still): ${JSON.stringify(s3.waits)}`);
     ok(s3.plates[0] === true && s3.plates[1] === false && !s3.plateAfter, `touch plate on for the probe, off after: ${s3.plates}`);
     ok(s3.cutRef > 1000 && s3.off < 1e-3 && s3.big === 0, `strut job carves as Playback: ${(s3.off * 100).toFixed(3)}% cells differ, ${s3.big} by > a cell's slope`);
 

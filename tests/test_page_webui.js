@@ -115,20 +115,37 @@ async function run(mode) {
     // folders: New folder on the SD card (and adding into it), one a web UI makes over WebDAV, one on the Flash
     const f = await page.val(`(async () => {
       window.prompt = () => "jobs"; window.confirm = () => true;
-      document.getElementById("sd-mkdir").click();
-      await T.until(() => [...document.querySelectorAll("#sd-list .sd-dir .sd-name")].some((n) => n.textContent === "jobs/"), 5000);
+      document.getElementById("sd-mkdir").click();   // New folder goes into it: the folder bar says so
+      await T.until(() => document.getElementById("sd-path").textContent === "/jobs/", 5000);
       const dt = new DataTransfer(); dt.items.add(new File(["G0 X1\\n"], "in_jobs.gcode"));
       const input = document.getElementById("job-file"); input.files = dt.files; input.dispatchEvent(new Event("change"));
       await T.until(() => LR4Job.files().includes("/jobs/in_jobs.gcode"), 5000);
-      [...document.querySelectorAll("#sd-list .sd-dir .sd-name")].find((n) => n.textContent === "jobs/").click();   // back to the top
+      const pathIn = document.getElementById("sd-path").textContent;
+      document.querySelector("#sd-path button").click();   // back to the top (the folder bar's "SD card")
+      const jobsRow = () => [...document.querySelectorAll("#sd-list .sd-dir")].find((r) => r.querySelector(".sd-name").textContent === "jobs/");
+      await T.until(() => jobsRow(), 5000);
+      const pathTop = document.getElementById("sd-path").textContent;
+      const dt2 = new DataTransfer(); dt2.items.add(new File(["G0 X2"], "dropped.gcode"));
+      jobsRow().dispatchEvent(new DragEvent("drop", { dataTransfer: dt2, bubbles: true, cancelable: true }));   // dropped on the folder
+      await T.until(() => LR4Job.files().includes("/jobs/dropped.gcode"), 5000);
+      const dropped = LR4Job.files().includes("/jobs/dropped.gcode");
+      await T.until(() => document.getElementById("sd-path").textContent === "/jobs/" && document.querySelectorAll("#sd-list .sd-row:not(.sd-dir)").length >= 2, 5000);
+      const inJobs = [...document.querySelectorAll("#sd-list .sd-row:not(.sd-dir) .sd-name")].map((n) => n.textContent).join(",");
+      document.querySelector("#sd-path button").click();
+      await T.until(() => jobsRow(), 5000);
+      const top = [...document.querySelectorAll("#sd-list .sd-row")].map((r) => r.querySelector(".sd-name").textContent);
       window.prompt = () => "flashdir";
       document.getElementById("flash-mkdir").click();
-      await T.until(() => [...document.querySelectorAll("#flash-list .sd-dir .sd-name")].some((n) => n.textContent === "flashdir/"), 5000);
+      await T.until(() => document.getElementById("flash-path").textContent === "/flashdir/", 5000);
+      document.querySelector("#flash-path button").click();
       const FS = LR4FluidNC.FS, isDir = (p) => { try { return FS.isDir(FS.stat(p).mode); } catch (e) { return false; } };
-      return { dirs: await SdCard.store.dirs(), flash: await SdCard.flash.store.dirs(), live: isDir("/native_sd/jobs") && isDir("/native_localfs/flashdir"),
+      return { pathIn, pathTop, dropped, inJobs, top, dirs: await SdCard.store.dirs(), flash: await SdCard.flash.store.dirs(), live: isDir("/native_sd/jobs") && isDir("/native_localfs/flashdir"),
         file: (() => { try { return FS.readFile("/native_sd/jobs/in_jobs.gcode", { encoding: "utf8" }); } catch (e) { return null; } })() };
     })()`);
     ok(f.dirs.includes("/jobs") && f.flash.includes("/flashdir") && f.live, `New folder on the SD card and the Flash (store ${f.dirs} / ${f.flash}, FluidNC sees them: ${f.live})`);
+    ok(f.pathIn === "/jobs/" && f.pathTop === "/", `the folder bar: "${f.pathIn}", back up: "${f.pathTop}"`);
+    ok(f.dropped && /dropped\.gcode/.test(f.inJobs) && f.top.includes("jobs/") && !f.top.some((n) => /in_jobs|dropped/.test(n)),
+      `one folder at a time: a file dropped on jobs/ goes in it (${f.inJobs}); the top shows ${f.top.join(", ")}`);
     ok(f.file === "G0 X1\n",`a file added with /jobs picked goes in it (/jobs/in_jobs.gcode on FluidNC's card)`);
     const mk = await win.val(`fetch("/sd/made_by_ui", { method: "MKCOL" }).then((r) => r.status)`);
     const seen = await page.val(`(async () => { for (let i = 0; i < 50; i++) { if ((await SdCard.store.dirs()).includes("/made_by_ui")) return true; await T.sleep(100); } return false; })()`);
@@ -169,7 +186,8 @@ async function run(mode) {
       const FS = LR4FluidNC.FS, isDir = (p) => { try { return FS.isDir(FS.stat(p).mode); } catch (e) { return false; } };
       const after = isDir("/native_sd/made_by_ui") && isDir("/native_localfs/flashdir");
       const row = [...document.querySelectorAll("#sd-list .sd-dir")].find((r) => r.querySelector(".sd-name").textContent === "jobs/");
-      row.querySelector(".sd-act").click();
+      row.querySelector(".sd-more").click();   // ⋯ > Delete jobs/ and everything in it
+      document.querySelector("#row-menu button").click();
       await T.until(() => !LR4Job.files().includes("/jobs/in_jobs.gcode"), 5000);
       return { after, why: [isDir("/native_sd/made_by_ui"), isDir("/native_localfs/flashdir"), FS.readdir("/native_sd").join(" "), (await SdCard.store.dirs()).join(" ")], gone: !isDir("/native_sd/jobs") && !(await SdCard.store.dirs()).includes("/jobs") && !LR4Job.files().includes("/jobs/in_jobs.gcode") };
     })()`);

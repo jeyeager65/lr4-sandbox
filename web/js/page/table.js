@@ -471,7 +471,7 @@
       JOB.partial.geometry.setDrawRange(0, 2);
     } else JOB.partial.geometry.setDrawRange(0, 0);
     // each probe (one per tool change): the plate on the stock from its attach pause until resumed past the next
-    const pw = tl.plates.find((q) => JOB.t >= q.t0 && JOB.t <= q.t1) || null;   // through its remove pause, till resumed past it
+    const pw = tl.plates.find((q) => JOB.t >= q.t0 && JOB.t < q.t1) || null;   // off at its remove pause (going home while it waits)
     jobTouch(pw);
     jobCloseUp(pw);
     const clamp = (v, r) => Math.min(Math.max(v, r[0]), r[1]);
@@ -497,7 +497,6 @@
     const short = jobZShort(tl, zLow);
     $("job-status").textContent = `${done ? "Done. " : ""}${m ? m.text : ""}` + (short > 0.05 ? ` This job goes ` +
       `${short.toFixed(1)} mm below the bottom of Z: the bit needs to stick out that much further.` : "");
-    $("job-install").hidden = !(done && JOB.src.kind === "page");
     if (done) jobPlaying(false);
   }
   function pvLines(tl, i) {                          // Preview's player: the file's line at this move, one either side
@@ -595,7 +594,7 @@
     if (e.kind === "tool") toolAsk(e);
     $("job-pop").hidden = false;
     $("job-status").textContent = $("job-pop-msg").textContent;   // not the MSG lines after the M0 yet
-    jobTouch(JOB.tl.plates.find((q) => JOB.t >= q.t0 && JOB.t <= q.t1) || null);
+    jobTouch(JOB.tl.plates.find((q) => JOB.t >= q.t0 && JOB.t < q.t1) || null);
   }
   function jobTick() {
     const now = performance.now(), dt = Math.min((now - (JOB.last || now)) / 1000, 0.5);   // wall time: the speed holds on
@@ -617,7 +616,7 @@
     if (!JOB.tl) return;
     if (!JOB.preview) {                              // Run / Hold / Resume on FluidNC
       if (!FJ.job) fjRun();
-      else if (CTL.sim) CTL.sim.realtime(FJ.job.held ? "~" : "!");
+      else if (CTL.sim) { if (FJ.job.held) resumeWhenSettled(() => CTL.sim && CTL.sim.realtime("~")); else CTL.sim.realtime("!"); }
       return;
     }
     if (!JOB.playing && JOB.t >= JOB.tl.total) { jobSeek(0); JOB.k = 0; }
@@ -625,10 +624,13 @@
   });
   $("job-prev").addEventListener("click", () => (JOB.preview ? previewEnd() : previewStart()));
   $("job-resume").addEventListener("click", () => {
-    $("job-pop").hidden = true;
+    if ($("job-resume").disabled) return;
     if (JOB.toolAsk) toolPut();
-    if (JOB.preview) jobPlaying(true);
-    else if (CTL.sim && FJ.job) CTL.sim.realtime("~");
+    resumeWhenSettled(() => {                        // the popup stays up (saying so) while the touch plate moves
+      $("job-pop").hidden = true;
+      if (JOB.preview) jobPlaying(true);
+      else if (CTL.sim && FJ.job) CTL.sim.realtime("~");
+    });
   });
   {                                                  // drag the pause popup anywhere over the view (kept till reload)
     for (const pop of [$("job-pop"), $("ft-pop")]) {
