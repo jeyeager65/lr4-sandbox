@@ -320,9 +320,13 @@
   function ctlLine(ev) {
     if (ev.type === "status") {
       $("ctl-state").textContent = ev.line;
-      const m = ev.MPos || (ev.WPos && ev.WCO ? ev.WPos.map((v, i) => v + ev.WCO[i]) : null);
+      if (ev.WCO) CTL.wco = ev.WCO;                  // FluidNC sends WCO / Ov every few reports and on a change
+      if (ev.Ov) CTL.ov = ev.Ov;
+      const m = ev.MPos || (ev.WPos && CTL.wco ? ev.WPos.map((v, i) => v + CTL.wco[i]) : null);
       if (m) CTL.mpos = m;
       CTL.state = ev.state;
+      runState();
+      if ($("con-status").checked) ctlAdd(ev.line, "dim");
       if (FT.homing && ev.state === "Home") FT.homing = "on";
       else if (FT.homing === "on" && ev.state === "Idle") { FT.homing = null; ctlHomed(" on the pendant"); }
       else if (FT.homing && ev.state === "Alarm") FT.homing = null;
@@ -336,8 +340,8 @@
     }
     if (ev.type === "error" && FJ.job) fjDone(`FluidNC: ${ev.line}${FJ.job.seenSD ? " - the job stopped." : ` (${FJ.job.path})`}`);
     if (ev.type === "msg" && /^Homed:/.test(ev.text)) $("home-status").textContent = `FluidNC ${ev.text}.`;
-    if (ev.type === "alarm") { CTL.homed = false; CTL.alarms = (CTL.alarms || 0) + 1; dro(); }
-    if (ev.type === "alarm") ctlMsg(`FluidNC ${ev.line}: send $X (Unlock) in the console to carry on.`);
+    if (ev.type === "alarm") { CTL.homed = false; CTL.axesHomed = null; CTL.alarms = (CTL.alarms || 0) + 1; dro(); }
+    if (ev.type === "alarm") { ctlMsg(`FluidNC ${ev.line}: Unlock ($X) to carry on.`); alarmShow(ev.code); }
     if (ev.type === "blank" || (ev.type === "text" && ev.line === ctlLastSent)) return;   // the console's echo
     ctlAdd(ev.line, CTL_CLS[ev.type]);
   }
@@ -418,9 +422,10 @@
     sim.setSwitch(pr.gpio, z.step, z.dir, (top - meta.tip_above_table - AB.probeDz - CTL.boot[2]) * CTL.cfg.steps.z.to, true);
   }
   // $H, or with a homing order (a video's HOMING=z,x,y) FluidNC's axis homing commands one after another: $HZ, $HX, $HY
-  async function ctlHome() {
+  // axis: one axis only ($HX ...; Run's Home X / Y / Z): the machine counts as homed only once $H (or all three) did it
+  async function ctlHome(axis) {
     if (!CTL.sim) return;
-    const cmds = Homing.commands(HOME.order);
+    const cmds = axis ? ["$H" + axis] : Homing.commands(HOME.order);
     $("home-status").textContent = `FluidNC is homing (${cmds.join(", ")})…`;
     CTL.homing = true;
     for (const c of cmds) {
@@ -436,10 +441,15 @@
       }
     }
     CTL.homing = false;
+    if (axis) {
+      CTL.axesHomed = new Set([...(CTL.axesHomed || []), axis]);
+      if (CTL.axesHomed.size < 3) { $("home-status").textContent = `Homed ${[...CTL.axesHomed].join(", ")} ($H${axis}); home the rest (or All) before a job.`; return; }
+    }
     ctlHomed("");
   }
   function ctlHomed(by) {                            // $H finished (from here, or from the pendant: by = " on the pendant")
     CTL.homed = true;
+    CTL.axesHomed = new Set(["X", "Y", "Z"]);
     ctlTick();
     CTL.homePose = { x: CTL.pose[0], y: CTL.pose[1], z: CTL.pose[2] };   // the job's start (jobStartAt)
     CTL.runFrom = null;
@@ -456,10 +466,20 @@
       if (!r.ok) ctlAdd(`jog ${axis}${sign > 0 ? "+" : "-"}: error:${r.code}${r.code === 15 ? " (past the travel)" : ""}`, "err");
     }).catch(() => {});
   }
+  function ctlJogBy(d) {                             // one jog by d = [x, y, z] mm (VR's core handle, let go)
+    if (!CTL.sim) return;
+    const f = Math.min(Number($("jog-feed").value), ...["x", "y", "z"].filter((a, i) => Math.abs(d[i]) > 0.05).map((a) => CTL.cfg.rates[a] || 1000));
+    CTL.sim.command(`$J=G91 G21 X${d[0].toFixed(2)} Y${d[1].toFixed(2)} Z${d[2].toFixed(2)} F${f}`).then((r) => {
+      if (!r.ok) ctlAdd(`jog: error:${r.code}${r.code === 15 ? " (past the travel)" : ""}`, "err");
+    }).catch(() => {});
+  }
   function ctlStop() {
     if (FJ.job) fjDone("FluidNC stopped.");
     if (CTL.sim) CTL.sim.stop();
-    Object.assign(CTL, { sim: null, mpos: null, state: "", pins: 0, pose: null, homed: false, homePose: null, runFrom: null });
+    Object.assign(CTL, { sim: null, mpos: null, state: "", pins: 0, pose: null, homed: false, homePose: null, runFrom: null,
+      axesHomed: null, wco: null, ov: null });
+    alarmShow(null);
+    runState();
     window.LR4FluidNC = null;
     $("ctl-state").textContent = "";
   }
@@ -570,7 +590,7 @@
 
   function pendantSet(on) {                          // the option: the pendant model + FluidTouch, or neither
     $("ft-on").checked = on;
-    $("ft-pop-btn").hidden = !on;
+    $("ft-pop-btn").hidden = !on; $("ft-off-note").hidden = on;
     try { localStorage.setItem("lr4-pendant", on ? "1" : "0"); } catch (e) { /* not kept */ }
     if (on) ftStart(CTL.sim);
     else ftStop();
@@ -580,35 +600,34 @@
     let k = null;
     try { k = localStorage.getItem("lr4-pendant"); } catch (e) { /* default */ }
     $("ft-on").checked = k === "1";                   // off unless turned on: most people have no pendant
-    $("ft-pop-btn").hidden = !pendantOn();
+    $("ft-pop-btn").hidden = !pendantOn(); $("ft-off-note").hidden = pendantOn();
     $("ft-on").addEventListener("change", () => pendantSet(pendantOn()));
   }
   // the page is built (scene.js load()): FluidNC starts with the config.yaml in use. It is the only machine (Part 34,
   // user 2026-10-24): where it can't run, that's an error the page shows - Preview still plays jobs.
   function ctlStartup() {
+    runState();
     if (!window.crossOriginIsolated) {
       ctlMsg("Error: FluidNC can't run here: this page isn't cross-origin isolated (reload once; private windows in " +
-        "some browsers have no service workers). The machine can't move; Run G-code > Preview still plays a job.");
+        "some browsers have no service workers). The machine can't move; 👁 Preview on a file still plays it.");
       $("ctl-msg").classList.add("err");
       return;
     }
     if (!CTL.sim && !CTL.booting) ctlBoot();
   }
+  function ctlSend(text) {                           // a line to FluidNC, as typed in the console (echoed there)
+    if (!CTL.sim || !text.trim()) return;
+    ctlLastSent = text.trim();
+    ctlAdd("> " + ctlLastSent, "in");
+    if (/^\$(SD|LocalFS|Upload)\b/i.test(ctlLastSent)) {   // its card / Flash changed?
+      const back = () => { sdSyncBack(); flashSyncBack(); };
+      CTL.sim.command(ctlLastSent).then(back, back);
+    }
+    else CTL.sim.send(ctlLastSent);
+  }
   function setupController() {
-    const sendLine = (text) => {
-      if (!CTL.sim || !text.trim()) return;
-      ctlLastSent = text.trim();
-      ctlAdd("> " + ctlLastSent, "in");
-      if (/^\$(SD|LocalFS|Upload)\b/i.test(ctlLastSent)) {   // its card / Flash changed?
-        const back = () => { sdSyncBack(); flashSyncBack(); };
-        CTL.sim.command(ctlLastSent).then(back, back);
-      }
-      else CTL.sim.send(ctlLastSent);
-    };
-    $("ctl-form").addEventListener("submit", (e) => { e.preventDefault(); sendLine($("ctl-in").value); $("ctl-in").value = ""; });
-    for (const b of document.querySelectorAll("#ctl-box [data-ctl]")) b.addEventListener("click", () => sendLine(b.dataset.ctl));
-    for (const b of document.querySelectorAll("#ctl-box [data-rt]"))
-      b.addEventListener("click", () => CTL.sim && CTL.sim.realtime(/^\d+$/.test(b.dataset.rt) ? Number(b.dataset.rt) : b.dataset.rt));
+    $("ctl-form").addEventListener("submit", (e) => { e.preventDefault(); ctlSend($("ctl-in").value); $("ctl-in").value = ""; });
+    for (const b of document.querySelectorAll("#ctl-box [data-ctl]")) b.addEventListener("click", () => ctlSend(b.dataset.ctl));
     setInterval(() => { if (CTL.sim && !document.hidden) CTL.sim.realtime("?"); }, 500);   // auto reports only come on a change
     $("ctl-speed").addEventListener("change", () => ncScale(Number($("ctl-speed").value)));
     for (const b of document.querySelectorAll("#pos-jog [data-jog]"))
@@ -616,6 +635,133 @@
     $("jog-stop").addEventListener("click", () => CTL.sim && CTL.sim.realtime(0x85));
   }
   setupController();
+
+  // ---- Run's left column (Part 36): the state pill + its Controller menu, Hold / Resume + Stop (a job on FluidNC),
+  // the DRO (click a value, type, Enter = G90 G0 / G53 G0), Home / Zero per axis, FluidNC's feed / rapid overrides
+  // (realtime 0x90-0x97), the jog step chips; alarms put a card over the view with the fix ----
+  const ALARMS = {                                   // FluidNC's alarm codes -> what happened, what to do
+    1: ["Hard limit", "A limit switch tripped while moving. Unlock, jog off the switch, then home."],
+    2: ["Soft limit", "The move goes past the travel. Unlock and check the job's work zero."],
+    3: ["Reset while moving", "A reset stopped the machine mid-move, so the position may be off. Unlock, then home."],
+    4: ["Probe fail", "The probe was already touching before the probe move. Check the touch plate and its clip."],
+    5: ["Probe fail", "The probe didn't touch within its distance. Is the plate under the bit and the clip on?"],
+    6: ["Homing fail", "A reset during homing. Unlock, then home again."],
+    7: ["Homing fail", "The door opened during homing."],
+    8: ["Homing fail", "The switch didn't release on the pull-off. Check the switch and its pulloff_mm."],
+    9: ["Homing fail", "A switch didn't trip within the search distance. Check the switch and its wiring, then home again."],
+    10: ["Spindle control", "The spindle didn't respond."],
+    11: ["Control pin on", "A control pin (door, hold, reset) was on at start-up."],
+    12: ["Ambiguous switch", "Two axes share a switch that's already pressed. Jog off it, then home."],
+    13: ["Hard stop", "The machine was stopped hard. Unlock, then home."],
+    14: ["Unhomed", "This config.yaml needs homing first. Home all."],
+    15: ["Init", "FluidNC didn't start cleanly. Power cycle it."],
+  };
+  function alarmShow(code) {
+    CTL.alarm = code == null ? null : code;
+    CTL.alarmSeen = false;
+    const card = $("alarm-card");
+    card.hidden = code == null;
+    if (code == null) return;
+    const a = ALARMS[code] || ["Alarm", "Unlock ($X) to carry on."];
+    $("alarm-h").textContent = `ALARM ${code} · ${a[0]}`;
+    $("alarm-msg").textContent = a[1];
+    runState();
+  }
+  function runState() {                              // the pill, Hold / Stop and the overrides, from the state
+    const st = CTL.state || (CTL.sim ? "" : CTL.booting ? "Starting" : "Off"), job = FJ.job, pill = $("st-pill");
+    const held = !!job && (job.held || /^Hold/.test(st));
+    pill.textContent = `${st || "–"}${CTL.homed && st !== "Alarm" ? " · homed" : ""} ▾`;
+    pill.className = "st-pill" + (st === "Alarm" ? " alarm" : /^(Run|Jog|Home)/.test(st) ? " run" : /^Hold|Door/.test(st) ? " hold" : "");
+    for (const b of document.querySelectorAll("[data-run=hold]")) {
+      b.disabled = !job;
+      b.textContent = b.id ? (held ? "▶ Resume" : "❚❚ Hold") : held ? "▶" : "❚❚";
+      b.title = held ? "Resume (cycle start ~)" : "Feed hold (!)";
+      b.classList.toggle("pri", !!job && !held);
+    }
+    for (const b of document.querySelectorAll("[data-run=stop]")) b.disabled = !job;
+    const ov = CTL.ov || [100, 100, 100];
+    $("ov-feed").textContent = `${ov[0]}%`;
+    $("ov-feed").classList.toggle("on", ov[0] !== 100);
+    for (const b of document.querySelectorAll("#ov-rapid button")) b.setAttribute("aria-pressed", String(+b.dataset.pct === ov[1]));
+    if (CTL.alarm != null && st === "Alarm") CTL.alarmSeen = true;   // (the ALARM line can beat the state's report)
+    if (CTL.alarm != null && CTL.alarmSeen && st && st !== "Alarm") alarmShow(null);   // unlocked / reset: the card goes
+  }
+  function runHold() {
+    if (!CTL.sim || !FJ.job) return;
+    CTL.sim.realtime(FJ.job.held || /^Hold/.test(CTL.state) ? "~" : "!");
+  }
+  function runStop() {                               // Stop = soft reset: FluidNC drops the job (ALARM:3 if it was moving)
+    if (CTL.sim && FJ.job) { CTL.sim.realtime(0x18); fjDone("Stopped (reset)."); }
+  }
+  const ctlZero = (axes) => ctlSend(`G10 L20 P1 ${[...axes].map((a) => a + "0").join(" ")}`);
+  const DRO_HINT = "mm · click a value to move there";
+  function droEdit(b) {                              // click a value: type where to go; Enter sends it, Esc / away cancels
+    if (!CTL.sim || FJ.job || JOB.preview || b.hidden) return;
+    const inp = document.createElement("input"), hint = $("dro-hint");
+    inp.className = "dv-in"; inp.inputMode = "decimal"; inp.autocomplete = "off";
+    inp.value = b.textContent === "–" ? "" : String(Number(b.textContent));
+    inp.setAttribute("aria-label", `${b.dataset.k === "m" ? "Machine" : "Work"} ${b.dataset.ax}, mm`);
+    const ok = () => inp.value.trim() !== "" && Number.isFinite(Number(inp.value));
+    const cmd = () => `${b.dataset.k === "m" ? "G53 G0" : "G90 G0"} ${b.dataset.ax}${Number(inp.value)}`;
+    const say = () => { hint.textContent = ok() ? `Enter = ${cmd()} · Esc cancels` : "type mm · Esc cancels"; hint.classList.add("on"); };
+    const done = (go) => {
+      if (!inp.isConnected) return;
+      if (go && ok()) ctlSend(cmd());
+      inp.remove(); b.hidden = false;
+      hint.textContent = DRO_HINT; hint.classList.remove("on");
+      if (go) b.focus();
+    };
+    inp.addEventListener("input", say);
+    inp.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") { e.preventDefault(); done(true); }
+      else if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); done(false); }
+    });
+    inp.addEventListener("blur", () => done(false));
+    b.hidden = true; b.after(inp);
+    inp.focus(); inp.select(); say();
+  }
+  function popToggle(btn, pop, on) {                 // a small menu under its button; outside / Esc closes it
+    on = on === undefined ? pop.hidden : on;
+    pop.hidden = !on;
+    btn.setAttribute("aria-expanded", String(on));
+  }
+  {
+    for (const b of document.querySelectorAll("#dro .dv")) b.addEventListener("click", () => droEdit(b));
+    for (const b of document.querySelectorAll("[data-home]")) b.addEventListener("click", () => ctlHome(b.dataset.home));
+    for (const b of document.querySelectorAll("[data-zero]")) b.addEventListener("click", () => ctlZero(b.dataset.zero));
+    for (const b of document.querySelectorAll("[data-ov]")) b.addEventListener("click", () => CTL.sim && CTL.sim.realtime(Number(b.dataset.ov)));
+    for (const b of document.querySelectorAll("[data-run]")) b.addEventListener("click", () =>
+      ({ hold: runHold, stop: runStop, home: () => ctlHome(), zero: () => ctlZero("XYZ") })[b.dataset.run]());
+    for (const b of document.querySelectorAll("#jog-steps [data-step]")) b.addEventListener("click", () => {
+      $("jog-step").value = b.dataset.step;
+      for (const q of document.querySelectorAll("#jog-steps [data-step]")) q.setAttribute("aria-pressed", String(q === b));
+    });
+    const pill = $("st-pill"), menu = $("st-menu");
+    pill.addEventListener("click", () => popToggle(pill, menu));
+    $("st-unlock").addEventListener("click", () => { popToggle(pill, menu, false); ctlSend("$X"); });
+    $("st-reset").addEventListener("click", () => {
+      popToggle(pill, menu, false);
+      if (FJ.job) runStop(); else if (CTL.sim) CTL.sim.realtime(0x18);
+    });
+    $("st-power").addEventListener("click", () => {  // as at the switch (As built: the gantry comes up racked)
+      popToggle(pill, menu, false);
+      if (AB.set.on) abPowerCycle(); else { if (JOB.preview) previewEnd(); ctlBoot(); }
+    });
+    $("alarm-unlock").addEventListener("click", () => ctlSend("$X"));
+    $("alarm-home").addEventListener("click", () => { alarmShow(null); ctlHome(); });
+    $("alarm-x").addEventListener("click", () => alarmShow(null));
+    const pw = $("pw-btn"), pwPop = $("pw-pop");
+    pw.addEventListener("click", () => popToggle(pw, pwPop));
+    document.addEventListener("pointerdown", (e) => {
+      if (!menu.hidden && !e.target.closest("#st-menu, #st-pill, #help-pop")) popToggle(pill, menu, false);
+      if (!pwPop.hidden && !e.target.closest("#pw-pop, #pw-btn, #help-pop")) popToggle(pw, pwPop, false);
+    });
+    document.addEventListener("keydown", (e) => {
+      if (e.key !== "Escape") return;
+      if (!menu.hidden) popToggle(pill, menu, false);
+      if (!pwPop.hidden) popToggle(pw, pwPop, false);
+    });
+  }
   // for tests/test_page_fluidnc.js: the controller's state and the model's pose (mm from the parked pose)
   window.LR4Ctl = { mode: () => CTL.mode, state: () => CTL.state, mpos: () => CTL.mpos, boot: () => CTL.boot,
     cfg: () => CTL.cfg, pose: () => HOME.pose && [HOME.pose.x, HOME.pose.y, HOME.pose.z], travel: () => meta && meta.travel,

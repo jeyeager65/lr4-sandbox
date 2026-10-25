@@ -130,7 +130,7 @@ async function run(mode) {
       if (!sim) return { msg: document.getElementById("ctl-msg").textContent, log: document.getElementById("ctl-log").textContent.slice(-300) };
       out.greeting = sim.greeting;
       out.ui = { play: document.getElementById("job-play").textContent, home: document.getElementById("home").disabled,
-        sliders: document.getElementById("pos-play").hidden, jog: document.getElementById("pos-jog").hidden,
+        sliders: !document.getElementById("pos-play") && !document.getElementById("sx"), jog: document.getElementById("pos-jog").hidden,
         status: document.getElementById("home-status").textContent, grey: document.getElementById("mx").style.opacity };
       const i = await sim.command("$I");
       out.machine = i.lines.map((e) => e.line).find((l) => /Machine:/.test(l));
@@ -153,6 +153,25 @@ async function run(mode) {
       await T.until(() => LR4Ctl.state() === "Idle" && Math.abs(LR4Ctl.mpos()[0] - 120) < 0.01 && Math.abs(LR4Ctl.mpos()[2] + 10) < 0.01, 20000);
       LR4Ctl.sync();
       out.mpos2 = LR4Ctl.mpos(); out.pose2 = LR4Ctl.pose();
+      // Part 36: Zero All (G10 L20 P1), then Work X = 25 typed into the DRO (G90 G0 X25), feed override +10 / reset
+      const txt = (id) => document.getElementById(id).textContent;
+      document.querySelector('[data-zero="XYZ"]').click();
+      await T.until(() => ["wx", "wy", "wz"].every((id) => txt(id) === "0.000"), 30000);
+      out.w0 = ["wx", "wy", "wz"].map(txt);
+      document.getElementById("wx").click();
+      const inp = document.querySelector("#dro .dv-in");
+      inp.value = "25"; inp.dispatchEvent(new Event("input"));
+      out.typeHint = txt("dro-hint");
+      inp.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+      await T.until(() => LR4Ctl.state() === "Idle" && Math.abs(LR4Ctl.mpos()[0] - 145) < 0.01, 20000);
+      out.w1 = txt("wx"); out.m1 = txt("mx");
+      document.querySelector('[data-ov="145"]').click();
+      await T.until(() => txt("ov-feed") === "110%", 20000);
+      out.ov = txt("ov-feed");
+      document.querySelector('[data-ov="144"]').click();
+      await T.until(() => txt("ov-feed") === "100%", 20000);
+      await sim.command("G10 L2 P1 X0 Y0 Z0");          // G54 back to 0 for the rest
+      out.pill = txt("st-pill"); out.hold = document.getElementById("run-hold").disabled;
       // the console: $I from its button
       document.querySelector('#ctl-box [data-ctl="$I"]').click();
       await T.sleep(500);
@@ -162,6 +181,11 @@ async function run(mode) {
     })()`);
     if (!p1.greeting) { ok(false, "FluidNC mode boots: " + JSON.stringify(p1)); return; }
     ok(/\$SD\/Run/.test(p1.ui.play) && !p1.ui.home && p1.ui.sliders && !p1.ui.jog, `FluidNC mode: Play = ${p1.ui.play}, Home on, sliders hidden, jog pad shown`);
+    ok(p1.w0 && p1.w0.every((v) => v === "0.000"), `Zero All: Work ${p1.w0}`);
+    ok(p1.typeHint === "Enter = G90 G0 X25 · Esc cancels" && p1.w1 === "25.000" && p1.m1 === "145.000",
+      `click-to-type: "${p1.typeHint}" -> Work X ${p1.w1}, MPos X ${p1.m1}`);
+    ok(p1.ov === "110%", `feed override +10: ${p1.ov}`);
+    ok(/^Idle/.test(p1.pill) && p1.hold, `state pill "${p1.pill}", Hold greyed out with no job`);
     ok(/^Not homed/.test(p1.ui.status) && p1.ui.grey === "0.55", `not homed: MPos greyed, "${p1.ui.status.slice(0, 60)}…"`);
     ok(p1.machine === "[MSG:Machine: LowRider]", `boots V1E's JP3_LR (${p1.machine})`);
     ok(Math.abs(p1.mt - (p1.span[0] - 4)) < 0.06 && Math.abs(p1.mty - (p1.span[1] - 4)) < 0.06,
@@ -174,7 +198,7 @@ async function run(mode) {
     ok(Math.abs(d2[0] - 120) < 0.01 && Math.abs(d2[1] - 200) < 0.01 && Math.abs(d2[2] + 10) < 0.01,
       `jog pad X+ X+ Z- (10 mm): MPos ${p1.mpos2}, the model by ${d2.map((v) => v.toFixed(2))}`);
     ok(/> \$I/.test(p1.log) && /\[VER:/.test(p1.log) && !/\$J=/.test(p1.log), "console shows the typed $I and its reply (jogs stay out of it)");
-    ok(p1.state.startsWith("<Idle|MPos:120.000,200.000,-10.000"), `console status line: ${p1.state}`);
+    ok(p1.state.startsWith("<Idle|MPos:145.000,200.000,-10.000"), `console status line: ${p1.state}`);
 
     // Part 16: home on the virtual switches, probe the touch plate, an unplugged switch, the time scale
     const h = await page.val(`(async () => {
@@ -219,8 +243,12 @@ async function run(mode) {
       const al = sim.waitFor((e) => e.type === "alarm", 120000).catch(() => null);
       await sim.command("$HX", 120000).catch(() => null);
       const alarm = await al;
-      out.unplug = { alarm: alarm && alarm.line, homed: LR4Ctl.homed() };
+      await T.sleep(300);
+      out.unplug = { alarm: alarm && alarm.line, homed: LR4Ctl.homed(), card: !document.getElementById("alarm-card").hidden && document.getElementById("alarm-h").textContent,
+        pill: document.getElementById("st-pill").className };
       await sim.command("$X");
+      await T.until(() => document.getElementById("alarm-card").hidden, 10000).catch(() => null);
+      out.unplug.gone = document.getElementById("alarm-card").hidden;
       return out;
     })()`);
     const tv = h.t;
@@ -241,6 +269,8 @@ async function run(mode) {
       ok(secs > real - tol && secs < real + Math.max(0.75 * real, 0.12),`${k}x: G1 X${d} F600 (${want} s machine time) took ${secs.toFixed(2)} s (want ${real.toFixed(2)})`);
     }
     ok(h.unplug.alarm && /^ALARM:(8|9)$/.test(h.unplug.alarm) && !h.unplug.homed, `X switch unplugged: $HX -> ${h.unplug.alarm}, not homed`);
+    ok(/^ALARM (8|9) · Homing fail/.test(h.unplug.card || "") && /alarm/.test(h.unplug.pill) && h.unplug.gone,
+      `the alarm card ("${h.unplug.card}") + red pill; Unlock clears it`);
 
     // a new config.yaml (pulloff 2, another name) restarts it
     if (!fs.existsSync(FIX)) { ok(false, "build/fixtures/JP3_LR.yaml missing - run node tests/test_sim_config.js"); return; }
@@ -281,7 +311,8 @@ async function run(mode) {
       const sp = document.getElementById("job-speed"); sp.value = "100";
       document.getElementById("job-prev").click();
       await T.until(() => document.getElementById("job-prev").getAttribute("aria-pressed") === "true", 10000);
-      out.on = { play: document.getElementById("job-play").textContent, speed: !sp.hidden, back: document.getElementById("job-prev").textContent };
+      out.on = { play: document.getElementById("job-play").textContent, speed: !document.getElementById("pv-box").hidden, back: document.getElementById("job-prev").textContent,
+        banner: !document.getElementById("pv-banner").hidden, lines: document.getElementById("pv-lines").childElementCount };
       for (const t0 = Date.now(); Date.now() - t0 < 15000 && sum(LR4Job.sim()) > out.stock0 - 1000;) {
         if (!document.getElementById("job-pop").hidden) document.getElementById("job-resume").click();
         await T.sleep(200);
@@ -290,11 +321,12 @@ async function run(mode) {
       document.getElementById("job-prev").click();       // Back to the machine
       await T.sleep(300);
       out.pose2 = LR4Ctl.pose(); out.stock2 = sum(LR4Job.sim());
-      out.off = { play: document.getElementById("job-play").textContent, speed: document.getElementById("job-speed").hidden };
+      out.off = { play: document.getElementById("job-play").textContent, speed: document.getElementById("pv-box").hidden && document.getElementById("pv-banner").hidden };
       return out;
     })()`);
     const d = (a, b) => Math.max(...a.map((v, i) => Math.abs(v - b[i])));
-    ok(p3.mode && /Pause|Play/.test(p3.on.play) && p3.on.speed && /Back/.test(p3.on.back), `Preview on: no mode toggle, ${p3.on.play} + speed + "${p3.on.back}"`);
+    ok(p3.mode && /Pause|Play/.test(p3.on.play) && p3.on.speed && /Exit/.test(p3.on.back) && p3.on.banner && p3.on.lines > 0,
+      `Preview on: the player (${p3.on.play}, "${p3.on.back}", ${p3.on.lines} lines) + the banner`);
     ok(d(p3.pose1, p3.pose0) > 1 && d(p3.mpos1, p3.mpos0) < 1e-6, `Preview moves the model (${d(p3.pose1, p3.pose0).toFixed(0)} mm), not FluidNC (MPos unchanged)`);
     ok(p3.stock1 < p3.stock0 - 1000 && p3.spoil1 === p3.spoil0, "Preview carves the stock copy, never the spoilboard");
     ok(d(p3.pose2, p3.pose0) < 1e-3 && p3.stock2 === p3.stock0 && /\$SD\/Run/.test(p3.off.play) && p3.off.speed,

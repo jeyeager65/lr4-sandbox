@@ -7,7 +7,7 @@
 // +90 deg about X (rig Y -> world Z, rig -Z -> world +Y) and scaled: 1000 mm per metre = 1:1, more = the machine smaller.
 // Things in the rig are in metres; things in the scene (handles, the tabletop stand, cards) are in mm.
 // Controls:
-//   trigger   press a menu / card button, grab a handle (red sphere = the core, diamond = the table corner), or point
+//   trigger   press a menu / card button, grab a handle (red sphere = the core: let go = FluidNC jogs it there (api.jog); diamond = the table corner), or point
 //             at a part to open its card (name, Hide part, Hide group)
 //   touch     put a controller into a part: its card opens (a buzz says which); into the pendant's screen: a finger
 //             on FluidTouch (api.poke)
@@ -466,7 +466,6 @@
       return h ? { o: h.object, d: h.distance } : null;
     }
     const pulse = (st, k = 0.4) => { try { st.src.gamepad.hapticActuators[0].pulse(k, 25); } catch (e) { /* no haptics */ } };
-    const sx = $("sx"), sy = $("sy"), sz = $("sz");
     function press(st) {
       if (!active || st.grab) return;
       const ph = panelHit(st);
@@ -475,7 +474,7 @@
       if (hh) {
         pulse(st);
         const p0 = world(st);
-        st.grab = hh.o === coreH ? { kind: "core", p0, s0: [+sx.value, +sy.value, +sz.value] }
+        st.grab = hh.o === coreH ? { kind: "core", p0, d: null }
           : { kind: "corner", p0, cut0: cut(), at0: cornerH.position.clone(), min: boxOf((m) => m.userData.group === "Table").min, next: cut() };
         return;
       }
@@ -485,6 +484,7 @@
     function release(st) {
       const g = st.grab;
       st.grab = null;
+      if (g && g.kind === "core") { if (g.d && g.d.length() > 1 && api.jog) api.jog([g.d.x, g.d.y, g.d.z]); return; }
       if (!g || g.kind !== "corner") return;
       outline.visible = false;
       tag.mesh.visible = false;
@@ -493,8 +493,7 @@
     function drag(st) {
       const g = st.grab, d = world(st).sub(g.p0);    // world mm = model mm
       if (g.kind === "core") {
-        sx.value = g.s0[0] + d.x / IN; sy.value = g.s0[1] + d.y / IN; sz.value = g.s0[2] + d.z;
-        sx.dispatchEvent(new Event("input"));
+        g.d = d;                                     // the jog, sent on release
         return;
       }
       g.next = [clampCut(snap(g.cut0[0] + d.x, IN / 2)), clampCut(snap(g.cut0[1] + d.y, IN / 2))];

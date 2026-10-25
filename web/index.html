@@ -39,8 +39,30 @@
     <button type="button" id="t-design" aria-pressed="true">Design</button><button type="button" id="t-run" aria-pressed="false">Run</button>
   </div>
   <div class="tb-right">
+    <button type="button" class="run-only" id="pw-btn" aria-expanded="false" aria-controls="pw-pop" title="FluidTouch pendant screen and web UIs (WebUI, FigUI) served by FluidNC">Pendant &amp; WebUI ▾</button>
     <button type="button" id="tb-files" title="BOM, cut list, strut plates, config.yaml">Get the files</button>
     <button id="v-more" type="button" aria-expanded="false" aria-controls="view-pop" title="Settings" aria-label="Settings">⚙</button>
+  </div>
+  <div class="view-pop pw-pop" id="pw-pop" role="dialog" aria-label="Pendant and web UIs" hidden>
+    <div class="pw-sec"><div class="lbl">FluidTouch pendant</div>
+      <div class="buttons" id="ft-row">
+        <button type="button" id="ft-pop-btn" disabled title="FluidTouch's screen in a window over the view (or click the pendant's screen in the view)">Pendant screen</button>
+      </div>
+      <p class="foot" id="ft-off-note">The pendant is off: turn it on under Design > My LR4 > FluidTouch pendant.</p></div>
+    <div class="pw-sec" id="ui-box">
+      <div class="lbl">Web UIs <button type="button" class="q" data-help="help-ui" aria-label="About web UIs" title="About web UIs">?</button></div>
+      <div class="help" id="help-ui" hidden><p>WebUI, FigUI or any web UI on FluidNC's SD card or Flash (.html or .html.gz), served by FluidNC's
+        own web server in a window of its own, the way a real board serves it: watch and drive the machine from there.
+        Keep this tab open. The Flash's index.html.gz opens at <code>/</code>, others at their own path
+        (<code>/sd/x.html</code> for x.html.gz). Add a UI with the buttons below (or drop it on the list): its
+        release's <code>index.html.gz</code>, as it is.</p></div>
+      <div class="sd-list" id="ui-list" aria-label="Web UIs on the SD card and Flash"></div>
+      <div class="buttons">
+        <label class="btn">Add to the Flash…<input type="file" id="ui-file-flash" accept=".html,.htm,.gz" hidden></label>
+        <label class="btn">Add to the SD card…<input type="file" id="ui-file-sd" accept=".html,.htm,.gz" multiple hidden></label>
+      </div>
+      <p class="foot" id="ui-status" role="status"></p>
+    </div>
   </div>
   <div class="view-pop" id="view-pop" role="dialog" aria-label="Settings" hidden>
     <div class="set-row"><span class="lbl">Theme</span><div class="seg" id="theme" role="group" aria-label="Theme">
@@ -345,6 +367,10 @@
     <button id="v-vr" type="button" hidden title="PC VR headset (SteamVR / OpenXR)">Enter VR</button>
   </div>
   <button type="button" class="v-only" id="v-only" aria-pressed="false" title="Only the view: hide the panels (Esc brings them back)" aria-label="Only the view">⛶</button>
+  <div class="pv-banner" id="pv-banner" hidden>Preview · on a copy · the machine isn't moving</div>
+  <div class="alarm-card" id="alarm-card" role="alert" hidden><span class="bang">!</span><div>
+    <b id="alarm-h">Alarm</b><p id="alarm-msg"></p>
+    <div class="buttons"><button type="button" class="pri" id="alarm-unlock">Unlock ($X)</button><button type="button" id="alarm-home">Home all</button><button type="button" id="alarm-x" aria-label="Dismiss" title="Dismiss">✕</button></div></div></div>
   <div class="mini-dro" id="mini-dro" aria-label="Work position, mm"><span><em>X</em><b id="md-x">–</b></span><span><em>Y</em><b id="md-y">–</b></span><span><em>Z</em><b id="md-z">–</b></span></div>
   <div class="pick" id="pick" role="status" hidden><div><strong></strong><p></p></div>
     <button type="button" id="pick-clear" aria-label="Clear the selection" title="Clear">✕</button></div>
@@ -404,6 +430,7 @@
   <span class="con-st" id="con-st"></span>
   <span class="con-last" id="con-last"></span>
   <div class="con-tools">
+    <label class="con-chk" title="Show FluidNC's status reports (&lt;Idle|MPos:...&gt;) in the log"><input type="checkbox" id="con-status"> Status reports</label>
     <button type="button" id="con-clear" title="Clear the console">Clear</button>
     <button type="button" id="con-big" aria-pressed="false" title="Bigger console" aria-label="Bigger console">⤢</button>
     <button type="button" id="con-fold" aria-expanded="false" aria-controls="con-body" title="Open the console" aria-label="Open the console">▴</button>
@@ -418,130 +445,156 @@
   </form>
   <div class="buttons con-btns">
     <button type="button" data-ctl="$I" title="Build info">$I</button>
-    <button type="button" data-ctl="$X" title="Clear an alarm">Unlock $X</button>
-    <button type="button" data-rt="!" title="Feed hold">Hold !</button>
-    <button type="button" data-rt="~" title="Cycle start / resume">Resume ~</button>
-    <button type="button" data-rt="24" title="Soft reset (Ctrl-X)">Reset</button>
+    <button type="button" data-ctl="$G" title="Parser state (modes, tool, feed)">$G</button>
+    <button type="button" data-ctl="$#" title="Work offsets (G54-G59, G92, the last probe)">$#</button>
+    <button type="button" data-ctl="$SD/List" title="Files on the SD card">$SD/List</button>
   </div>
 </section>
 
 <aside class="side side-l" id="run-left" aria-label="Machine">
-  <div class="colhead"><span class="lbl">Machine</span>
+  <div class="colhead">
+    <button type="button" class="st-pill" id="st-pill" aria-haspopup="menu" aria-expanded="false" aria-controls="st-menu" title="Controller: unlock, reset, power cycle">–</button>
+    <span class="lbl" title="FluidNC in the browser keeps up to about 5x on rapid moves; at 10x and 20x it may run slower than the label">Speed <select id="ctl-speed" aria-label="Machine speed">
+      <option value="1" selected>1×</option><option value="2">2×</option><option value="5">5×</option><option value="10">10×</option>
+      <option value="20">20×</option></select></span>
     <button type="button" class="col-btn" id="col-l" aria-expanded="true" aria-controls="run-left-body" title="Fold the column" aria-label="Fold the Machine column">«</button></div>
+  <div class="st-menu" id="st-menu" role="menu" aria-label="Controller" hidden>
+    <div class="lbl">Controller <button type="button" class="q" data-help="help-ctl" aria-label="About the controller" title="About the controller">?</button></div>
+    <button type="button" role="menuitem" id="st-unlock">Unlock <code>$X</code><small>clears an alarm</small></button>
+    <button type="button" role="menuitem" id="st-reset">Soft reset <code>Ctrl-X</code><small>stops everything</small></button>
+    <button type="button" role="menuitem" id="st-power">Power cycle<small>as at the switch: FluidNC restarts, not homed</small></button>
+  </div>
+  <div class="help" id="help-ctl" hidden>
+    <p><b>FluidNC</b>, the real firmware, runs in your browser and drives the machine with the config.yaml in use (V1E's
+    JP3_LR until you load your own, under Build): home it, jog it, zero it, run files from its SD card, or type G-code in
+    the console. It runs a copy with plain stepper drivers ($CD shows that copy).</p>
+    <p>Click a Work or Machine value to type where to go: Enter sends <code>G90 G0</code> (work) or <code>G53 G0</code>
+    (machine). Zero sets work zero where the bit is (<code>G10 L20 P1</code>). Feed and Rapid are FluidNC's realtime
+    overrides. 👁 on a file previews it fast without moving the machine.</p>
+  </div>
+  <div class="col-strip" aria-label="Machine (folded)">
+    <button type="button" class="hold-btn" data-run="hold" disabled title="Feed hold (!)" aria-label="Hold">❚❚</button>
+    <button type="button" data-run="stop" disabled title="Stop the job (soft reset)" aria-label="Stop">■</button>
+    <button type="button" data-run="home" title="Home all ($H)" aria-label="Home all">⌂</button>
+    <button type="button" data-run="zero" title="Zero all here (G10 L20 P1 X0 Y0 Z0)" aria-label="Zero all">⊙</button>
+  </div>
   <div class="col-body" id="run-left-body">
-    <section aria-labelledby="h-ctl">
-      <h2 id="h-ctl">Controller <button type="button" class="q" data-help="help-ctl" aria-label="About the controller" title="About the controller">?</button></h2>
-      <p class="foot" id="ctl-note"><b>FluidNC</b>, the real firmware, running in your browser, drives the machine.</p>
-      <div class="help" id="help-ctl" hidden>
-        <p>FluidNC drives the machine with the config.yaml in use (V1E's JP3_LR until you load your own,
-        under Build): jog it, home it ($H on the machine's switches), send it G-code. It runs a copy with plain stepper
-        drivers ($CD shows that copy). To see a job fast, Run G-code > Preview plays it from where FluidNC is.</p>
+    <div class="g2">
+      <button type="button" class="big hold-btn" id="run-hold" data-run="hold" disabled title="Feed hold (!)">❚❚ Hold</button>
+      <button type="button" class="big" id="run-stop" data-run="stop" disabled title="Stop the job: soft reset (FluidNC drops it)">■ Stop</button>
+    </div>
+    <div class="dro-box">
+      <div class="dro" id="dro" aria-label="Position, mm">
+        <span></span><span class="hd">Work</span><span class="hd">Machine</span>
+        <span class="ax">X</span><button type="button" class="dv" id="wx" data-ax="X" data-k="w">–</button><button type="button" class="dv m" id="mx" data-ax="X" data-k="m">–</button>
+        <span class="ax">Y</span><button type="button" class="dv" id="wy" data-ax="Y" data-k="w">–</button><button type="button" class="dv m" id="my" data-ax="Y" data-k="m">–</button>
+        <span class="ax">Z</span><button type="button" class="dv" id="wz" data-ax="Z" data-k="w">–</button><button type="button" class="dv m" id="mz" data-ax="Z" data-k="m">–</button>
       </div>
-      <div class="buttons" id="ft-row">
-        <button type="button" id="ft-pop-btn" disabled title="FluidTouch's screen in a window over the view (or click the pendant's screen in the view)">Pendant screen</button>
+      <p class="dhint" id="dro-hint">mm · click a value to move there</p>
+    </div>
+    <div class="hz">
+      <span class="lbl">Home</span><button type="button" id="home" title="Home all ($H): Z up to its switch, then X and Y">All</button><button type="button" data-home="X">X</button><button type="button" data-home="Y">Y</button><button type="button" data-home="Z">Z</button>
+      <span class="lbl">Zero</span><button type="button" data-zero="XYZ" title="Work zero here: G10 L20 P1 X0 Y0 Z0">All</button><button type="button" data-zero="X">X</button><button type="button" data-zero="Y">Y</button><button type="button" data-zero="Z">Z</button>
+    </div>
+    <p class="foot" id="home-status" role="status">Not homed. Home runs FluidNC's $H: Z up to its switch, then X and Y
+      together to theirs (each Y motor stops on its own switch, squaring the gantry).</p>
+    <div class="ovr">
+      <span class="lbl">Feed</span><span class="ov"><button type="button" data-ov="146" title="Feed -10%" aria-label="Feed -10%">−</button><b id="ov-feed">100%</b><button type="button" data-ov="145" title="Feed +10%" aria-label="Feed +10%">+</button><button type="button" data-ov="144" title="Feed back to 100%" aria-label="Feed back to 100%">↺</button></span>
+      <span class="lbl">Rapid</span><span class="ov chips" id="ov-rapid"><button type="button" data-ov="151" data-pct="25" aria-pressed="false">25</button><button type="button" data-ov="150" data-pct="50" aria-pressed="false">50</button><button type="button" data-ov="149" data-pct="100" aria-pressed="true">100%</button></span>
+    </div>
+    <div class="jog-box" id="pos-jog">
+      <div class="jog" role="group" aria-label="Jog">
+        <span></span><button type="button" data-jog="Y+">Y+</button><span></span><button type="button" data-jog="Z+">Z+</button>
+        <button type="button" data-jog="X-">X−</button><button type="button" id="jog-stop" title="Stop the jog (0x85)">■</button>
+        <button type="button" data-jog="X+">X+</button><span></span>
+        <span></span><button type="button" data-jog="Y-">Y−</button><span></span><button type="button" data-jog="Z-">Z−</button>
       </div>
-      <div class="buttons" id="ctl-opts">
-        <label class="check">Machine speed <select id="ctl-speed" aria-label="Machine speed" title="FluidNC in the browser keeps up to about 5x on rapid moves; at 10x and 20x it may run slower than the label" style="width: auto">
-          <option value="1" selected>1×</option><option value="2">2×</option><option value="5">5×</option><option value="10">10×</option>
-          <option value="20">20×</option></select></label>
+      <div class="chips" id="jog-steps" role="group" aria-label="Jog step, mm">
+        <button type="button" data-step="0.1" aria-pressed="false">0.1</button><button type="button" data-step="1" aria-pressed="false">1</button><button type="button" data-step="10" aria-pressed="true">10</button><button type="button" data-step="100" aria-pressed="false">100</button>
+        <input type="hidden" id="jog-step" value="10">
+        <select id="jog-feed" aria-label="Jog feed, mm/min" title="Jog feed, mm/min">
+          <option value="300">F 300</option><option value="1000">F 1000</option><option value="3000" selected>F 3000</option><option value="6000">F 6000</option></select>
       </div>
-      <p class="foot" id="ctl-msg" role="status"></p>
-      <p class="foot" id="ctl-src"></p>
-    </section>
-
-    <section aria-labelledby="h-pos">
-      <h2 id="h-pos">Tool position (mm, as FluidNC reports)</h2>
-      <div id="pos-play" hidden><!-- the model's pose store (move() reads the sliders); Part 36 retires it -->
-        <div class="readout" title="X, Y from the home switches; Z from Z's homed spot (0 there, negative below)">
-          <div><b>X</b><span id="rx">330.200</span> <small>mm</small></div>
-          <div><b>Y</b><span id="ry">444.500</span> <small>mm</small></div>
-          <div><b>Z</b><span id="rz">0.000</span> <small>mm</small></div>
-        </div>
-        <div class="slider"><label for="sx">X</label><input id="sx" type="range" step="0.1"><output id="ox" for="sx"></output></div>
-        <div class="slider"><label for="sy">Y</label><input id="sy" type="range" step="0.1"><output id="oy" for="sy"></output></div>
-        <div class="slider"><label for="sz">Z</label><input id="sz" type="range" step="0.5"><output id="oz" for="sz"></output></div>
-      </div>
-      <div class="readout" aria-label="Machine position (MPos), mm">
-        <div><b>MPos X</b><span id="mx">–</span> <small>mm</small></div>
-        <div><b>MPos Y</b><span id="my">–</span> <small>mm</small></div>
-        <div><b>MPos Z</b><span id="mz">–</span> <small>mm</small></div>
-      </div>
-      <div id="pos-jog">
-        <div class="jog" role="group" aria-label="Jog">
-          <span></span><button type="button" data-jog="Y+">Y+</button><span></span><button type="button" data-jog="Z+">Z+</button>
-          <button type="button" data-jog="X-">X−</button><button type="button" id="jog-stop" title="Stop the jog (0x85)">■</button>
-          <button type="button" data-jog="X+">X+</button><span></span>
-          <span></span><button type="button" data-jog="Y-">Y−</button><span></span><button type="button" data-jog="Z-">Z−</button>
-        </div>
-        <div class="buttons">
-          <label class="check">Step <select id="jog-step" aria-label="Jog step" style="width: auto">
-            <option value="0.1">0.1</option><option value="1">1</option><option value="10" selected>10</option><option value="100">100</option></select> mm</label>
-          <label class="check">Feed <select id="jog-feed" aria-label="Jog feed" style="width: auto">
-            <option value="300">300</option><option value="1000">1000</option><option value="3000" selected>3000</option><option value="6000">6000</option></select> mm/min</label>
-        </div>
-      </div>
+    </div>
+    <p class="foot" id="ctl-msg" role="status"></p>
+    <p class="foot" id="ctl-src"></p>
+    <div id="ab-run" hidden>
+      <p class="foot" id="ab-now" role="status"></p>
       <div class="buttons">
-        <button type="button" id="home">Home ($H)</button>
+        <button type="button" id="ab-cycle" title="Power down and up: the gantry comes up racked and the beam off level (FluidNC restarts)">Power cycle</button>
+        <button type="button" id="ab-sq" title="A rectangle over the cutting area with corner crosses, saved to the SD card: measure its diagonals">Squareness test to the SD card</button>
+        <button type="button" id="ab-meas" title="Find the test's four corner crosses in the carved spoilboard / stock and measure both diagonals">Measure the diagonals</button>
       </div>
-      <p class="foot" id="home-status" role="status">Not homed. Home runs FluidNC's $H: Z up to its switch, then X and Y
-        together to theirs (each Y motor stops on its own switch, squaring the gantry).</p>
-      <div id="ab-run" hidden>
-        <p class="foot" id="ab-now" role="status"></p>
-        <div class="buttons">
-          <button type="button" id="ab-cycle" title="Power down and up: the gantry comes up racked and the beam off level (FluidNC restarts)">Power cycle</button>
-          <button type="button" id="ab-sq" title="A rectangle over the cutting area with corner crosses, saved to the SD card: measure its diagonals">Squareness test to the SD card</button>
-          <button type="button" id="ab-meas" title="Find the test's four corner crosses in the carved spoilboard / stock and measure both diagonals">Measure the diagonals</button>
-        </div>
-        <p class="foot" id="ab-sq-note" role="status"></p>
-        <p class="foot">As built is on (My LR4 > As built).</p>
-      </div>
-    </section>
+      <p class="foot" id="ab-sq-note" role="status"></p>
+      <p class="foot">As built is on (My LR4 > As built).</p>
+    </div>
   </div>
 </aside>
 
 <aside class="side side-r" id="run-right" aria-label="Job">
-  <div class="colhead"><span class="lbl">Job</span>
+  <div class="colhead">
+    <span class="seg" id="src-seg" role="group" aria-label="Files on"><button type="button" id="src-sd" aria-pressed="true">SD card</button><button type="button" id="src-flash" aria-pressed="false">Flash</button></span>
+    <span class="lbl pv-lbl">👁 Preview</span>
     <button type="button" class="col-btn" id="col-r" aria-expanded="true" aria-controls="run-right-body" title="Fold the column" aria-label="Fold the Job column">»</button></div>
+  <div class="col-strip" aria-label="Job (folded)">
+    <button type="button" data-unfold="sd" title="SD card" aria-label="SD card">▤</button>
+    <button type="button" data-unfold="pv" title="Preview the loaded job" aria-label="Preview the loaded job">👁</button>
+    <button type="button" data-unfold="table" title="On the table" aria-label="On the table">▣</button>
+  </div>
   <div class="col-body" id="run-right-body">
-    <section aria-labelledby="h-job">
-      <h2 id="h-job">Run G-code</h2>
-      <div id="job-off">
-        <p class="foot">V1E's build order: the machine runs on the printed temporary struts first and cuts its own MDF
-          strut plates. Load that job here (on the temporary struts), or pick a G-code file on the SD card.</p>
-        <div class="buttons"><button type="button" id="job-temp" title="Switches to the temporary struts if needed; the job's MDF goes on the table">Load the strut plate job</button></div>
+    <div class="pv-box" id="pv-box" hidden>
+      <div class="box">
+        <b class="pv-name" id="pv-name"></b>
+        <input type="range" id="job-t" min="0" max="1000" step="1" value="0" aria-label="Preview time">
+        <div class="pv-times"><output id="job-o" for="job-t"></output><span id="pv-line"></span><span id="pv-total"></span></div>
+        <div class="pv-ctl">
+          <button type="button" id="job-reset" title="Back to the start" aria-label="Back to the start">⏮</button>
+          <button type="button" class="pri" id="job-play" title="Play / pause (Space)">Play</button>
+        </div>
+        <label class="lbl pv-speed">Preview speed <select id="job-speed" aria-label="Preview speed">
+          <option value="1">1×</option><option value="2">2×</option><option value="5">5×</option><option value="10" selected>10×</option>
+          <option value="20">20×</option><option value="50">50×</option><option value="100">100×</option></select></label>
       </div>
-      <p class="foot" id="job-src"></p>
-      <div id="job-on" hidden>
-        <div class="buttons">
-          <button type="button" id="job-play">Run ($SD/Run)</button>
-          <button type="button" id="job-reset" disabled>Stop (reset)</button>
-          <button type="button" id="job-prev" aria-pressed="false" title="Play the job fast from where FluidNC is, on a copy of the stock: what Run would do. FluidNC doesn't move">Preview</button>
-          <button type="button" id="job-unload" title="Unload the file: its stock, moves and bits come off the table (the file stays on the SD card)">Unload</button>
-          <select id="job-speed" aria-label="Preview speed" style="width: auto" hidden>
-            <option value="1">1×</option><option value="2">2×</option><option value="5">5×</option><option value="10" selected>10×</option>
-            <option value="20">20×</option><option value="50">50×</option><option value="100">100×</option></select>
+      <div class="box pv-lines" id="pv-lines" aria-label="The file's lines at this point"></div>
+      <p class="foot" id="job-prev-note">Plays from where FluidNC is, as Run would (the file's own probing and zeroing on
+        a copy of the offsets), on a copy of the stock that's put back when you exit. The spoilboard isn't cut and
+        FluidNC doesn't move; moving the machine ends the preview.</p>
+      <button type="button" id="job-prev" aria-pressed="false" title="Back to the machine: the model goes back where FluidNC is">Exit preview</button>
+    </div>
+    <div class="run-main" id="run-main">
+      <section aria-labelledby="h-job">
+        <h2 id="h-job">Job <button type="button" class="q" data-help="help-job" aria-label="About jobs" title="About jobs">?</button></h2>
+        <div class="help" id="help-job" hidden><p>▶ on a file starts it on FluidNC (<code>$SD/Run</code>) after a check
+          (homed, work zero, the stock, the bit); 👁 previews it fast from where FluidNC is, on a copy of the stock.
+          Clicking a file's name loads it without starting: its stock and bits go on the table.</p></div>
+        <div id="job-off">
+          <p class="foot">V1E's build order: the machine runs on the printed temporary struts first and cuts its own MDF
+            strut plates. Load that job here, or pick a file below.</p>
+          <div class="buttons"><button type="button" id="job-temp" title="Switches to the temporary struts if needed; the job's MDF goes on the table">Load the strut plate job</button></div>
         </div>
-        <p class="foot" id="job-prev-note" hidden>Preview: the job as Run would do it from where FluidNC is now (its
-          own probing and zeroing on a copy of the offsets), fast, on a copy of the stock. The spoilboard isn't cut and
-          FluidNC doesn't move; Back to the machine puts the model back where FluidNC is.</p>
-        <div class="slider"><label for="job-t" title="Job time">⏱</label><input id="job-t" type="range" min="0" max="1000" step="1" value="0"><output id="job-o" for="job-t"></output></div>
-        <div class="readout" aria-label="Work position, mm">
-          <div><b>Work X</b><span id="wx">0.000</span> <small>mm</small></div>
-          <div><b>Work Y</b><span id="wy">0.000</span> <small>mm</small></div>
-          <div><b>Work Z</b><span id="wz">0.000</span> <small>mm</small></div>
+        <div class="box job-box" id="job-on" hidden>
+          <div class="job-head"><b id="job-name"></b><span class="pill" id="job-pill" hidden></span></div>
+          <div class="bar" id="job-bar" hidden><i id="job-bar-i"></i></div>
+          <p class="dhint" id="job-prog" hidden></p>
+          <div class="buttons">
+            <button type="button" class="pri" id="job-start" title="Start it on FluidNC ($SD/Run), after a check">▶ Start</button>
+            <button type="button" id="job-pv" title="Play the job fast from where FluidNC is, on a copy of the stock: what Run would do. FluidNC doesn't move">👁 Preview</button>
+            <button type="button" id="job-unload" title="Unload the file: its stock, moves and bits come off the table (the file stays on the SD card)">Unload</button>
+          </div>
+          <label class="check"><input type="checkbox" id="job-moves"> Show the moves</label>
+          <label class="check"><input type="checkbox" id="job-closeup" checked> Close-up while probing</label>
         </div>
-        <label class="check"><input type="checkbox" id="job-moves"> Show the moves</label>
-        <label class="check"><input type="checkbox" id="job-closeup" checked> Close-up while probing</label>
+        <p class="foot" id="job-src"></p>
         <p class="foot" id="job-status" role="status"></p>
-      </div>
-      <div class="buttons">
-        <button type="button" id="job-back" hidden>Back to the strut plate job</button>
-        <button type="button" id="job-install" hidden>Install the plates (Permanent)</button>
-      </div>
-      <details class="cam" id="sd-box" open>
-        <summary>SD card (<span id="sd-count">0 files</span>) <button type="button" class="q" data-help="help-sd" aria-label="About the SD card" title="About the SD card">?</button></summary>
-        <div class="help" id="help-sd" hidden><p>G-code files kept in this browser: ▶ runs one on FluidNC, which sees
-          the same card ($SD/List); the name loads it without starting. Drop files here or add them. The strut plate G-code is kept as /LR4_strut_plates.gcode.
+        <div class="buttons">
+          <button type="button" id="job-back" hidden>Back to the strut plate job</button>
+          <button type="button" id="job-install" hidden>Install the plates (Permanent)</button>
+        </div>
+      </section>
+      <section class="src-pane" id="sd-box" aria-label="SD card">
+        <div class="lbl">SD card · <span id="sd-count">0 files</span> <button type="button" class="q" data-help="help-sd" aria-label="About the SD card" title="About the SD card">?</button></div>
+        <div class="help" id="help-sd" hidden><p>G-code files kept in this browser: ▶ starts one on FluidNC, which sees
+          the same card ($SD/List); 👁 previews it; the name loads it without starting. Drop files here or add them. The strut plate G-code is kept as /LR4_strut_plates.gcode.
           Click a folder to add files and folders into it (again to go back to the top).</p></div>
         <div class="sd-list" id="sd-list" role="listbox" aria-label="Files on the SD card"></div>
         <div class="buttons">
@@ -550,53 +603,9 @@
           <small class="sd-where" id="sd-where"></small>
         </div>
         <p class="foot" id="sd-status" role="status"></p>
-      </details>
-    </section>
-
-    <section aria-labelledby="h-setup">
-      <h2 id="h-setup">On the table <button type="button" class="q" data-help="help-setup" aria-label="About On the table" title="About On the table">?</button></h2>
-      <div class="help" id="help-setup" hidden><p>What's on the table and in the router, as at the real machine. A job that names its stock or bits
-        brings them; one that doesn't uses these. Every move carves: jobs, jogs, the console, the pendant.</p></div>
-      <div class="buttons"><button type="button" id="ctl-plate" aria-pressed="false" title="Lay the touch plate under the bit, on the stock or the spoilboard, and wire it to the probe input">Touch plate under the bit</button></div>
-      <p class="foot" id="hs-plate-note" role="status"></p>
-      <details class="cam" id="hs-stock-box">
-        <summary>Stock: <span id="hs-stock-name">none</span></summary>
-        <p class="foot">mm from the cutting area's front-left corner (a job's work zero), thickness up from the spoilboard.</p>
-        <div class="trio">
-          <label>X from<input id="hs-x0" type="number" step="any"></label><label>to<input id="hs-x1" type="number" step="any"></label>
-          <label>Y from<input id="hs-y0" type="number" step="any"></label><label>to<input id="hs-y1" type="number" step="any"></label>
-          <label>Thickness<input id="hs-t" type="number" step="any" min="0.1"></label>
-          <label>On a warped spoilboard<select id="hs-follow" title="As built's warped spoilboard: the stock bent onto it (as clamped down), or flat on its high spot. Jobs that bring their own stock too"><option value="1">Follows it</option><option value="0">Stays flat</option></select></label>
-        </div>
-        <div class="buttons"><button type="button" id="hs-use">Put it on the table</button><button type="button" id="hs-fit" title="X / Y round the loaded job's cuts">Size it to the job</button>
-          <button type="button" id="hs-off">Take it off</button></div>
-      </details>
-      <details class="cam" id="hs-bit-box">
-        <summary>Bit: <span id="hs-bit-name"></span></summary>
-        <div class="trio hs-bit" id="hs-bit">
-          <label>Bit<select data-k="shape"><option value="flat">Flat end mill</option><option value="ball">Ball end</option><option value="vbit">V-bit</option></select></label>
-          <label>Diameter<input data-k="d" type="number" step="any" min="0.1"></label><label>V angle<input data-k="angle" type="number" step="any" min="10" max="170"></label>
-          <label>Sticks out<input data-k="len" type="number" step="any" min="0" title="mm below the collet (drawing only; 0 = as the model's bit)"></label>
-        </div>
-        <div class="buttons"><button type="button" id="hs-bit-use">Put it in the router</button></div>
-      </details>
-      <details class="cam" id="hs-spoil-box">
-        <summary>Spoilboard</summary>
-        <p class="foot" id="hs-spoil-note">The table's top: it keeps every cut that goes below the stock (kept in this browser, per machine size).</p>
-        <label class="check"><input type="checkbox" id="hs-show-stock" checked> Show the stock (off: see what the jobs did to the spoilboard)</label>
-        <div class="trio">
-          <label>Surfacing bit<input id="hs-sd" type="number" step="any" min="1" value="25.4"></label><label>Step-over %<input id="hs-so" type="number" step="any" min="5" max="95" value="40"></label>
-          <label>Depth<input id="hs-sz" type="number" step="any" min="0.05" value="0.5" title="mm below the spoilboard's level"></label>
-        </div>
-        <div class="buttons"><button type="button" id="hs-surf" title="A zigzag over the cutting area, its bit in a ToolDef, saved to the SD card">Surfacing job to the SD card</button>
-          <button type="button" id="hs-new">New spoilboard</button></div>
-      </details>
-    </section>
-
-    <section aria-labelledby="h-fw">
-      <h2 id="h-fw">FluidNC's Flash and web UIs</h2>
-      <details class="cam" id="flash-box">
-        <summary>Flash (LocalFS) <button type="button" class="q" data-help="help-flash" aria-label="About the Flash" title="About the Flash">?</button></summary>
+      </section>
+      <section class="src-pane" id="flash-box" aria-label="Flash" hidden>
+        <div class="lbl">Flash (LocalFS) <button type="button" class="q" data-help="help-flash" aria-label="About the Flash" title="About the Flash">?</button></div>
         <div class="help" id="help-flash" hidden><p>FluidNC's Flash, kept in this browser: config.yaml is the one in use (V1E's, or yours from Build,
           which comes back after a reload). FluidNC boots a translated copy, sim_config.yaml, with plain stepper drivers;
           if config.yaml changes on its Flash, the page uses that one and restarts FluidNC.</p></div>
@@ -607,24 +616,56 @@
           <small class="sd-where" id="flash-where"></small>
         </div>
         <p class="foot" id="flash-status" role="status"></p>
-      </details>
-      <details class="cam" id="ui-box" open>
-        <summary>Web UIs <button type="button" class="q" data-help="help-ui" aria-label="About web UIs" title="About web UIs">?</button></summary>
-        <div class="help" id="help-ui" hidden><p>WebUI, FigUI or any web UI on FluidNC's SD card or Flash (.html or .html.gz), served by FluidNC's
-          own web server in a window of its own, the way a real board serves it: watch and drive the machine from there.
-          Keep this tab open. The Flash's index.html.gz opens at <code>/</code>, others at their own path
-          (<code>/sd/x.html</code> for x.html.gz). Add a UI with the buttons below (or drop it on the list): its
-          release's <code>index.html.gz</code>, as it is.</p></div>
-        <div class="sd-list" id="ui-list" aria-label="Web UIs on the SD card and Flash"></div>
-        <div class="buttons">
-          <label class="btn">Add to the Flash…<input type="file" id="ui-file-flash" accept=".html,.htm,.gz" hidden></label>
-          <label class="btn">Add to the SD card…<input type="file" id="ui-file-sd" accept=".html,.htm,.gz" multiple hidden></label>
-        </div>
-        <p class="foot" id="ui-status" role="status"></p>
-      </details>
-    </section>
+      </section>
+
+      <section aria-labelledby="h-setup" id="setup-sec">
+        <h2 id="h-setup">On the table <button type="button" class="q" data-help="help-setup" aria-label="About On the table" title="About On the table">?</button></h2>
+        <div class="help" id="help-setup" hidden><p>What's on the table and in the router, as at the real machine. A job that names its stock or bits
+          brings them; one that doesn't uses these. Every move carves: jobs, jogs, the console, the pendant.</p></div>
+        <div class="buttons"><button type="button" id="ctl-plate" aria-pressed="false" title="Lay the touch plate under the bit, on the stock or the spoilboard, and wire it to the probe input">Touch plate under the bit</button></div>
+        <p class="foot" id="hs-plate-note" role="status"></p>
+        <details class="cam" id="hs-stock-box">
+          <summary>Stock: <span id="hs-stock-name">none</span></summary>
+          <p class="foot">mm from the cutting area's front-left corner (a job's work zero), thickness up from the spoilboard.</p>
+          <div class="trio">
+            <label>X from<input id="hs-x0" type="number" step="any"></label><label>to<input id="hs-x1" type="number" step="any"></label>
+            <label>Y from<input id="hs-y0" type="number" step="any"></label><label>to<input id="hs-y1" type="number" step="any"></label>
+            <label>Thickness<input id="hs-t" type="number" step="any" min="0.1"></label>
+            <label>On a warped spoilboard<select id="hs-follow" title="As built's warped spoilboard: the stock bent onto it (as clamped down), or flat on its high spot. Jobs that bring their own stock too"><option value="1">Follows it</option><option value="0">Stays flat</option></select></label>
+          </div>
+          <div class="buttons"><button type="button" id="hs-use">Put it on the table</button><button type="button" id="hs-fit" title="X / Y round the loaded job's cuts">Size it to the job</button>
+            <button type="button" id="hs-off">Take it off</button></div>
+        </details>
+        <details class="cam" id="hs-bit-box">
+          <summary>Bit: <span id="hs-bit-name"></span></summary>
+          <div class="trio hs-bit" id="hs-bit">
+            <label>Bit<select data-k="shape"><option value="flat">Flat end mill</option><option value="ball">Ball end</option><option value="vbit">V-bit</option></select></label>
+            <label>Diameter<input data-k="d" type="number" step="any" min="0.1"></label><label>V angle<input data-k="angle" type="number" step="any" min="10" max="170"></label>
+            <label>Sticks out<input data-k="len" type="number" step="any" min="0" title="mm below the collet (drawing only; 0 = as the model's bit)"></label>
+          </div>
+          <div class="buttons"><button type="button" id="hs-bit-use">Put it in the router</button></div>
+        </details>
+        <details class="cam" id="hs-spoil-box">
+          <summary>Spoilboard</summary>
+          <p class="foot" id="hs-spoil-note">The table's top: it keeps every cut that goes below the stock (kept in this browser, per machine size).</p>
+          <label class="check"><input type="checkbox" id="hs-show-stock" checked> Show the stock (off: see what the jobs did to the spoilboard)</label>
+          <div class="trio">
+            <label>Surfacing bit<input id="hs-sd" type="number" step="any" min="1" value="25.4"></label><label>Step-over %<input id="hs-so" type="number" step="any" min="5" max="95" value="40"></label>
+            <label>Depth<input id="hs-sz" type="number" step="any" min="0.05" value="0.5" title="mm below the spoilboard's level"></label>
+          </div>
+          <div class="buttons"><button type="button" id="hs-surf" title="A zigzag over the cutting area, its bit in a ToolDef, saved to the SD card">Surfacing job to the SD card</button>
+            <button type="button" id="hs-new">New spoilboard</button></div>
+        </details>
+      </section>
+    </div>
   </div>
 </aside>
+
+<div class="start-pop" id="start-pop" role="dialog" aria-labelledby="start-h" hidden>
+  <b id="start-h">Start?</b>
+  <ul class="chk" id="start-chk"></ul>
+  <div class="buttons"><button type="button" id="start-no">Cancel</button><button type="button" class="pri" id="start-go">▶ Start</button></div>
+</div>
 
 
 <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>

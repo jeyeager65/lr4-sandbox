@@ -492,12 +492,27 @@
     $("wx").textContent = p.x.toFixed(3); $("wy").textContent = p.y.toFixed(3); $("wz").textContent = p.z.toFixed(3);
     $("job-t").value = Math.round(JOB.t / tl.total * 1000);
     $("job-o").textContent = clock(JOB.t);
+    if (JOB.preview) pvLines(tl, p.index);
     const m = GcodePlay.message(tl, JOB.t), done = JOB.t >= tl.total;
     const short = jobZShort(tl, zLow);
     $("job-status").textContent = `${done ? "Done. " : ""}${m ? m.text : ""}` + (short > 0.05 ? ` This job goes ` +
       `${short.toFixed(1)} mm below the bottom of Z: the bit needs to stick out that much further.` : "");
     $("job-install").hidden = !(done && JOB.src.kind === "page");
     if (done) jobPlaying(false);
+  }
+  function pvLines(tl, i) {                          // Preview's player: the file's line at this move, one either side
+    const sg = tl.segs[Math.min(i, tl.segs.length - 1)], n = sg && sg.srcLine, box = $("pv-lines");
+    if (!n || n === JOB.pvLine) return;
+    JOB.pvLine = n;
+    if (!JOB.srcLines || JOB.srcLines.text !== JOB.src.text) JOB.srcLines = { text: JOB.src.text, lines: JOB.src.text.split("\n") };
+    box.textContent = "";
+    for (let k = Math.max(1, n - 1); k <= Math.min(JOB.srcLines.lines.length, n + 1); k++) {
+      const d = document.createElement("div");
+      d.textContent = `${k}  ${JOB.srcLines.lines[k - 1].replace(/\r$/, "")}`;
+      if (k === n) d.className = "cur";
+      box.append(d);
+    }
+    $("pv-line").textContent = `line ${n.toLocaleString()}`;
   }
   function jobZShort(tl, zLow) {                     // how far the job's lowest Z is below the reach (cached per job)
     if (JOB.zMinFor !== tl) {
@@ -530,7 +545,7 @@
       bit: HAND.bit && Object.assign({}, HAND.bit) };
     if (JOB.sim) JOB.sim.reset();
     if (JOB.bits && JOB.bits.size && !jobBit) { jobBit = true; applyVisibility(); }   // the job's bits ride the router
-    JOB.k = 0;
+    JOB.k = 0; JOB.pvLine = null;
     jobSeek(0);
     $("job-prev").setAttribute("aria-pressed", "true");
     $("job-prev-note").hidden = false;

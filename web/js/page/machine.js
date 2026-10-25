@@ -1,10 +1,11 @@
 // lr4-sandbox page, part 3 of 12: the machine's pose (travel), Home ($H).
 // The page's scripts share one global scope (js/page/*.js, loaded in order by index.html): names declared
 // at the top level here are seen by the later files.
-  // ---- travel sliders: X along the beam, Y along the table, Z by bit-tip height, over the real travel (0 = the
-  // home switch trip, lr4.STOPS). A new size keeps the gantry and core at the same fraction of their travel. Hidden
-  // since Part 34 (FluidNC moves the machine; the jog pad instead): they only hold the model's pose for move(). ----
-  const sx = document.getElementById("sx"), sy = document.getElementById("sy"), sz = document.getElementById("sz");
+  // ---- the model's pose store: X along the beam, Y along the table (inches from the home switch trip, lr4.STOPS),
+  // Z by bit-tip height (mm), over the real travel. A new size keeps the gantry and core at the same fraction of their
+  // travel. Was three hidden sliders until Part 36 (FluidNC moves the machine); move(pose) writes it, move() reads it. ----
+  const poseAxis = () => ({ value: "0", min: "0", max: "0", dataset: {} });
+  const sx = poseAxis(), sy = poseAxis(), sz = poseAxis();
   function updateSliders() {
     const t = meta.travel, first = !sx.dataset.init, cx = (t.x[1] - t.x[0]) / IN, cy = (t.y[1] - t.y[0]) / IN;
     const fx = first ? -t.x[0] / (t.x[1] - t.x[0]) : sx.value / sx.max;
@@ -88,7 +89,6 @@
       sz.value = (pose[2] + meta.tip_above_table).toFixed(1);
     }
     const [dx, dy, dz] = pose || [sx.value * IN + t.x[0], sy.value * IN + t.y[0], sz.value - meta.tip_above_table];
-    const X = (dx - t.x[0]) / IN, Y = (dy - t.y[0]) / IN, Z = dz + meta.tip_above_table;
     for (const m of meshes) {
       const k = m.userData.motion;
       if (k === "hose" || m.userData.held) continue;   // held: the touch plate laid on the stock (G-code playback)
@@ -116,31 +116,10 @@
     }
     if (hoseMesh) updateHose(dx, dy, dz);
     if (CAPS.list.length) placeSection();             // inspect's section cut follows the set
-    readout(X, Y, Z, !!pose);
     HOME.pose = { x: dx, y: dy, z: dz };
     touchClipPlace();                                 // the clip on the collet nut while probing rides the core
     touchSkirtPlace();                                // the shoe's bottom on its way off / back (job.js)
     dro();
-  }
-  let lastPos = null, zHomeMemo = null;
-  // the tip height (above the table) at Z's homed spot: the readout's Z is measured from there (0, negative below)
-  function zHomeTip() {
-    if (!zHomeMemo || zHomeMemo.yaml !== yamlBase || zHomeMemo.t !== meta.travel)
-      zHomeMemo = { yaml: yamlBase, t: meta.travel,
-        v: meta.tip_above_table + meta.travel.z[1] - Homing.settings(yamlBase ? yamlBase.text : null).z.pulloff };
-    return zHomeMemo.v;
-  }
-  function readout(X, Y, Z, playing) {                // X, Y in inches (the sliders); shown in mm, as FluidNC reports
-    if (X === undefined) { if (!lastPos) return; [X, Y, Z, playing] = lastPos; }
-    lastPos = [X, Y, Z, playing];
-    const u = (v) => v * IN;
-    document.getElementById("rx").textContent = u(X).toFixed(3);
-    document.getElementById("ry").textContent = u(Y).toFixed(3);
-    const zr = Z - zHomeTip();                       // Z from its homed spot
-    document.getElementById("rz").textContent = zr.toFixed(3);
-    document.getElementById("ox").textContent = `${u(X).toFixed(0)} / ${u(Number(sx.max)).toFixed(0)}`;
-    document.getElementById("oy").textContent = `${u(Y).toFixed(0)} / ${u(Number(sy.max)).toFixed(0)}`;
-    document.getElementById("oz").textContent = `${zr.toFixed(playing ? 1 : 0)} mm`;
   }
 
   // ---- Home ($H): FluidNC's own homing (ctlHome); the switches flash at each trip (clickSwitch, from its pins).
@@ -175,10 +154,14 @@
       m.userData.flashT = setTimeout(() => { m.material = m.userData.flashOrig; delete m.userData.flashOrig; }, 300);
     }
   }
-  function dro() {                                   // FluidNC's MPos, greyed until homed (it doesn't know where it is)
+  // the DRO: FluidNC's MPos, greyed until homed (it doesn't know where it is), and its work position (MPos - WCO).
+  // While a job runs or Preview plays, those write Work (fjTick / jobSeek: the job's own work mm)
+  function dro() {
+    const own = !FJ.job && !JOB.preview, w = CTL.mpos && CTL.wco ? CTL.mpos.map((v, i) => v - CTL.wco[i]) : null;
     for (const [i, a] of ["x", "y", "z"].entries()) {
       $("m" + a).textContent = CTL.mpos ? CTL.mpos[i].toFixed(3) : "–";
       $("m" + a).style.opacity = CTL.homed ? "" : "0.55";
+      if (own) $("w" + a).textContent = w ? w[i].toFixed(3) : "–";
     }
   }
   // where the job starts (Run and Preview): where the machine was when Run / Preview was pressed (CTL.runFrom), else

@@ -8,15 +8,26 @@
   // change to a bit the file doesn't define holds it (!) so the bit can be given. The job's work zero is wherever it
   // starts (the strut job: G10 L20 at the homed spot), so it needs $H first. ----
   const fjPath = () => (!JOB.src ? null : JOB.src.kind === "sd" ? JOB.src.name : JOB.src.kind === "page" ? PAGE_SD : null);
+  // Part 36: the job box (▶ Start = the check, then $SD/Run; 👁 Preview; the running job's progress), Preview's player
+  // in place of the right column (job-play = its Play / Pause; clicked outside Preview it still runs the job: tests,
+  // videos), Hold / Resume + Stop in the left column (runState)
   function fjButtons() {
-    const on = !JOB.preview;                         // FluidNC's Run / Hold / Stop, else Preview's Play / Pause / Start over
-    $("job-play").textContent = !on ? (JOB.playing ? "Pause" : "Play") : !FJ.job ? "Run ($SD/Run)" : FJ.job.held ? "Resume ~" : "Hold !";
-    $("job-reset").textContent = on ? "Stop (reset)" : "Start over";
-    $("job-reset").disabled = on && !FJ.job;
-    $("job-speed").hidden = on;
-    $("job-t").disabled = on;
-    $("job-prev").textContent = on ? "Preview" : "Back to the machine";
-    $("job-prev").disabled = !!FJ.job;               // not while FluidNC runs a job
+    const pv = !!JOB.preview, run = !!FJ.job;
+    $("job-play").textContent = pv ? (JOB.playing ? "❚❚ Pause" : "▶ Play") : "Run ($SD/Run)";
+    $("job-start").disabled = $("job-pv").disabled = $("job-prev").disabled = $("job-unload").disabled = run;
+    $("pv-box").hidden = !pv; $("run-main").hidden = pv; $("pv-banner").hidden = !pv;
+    document.documentElement.classList.toggle("pv-on", pv);
+    $("job-bar").hidden = $("job-prog").hidden = !run;
+    $("job-pill").hidden = !run;
+    if (run) { $("job-pill").textContent = FJ.job.held ? "Held" : "Running"; $("job-pill").classList.toggle("hold", !!FJ.job.held); }
+    else $("job-bar-i").style.width = "0";
+    runState();
+  }
+  function fjProgress(pct) {                         // FluidNC's SD:pct while it runs; the time left from the file's clock
+    const J = FJ.job, el = (ncTime() - J.t0) / 1000, ov = CTL.ov ? CTL.ov[0] / 100 : 1;
+    const left = pct > 0.5 ? el * (100 - pct) / pct : JOB.tl ? JOB.tl.total / ov : 0;
+    $("job-bar-i").style.width = `${Math.min(100, pct).toFixed(1)}%`;
+    $("job-prog").textContent = `${pct.toFixed(0)}% · ${clock(el)} in · ~${clock(left)} left (machine time)`;
   }
   function fjWork(p) {                               // the page's pose (mm from the parked pose) -> the job's work mm
     const tv = meta.travel, st = JOB.tl.stock, z0 = jobZ0();
@@ -72,7 +83,7 @@
     }
     if (JOB.sim) JOB.sim.reset();
     jobUpdateMesh(true);
-    FJ.job = { path, T: MotionCarve.tracker(JOB.tl.segs), seenSD: false, held: false, k: 0, at: ncTime(), plate: null };
+    FJ.job = { path, T: MotionCarve.tracker(JOB.tl.segs), seenSD: false, held: false, k: 0, at: ncTime(), t0: ncTime(), plate: null };
     FJ.pts = []; FJ.lastMsg = "";
     clearInterval(FJ.timer);
     FJ.timer = setInterval(fjSample, 4);
@@ -143,7 +154,7 @@
   }
   function fjStatus(ev) {                            // each status report while a job runs
     const J = FJ.job;
-    if (ev.SD) { J.seenSD = true; $("job-o").textContent = `${ev.SD.pct.toFixed(0)}%`; $("job-t").value = Math.round(ev.SD.pct * 10); }
+    if (ev.SD) { J.seenSD = true; fjProgress(ev.SD.pct); }
     const hold = /^Hold/.test(ev.state || "");
     if (hold && !J.held) { J.held = true; fjHold(); fjButtons(); }
     else if (!hold && J.held && ev.state !== "Door") { J.held = false; $("job-pop").hidden = true; if (JOB.toolAsk) toolPut(); FJ.lastMsg = ""; fjButtons(); }
@@ -198,16 +209,18 @@
     name.type = "button"; name.className = "sd-name"; name.textContent = r.path.split("/").pop(); name.title = `Load ${r.path}`;
     size.textContent = r.bytes.length >= 1e6 ? `${(r.bytes.length / 1e6).toFixed(1)} MB` : `${Math.ceil(r.bytes.length / 1e3)} KB`;
     row.append(name, size);
-    if (UI_FILE.test(r.path)) {                      // a web UI, not a job: it opens under Controller > Web UIs
-      name.title = `${r.path} is a web UI: open it under Run > Controller > Web UIs`;
-      name.addEventListener("click", () => { $("ui-box").open = true; $("ui-box").scrollIntoView({ block: "center", behavior: "smooth" }); });
+    if (UI_FILE.test(r.path)) {                      // a web UI, not a job: it opens from the top bar's Pendant & WebUI
+      name.title = `${r.path} is a web UI: open it from Pendant & WebUI (top bar)`;
+      name.addEventListener("click", () => popToggle($("pw-btn"), $("pw-pop"), true));
     } else {
       name.addEventListener("click", () => sdSelect(r.path));
-      const go = document.createElement("button");  // load it and run it on FluidNC ($SD/Run)
-      go.type = "button"; go.className = "sd-act"; go.textContent = "▶";
-      go.title = `Run ${r.path}`; go.setAttribute("aria-label", go.title);
-      go.addEventListener("click", () => sdStart(r.path));
-      row.append(go);
+      const pv = document.createElement("button"), go = document.createElement("button");
+      pv.type = go.type = "button"; pv.className = "sd-act"; go.className = "sd-act sd-go";
+      pv.textContent = "👁"; pv.title = `Preview ${r.path} (the machine doesn't move)`; pv.setAttribute("aria-label", pv.title);
+      pv.addEventListener("click", () => sdPreview(r.path));
+      go.textContent = "▶"; go.title = `Start ${r.path} on FluidNC`; go.setAttribute("aria-label", go.title);
+      go.addEventListener("click", () => sdStart(r.path, go));
+      row.append(pv, go);
     }
     const dl = document.createElement("button"), del = document.createElement("button");
     dl.type = del.type = "button"; dl.className = del.className = "sd-act";
@@ -237,7 +250,7 @@
   $("sd-mkdir").addEventListener("click", () => cardMkdir(SdCard, SDC.tree, sdRefresh, "sd-status"));
   const pageLive = () => U.struts === "temp" && !!JOB.pageJob;   // the strut job is the page's own (Temporary struts)
   async function sdSelect(path) {
-    if (UI_FILE.test(path)) return;                  // web UIs open under Controller > Web UIs
+    if (UI_FILE.test(path)) return;                  // web UIs open from Pendant & WebUI
     const r = SDC.recs.find((q) => q.path === path);
     if (!r) return;
     JOB.usePage = path === PAGE_SD && pageLive();
@@ -246,13 +259,68 @@
     sdRefresh();
     await jobSetup(JOB.pageJob);
   }
-  async function sdStart(path) {                     // ▶: load the file, then run it on FluidNC
+  const isLoaded = (path) => JOB.tl && JOB.src && (JOB.src.kind === "sd" ? JOB.src.name === path : path === PAGE_SD);
+  async function sdStart(path, by) {                 // ▶: load the file, then the Start check by its row
     if (FJ.job) { $("sd-status").textContent = "A job is running on FluidNC: stop it first."; return; }
-    await sdSelect(path);
-    $("h-job").scrollIntoView({ block: "start", behavior: "smooth" });
-    if (!JOB.tl || !JOB.src || (JOB.src.kind === "sd" ? JOB.src.name !== path : path !== PAGE_SD)) return;
-    if (CTL.sim) fjRun(); else $("sd-status").textContent = CTL.booting ? "FluidNC is still starting." : "FluidNC isn't running.";
+    if (!isLoaded(path)) await sdSelect(path);
+    if (!isLoaded(path)) return;
+    startAsk(by);
   }
+  async function sdPreview(path) {                   // 👁: load it, then Preview
+    if (FJ.job) { $("sd-status").textContent = "A job is running on FluidNC: Preview after it."; return; }
+    if (JOB.preview) previewEnd();
+    if (!isLoaded(path)) await sdSelect(path);
+    if (isLoaded(path)) previewStart();
+  }
+  // ---- ▶ Start's check (user 2026-10-24): the file + what's off (not homed, no work zero, bigger than the stock,
+  // another bit in the router, past the travel), one Start button. by = the button it opens by ----
+  function startChecks() {
+    const tl = JOB.tl, out = [], st = tl.stock, txt = JOB.src.text || "";
+    out.push(CTL.homed ? ["ok", "Homed"] : ["bad", "Not homed: Home all first (the job is laid out from the homed spot)"]);
+    out.push(/^\s*[^;(]*\b(G10\s*L20|G92|G38\.[2-5])/im.test(txt) ? ["ok", "The file sets its own work zero (G10 L20 / G92 / probe)"]
+      : ["warn", "Work zero: the page sets G54 at the cutting area's front-left corner, Z on the stock top (your own Zero is replaced)"]);
+    if (st) {
+      const b = tl.segs.reduce((r, s) => [Math.min(r[0], s.end.x), Math.max(r[1], s.end.x), Math.min(r[2], s.end.y), Math.max(r[3], s.end.y)],
+        [Infinity, -Infinity, Infinity, -Infinity]);
+      const w = b[1] - b[0], h = b[3] - b[2], fits = b[0] >= st.xmin - 0.5 && b[1] <= st.xmax + 0.5 && b[2] >= st.ymin - 0.5 && b[3] <= st.ymax + 0.5;
+      out.push([fits ? "ok" : "warn", `${fits ? "Fits on" : "Bigger than"} the stock (${w.toFixed(0)} × ${h.toFixed(0)} of ` +
+        `${(st.xmax - st.xmin).toFixed(0)} × ${(st.ymax - st.ymin).toFixed(0)} mm)`]);
+    } else out.push(["warn", "No stock on the table: only the spoilboard gets cut"]);
+    const t1 = tl.tools.get(tl.segs[0].toolNumber);
+    if (t1) {
+      const want = HandSetup.fromDef(t1), have = HAND.bit, same = have && have.shape === want.shape && Math.abs(have.d - want.d) < 0.01;
+      out.push([same ? "ok" : "warn", same ? `${HandSetup.bitName(want)} in the router` : `The file wants ${HandSetup.bitName(want)}; the router has ${have ? HandSetup.bitName(have) : "no bit"}`]);
+    }
+    if (!JOB.fits) out.push(["warn", "Some moves are past this machine's travel"]);
+    if (!CTL.sim) out.push(["bad", CTL.booting ? "FluidNC is still starting" : "FluidNC isn't running"]);
+    return out;
+  }
+  function startAsk(by) {
+    const pop = $("start-pop"), list = $("start-chk");
+    if (!JOB.tl || FJ.job) return;
+    if (JOB.preview) previewEnd();
+    $("start-h").textContent = `Start ${JOB.src.kind === "sd" ? JOB.src.name.split("/").pop() : "the strut plate job"}?`;
+    list.textContent = "";
+    const chk = startChecks();
+    for (const [k, t] of chk) { const li = document.createElement("li"); li.className = k; li.textContent = t; list.append(li); }
+    $("start-go").disabled = chk.some(([k]) => k === "bad");
+    pop.hidden = false;
+    const r = (by || $("job-start")).getBoundingClientRect(), w = pop.offsetWidth, hgt = pop.offsetHeight;
+    pop.style.left = `${Math.max(8, Math.min(r.right - w, innerWidth - w - 8))}px`;
+    pop.style.top = `${r.bottom + hgt + 8 < innerHeight ? r.bottom + 6 : Math.max(8, r.top - hgt - 6)}px`;
+    $("start-go").focus();
+  }
+  const startClose = () => { $("start-pop").hidden = true; };
+  $("start-no").addEventListener("click", startClose);
+  $("start-go").addEventListener("click", () => { startClose(); if (CTL.sim && JOB.tl && !FJ.job) fjRun(); });
+  $("job-start").addEventListener("click", (e) => startAsk(e.currentTarget));
+  $("job-pv").addEventListener("click", () => previewStart());
+  document.addEventListener("pointerdown", (e) => { if (!$("start-pop").hidden && !e.target.closest("#start-pop, .sd-go, #job-start")) startClose(); });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") startClose(); });
+  // the right column's SD card | Flash
+  for (const [id, show] of [["src-sd", "sd-box"], ["src-flash", "flash-box"]]) $(id).addEventListener("click", () => {
+    for (const [b, p] of [["src-sd", "sd-box"], ["src-flash", "flash-box"]]) { $(b).setAttribute("aria-pressed", String(p === show)); $(p).hidden = p !== show; }
+  });
   async function sdAdd(files) {
     const uis = files.filter((f) => UI_FILE.test(f.name));   // web UIs dropped on the card: as from Web UIs
     if (uis.length) { await uiAdd(uis, "sd"); files = files.filter((f) => !uis.includes(f)); if (!files.length) return; }

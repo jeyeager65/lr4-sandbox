@@ -126,6 +126,14 @@
     const fitCols = () => { for (const side of ["l", "r"]) fold(side, narrow.matches || userOff[side]); };
     narrow.addEventListener("change", fitCols);
     fitCols();
+    // the folded Job strip: unfold it at the SD card, the loaded job's Preview or On the table
+    for (const b of document.querySelectorAll("[data-unfold]")) b.addEventListener("click", () => {
+      fold("r", false);
+      const k = b.dataset.unfold;
+      if (k === "sd") { $("src-sd").click(); $("sd-box").scrollIntoView({ block: "nearest" }); }
+      else if (k === "pv") { if (JOB.tl && !JOB.preview) previewStart(); }
+      else $("setup-sec").scrollIntoView({ block: "start" });
+    });
     // left folded: the work position floats on the view
     const md = { x: $("md-x"), y: $("md-y"), z: $("md-z") };
     const mdSync = () => { for (const a of "xyz") md[a].textContent = $("w" + a).textContent; };
@@ -304,6 +312,7 @@
     scenery: (on) => { shopVR = on; updateShop(); return !!shop; },
     room: () => (shop ? shopRoom : null),       // the workshop at 1:1, not on the tabletop
     poke: ftPoke,
+    jog: ctlJogBy,
     carry: { meshes: () => meshes.filter((m) => m.userData.group === "Pendant" && /^Pendant_(case|screen)/.test(m.userData.name)),
       done: () => move(JOB.preview ? null : CTL.pose) } });   // back on its stand
   window.LR4VR.page = vr;

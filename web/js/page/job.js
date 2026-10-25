@@ -2,7 +2,7 @@
 // The page's scripts share one global scope (js/page/*.js, loaded in order by index.html): names declared
 // at the top level here are seen by the later files.
   // ---- version + feedback: the issue link carries the size, data date and the loaded files' checksums ----
-  const VERSION = "0.39.0";
+  const VERSION = "0.40.0";
   function setupAbout() {
     const bits = [`lr4-sandbox ${VERSION}`];
     if (cfg.built) bits.push(`model data built ${cfg.built}`);
@@ -650,6 +650,8 @@
       (JOB.fits ? "" : "Some moves are outside this machine's travel: the bit stops at its limits. ") +
       (longAt < 0 ? "" : `Line ${longAt + 1} is too long for FluidNC (over 127 bytes): Run will stop there with ` +
         "error 14 (Line too long). Shorten or split it.");
+    $("job-name").textContent = $("pv-name").textContent = src.kind === "page" ? "Strut plates (the page's G-code)" : src.name.split("/").pop();
+    $("pv-total").textContent = clock(tl.total);
     $("job-on").hidden = false;
     if (keep) fjReload(); else if (FJ.job) fjDone("The file changed: the page stopped following the job.");
     if (JOB.preview) jobSeek(0, false);

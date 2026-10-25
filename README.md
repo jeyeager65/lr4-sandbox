@@ -100,31 +100,37 @@ travel, homing and limits are kept as in your file. (`$CD` in the console shows 
 download is always your real file.) FluidNC needs a cross-origin isolated page (`tools/serve.py`, or GitHub Pages
 after one reload); where it can't run, the page says so.
 
-- **Home ($H)** homes on the machine's switches: each switch trips when its motor reaches the stop, so each Y motor
-  stops on its own switch and squares the gantry, as on the real machine.
+Run has a Machine column on the left, the Job column on the right and the console under the view:
+- **The state pill** shows FluidNC's state (red on an alarm, with a card over the view saying what to do); its menu
+  has Unlock ($X), Soft reset and Power cycle.
+- **Home** All ($H) or one axis homes on the machine's switches: each switch trips when its motor reaches the stop,
+  so each Y motor stops on its own switch and squares the gantry, as on the real machine.
+- **Work | Machine readout:** click a value and type where to go (Enter = `G90 G0` / `G53 G0`). **Zero** All / X /
+  Y / Z sets work zero where the bit is. Machine is greyed until it has homed: like the real controller, it doesn't
+  know where the machine is until then.
+- **Hold / Resume** and **Stop** for a running job; FluidNC's **Feed** and **Rapid** overrides.
 - **The jog pad** jogs X / Y / Z by a step (0.1 to 100 mm) at a feed; ■ stops the jog.
 - **Touch plate under the bit** puts the plate on the stock so G38.2 stops on it.
-- **The console** takes any G-code or `$` command and shows FluidNC's replies.
-- **Machine speed** runs it at 1x, 2x, 5x or 10x.
-- MPos is greyed until it has homed: like the real controller, it doesn't know where the machine is until then.
+- **The console** takes any G-code or `$` command and shows FluidNC's replies (folded to one line until you open it).
+- **Speed** runs the machine at 1x to 20x.
 
 **Run G-code** runs the strut plate job (V1E's build order: the machine runs on its printed temporary struts and
 cuts its own MDF strut plates; **Load the strut plate job**, which puts it on the temporary struts) or any G-code file from the page's **SD card** (**Add
-G-code files…**, or drop them on it; ▶ runs one) through FluidNC (`$SD/Run`), from the page or from the FluidTouch
+G-code files…**, or drop them on it; ▶ starts one after a short check: homed, work zero, the stock, the bit) through FluidNC (`$SD/Run`), from the page or from the FluidTouch
 pendant. The stock is carved as the motors move (with the file's own bits, from
 [cnc-gcode-tools](https://github.com/jeyeager65/cnc-gcode-tools) `(Stock: ...)` / `(ToolDef ...)` comments, or the
 ones set up under **On the table**), M0 holds pop up their message, G38.2 probes stop on the touch plate and tool
 changes hold for the bit.
 
-**Preview** plays the loaded file fast (1x to 100x, scrub with the timeline, **Space** plays / pauses) from where
-FluidNC is: what Run would do, with the file's own probing and zeroing (G38.2 P, G10 L20, G92) on a copy of the
-offsets. It carves a copy of the stock, never the spoilboard, and FluidNC doesn't move; **Back to the machine** (or
+**👁 Preview** plays a file fast (1x to 100x, scrub with the timeline, **Space** plays / pauses) from where
+FluidNC is, in a player that takes the Job column's place: what Run would do, with the file's own probing and zeroing (G38.2 P, G10 L20, G92) on a copy of the
+offsets. It carves a copy of the stock, never the spoilboard, and FluidNC doesn't move; **Exit preview** (or
 FluidNC moving) puts the model back where FluidNC is. Preview works even where FluidNC can't run.
 
 ![Preview: the strut plate job on the temporary struts](docs/img/playback.webp)
 
 **Web UIs:** put a web UI on FluidNC's SD card or Flash (WebUI 3, WebUI 2 or FigUI: their release `index.html.gz`,
-as they are) and **Run > Controller > Web UIs > Open** shows it in a window of its own, served by the page's FluidNC
+as they are) and **Pendant & WebUI > Web UIs > Open** (top bar, in Run) shows it in a window of its own, served by the page's FluidNC
 web server the way a board serves it: watch and drive the machine from there, upload files to its card. The Flash's
 `index.html.gz` opens at `/`, `/sd/ui/<name>/index.html.gz` at `/ui/<name>/`, any other `x.html.gz` at
 `/sd/x.html` (FluidNC's WebDAV, in 4.1.1 too). Keep the sandbox tab open: FluidNC runs there, and the window reaches

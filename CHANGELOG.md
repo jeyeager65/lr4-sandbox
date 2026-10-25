@@ -3,6 +3,23 @@
 The version is the sandbox page's (`VERSION` in `web/js/page/job.js`, shown in its footer). The footer also shows
 the date the model data was built and the Printables file set it was solved for.
 
+## 0.40.0 - 2026-10-24
+- **New page layout, part 2 (Run):** the Machine column has FluidNC's **state pill** (its menu: Unlock $X, Soft reset,
+  Power cycle), **Hold / Resume** (one button) and **Stop**, greyed out until a job runs, a **Work | Machine** readout
+  (click a value, type a position, Enter = `G90 G0` / `G53 G0`, Esc cancels), **Home** All / X / Y / Z and **Zero**
+  All / X / Y / Z (`G10 L20 P1`), FluidNC's **Feed** (-10 / +10 / reset) and **Rapid** (25 / 50 / 100%) overrides,
+  and the jog pad with step chips. The old Tool position block and the hidden sliders are gone.
+- The Job column switches **SD card | Flash**. Each file has **👁 Preview** and **▶ Start**; Start opens a short check
+  by the button (homed, work zero, fits on the stock, the bit in the router, the travel) with one Start button. The
+  loaded job's box shows its progress (a bar, % and time left) while it runs.
+- **Preview** swaps the Job column for a player: scrub bar, play / pause, back to the start, speed, the file's
+  current lines, Exit preview; a banner on the view says the machine isn't moving.
+- **Alarms:** the pill turns red and a card over the view says what happened and what to do (Unlock / Home all);
+  it goes away once FluidNC is out of the alarm.
+- The FluidTouch pendant screen and the web UIs (WebUI, FigUI) moved to **Pendant & WebUI ▾** in the top bar. The
+  console gets a Status reports switch and $G / $# / $SD/List buttons (Hold / Resume / Reset are in the Machine column).
+- VR: letting go of the core's red handle jogs FluidNC there.
+
 ## 0.39.0 - 2026-10-24
 - **New page layout, part 1 (the shell):** a top bar with the size, a **Design | Run** switch, **Get the files** and ⚙
   (theme Auto / Light / Dark, sounds, SpaceMouse, keyboard shortcuts, Reset settings). Design = today's My LR4 / Show /
