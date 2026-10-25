@@ -171,7 +171,9 @@ same menu has the volume and, for fun, a "robot noises" voice.
 ### Around the view
 
 - **Iso / Front / Top / Side / Back / Fit all** (keys **1**-**5**, **F**) set the camera; on a phone they fold into
-  one **View** menu. ☰ (**H**) hides the side panel.
+  one **View** menu. ☰ (**H**) hides the side panel. **Layers** (**L**) shows / hides parts.
+- **On a phone** Run is the view, Hold / Stop, the readout, Home / Zero / Jog / Files and the job; Jog, Files and the
+  console open as sheets from the bottom.
 - **📏 Measure** (**M**): two clicks on the machine, snapping to corners and hole centres; Esc ends it.
 - **📷** (**P**) saves the view as a PNG.
 - **?** lists the keys. ⚙ also connects a 3Dconnexion SpaceMouse.
@@ -298,6 +300,8 @@ node test_page_sdjob.js                      # headless Chrome: the SD card and 
 node test_page_pendant.js                    # headless Chrome: the pendant on FluidNC
 node test_page_fluidtouch.js                 # headless Chrome: FluidTouch's UI connected to the page
 node test_page_sound.js                      # headless Chrome: machine sounds start, follow the axes, render a WAV
+node test_page_parts.js                      # headless Chrome: part files - the Parts chip, welcome card, stand-ins
+node test_page_phone.js                      # headless Chrome: the phone layout (390 x 844): Run's sheets, console
 node test_strut_plate.js                     # JS strut plates vs Vector76's OpenSCAD generator (maintainer only)
 python ../tools/run.py test_strut_plate.py   # Python strut plates vs the same (maintainer only)
 node test_parts_files.js                     # the page's STL / DXF readers vs the reference build (needs parts/)

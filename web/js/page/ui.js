@@ -155,6 +155,16 @@
     const fitCols = () => { for (const side of ["l", "r"]) fold(side, narrow.matches || userOff[side]); };
     narrow.addEventListener("change", fitCols);
     fitCols();
+    // phone (Part 39): Jog and Files open as sheets from the bottom (html.ph-jog / html.ph-files, one at a time)
+    function sheet(k) {
+      for (const s of ["jog", "files"]) root.classList.toggle("ph-" + s, s === k);
+      $("ph-jog").setAttribute("aria-expanded", String(k === "jog"));
+      $("ph-files").setAttribute("aria-expanded", String(k === "files"));
+    }
+    $("ph-jog").addEventListener("click", () => sheet(root.classList.contains("ph-jog") ? null : "jog"));
+    $("ph-files").addEventListener("click", () => sheet(root.classList.contains("ph-files") ? null : "files"));
+    for (const b of document.querySelectorAll(".sheet-x")) b.addEventListener("click", () => sheet(null));
+    document.addEventListener("keydown", (e) => { if (e.key === "Escape" && /\bph-(jog|files)\b/.test(root.className)) sheet(null); });
     // the folded Job strip: unfold it at the SD card, the loaded job's Preview or On the table
     for (const b of document.querySelectorAll("[data-unfold]")) b.addEventListener("click", () => {
       fold("r", false);

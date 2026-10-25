@@ -119,7 +119,7 @@
           <label class="check sub"><input type="checkbox" id="opt-skirt" checked> Dust skirt + bristles</label>
           <label class="check sub"><input type="checkbox" id="opt-hose" checked> Dust shoe + vacuum hose, router cord + cable sleeve</label>
           <label class="check"><input type="checkbox" id="opt-fan" checked> Jackpot3 lid fan</label>
-          <label class="check" title="The FluidTouch touchscreen pendant (github.com/jeyeager65/FluidTouch) on the table's front, running its real firmware in the page"><input type="checkbox" id="ft-on"> FluidTouch pendant</label>
+          <label class="check no-phone" title="The FluidTouch touchscreen pendant (github.com/jeyeager65/FluidTouch) on the table's front, running its real firmware in the page"><input type="checkbox" id="ft-on"> FluidTouch pendant</label>
         </div>
         <div class="variant" id="peter-variant" hidden><span>Peter Plates</span>
           <button type="button" data-v="solid" aria-pressed="false">Solid</button>
@@ -502,6 +502,9 @@
       </div>
       <p class="dhint" id="dro-hint">mm · click a value to move there</p>
     </div>
+    <div class="ph-row" id="ph-row" role="group" aria-label="Machine">
+      <button type="button" data-run="home" title="Home all ($H)">⌂ Home</button><button type="button" data-run="zero" title="Zero all here (G10 L20 P1 X0 Y0 Z0)">⊙ Zero</button><button type="button" id="ph-jog" aria-expanded="false" aria-controls="pos-jog">✥ Jog</button><button type="button" id="ph-files" aria-expanded="false" aria-controls="run-right">▤ Files</button>
+    </div>
     <div class="hz">
       <span class="lbl">Home</span><button type="button" id="home" title="Home all ($H): Z up to its switch, then X and Y">All</button><button type="button" data-home="X">X</button><button type="button" data-home="Y">Y</button><button type="button" data-home="Z">Z</button>
       <span class="lbl">Zero</span><button type="button" data-zero="XYZ" title="Work zero here: G10 L20 P1 X0 Y0 Z0">All</button><button type="button" data-zero="X">X</button><button type="button" data-zero="Y">Y</button><button type="button" data-zero="Z">Z</button>
@@ -513,6 +516,7 @@
       <span class="lbl">Rapid</span><span class="ov chips" id="ov-rapid"><button type="button" data-ov="151" data-pct="25" aria-pressed="false">25</button><button type="button" data-ov="150" data-pct="50" aria-pressed="false">50</button><button type="button" data-ov="149" data-pct="100" aria-pressed="true">100%</button></span>
     </div>
     <div class="jog-box" id="pos-jog">
+      <div class="sheet-head"><b>Jog</b><button type="button" class="sheet-x" data-sheet="jog" aria-label="Close" title="Close">✕</button></div>
       <div class="jog" role="group" aria-label="Jog">
         <span></span><button type="button" data-jog="Y+">Y+</button><span></span><button type="button" data-jog="Z+">Z+</button>
         <button type="button" data-jog="X-">X−</button><button type="button" id="jog-stop" title="Stop the jog (0x85)">■</button>
@@ -545,6 +549,7 @@
   <div class="colhead">
     <span class="seg" id="src-seg" role="group" aria-label="Files on"><button type="button" id="src-sd" aria-pressed="true">SD card</button><button type="button" id="src-flash" aria-pressed="false">Flash</button></span>
     <span class="lbl pv-lbl">👁 Preview</span>
+    <button type="button" class="sheet-x" data-sheet="files" aria-label="Close" title="Close">✕</button>
     <button type="button" class="col-btn" id="col-r" aria-expanded="true" aria-controls="run-right-body" title="Fold the column" aria-label="Fold the Job column">»</button></div>
   <div class="col-strip" aria-label="Job (folded)">
     <button type="button" data-unfold="sd" title="SD card" aria-label="SD card">▤</button>

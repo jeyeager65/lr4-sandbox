@@ -3,6 +3,13 @@
 The version is the sandbox page's (`VERSION` in `web/js/page/job.js`, shown in its footer). The footer also shows
 the date the model data was built and the Printables file set it was solved for.
 
+## 0.43.0 - 2026-10-25
+- **New page layout, part 5 (phones):** Run on a phone is the view on top, then Hold / Stop, the Work | Machine
+  readout, **Home / Zero / Jog / Files** and the loaded job. **Jog** and **Files** (the SD card and On the table) open
+  as sheets from the bottom (✕ or Esc closes them); the console is a line at the bottom that opens as a sheet. The
+  part files card is a bottom sheet too. No Flash, Pendant & WebUI or pendant option on a phone. Not yet checked on
+  a real phone.
+
 ## 0.42.0 - 2026-10-25
 - **New page layout, part 4 (part files):** the files box in the side panel became a **welcome card over the view**
   on a first visit: why the page needs the files, **1 Download** (a button per Printables source, "n of m ✓"),

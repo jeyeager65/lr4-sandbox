@@ -463,12 +463,6 @@ label.btn:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; 
   .modes button { padding: 4px 12px; font-size: 13px; }
   .tb-right { margin-left: 0; }
   #tb-files { display: none; }
-  /* Run on a phone, until Part 39: the view on top, the console, then both columns, one page that scrolls */
-  :root[data-mode="run"] body { display: block; overflow-y: auto; height: 100%; }
-  :root[data-mode="run"] .topbar { position: sticky; top: 0; height: var(--top-h); }
-  :root[data-mode="run"] .stage { position: sticky; top: var(--top-h); height: 46dvh; z-index: 4; }
-  :root[data-mode="run"] .side { border: 0; border-top: 1px solid var(--line); }
-  :root[data-mode="run"] .side .col-body { display: flex !important; overflow: visible; }
   .col-btn, :root[data-mode="run"] .mini-dro { display: none !important; }
   .toolbar { left: 8px; top: 8px; right: 48px; }
   .v-only { right: 8px; top: 8px; }
@@ -668,3 +662,51 @@ button:disabled { opacity: 0.42; cursor: default; }
 .drop-over.over { display: grid; }
 .drop-over div { padding: 18px 26px; border-radius: 8px; background: var(--panel); text-align: center; font: 600 16px var(--font-display); line-height: 1.5; }
 .drop-over small { color: var(--muted); font: 12px var(--font-body); }
+
+/* phone (Part 39): Design = the steps under the view; Run = the view on top, then Hold / Stop, the readout, Home /
+   Zero / Jog / Files and the job, one page that scrolls; Jog and Files (the SD card + On the table) open as sheets
+   from the bottom; the console is a folded line at the bottom that opens as a sheet. No Flash, Pendant & WebUI or
+   pendant here. */
+.ph-row, .sheet-head, .sheet-x { display: none; }
+@media (max-width: 760px) {
+  .no-phone, #pw-btn, #src-flash, #flash-box, .col-strip, .pw-pop { display: none !important; }
+  .parts-chip { padding: 3px 9px; font-size: 11px; }
+  :root[data-mode="run"] body { display: block; overflow-y: auto; height: 100%; padding-bottom: 46px; }
+  :root[data-mode="run"] .topbar { position: sticky; top: 0; height: var(--top-h); }
+  :root[data-mode="run"] .stage { position: sticky; top: var(--top-h); height: 42dvh; z-index: 4; }
+  :root[data-mode="run"] .side { border: 0; border-top: 1px solid var(--line); }
+  :root[data-mode="run"] .side .col-body { display: flex !important; overflow: visible; gap: 12px; padding-top: 10px; }
+  :root[data-mode="run"] .side .colhead { justify-content: space-between !important; padding: 8px 16px 0 !important; }
+  :root[data-mode="run"] .side-l .colhead > :is(.st-pill, .lbl) { display: inline-flex !important; }
+  :root.ph-files .side-r .colhead > :is(#src-seg, .sheet-x) { display: inline-flex !important; }
+  :root.ph-files.pv-on .side-r .colhead > .pv-lbl { display: inline !important; }
+  .tb-name { display: none; }
+  .side-l .hz, .side-l .ovr, .side-l #ctl-src { display: none; }
+  .ph-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+  .ph-row button { padding: 10px 2px; font: 600 13px var(--font-display); }
+  .ph-row button[aria-expanded="true"] { border-color: var(--accent); color: var(--accent); }
+  .dro .dv { font-size: 19px; }
+  /* the right column inline shows only the job; Files = all of it as a sheet */
+  :root:not(.ph-files) .side-r :is(.colhead, #sd-box, #setup-sec) { display: none !important; }
+  .sheet-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+  .sheet-head b, .side-r .colhead .lbl { font: 600 13px var(--font-display); letter-spacing: 0.06em; }
+  :root.ph-files .side-r .sheet-x, .sheet-head .sheet-x { display: inline-block; border: 0; padding: 4px 8px; color: var(--muted); }
+  :root.ph-files .side-r, :root.ph-jog #pos-jog { position: fixed; left: 0; right: 0; bottom: 0; z-index: 15; max-height: 75dvh;
+    overflow-y: auto; background: var(--panel); border: 1px solid var(--line); border-radius: 12px 12px 0 0;
+    box-shadow: 0 -10px 32px rgb(0 0 0 / 0.28); padding-bottom: max(14px, env(safe-area-inset-bottom, 0px)); }
+  :root.ph-jog #pos-jog { padding: 12px 16px max(18px, env(safe-area-inset-bottom, 0px)); }
+  :root:not(.ph-jog) #pos-jog { display: none; }
+  .jog-box .jog { grid-template-columns: repeat(4, minmax(0, 64px)); }
+  .jog-box .jog button { padding: 14px 0; }
+  /* the console: a line at the bottom; open (or big) = a sheet */
+  :root[data-mode="run"] .console { position: fixed; left: 0; right: 0; bottom: 0; z-index: 12;
+    grid-template-columns: auto minmax(0, 1fr) auto; grid-template-areas: "st last tools"; padding: 4px 10px max(6px, env(safe-area-inset-bottom, 0px)); }
+  :root[data-mode="run"]:not(.con-open):not(.con-big) .console :is(.con-ttl, .ctl-form) { display: none; }
+  :root[data-mode="run"]:is(.con-open, .con-big) .console { max-height: 70dvh; border-radius: 12px 12px 0 0;
+    grid-template-columns: auto auto minmax(0, 1fr) auto; grid-template-areas: "ttl st . tools" "body body body body" "form form form form" "btns btns btns btns"; }
+  :root[data-mode="run"] .console .con-grip, :root[data-mode="run"] #con-big { display: none !important; }
+  :root[data-mode="run"]:is(.con-open, .con-big) .console .ctl-log { height: 34dvh; }
+  :root[data-mode="run"] .start-pop { left: 8px !important; right: 8px; width: auto; }
+  .welcome { position: fixed; left: 0; right: 0; top: auto; bottom: 0; transform: none; width: auto; max-height: 82dvh; z-index: 16;
+    border-radius: 12px 12px 0 0; padding-bottom: max(16px, env(safe-area-inset-bottom, 0px)); }
+}
