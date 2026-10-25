@@ -296,6 +296,7 @@
     selected = m;
     const box = document.getElementById("pick");     // a chip on the canvas, only while a part is selected
     box.hidden = !m;
+    filPick(m);                                       // Part 40: Printed in
     if (!m) return;
     m.material.emissive.set(css("--accent") || "#c8241b");
     m.material.emissiveIntensity = 0.45;

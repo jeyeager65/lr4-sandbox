@@ -23,7 +23,6 @@
     else if (!steps.some((s) => s.open)) { try { localStorage.setItem("lr4-step", ""); } catch (e) { /* not kept */ } }
     stepSums();
   });
-  for (const b of document.querySelectorAll(".st-next")) b.addEventListener("click", () => showStep($(b.dataset.next), true));
   {
     let id = null;
     try { id = localStorage.getItem("lr4-step"); } catch (e) { /* step 1 */ }
@@ -39,8 +38,8 @@
         (!sv.hidden && pressed("strut-variant") ? ` · ${pressed("strut-variant").replace(/ \(.*/, "")} struts` : ""),
       opts: [...checkedOpts(), !$("peter-variant").hidden && pressed("peter-variant") ? `${pressed("peter-variant")} Peter plates` : ""].filter(Boolean).join(", ") || "Bare machine",
       shop: `${pressed("table-variant")}${$("table-top").value ? ` · top at ${$("table-top").value} ${u}` : ""}`,
-      ab: $("ab-on").checked ? "A real machine (out of square until homed)" : "Perfect",
-      look: [pressed("scenery"), pressed("lighting"), pressed("detail")].filter(Boolean).join(" · "),
+      ab: $("ab-on").checked ? "Real-world (out of square until homed)" : "Ideal",
+      look: [LR4Filaments.PRESETS[FIL.s.preset].label, pressed("scenery"), pressed("lighting"), pressed("detail")].filter(Boolean).join(" · "),
       files: "BOM, cut list, strut plates, config.yaml",
     };
     for (const [k, v] of Object.entries(s)) $("sum-" + k).textContent = v;
@@ -357,9 +356,8 @@
   window.LR4VR.page = vr;
   // ---- automation handle for scripted videos (tools/record_demo.js); nothing on the page uses it ----
   // ---- share link, picture, measure in the main view, reset, keyboard ----
-  // The link: #26x50&braces=6&struts=temp&peter=honeycomb&hose=0&pendant=1&table=762&room=6096,7315,3048&main=292a2e&units=mm
+  // The link: #26x50&braces=6&struts=temp&peter=honeycomb&hose=0&pendant=1&table=762&room=6096,7315,3048&preset=fiber&spools=PLA_292a2e~PLA_cc1f1a~PET-CF_2a2a2c&parts=Core.3&units=mm
   // (size in inches as before; only what's set - options are on unless =0). Applied through LR4Machine, as a video does.
-  const COL0 = { main: "#292a2e", accent: "#cc1f1a" };
   function shareLink() {
     const q = [`${+(S.cutX / IN).toFixed(3)}x${+(S.cutY / IN).toFixed(3)}`], add = (k, v) => q.push(`${k}=${encodeURIComponent(v)}`);
     if ($("braces").value !== "0") add("braces", $("braces").value);
@@ -373,7 +371,8 @@
     if (t > 0) add("table", +(t * (U.unit === "in" ? IN : 1)).toFixed(1));
     const room = ["w", "d", "h"].map((k) => parseFloat($("room-" + k).value));
     if (room.every((v) => v > 0)) add("room", room.map((v) => Math.round(v * roomU())).join(","));
-    for (const role of ["main", "accent"]) if (pick[role].value.toLowerCase() !== COL0[role]) add(role, pick[role].value.slice(1));
+    for (const [k, v] of Object.entries(LR4Filaments.toLink(FIL.s))) add(k, v);   // Part 40: spools, overrides, look, plates
+    for (const [k, v] of Object.entries(Imperfect.toLink(AB.set))) add(k, v);       // As built (ab=1 = Real-world, abx = its errors)
     if (U.unit === "mm") add("units", "mm");
     return q.join("&");
   }
@@ -392,6 +391,10 @@
     if (o.table !== undefined) set.table = Number(o.table);
     if (o.room) { const r = o.room.split(",").map(Number); if (r.length === 3 && r.every((v) => v > 0)) set.room = r; }
     for (const role of ["main", "accent"]) if (o[role]) set[role] = "#" + o[role];
+    const fil = LR4Filaments.fromLink(o);              // Part 40 (main= / accent= from older links still work, via set)
+    if (fil) { FIL.s = fil; filSave(); applyColours(); }
+    const ab = Imperfect.fromLink(o);                  // As built, when the link has it
+    if (ab) LR4AsBuilt.set(ab);
     const bad = LR4Machine.apply(set), left = {};
     for (const b of bad) {
       const k = b.split("=")[0].toLowerCase();

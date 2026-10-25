@@ -447,7 +447,7 @@
     const sim = CTL.sim, tr = CTL.cfg, t = meta.travel, h = Homing.settings(CTL.yaml), st = AB.set.on ? abStops() : { y: 0, z: 0 };
     for (const [k, m] of tr.pins.motors.entries()) {
       sim.addMotor(m.step, m.dir);
-      const off = m.motor === 1 && (m.axis === "y" || m.axis === "z") ? st[m.axis] : 0;
+      const off = m.motor === Imperfect.side2Motor(AB.set) && (m.axis === "y" || m.axis === "z") ? st[m.axis] : 0;   // the Max end's motor
       for (const [kind, g] of Object.entries(m.limits)) {
         const below = kind === "neg" || (kind === "all" && !h[m.axis].positive);
         sim.setSwitch(g, m.step, m.dir, (t[m.axis][below ? 0 : 1] + off - CTL.bootM[k]) * tr.steps[m.axis].to, below);
@@ -557,7 +557,7 @@
     CTL.booting = null;
     Object.assign(CTL, { sim, cfg: tr, yaml, boot: [HOME.pose.x, HOME.pose.y, HOME.pose.z] });
     // each motor where its side is (Part 32: side 2 = side 1 + AB.E: the machine as it is at this power-up)
-    CTL.bootM = tr.pins.motors.map((m) => CTL.boot["xyz".indexOf(m.axis)] + (AB.set.on && m.motor === 1 && (m.axis === "y" || m.axis === "z") ? AB.E[m.axis] : 0));
+    CTL.bootM = tr.pins.motors.map((m) => CTL.boot["xyz".indexOf(m.axis)] + (AB.set.on && m.motor === Imperfect.side2Motor(AB.set) && (m.axis === "y" || m.axis === "z") ? AB.E[m.axis] : 0));
     window.LR4FluidNC = sim;
     try {                                            // SD card / Flash files added while it booted (it boots with the page)
       const now = Object.assign(SdCard.files(await SdCard.store.all()), SdCard.flash.files(await SdCard.flash.store.all()));

@@ -33,7 +33,10 @@
       for (const role of ["main", "accent"]) {
         if (o[role] === undefined) continue;
         if (!/^#[0-9a-f]{6}$/i.test(o[role])) { bad.push(`${role.toUpperCase()}=${o[role]}: #rrggbb`); continue; }
-        pick[role].value = o[role]; fire(pick[role], "input");
+        const c = o[role].toLowerCase();                // spool 1 (main) / spool 2 (accent; the classic router-mount PETG too)
+        FIL.s.spools[0 + (role === "accent")].color = c;
+        if (role === "accent" && FIL.s.preset === "classic" && FIL.s.spools[2]) FIL.s.spools[2].color = c;
+        filSave(); applyColours();
       }
       return bad;
     } };

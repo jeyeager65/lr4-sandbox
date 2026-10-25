@@ -2,7 +2,7 @@
 // The page's scripts share one global scope (js/page/*.js, loaded in order by index.html): names declared
 // at the top level here are seen by the later files.
   // ---- version + feedback: the issue link carries the size, data date and the loaded files' checksums ----
-  const VERSION = "0.43.3";
+  const VERSION = "0.44.0";
   function setupAbout() {
     const bits = [`lr4-sandbox ${VERSION}`];
     if (cfg.built) bits.push(`model data built ${cfg.built}`);
@@ -118,21 +118,24 @@
         uSkirt: { value: skirt ? 1 : 0 } },
       // aRest: how far the vertex sits below where it would on flat stock (a stock following a warped spoilboard): depth
       // and cut-through are measured without it
-      vertexShader: `uniform float uThroughZ; attribute float aRest; varying vec3 vPos; varying vec3 vNormal; varying float vThrough;
+      // aFresh: how far the uncut surface is below uTop there (a warped spoilboard as laid): cuts are measured from it
+      vertexShader: `uniform float uThroughZ; attribute float aRest; attribute float aFresh; varying vec3 vPos; varying vec3 vNormal; varying float vThrough;
+        varying float vFresh;
         void main() {
+          vFresh = aFresh;
           vec3 p0 = position - vec3(0.0, 0.0, aRest);
           vPos = (modelMatrix * vec4(p0, 1.0)).xyz; vNormal = mat3(modelMatrix) * normal;
           vThrough = p0.z <= uThroughZ ? 1.0 : 0.0;
           gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
         }`,
-      fragmentShader: `varying vec3 vPos; varying vec3 vNormal; varying float vThrough;
+      fragmentShader: `varying vec3 vPos; varying vec3 vNormal; varying float vThrough; varying float vFresh;
         uniform vec3 uLight; uniform vec3 uView; uniform vec3 uStockColor; uniform vec3 uCutColor;
         uniform float uTop; uniform float uBottom; uniform float uSkirt;
         void main() {
           if (vThrough > 0.999) discard;
           vec3 n = normalize(vNormal);
           if (dot(n, uView) < 0.0) n = -n;
-          float depth = clamp((uTop - vPos.z) / max(uTop - uBottom, 1e-6), 0.0, 1.0);
+          float depth = clamp((uTop - vFresh - vPos.z) / max(uTop - uBottom, 1e-6), 0.0, 1.0);
           vec3 base = depth < 1e-4 || uSkirt > 0.5 ? uStockColor : mix(uCutColor, uCutColor * 0.55, depth);
           float diffuse = max(dot(n, uLight), 0.0);
           float sky = 0.5 + 0.5 * n.z;
@@ -165,6 +168,7 @@
     geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
     geo.setAttribute("normal", new THREE.BufferAttribute(new Float32Array(vx * vy * 3), 3));
     geo.setAttribute("aRest", new THREE.BufferAttribute(sag, 1));
+    geo.setAttribute("aFresh", new THREE.BufferAttribute(new Float32Array(vx * vy), 1));   // 0 = flat (setFresh)
     geo.setIndex(new THREE.BufferAttribute(idx, 1));
     // shaded as cnc-gcode-tools shades its stock (StockMeshRenderer): cut surfaces in their own colour, darker with
     // depth, lit from beside the camera; cut-through triangles dropped so the table shows; pushed back (polygon offset)
@@ -190,12 +194,21 @@
     const wg = new THREE.BufferGeometry();
     wg.setAttribute("position", new THREE.Float32BufferAttribute(w, 3));
     wg.setAttribute("aRest", new THREE.BufferAttribute(new Float32Array(w.length / 3), 1));
+    wg.setAttribute("aFresh", new THREE.BufferAttribute(new Float32Array(w.length / 3), 1));
     wg.computeVertexNormals();
     top.add(new THREE.Mesh(wg, jobStockMaterial(z1, z0, -Infinity, true, rgb)));
     top.userData.z = at[2];
     top.onBeforeRender = camLight([top.material]);
     top.children[0].onBeforeRender = camLight([top.children[0].material]);
     return top;
+  }
+  // the uncut surface for a stock mesh's shading: fresh = the sim's heights as laid (null = flat at zmax) - a warped
+  // spoilboard (user 2026-10-25: all of it showed as cut but an oval at its high spot)
+  function setFresh(sim, mesh, fresh) {
+    if (!mesh) return;
+    const a = mesh.geometry.attributes.aFresh;
+    for (let k = 0; k < a.array.length; k++) a.array[k] = fresh ? sim.stock.zmax - fresh[k] : 0;
+    a.needsUpdate = true;
   }
   function jobUpdateMesh(all) { meshUpdate(JOB.sim, JOB.stock, all); }
   function meshUpdate(sim, mesh, all) {              // copy the carved rows into the grid: heights, normals, shading

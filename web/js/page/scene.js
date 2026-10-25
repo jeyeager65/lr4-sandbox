@@ -38,6 +38,17 @@
   // ---- metals: they only look like metal when they have something to reflect, so the metal parts get a soft
   // studio environment (RoomEnvironment) as their envMap; the XZ plates also get a fine brushed grain ----
   const envMap = new THREE.PMREMGenerator(renderer).fromScene(new THREE.RoomEnvironment(), 0.04).texture;
+  // the EMT (galvanized): a soft studio instead - a smooth bright-top / dark-floor gradient + one broad glow, Z up.
+  // RoomEnvironment is a box room (Y up): a cylinder mirrors its walls as flat bands with hard steps, so the tubes read
+  // as rounded squares (user 2026-10-25)
+  const softEnv = (() => {
+    const s = new THREE.Scene(), m = new THREE.ShaderMaterial({ side: THREE.BackSide, depthWrite: false,
+      vertexShader: "varying vec3 vD; void main() { vD = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }",
+      fragmentShader: "varying vec3 vD; void main() { vec3 c = mix(vec3(0.32, 0.31, 0.30), vec3(0.95, 0.97, 1.0), smoothstep(-0.5, 0.9, vD.z));"
+        + " c += vec3(1.2) * pow(max(dot(vD, normalize(vec3(-0.4, -0.6, 0.7))), 0.0), 10.0); gl_FragColor = vec4(c, 1.0); }" });
+    s.add(new THREE.Mesh(new THREE.SphereGeometry(10, 64, 32), m));
+    return new THREE.PMREMGenerator(renderer).fromScene(s, 0.02).texture;
+  })();
   const brushed = (() => {
     const c = document.createElement("canvas");
     c.width = 512; c.height = 128;
@@ -75,11 +86,11 @@
     t.encoding = THREE.sRGBEncoding;
     return t;
   })();
-  const FINISH = {                                    // colour (sRGB), roughness; all fully metallic
+  const FINISH = {                                    // colour (sRGB), roughness; fully metallic unless m
     aluminium: { c: [0.86, 0.87, 0.89], r: 0.36 },
     aluminium_plate: { c: [0.80, 0.81, 0.83], r: 0.40, brushed: true },
     steel: { c: [0.72, 0.73, 0.75], r: 0.28 },
-    galvanized: { c: [0.79, 0.81, 0.83], r: 0.46, spangle: true },
+    galvanized: { c: [0.79, 0.81, 0.83], r: 0.52, m: 0.85, spangle: true },   // softer (user 2026-10-25: was r 0.46, fully metal; 0.75 / 0.55 too dull)
     rail_steel: { c: [0.56, 0.58, 0.61], r: 0.30 },
     leadscrew: { c: [0.80, 0.81, 0.83], r: 0.30, thread: true },
     thread: { c: [0.76, 0.77, 0.79], r: 0.30, thread: true },
@@ -286,13 +297,14 @@
     const box = document.getElementById("lighting");
     const mark = () => {
       const q = lightQ();
-      box.querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.v === q)));
-      document.getElementById("lighting-note").textContent = (LIGHT.saved ? "" : "Picked for this device. ")
-        + (q === "real" ? "Realistic: the workshop's own lights, soft shadows (Full detail), filmic colour. Needs a decent GPU."
-          : "Simple: even light, no shadows. Lightest on the GPU.");
+      box.querySelectorAll("button[data-v]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.v === q)));
+      document.getElementById("lighting-note").innerHTML =   // both options (user: not just the one picked)
+        "<p><b>Realistic:</b> the workshop's own lights, soft shadows (Full detail), filmic color. Needs a decent GPU.</p>"
+        + "<p><b>Simple:</b> even light, no shadows. Lightest on the GPU.</p>"
+        + (LIGHT.saved ? "" : `<p>${q === "real" ? "Realistic" : "Simple"} was picked for this device.</p>`);
     };
     box.addEventListener("click", (e) => {
-      const b = e.target.closest("button");
+      const b = e.target.closest("button[data-v]");   // not the "?"
       if (!b) return;
       LIGHT.saved = b.dataset.v;
       try { localStorage.setItem("lr4-lighting", LIGHT.saved); } catch (e2) { /* not kept */ }
@@ -398,9 +410,11 @@
     const auto = autoLite();
     lite = saved ? saved === "lite" : auto;
     const mark = () => {
-      box.querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String((b.dataset.v === "lite") === lite)));
-      document.getElementById("detail-note").textContent = (saved ? "" : "Picked for this device. ")
-        + (lite ? "Lite: simplified meshes (about a fifth of the triangles)." : "Full: every triangle of every file.");
+      box.querySelectorAll("button[data-v]").forEach((b) => b.setAttribute("aria-pressed", String((b.dataset.v === "lite") === lite)));
+      document.getElementById("detail-note").innerHTML =
+        "<p><b>Full:</b> every triangle of every file, at your screen's sharpness.</p>"
+        + "<p><b>Lite:</b> simplified meshes (about a fifth of the triangles), for phones and weaker GPUs; the printed look is off by default.</p>"
+        + (saved ? "" : `<p>${lite ? "Lite" : "Full"} was picked for this device.</p>`);
       renderer.setPixelRatio(lite ? 1 : Math.min(window.devicePixelRatio || 1, 2));
       if (LIGHT.mark) LIGHT.mark();                  // Lighting's default follows Lite
       resize();
@@ -408,7 +422,7 @@
     let busy = false;
     // switching remakes every mesh: the loading popup with the same count as at load (user 2026-10-24: it sat for
     // seconds with no sign of life)
-    box.querySelectorAll("button").forEach((b) => b.addEventListener("click", async () => {
+    box.querySelectorAll("button[data-v]").forEach((b) => b.addEventListener("click", async () => {
       if (busy || (b.dataset.v === "lite") === lite) return;
       busy = true;
       lite = b.dataset.v === "lite";
@@ -549,8 +563,8 @@
   function material(color, fin, hasUV, grain) {         // grain: "pine" / "ply" (woodTex; boxesGeo's UVs)
     if (fin) {                                        // metal: reflects the environment
       const mat = new THREE.MeshStandardMaterial({
-        color: new THREE.Color().setRGB(...fin.c).convertSRGBToLinear(), metalness: 1.0, roughness: fin.r,
-        envMap, envMapIntensity: 1.0, side: THREE.DoubleSide});
+        color: new THREE.Color().setRGB(...fin.c).convertSRGBToLinear(), metalness: fin.m ?? 1.0, roughness: fin.r,
+        envMap: fin.spangle ? softEnv : envMap, envMapIntensity: 1.0, side: THREE.DoubleSide});
       if (fin.brushed) Object.assign(mat, { roughnessMap: brushed, bumpMap: brushed, bumpScale: 0.04 });
       if (fin.spangle) Object.assign(mat, { map: spangle, roughnessMap: spangle });
       if (fin.thread && hasUV) Object.assign(mat, { map: threadV, bumpMap: threadV, bumpScale: 0.9 });
@@ -561,6 +575,92 @@
       color: new THREE.Color().setRGB(...color).convertSRGBToLinear(),
       roughness: 0.6, metalness: 0.0, envMapIntensity: 0.3, side: THREE.DoubleSide});
     if (grain) Object.assign(mat, { map: woodTex(grain), bumpMap: woodTex(grain), bumpScale: 0.25, roughness: 0.75 });
+    return mat;
+  }
+  // ---- Part 40: printed parts look printed - layer lines along each part's print Z (a normal tilt across each bead,
+  // fading out once a layer is under ~3 px, so no shimmer far out), the bed face (textured PEI sparkle / smooth gloss),
+  // fiber specks (CF dark, GF light) and PETG's thin-edge glow. No geometry: one shader on the printed materials.
+  // Per mesh: uPrintDir / uPrintOff (file z = dot(dir, p) + off, p in the mesh's own coordinates = the ref build's
+  // frame) and the material's uFiber / uRim; shared: PRINT.layer / bed / lines (panel.js sets them). ----
+  const PRINT = { layer: { value: 0.2 }, bed: { value: 1 }, lines: { value: 1 } };
+  const PRINT_AXIS = { "peter/PeterPlates_w_locations.stl": 1 };   // a layout file: both plates on edge, thickness on file Y
+  function printFrame(src) {                          // a part's print Z from its file's placement A, or null
+    if (!src || src.kind === "bent" || src.kind === "dxf") return null;   // the bent TPU strip: no straight layers
+    const r = src.kind === "peter" ? (peterStyle === "honeycomb" || !src[peterStyle] ? src.closed : src[peterStyle]) : src;
+    if (!r || !r.A) return null;
+    const A = r.A, ax = PRINT_AXIS[r.file] ?? 2, d = [A[0][ax], A[1][ax], A[2][ax]];
+    return { dir: d, off: -(d[0] * A[0][3] + d[1] * A[1][3] + d[2] * A[2][3]) };
+  }
+  // Peter Plates (any style): printed outside face down - the print Z points inward (the bed face's normal outward:
+  // -X on the Min side, +X on Max) and starts at the plate's outermost face (the open layout file's own origin isn't the bed)
+  function bedOutside(mat, geo, name) {
+    const u = mat.userData.print, d = u.uPrintDir.value, out = /_Min$/.test(name) ? -1 : 1;
+    if (d.x * out > 0) d.negate();
+    const p = geo.attributes.position.array;
+    let lo = Infinity;
+    for (let i = 0; i < p.length; i += 3) lo = Math.min(lo, d.x * p[i] + d.y * p[i + 1] + d.z * p[i + 2]);
+    u.uPrintOff.value = -lo;
+  }
+  const PRINT_VS = `
+uniform vec3 uPrintDir; uniform float uPrintOff;
+varying float vPrintZ; varying vec3 vObjPos; varying vec3 vPrintDirV;`;
+  const PRINT_FS = `
+uniform vec3 uPrintDir; uniform float uLayer, uBed, uLines, uFiber, uRim;
+varying float vPrintZ; varying vec3 vObjPos; varying vec3 vPrintDirV;
+float lr4h13(vec3 p) { p = fract(p * 0.1031); p += dot(p, p.zyx + 31.32); return fract((p.x + p.y) * p.z); }
+vec3 lr4h33(vec3 p) { p = fract(p * vec3(0.1031, 0.1030, 0.0973)); p += dot(p, p.yxz + 33.33); return fract((p.xxy + p.yxx) * p.zyx); }
+float lr4F(float x) { float f = fract(x); return f * f - f; }                       // integral of the bead s = 2 fract - 1
+float lr4G(float x) { float s = 2.0 * fract(x) - 1.0; return floor(x) / 3.0 + (s * s * s + 1.0) / 6.0; }   // ... of s^2`;
+  const PRINT_FRAG = `
+{
+  float lines = uLines * step(0.5, dot(uPrintDir, uPrintDir));
+  vec3 pd = normalize(vPrintDirV);
+  float nd = dot(normal, pd);
+  vec3 dp = pd - normal * nd;                         // the print Z along the surface (0 on tops and bottoms)
+  // s = -1 bottom of a bead .. 1 its top, box-filtered over the pixel (w layers wide): no moire, so the lines can
+  // show down to about a pixel a layer
+  float w = max(fwidth(vPrintZ) / uLayer, 1e-4), x = vPrintZ / uLayer;
+  float fade = lines * (1.0 - smoothstep(0.6, 1.2, w));
+  if (fade > 0.0) {
+    float s = (lr4F(x + 0.5 * w) - lr4F(x - 0.5 * w)) / w, s2 = (lr4G(x + 0.5 * w) - lr4G(x - 0.5 * w)) / w;
+    normal = normalize(normal + dp * s * 0.75 * fade);
+    diffuseColor.rgb *= 1.0 - 0.12 * fade * length(dp) * s2;
+  }
+  float near = 1.0 - smoothstep(0.35, 0.9, length(fwidth(vObjPos)) * 5.0);
+  if (lines > 0.0 && nd < -0.9 && abs(vPrintZ) < 0.6 * uLayer) {   // the face that sat on the bed
+    if (uBed > 0.5) {                                 // textured PEI: matte and a little lighter from afar, grain up close
+      float g = 1.0 - smoothstep(0.35, 0.9, length(fwidth(vObjPos)) * 2.5);
+      normal = normalize(normal + (lr4h33(floor(vObjPos * 2.5)) - 0.5) * 0.6 * g);
+      roughnessFactor = max(roughnessFactor, 0.85);
+      diffuseColor.rgb = diffuseColor.rgb * 1.18 + 0.025;
+    }
+    else roughnessFactor *= 0.35;
+  }
+  if (uFiber > 0.5) {
+    float spk = step(0.9, lr4h13(floor(vObjPos * 6.0))) * near;
+    diffuseColor.rgb = mix(diffuseColor.rgb, uFiber > 1.5 ? diffuseColor.rgb * 1.5 + 0.10 : diffuseColor.rgb * 0.5 + 0.02, spk);
+    roughnessFactor = mix(roughnessFactor, 0.4, spk);
+  }
+}`;
+  function printedMaterial(color, frame) {
+    const mat = new THREE.MeshPhysicalMaterial({
+      color: new THREE.Color().setRGB(...color).convertSRGBToLinear(),
+      roughness: 0.42, metalness: 0.0, envMap, envMapIntensity: 0.3, side: THREE.DoubleSide });
+    const u = { uPrintDir: { value: new THREE.Vector3(...(frame ? frame.dir : [0, 0, 0])) }, uPrintOff: { value: frame ? frame.off : 0 },
+      uFiber: { value: 0 }, uRim: { value: 0 }, uLayer: PRINT.layer, uBed: PRINT.bed, uLines: PRINT.lines };
+    mat.userData.print = u;
+    mat.extensions = { derivatives: true };           // fwidth on WebGL 1
+    mat.customProgramCacheKey = () => "lr4-print";
+    mat.onBeforeCompile = (sh) => {
+      Object.assign(sh.uniforms, u);
+      sh.vertexShader = sh.vertexShader.replace("#include <common>", "#include <common>" + PRINT_VS).replace("#include <begin_vertex>",
+        "#include <begin_vertex>\n vPrintZ = dot(uPrintDir, position) + uPrintOff; vObjPos = position;"
+        + " vPrintDirV = (modelViewMatrix * vec4(uPrintDir, 0.0)).xyz + vec3(1e-6);");
+      sh.fragmentShader = sh.fragmentShader.replace("#include <common>", "#include <common>" + PRINT_FS)
+        .replace("#include <normal_fragment_maps>", "#include <normal_fragment_maps>" + PRINT_FRAG)
+        .replace("#include <emissivemap_fragment>", "#include <emissivemap_fragment>\n if (uRim > 0.0) { float fr = 1.0 - abs(dot(normal, normalize(vViewPosition)));"
+          + " totalEmissiveRadiance += diffuseColor.rgb * uRim * fr * fr * fr; }");
+    };
     return mat;
   }
   const pretty = (n) => n.replace(/_/g, " ").replace("29p5", "29.5").replace(" V1", "").replace("Kobalt", "(Kobalt)").trim();
@@ -578,6 +678,8 @@
         return sh;
       });
       const geo = new THREE.ExtrudeGeometry(shapes, { depth: STRUT_T, bevelEnabled: false, curveSegments: 1 });
+      const uv = geo.attributes.uv.array;               // mm -> the wood textures' scale (plywood plates, Part 40)
+      for (let i = 0; i < uv.length; i += 2) { uv[i] /= GRAIN_MM[0]; uv[i + 1] /= GRAIN_MM[1]; }
       geo.applyMatrix4(new THREE.Matrix4().set(...LR4Model.plateFrame(cfg, key, S), 0, 0, 0, 1));
       out.push({ rec, geo });
     }
@@ -773,7 +875,7 @@
       mount = { front, sp, block: [st.min.x, front, low, st.max.x, front + 60, st.min.z] };
     }
     const ud = (name, label, extra) => Object.assign({ name, label, group: "Pendant", motion: "table", source: "pendant", base }, extra);
-    const out = PENDANT.parts.map(([part, label, role]) => [pendant.geos[part], material(PRINT_ROLE[role], null),
+    const out = PENDANT.parts.map(([part, label, role]) => [pendant.geos[part], printedMaterial(PRINT_ROLE[role], null),   // print Z unknown: no lines
       ud("Pendant_" + part, label, { role, color: PRINT_ROLE[role] })]);
     // the spacer: the stand's length, from the apron's bottom (or the stand's base) to the stand's top
     const sx = base.t[0], sz = base.t[2];
@@ -832,7 +934,8 @@
       if (DUST_PARTS.test(o.name)) ud.group = "Shoe";   // own toggle, so the bit shows with the hose on (user 2026-10-20)
       if (o.rec.src) delete ud.variant;              // Peter Plates from files: the style picks the geometry
       if (o.name !== o.rec.meta.name) { ud.label = pretty(o.name); ud.ref = o.rec.meta.name; }
-      const mat = material(ud.color, fin, hasUV);
+      const mat = ud.source === "printed" && !fin ? printedMaterial(ud.color, printFrame(o.rec.src)) : material(ud.color, fin, hasUV);
+      if (o.rec.src && o.rec.src.kind === "peter" && mat.userData.print) bedOutside(mat, geo, o.name);
       if (ud.clip) { ud.clip = Object.assign({}, ud.clip, { p: o.clipP }); mat.clippingPlanes = [new THREE.Plane()]; }
       addMesh(geo, mat, ud);
       tris += n;

@@ -120,6 +120,7 @@
     else spoilFresh(SPOIL.sim);                      // until this size's kept board comes back (if any)
     SPOIL.key = key;
     SPOIL.mesh = jobStockMesh(SPOIL.sim, fr, MDF_RGB);
+    spoilRef();
     scene.add(SPOIL.mesh);
     meshUpdate(SPOIL.sim, SPOIL.mesh, true);
     applyVisibility();
@@ -132,6 +133,7 @@
         sim.markAllDirty();
         meshUpdate(sim, SPOIL.mesh, true);
         SPOIL.laid = "laid" in r ? r.laid : spoilLaidGuess(sim);
+        spoilRef();
         SPOIL.ver++;
         spoilNote();
         handStock();                                 // a stock following it: laid on this one
@@ -146,6 +148,12 @@
     SPOIL.ver++;
     if (SPOIL.laid) Imperfect.warpBoard(sim, SPOIL.laid, spoilBox());
     else { sim.heights.fill(0); sim.markAllDirty(); }
+    spoilRef();
+  }
+  function spoilRef() {                              // the board's shading measures cuts from its surface as laid
+    if (!SPOIL.sim || !SPOIL.mesh) return;
+    const w = SPOIL.laid && typeof SPOIL.laid === "object" ? SPOIL.laid : null;
+    setFresh(SPOIL.sim, SPOIL.mesh, w ? Imperfect.freshHeights(SPOIL.sim, w, spoilBox()).heights : null);
   }
   // a board kept before the warp was kept with it: flat or the warp now if it's still as laid, else not known (= cut)
   function spoilLaidGuess(sim) {
@@ -329,10 +337,9 @@
   // side its own switch, side 2's stops a little apart, the motors letting go when powered down), a warped spoilboard
   // and the router out of tram. AB (above) + js/imperfect.js; every stock sim carves through it (Imperfect.attach). ----
   function abYaml() { return CTL.yaml ? CTL.yaml : yamlBase ? yamlBase.text : null; }
-  function abPulls() {                               // each Y / Z motor's pulloff_mm in the config.yaml in use
-    const y = abYaml();
-    if (AB.set.pull) return Object.assign(abPullsOf(y), AB.set.pull);   // a video's stand-in for a tuned config
-    return abPullsOf(y);
+  function abPulls() {                               // each side's pulloff_mm ([Min end, Max end]) in the config.yaml in use
+    const y = abYaml(), p = AB.set.pull ? Object.assign(abPullsOf(y), AB.set.pull) : abPullsOf(y);   // pull: a video's stand-in
+    return { y: Imperfect.bySide(p.y, AB.set), z: Imperfect.bySide(p.z, AB.set) };
   }
   function abPullsOf(y) {
     if (AB.pullMemo && AB.pullMemo.y === y) return Object.assign({}, AB.pullMemo.p);
@@ -349,7 +356,7 @@
     if (!AB.set.on || !CTL.sim || !CTL.bootM || !CTL.cfg) return null;
     const ms = CTL.cfg.pins.motors, E = {};
     for (const a of ["y", "z"]) {
-      const k = [0, 1].map((n) => ms.findIndex((m) => m.axis === a && m.motor === n));
+      const s2 = Imperfect.side2Motor(AB.set), k = [1 - s2, s2].map((n) => ms.findIndex((m) => m.axis === a && m.motor === n));   // [Min, Max]
       E[a] = k.some((i) => i < 0) ? AB.E[a] : k.map((i) => CTL.bootM[i] + CTL.sim.motorSteps(ms[i].step) / CTL.cfg.steps[a].to).reduce((s1, s2) => s2 - s1);
     }
     return E;
@@ -358,7 +365,7 @@
   function abNote() {
     const f = (v) => Math.abs(v).toFixed(2), E = AB.E;
     $("ab-run").hidden = !AB.set.on;
-    if (!AB.set.on) { $("ab-now").textContent = "Off: a perfect machine (square, level, flat, trammed)."; $("ab-stop-note").textContent = ""; return; }
+    if (!AB.set.on) { $("ab-now").textContent = "Ideal: a perfect machine (square, level, flat, trammed)."; $("ab-stop-note").textContent = ""; return; }
     const st = abStops(), pl = abPulls(), h = Homing.settings(abYaml());
     const res = { y: Imperfect.residual(st.y, pl.y, h.y.positive), z: Imperfect.residual(st.z, pl.z, h.z.positive) };
     const rk = (v) => (Math.abs(v) < 0.005 ? "square" : `racked ${f(v)} mm (the Max side ${v > 0 ? "ahead" : "behind"})`);
@@ -366,23 +373,28 @@
     let t = `Now: the gantry ${rk(E.y)}, the beam ${lv(E.z)}`;
     if (AB.geo) t += `; a cutting-area rectangle's diagonals would differ by ${f(Imperfect.squareness(E, AB.geo, { x0: 0, x1: S.cutX, y0: 0, y1: S.cutY }).diff)} mm`;
     $("ab-now").textContent = t + `. $H leaves it ${rk(res.y)}, ${lv(res.z)}.`;
-    const from = { set: "set here", pulloffs: "what this config's pulloffs make up for", guess: "a GUESS: this config's pulloffs are equal, so $H leaves it that far out" };
+    // where each "stops apart" comes from: set here, what the pulloffs make up for, else a typical amount (equal pulloffs)
+    const from = { set: "set here", pulloffs: "from your pulloffs", guess: "typical" };
+    const why = [st.from.y, st.from.z].includes("guess") ? " Typical = a usual amount; your pulloffs are equal, so $H leaves it that far out." : "";
     $("ab-stop-note").textContent = `Stops apart: Y ${st.y.toFixed(2)} mm (${from[st.from.y]}), Z ${st.z.toFixed(2)} mm (${from[st.from.z]}). ` +
-      `pulloff_mm motor0 / motor1: Y ${pl.y.join(" / ")}, Z ${pl.z.join(" / ")}.`;
+      `Pulloffs, Min / Max end: Y ${pl.y.join(" / ")}, Z ${pl.z.join(" / ")} mm.` + why;
   }
   let abNoteTimer = 0;
   const abNoteSoon = () => { if (!abNoteTimer) abNoteTimer = setTimeout(() => { abNoteTimer = 0; abNote(); }, 300); };
   function abForm() {
     const s = AB.set, v = (id, x) => { $(id).value = x === null || x === undefined || !Number.isFinite(+x) ? "" : +(+x).toFixed(4); };
     $("ab-on").checked = s.on; $("ab-power").checked = s.power;
+    $("ab-mode").querySelectorAll("button[data-v]").forEach((b) => b.setAttribute("aria-pressed", String((b.dataset.v === "real") === s.on)));
+    $("ab-box").hidden = !s.on;                      // the errors only matter (and show) on Real-world
     v("ab-sy", s.stop.y); v("ab-sz", s.stop.z); v("ab-rm", s.rackMax); v("ab-tm", s.tiltMax);
     v("ab-wx", s.warp.x); v("ab-wy", s.warp.y); v("ab-wb", s.warp.bow); v("ab-tx", s.tram.x); v("ab-ty", s.tram.y);
     $("ab-ex").value = String(s.exag);
+    $("ab-m0").querySelectorAll("button[data-v]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.v === s.motor0)));
   }
   function abRead() {
     const n = (id) => { const x = parseFloat($(id).value); return Number.isFinite(x) ? x : null; }, d = (id) => n(id) ?? 0;
     return { on: $("ab-on").checked, power: $("ab-power").checked, stop: { y: n("ab-sy"), z: n("ab-sz") }, rackMax: d("ab-rm"), tiltMax: d("ab-tm"),
-      warp: { x: d("ab-wx"), y: d("ab-wy"), bow: d("ab-wb") }, tram: { x: d("ab-tx"), y: d("ab-ty") }, exag: Number($("ab-ex").value) || 1 };
+      warp: { x: d("ab-wx"), y: d("ab-wy"), bow: d("ab-wb") }, tram: { x: d("ab-tx"), y: d("ab-ty") }, exag: Number($("ab-ex").value) || 1, motor0: AB.set.motor0 };
   }
   // a change (the form, LR4AsBuilt.set, a video): merged into the settings and kept; the switches + drawing follow, and
   // the spoilboard its warp (ask = the form: may ask to lay a cut board again)
@@ -391,10 +403,12 @@
     for (const [k, v] of Object.entries(ch || {})) {
       if (v && typeof v === "object" && cur[k] && typeof cur[k] === "object") Object.assign(cur[k], v); else cur[k] = v;
     }
+    const rewired = cur.motor0 !== AB.set.motor0;
     AB.set = Imperfect.settings(cur);
     try { localStorage.setItem("lr4-asbuilt", JSON.stringify(AB.set)); } catch (e) { /* not kept */ }
     abForm();
-    if (CTL.sim && CTL.bootM && meta) { ctlSwitches(); ctlProbe(); }
+    if (rewired && CTL.sim) ctlBoot();                // which motor is where: FluidNC restarts with each motor on its side
+    else if (CTL.sim && CTL.bootM && meta) { ctlSwitches(); ctlProbe(); }
     spoilRelay(ask);
     handStock();                                     // the stock follows the board (or not) as As built now says
     abRedraw();
@@ -411,6 +425,11 @@
   for (const id of ["ab-on", "ab-power", "ab-sy", "ab-sz", "ab-rm", "ab-tm", "ab-wx", "ab-wy", "ab-wb", "ab-tx", "ab-ty", "ab-ex"])
     $(id).addEventListener("change", () => abSet(abRead(), true));
   $("ab-cycle").addEventListener("click", abPowerCycle);
+  $("ab-mode").addEventListener("click", (e) => {    // Ideal | Real-world = the hidden ab-on checkbox (tests / videos set it)
+    const b = e.target.closest("button[data-v]");
+    if (b && (b.dataset.v === "real") !== $("ab-on").checked) { $("ab-on").checked = b.dataset.v === "real"; abSet(abRead(), true); }
+  });
+  $("ab-m0").addEventListener("click", (e) => { const b = e.target.closest("button[data-v]"); if (b) abSet({ motor0: b.dataset.v }); });
   // the squareness test's rectangle: 25 mm in from the cutting area; deep enough that the V-groove is ~2 of the
   // spoilboard sim's cells wide (Measure reads it to ~0.1 mm then; 1 mm deep would fall between its points): 2.5 mm,
   // 5 in Lite

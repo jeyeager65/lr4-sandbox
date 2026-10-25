@@ -107,7 +107,6 @@
         <div class="variant" id="strut-variant" hidden><span>Strut plates</span>
           <button type="button" data-v="mdf" aria-pressed="true">Permanent (MDF)</button>
           <button type="button" data-v="temp" aria-pressed="false">Temporary (printed)</button></div>
-        <button type="button" class="st-next" data-next="st-opts">Next: Options</button>
       </div>
     </details>
     <details class="step" id="st-opts">
@@ -125,7 +124,6 @@
           <button type="button" data-v="solid" aria-pressed="false">Solid</button>
           <button type="button" data-v="honeycomb" aria-pressed="false">Honeycomb</button>
           <button type="button" data-v="none" aria-pressed="false">None</button></div>
-        <button type="button" class="st-next" data-next="st-shop">Next: Table</button>
       </div>
     </details>
     <details class="step" id="st-shop">
@@ -136,63 +134,128 @@
           <button type="button" data-v="torsion" aria-pressed="false">Torsion box</button></div>
         <div class="field"><label for="table-top">Table height (top of the spoilboard; legs are drawn only)</label>
           <div class="unit-input"><input id="table-top" type="number" step="any" min="1"><span class="u">in</span></div></div>
-        <button type="button" class="st-next" data-next="st-ab">Next: As built</button>
       </div>
     </details>
     <details class="step" id="st-ab">
       <summary><span class="st-n">4</span><span class="st-t" id="h-ab">As built</span><span class="st-dot" id="dot-ab" hidden aria-label="needs a look"></span><span class="st-sum" id="sum-ab"></span></summary>
       <div class="st-body">
-        <label class="check"><input type="checkbox" id="ab-on"> A real machine: a little out of square until it homes</label>
-        <p class="foot">Off = a perfect machine. On: Run shows how far out it is, with Power cycle and a squareness test.</p>
-        <details class="cam" id="ab-box">
-          <summary>Errors</summary>
-          <p class="foot">Each Y and Z motor has its own switch: <code>$H</code> pulls each side to its switch and off by its
-            own <code>pulloff_mm</code>, which squares the gantry and levels the beam. Side 1 = motor0 = the Min end (a GUESS).</p>
-          <div class="trio">
-            <label>Y stops apart<input id="ab-sy" type="number" step="any" placeholder="auto" title="mm the Max side's Y switch trips past the Min side's (empty = what your pulloffs make up for)"></label>
-            <label>Z stops apart<input id="ab-sz" type="number" step="any" placeholder="auto" title="mm the Max side's Z switch trips past the Min side's (empty = what your pulloffs make up for)"></label>
+        <div class="variant" id="ab-mode"><span>The machine <button type="button" class="q" data-help="help-ab" aria-label="About As built" title="About As built">?</button></span>
+          <button type="button" data-v="ideal" aria-pressed="true">Ideal</button>
+          <button type="button" data-v="real" aria-pressed="false">Real-world</button></div>
+        <input type="checkbox" id="ab-on" hidden>
+        <div class="help" id="help-ab" hidden><p><b>Ideal:</b> a perfect machine - square, level, flat and trammed.</p>
+          <p><b>Real-world:</b> like a real LR4, a little out of square until it homes, with a warped spoilboard and the router
+          maybe out of tram. Run shows how far out it is, with Power cycle and a squareness test. Set how far out under Errors.</p></div>
+        <div class="cam ab" id="ab-box" hidden>
+          <h4>Homing fixes <button type="button" class="q" data-help="help-ab-home" aria-label="About homing and squaring" title="About homing and squaring">?</button></h4>
+          <div class="help" id="help-ab-home" hidden><p>Each Y and Z motor has its own switch: <code>$H</code> pulls each side to its
+            switch and off by its own <code>pulloff_mm</code>, which squares the gantry and levels the beam.</p>
+            <p><b>Stops apart:</b> how far the Max side's switch trips past the Min side's (empty = what your pulloffs make up for).
+</p>
+            <p><b>motor0:</b> which end the Y0 / Z0 motors and switches are on. V1E's docs: "Typically, as you face the machine,
+            the left side is Y0 and Z0" (the Min end); some machines are wired the other way. Changing it restarts FluidNC.</p>
+            <p><b>Rack / Beam tilt up to:</b> how far out each side lands at power-up, when the motors let go.</p></div>
+          <div class="variant" id="ab-m0"><span>motor0 (Y0 / Z0) is on the</span>
+            <button type="button" data-v="min" aria-pressed="true">Left (Min end)</button>
+            <button type="button" data-v="max" aria-pressed="false">Right (Max end)</button></div>
+          <div class="pair">
+            <div class="field"><label for="ab-sy">Y stops apart</label>
+              <div class="unit-input"><input id="ab-sy" type="number" step="any" placeholder="auto" title="mm the Max side's Y switch trips past the Min side's"><span>mm</span></div></div>
+            <div class="field"><label for="ab-sz">Z stops apart</label>
+              <div class="unit-input"><input id="ab-sz" type="number" step="any" placeholder="auto" title="mm the Max side's Z switch trips past the Min side's"><span>mm</span></div></div>
           </div>
           <p class="foot" id="ab-stop-note"></p>
-          <label class="check"><input type="checkbox" id="ab-power"> Powered down, the motors let go (racked / off level at each power-up)</label>
-          <div class="trio">
-            <label>Rack up to<input id="ab-rm" type="number" step="any" min="0" title="mm, side 2 ahead of side 1"></label>
-            <label>Beam tilt up to<input id="ab-tm" type="number" step="any" min="0" title="mm, side 2 above side 1"></label>
+          <label class="check"><input type="checkbox" id="ab-power"> Motors let go when powered down (racked / off level at each power-up)</label>
+          <div class="pair">
+            <div class="field"><label for="ab-rm">Rack up to</label>
+              <div class="unit-input"><input id="ab-rm" type="number" step="any" min="0" title="mm, side 2 ahead of side 1"><span>mm</span></div></div>
+            <div class="field"><label for="ab-tm">Beam tilt up to</label>
+              <div class="unit-input"><input id="ab-tm" type="number" step="any" min="0" title="mm, side 2 above side 1"><span>mm</span></div></div>
           </div>
-          <p class="foot">Not fixed by homing: a <b>warped spoilboard</b> (changing it lays a new one - asked first if it has cuts; surfacing flattens it) and a
-            <b>router out of tram</b> (lines when surfacing; shim the router mount).</p>
-          <div class="trio">
-            <label>Warp X<input id="ab-wx" type="number" step="any" title="mm the +X end is higher than the -X end"></label>
-            <label>Warp Y<input id="ab-wy" type="number" step="any" title="mm the back is higher than the front"></label>
-            <label>Bow<input id="ab-wb" type="number" step="any" title="mm the middle is above the edges (negative = dished)"></label>
-            <label>Tram X°<input id="ab-tx" type="number" step="any" title="the bit's bottom tilted down toward +X, degrees"></label>
-            <label>Tram Y°<input id="ab-ty" type="number" step="any" title="the bit's bottom tilted down toward +Y, degrees"></label>
-            <label>Draw ×<select id="ab-ex" title="the drawing's rack / tilt, exaggerated (cuts are always true)"><option>1</option><option>10</option><option>25</option><option>50</option><option>100</option></select></label>
+          <h4>Homing doesn't fix <button type="button" class="q" data-help="help-ab-nofix" aria-label="About warp and tram" title="About warp and tram">?</button></h4>
+          <div class="help" id="help-ab-nofix" hidden><p><b>A warped spoilboard:</b> Warp X = the +X end higher than the −X end,
+            Warp Y = the back higher than the front, Bow = the middle above the edges (negative = dished). Changing it lays a new
+            spoilboard (asked first if it has cuts); surfacing flattens it.</p>
+            <p><b>A router out of tram:</b> the bit's bottom tilted down toward +X / +Y. It leaves lines when surfacing; shim the
+            router mount.</p></div>
+          <div class="pair">
+            <div class="field"><label for="ab-wx">Warp X</label>
+              <div class="unit-input"><input id="ab-wx" type="number" step="any" title="mm the +X end is higher than the -X end"><span>mm</span></div></div>
+            <div class="field"><label for="ab-wy">Warp Y</label>
+              <div class="unit-input"><input id="ab-wy" type="number" step="any" title="mm the back is higher than the front"><span>mm</span></div></div>
+            <div class="field"><label for="ab-wb">Bow</label>
+              <div class="unit-input"><input id="ab-wb" type="number" step="any" title="mm the middle is above the edges (negative = dished)"><span>mm</span></div></div>
+            <div></div>
+            <div class="field"><label for="ab-tx">Tram X</label>
+              <div class="unit-input"><input id="ab-tx" type="number" step="any" title="the bit's bottom tilted down toward +X, degrees"><span>°</span></div></div>
+            <div class="field"><label for="ab-ty">Tram Y</label>
+              <div class="unit-input"><input id="ab-ty" type="number" step="any" title="the bit's bottom tilted down toward +Y, degrees"><span>°</span></div></div>
           </div>
-        </details>
-        <button type="button" class="st-next" data-next="st-look">Next: Look</button>
+          <div class="field"><label for="ab-ex">Magnify rack / tilt in the view <button type="button" class="q" data-help="help-ab-ex" aria-label="About magnifying" title="About magnifying">?</button></label>
+            <div class="help" id="help-ab-ex" hidden><p>A rack or beam tilt of a few tenths of a mm can't be seen at actual size. This
+              draws the gantry and beam that many times further out of square so you can see which way it's off.</p>
+              <p>Drawing only: the cuts, the readouts and the G-code always use the real values.</p></div>
+            <select id="ab-ex"><option value="1">Actual size</option><option value="10">10×</option><option value="25">25×</option><option value="50">50×</option><option value="100">100×</option></select></div>
+        </div>
       </div>
     </details>
     <details class="step" id="st-look">
       <summary><span class="st-n">5</span><span class="st-t" id="h-look">Look</span><span class="st-dot" id="dot-look" hidden aria-label="needs a look"></span><span class="st-sum" id="sum-look"></span></summary>
       <div class="st-body">
       <section aria-labelledby="h-colours">
-        <h3 id="h-colours">Print colors</h3>
-        <div class="swatches">
-          <label><input id="c-main" type="color" value="#292a2e"> Main</label>
-          <label><input id="c-accent" type="color" value="#cc1f1a"> Accent</label>
-          <button id="c-reset" type="button">Reset</button>
-        </div>
+        <h3 id="h-colours">Filaments <button type="button" class="q" data-help="help-fil" aria-label="About filaments" title="About filaments">?</button></h3>
+        <div class="variant" id="fil-preset"><span>Preset</span>
+          <button type="button" data-v="classic" aria-pressed="true">V1E classic</button>
+          <button type="button" data-v="single" aria-pressed="false">Single color</button>
+          <button type="button" data-v="fiber" aria-pressed="false">Fiber upgrade</button></div>
+        <div class="variant" id="fil-mine" hidden><span>Mine</span></div>
+        <div class="fil-edited" id="fil-edited" hidden><span><span id="fil-ed-what">Edited from</span> <b id="fil-from"></b></span>
+          <button type="button" id="fil-update" hidden></button><button type="button" id="fil-save">Save as a preset…</button>
+          <button type="button" id="fil-reset">Reset</button></div>
+        <form class="fil-save" id="fil-save-form" hidden><input id="fil-save-name" maxlength="40" placeholder="Preset name" aria-label="Preset name" required>
+          <button type="submit">Save</button><button type="button" id="fil-save-x">Cancel</button></form>
+        <div class="fil-spools" id="fil-spools"></div>
+        <datalist id="fil-palette"></datalist>
+        <div class="fil-buttons"><button type="button" id="fil-add">Add a filament</button>
+          <button type="button" id="fil-rename" hidden>Rename</button><button type="button" id="fil-del" hidden>Delete this preset</button>
+          <span class="fil-ok" id="fil-ok" role="status"></span></div>
+        <div class="help" id="help-fil" hidden><p>The presets are starting points: change a filament or put a part in another
+          one and save it as your own (kept in this browser; a copied link carries it too).</p>
+          <p>Pick a part, then <b>Printed in</b> on its chip (or in Inspect) to print it in another filament.</p>
+          <p>V1E recommends PLA for rigidity; PET / PC with carbon or glass fiber add heat resistance; the router mounts are
+          often PETG. See <a href="https://docs.v1e.com/lowrider/" target="_blank" rel="noopener">V1E's LowRider docs</a>.
+          The bristles are always TPU.</p></div>
+      </section>
+      <section aria-labelledby="h-printed">
+        <h3 id="h-printed">Printed look <button type="button" class="q" data-help="help-printed" aria-label="About the printed look" title="About the printed look">?</button></h3>
+        <div class="variant" id="fil-look"><span>Layer lines</span>
+          <button type="button" data-v="on" aria-pressed="true">On</button>
+          <button type="button" data-v="off" aria-pressed="false">Off</button></div>
+        <div class="fil-layer"><label for="fil-layer">Layer height</label>
+          <div class="unit-input"><input id="fil-layer" type="number" step="0.01" min="0.08" max="0.6" value="0.2"><span>mm</span></div>
+          <div class="fil-chips" id="fil-layer-chips"></div></div>
+        <div class="variant" id="fil-bed"><span>Bed face</span>
+          <button type="button" data-v="pei" aria-pressed="true">Textured PEI</button>
+          <button type="button" data-v="smooth" aria-pressed="false">Smooth</button></div>
+        <div class="help" id="help-printed" hidden><p>Layer lines along each part's print direction (how its file sits on the
+          bed) and the bed face's finish. They show as you zoom in close and fade out further away. On by default, off in
+          Lite.</p></div>
+      </section>
+      <section aria-labelledby="h-plates">
+        <h3 id="h-plates">Strut plates <button type="button" class="q" data-help="help-plates" aria-label="About the strut plates' look" title="About the strut plates' look">?</button></h3>
+        <div class="fil-plates" id="fil-plates"></div>
+        <div class="help" id="help-plates" hidden><p>How the permanent strut plates look. Visual only: the G-code is the same.</p></div>
       </section>
       <section aria-labelledby="h-scene">
         <h3 id="h-scene">Scene</h3>
-        <div class="variant" id="detail"><span>Detail</span>
+        <div class="variant" id="detail"><span>Detail <button type="button" class="q" data-help="detail-note" aria-label="About Detail" title="About Detail">?</button></span>
           <button type="button" data-v="full" aria-pressed="false">Full</button>
           <button type="button" data-v="lite" aria-pressed="false">Lite</button></div>
-        <p class="foot" id="detail-note"></p>
-        <div class="variant" id="lighting"><span>Lighting</span>
+        <div class="help" id="detail-note" hidden></div>
+        <div class="variant" id="lighting"><span>Lighting <button type="button" class="q" data-help="lighting-note" aria-label="About Lighting" title="About Lighting">?</button></span>
           <button type="button" data-v="real" aria-pressed="false">Realistic</button>
           <button type="button" data-v="simple" aria-pressed="false">Simple</button></div>
-        <p class="foot" id="lighting-note"></p>
+        <div class="help" id="lighting-note" hidden></div>
         <div class="variant" id="scenery"><span>Background</span>
           <button type="button" data-v="shop" aria-pressed="true">Workshop</button>
           <button type="button" data-v="empty" aria-pressed="false">Empty shop</button>
@@ -210,7 +273,6 @@
           <div id="room-warn"></div>
         </div>
       </section>
-        <button type="button" class="st-next" data-next="st-files">Next: Get the files</button>
       </div>
     </details>
     <details class="step" id="st-files">
@@ -219,13 +281,15 @@
       <section aria-labelledby="h-bom">
         <h3 id="h-bom">Bill of materials</h3>
         <div class="bom-open"><button id="bom-btn" type="button" disabled>Open the full BOM</button><span id="bom-sum">Loading…</span></div>
+        <p class="foot">Buy the hardware, kits and printed parts from the
+          <a href="https://www.v1e.com/collections/lowrider-parts" target="_blank" rel="noopener">LowRider parts in the V1E store</a>.</p>
       </section>
       <section aria-labelledby="h-calc">
         <h3 id="h-calc">Cut list (V1E calculator)</h3>
         <table id="calc"><tbody></tbody></table>
       </section>
       <section class="plates" aria-labelledby="h-plates">
-        <h3 id="h-plates">Strut plates</h3>
+        <h3 id="h-plates">Strut plates <button type="button" class="q" data-help="help-plates" aria-label="About the strut plates' look" title="About the strut plates' look">?</button></h3>
         <div id="plate-draw"></div>
         <div class="buttons">
           <button type="button" id="dl-dxf">Download DXF</button>
@@ -290,6 +354,7 @@
   <footer class="foot about-line" id="about"><span id="version"></span><br>
     <a id="fb-issue" href="https://github.com/jeyeager65/lr4-sandbox/issues/new" target="_blank" rel="noopener">Report a problem</a>
     · <a href="https://forum.v1e.com/" target="_blank" rel="noopener">V1E forum</a>
+    · <a href="https://www.v1e.com/collections/lowrider-parts" target="_blank" rel="noopener">V1E store</a>
     · <button type="button" class="link" id="about-btn">About this model</button><br>
     <button type="button" class="link" id="copy-link" title="A link to this machine: size, braces, options, table, room, colours">Copy a link to this build</button></footer>
 </aside>
@@ -382,7 +447,7 @@
     <b id="alarm-h">Alarm</b><p id="alarm-msg"></p>
     <div class="buttons"><button type="button" class="pri" id="alarm-unlock">Unlock ($X)</button><button type="button" id="alarm-home">Home all</button><button type="button" id="alarm-x" aria-label="Dismiss" title="Dismiss">✕</button></div></div></div>
   <div class="mini-dro" id="mini-dro" aria-label="Work position, mm"><span><em>X</em><b id="md-x">–</b></span><span><em>Y</em><b id="md-y">–</b></span><span><em>Z</em><b id="md-z">–</b></span></div>
-  <div class="pick" id="pick" role="status" hidden><div><strong></strong><p></p></div>
+  <div class="pick" id="pick" role="status" hidden><div><strong></strong><p></p><div class="pick-fil" id="pick-fil" hidden><span>Printed in</span><span class="fil-dd"><button type="button" class="fil-dd-btn" aria-haspopup="listbox"></button><span class="fil-dd-menu" role="listbox" hidden></span></span></div></div>
     <button type="button" id="pick-insp" title="Inspect it on its own (double-click a part does too)">Inspect</button><button type="button" id="pick-clear" aria-label="Clear the selection" title="Clear">✕</button></div>
   <div class="insp" id="insp" hidden>
     <button type="button" id="insp-back">← Back to the machine</button>
@@ -401,7 +466,7 @@
       <p class="tool" id="meas-out" role="status" hidden></p>
     </div>
     <details class="insp-card" id="insp-card" open><summary><strong id="insp-h"></strong><em id="insp-n"></em></summary>
-      <div id="insp-list"></div></details>
+      <div class="pick-fil" id="insp-fil" hidden><span>Printed in</span><span class="fil-dd"><button type="button" class="fil-dd-btn" aria-haspopup="listbox"></button><span class="fil-dd-menu" role="listbox" hidden></span></span></div><div id="insp-list"></div></details>
   </div>
   <div class="hint"><span class="h-mouse">Drag to orbit · right-drag to pan · scroll to zoom · <button type="button" class="link" id="keys-btn">? keys</button></span><span class="h-touch">Drag to orbit · two fingers to pan · pinch to zoom</span></div>
   <p class="meas-main" id="meas-main" role="status" hidden></p>
@@ -540,7 +605,7 @@
         <button type="button" id="ab-meas" title="Find the test's four corner crosses in the carved spoilboard / stock and measure both diagonals">Measure the diagonals</button>
       </div>
       <p class="foot" id="ab-sq-note" role="status"></p>
-      <p class="foot">As built is on (Configure > 4 As built).</p>
+      <p class="foot">The machine is Real-world (Configure > 4 As built).</p>
     </div>
   </div>
 </aside>
@@ -699,6 +764,7 @@
 <script src="js/motion_carve.js"></script>
 <script src="js/hand_setup.js"></script>
 <script src="js/imperfect.js"></script>
+<script src="js/filaments.js"></script>
 <script src="js/sd_card.js"></script>
 <script src="js/homing.js"></script>
 <script src="js/fluidnc_sim.js"></script>

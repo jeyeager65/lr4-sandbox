@@ -316,7 +316,7 @@ The rest need Chrome, `parts/`, the size builds or the OpenSCAD goldens, so they
 
 Something placed wrong, a file not recognised, a wrong number: use **Report a problem** in the page's footer. It
 opens a GitHub issue with your size and file checksums filled in. Questions about the LowRider itself go to the
-[V1E forum](https://forum.v1e.com/). What changed per version: [CHANGELOG.md](CHANGELOG.md).
+[V1E forum](https://forum.v1e.com/). Parts to buy: [LowRider parts in the V1E store](https://www.v1e.com/collections/lowrider-parts). What changed per version: [CHANGELOG.md](CHANGELOG.md).
 
 ## Layout
 

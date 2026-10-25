@@ -3,6 +3,31 @@
 The version is the sandbox page's (`VERSION` in `web/js/page/job.js`, shown in its footer). The footer also shows
 the date the model data was built and the Printables file set it was solved for.
 
+## 0.44.0 - 2026-10-25
+- **Printed parts look printed** (Configure > Look > Printed look): layer lines along each part's own print direction
+  (from how its STL sits on the bed), showing as you zoom in close and fading out further away; the bed face is
+  Textured PEI or Smooth (the Peter Plates' outside face); the layer height is yours (0.08 - 0.6 mm; 0.12 / 0.2 / 0.28 for a 0.4 nozzle, 0.3 / 0.4 for a
+  0.6). On by default, off in Lite.
+- **Filaments** replace the Main / Accent colors: filaments (named by color + material, "Black PLA") of PLA, PETG, PET-CF, PET-GF, PC-CF or PC-GF in any color
+  (common filament colors suggested), each with its own look (PETG glossy, fiber blends matte with specks). Presets:
+  **V1E classic** (black + red PLA, the top Peter Plate black and the bottom red, the router mounts in PETG), **Single color**, **Fiber upgrade** (the Core, both YZ
+  plates, the two end braces and the router mounts on a PET-CF spool). The presets are starting points: change a filament
+  or a part and it shows "Edited from ...", with Reset and **Save as a preset** (your presets, kept in this browser: save changes over them, rename, delete).
+  Put any part in any filament with **Printed in** on the selection chip or in Inspect. The bristles are always TPU. Kept in this browser
+  and in the share link (older links' main= / accent= still work).
+- **The EMT looks round again:** the galvanized tubes are softer and reflect a soft top-to-bottom studio instead of the box-room one,
+  whose walls showed up as flat bands with hard steps (the tubes read as rounded squares).
+- **Printed in** shows each filament's color swatch and name, not a hex code.
+- A link to the **LowRider parts in the V1E store** (Get the files > Bill of materials, the footer, the README).
+- The Design steps' **Next** buttons are gone (open any step from its header).
+- **Fixed:** a warped spoilboard (Real-world) showed as cut everywhere but an oval at its high spot; cuts are now measured from the board as laid.
+- **As built is in the share link** (ab=1 = Real-world, abx = its errors that differ from the defaults).
+- **As built: Ideal | Real-world** in place of the checkbox; the Errors only show (and count) on Real-world. New:
+  which end motor0 (Y0 / Z0) is on - Left (Min end, V1E's usual: "as you face the machine, the left side is Y0 and Z0") or
+  Right; the switches, pulloffs and readouts follow it. "Magnify rack / tilt in the view" (was Exaggerate the drawing).
+- **As built cleaned up:** fields with units in two columns that fit the panel, Homing fixes / Homing doesn't fix groups, explanations behind "?", Exaggerate the drawing as its own choice.
+- **Strut plates' material:** MDF, hardboard, plywood or acrylic, a color each, front and bottom set apart (visual only).
+
 ## 0.43.3 - 2026-10-25
 - **Homing no longer fails on a busy PC** (FluidNC wasm-sim 8755cc99): the simulated switches missed a re-press after homing's pull-off when the PC was busy or the machine fast (ALARM 9 / 8, or the two motors a step apart); now 0 of 15 at 10x with the CPU busy, was 3 of 15 (`node tests/stress_homing.js`).
 - **Resume waits for the touch plate:** at the probe's holds, Resume (the popup, the Hold button or the pendant) waits until the plate, clip and shoe bottom have finished moving (the popup says so); in Preview the plate now goes home at the Remove Probe pause too, not after it. The animation keeps to about real time on a slow GPU.

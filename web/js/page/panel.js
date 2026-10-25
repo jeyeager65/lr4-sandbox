@@ -358,42 +358,283 @@
     un.textContent = `Show ${n} hidden part${n === 1 ? "" : "s"}`;
   }
 
-  // ---- print colours: the printed parts come in two colours (main, accent); the pickers recolour each set.
-  // The choice is kept in this browser only. ----
+  // ---- Part 40: filaments. The printed parts are in filaments (material + color: js/filaments.js; "spools" in the
+  // code); a part's filament comes from the preset's rule (main / accent by its data color, the router mounts, the fiber
+  // parts) unless the user picked one (Printed in: the selection chip, Inspect). The bristles are always TPU. Presets are
+  // starting points; the user's own are saved (lr4-fil-presets). Kept in this browser (lr4-filaments) + the share link. Also the printed look (scene.js PRINT) and the strut plates' material. ----
   const PRINT_ROLE = { main: [0.16, 0.16, 0.18], accent: [0.80, 0.12, 0.10] };   // build.py PRINT_MAIN / PRINT_ACCENT
-  const PRINT_DEFAULT = { main: "#292a2e", accent: "#cc1f1a" };
-  const pick = { main: document.getElementById("c-main"), accent: document.getElementById("c-accent") };
+  const FIL = { s: LR4Filaments.defaults(), map: new Map(), saved: [] };
+  function filSave() { try { localStorage.setItem("lr4-filaments", JSON.stringify(FIL.s)); } catch (e) { /* not kept */ } }
+  function filSavePresets() { try { localStorage.setItem("lr4-fil-presets", JSON.stringify(FIL.saved)); } catch (e) { /* not kept */ } }
+  function filLoad() {
+    let s = null;
+    try { s = JSON.parse(localStorage.getItem("lr4-filaments") || "null"); } catch (e) { /* defaults */ }
+    if (!s) {                                         // before Part 40: two colors (print-main / print-accent)
+      s = LR4Filaments.defaults();
+      try {
+        const c0 = localStorage.getItem("print-main"), c1 = localStorage.getItem("print-accent");
+        if (c0) s.spools[0].color = c0;
+        if (c1) s.spools[1].color = s.spools[2].color = c1;
+      } catch (e) { /* defaults */ }
+    }
+    FIL.s = LR4Filaments.clean(s);
+    try { FIL.saved = LR4Filaments.cleanSaved(JSON.parse(localStorage.getItem("lr4-fil-presets") || "[]")); } catch (e) { FIL.saved = []; }
+  }
+  const isPrinted = (m) => !m.userData.standin && !!m.userData.role && !!(m.material.userData && m.material.userData.print);
   function assignRoles() {
     for (const m of meshes) {
       const p = m.userData;
-      if (p.source !== "printed" || p.standin) continue;   // stand-ins (Part 38) stay grey
+      if (p.source !== "printed" || p.standin || p.role) continue;   // stand-ins (Part 38) stay grey; the pendant has its own
       for (const [role, c] of Object.entries(PRINT_ROLE))
         if (p.color.every((v, i) => Math.abs(v - c[i]) < 0.02)) p.role = role;
+      if (!p.role) p.role = "main";
     }
   }
-  function applyColours(only) {
-    for (const role of Object.keys(pick)) {
-      if (only && only !== role) continue;
-      const col = new THREE.Color(pick[role].value).convertSRGBToLinear();
-      for (const m of meshes) if (m.userData.role === role) m.material.color.copy(col);
+  const _cx = new THREE.Vector3();
+  function partCx(m) {
+    if (!m.geometry.boundingBox) m.geometry.computeBoundingBox();
+    return m.geometry.boundingBox.getCenter(_cx).x + (m.userData.base ? m.userData.base.t[0] : 0);
+  }
+  function applyColours(quiet) {                      // every printed mesh from its spool, the look, the plates
+    const list = meshes.filter(isPrinted), on = LR4Filaments.lookOn(FIL.s, lite);
+    FIL.map = LR4Filaments.assign(list.map((m) => ({ name: m.userData.name, role: m.userData.role, cx: partCx(m) })), FIL.s);
+    PRINT.lines.value = on ? 1 : 0;
+    PRINT.layer.value = FIL.s.layer;
+    PRINT.bed.value = FIL.s.bed === "pei" ? 1 : 0;
+    for (const m of list) {
+      const i = FIL.map.get(m.userData.name), sp = i >= 0 ? FIL.s.spools[i] : null;
+      const L = LR4Filaments.MATERIALS[sp ? sp.mat : "TPU"], mat = m.material, u = mat.userData.print;
+      if (sp) mat.color.set(sp.color).convertSRGBToLinear();
+      else mat.color.setRGB(...m.userData.color).convertSRGBToLinear();
+      mat.roughness = L.rough;
+      mat.clearcoat = L.clear;
+      mat.clearcoatRoughness = 0.25;
+      u.uFiber.value = on ? L.fiber : 0;
+      u.uRim.value = L.rim;
     }
+    for (const m of meshes) {                         // the strut plates (permanent struts only)
+      const k = { StrutPlate_Front: "front", StrutPlate_Bottom: "bottom" }[m.userData.name];
+      if (!k) continue;
+      const p = FIL.s.plates[k], P = LR4Filaments.PLATES[p.mat], mat = m.material, map = P.grain ? woodTex(P.grain) : null, see = !!P.opacity;
+      mat.color.set(p.color).convertSRGBToLinear();
+      if (mat.map !== map || mat.transparent !== see) {
+        Object.assign(mat, { map, bumpMap: map, bumpScale: 0.25, transparent: see, depthWrite: !see, needsUpdate: true });
+      }
+      mat.opacity = P.opacity || 1;
+      mat.roughness = P.rough;
+    }
+    if (!quiet) filUI();
+  }
+  // a "Printed in" menu for these parts (mesh names): By the preset, or a spool, each with its color swatch + name (a
+  // native select can't show colors); several parts may be mixed. host: the .pick-fil label's .fil-dd
+  const spoolText = (i) => LR4Filaments.filamentName(FIL.s, i);
+  function swatchEl(color) { const e = document.createElement("i"); e.className = "fil-sw"; e.style.background = color; return e; }
+  function filSelect(host, names) {
+    const own = names.map((n) => FIL.s.parts[n]), same = own.every((v) => v === own[0]);
+    const rule = names.length === 1 ? FIL.map.get(names[0]) : null;
+    const cur = !same ? "mixed" : own[0] === undefined ? "" : String(own[0]);
+    const items = [["", rule !== null && rule >= 0 ? `By the preset (${spoolText(rule)})` : "By the preset", rule !== null && rule >= 0 ? FIL.s.spools[rule].color : null],
+      ...FIL.s.spools.map((sp, i) => [String(i), spoolText(i), sp.color])];
+    const btn = host.querySelector(".fil-dd-btn"), menu = host.querySelector(".fil-dd-menu");
+    const shown = items.find(([v]) => v === cur);
+    btn.textContent = "";
+    if (shown && shown[2]) btn.append(swatchEl(shown[2]));
+    btn.append(document.createTextNode(shown ? shown[1] : "Mixed"));
+    btn.dataset.v = cur;
+    menu.textContent = "";
+    for (const [v, t, c] of items) {
+      const o = document.createElement("button");
+      o.type = "button"; o.setAttribute("role", "option"); o.dataset.v = v;
+      o.setAttribute("aria-selected", String(v === cur));
+      if (c) o.append(swatchEl(c));
+      o.append(document.createTextNode(t));
+      o.addEventListener("click", () => {
+        menu.hidden = true;
+        for (const n of names) { if (v === "") delete FIL.s.parts[n]; else FIL.s.parts[n] = +v; }
+        filSave();
+        applyColours();
+        if (INSPECT) inspectScene();
+      });
+      menu.append(o);
+    }
+    btn.onclick = () => { menu.hidden = !menu.hidden; if (!menu.hidden) (menu.querySelector('[aria-selected="true"]') || menu.firstChild).focus(); };
+  }
+  document.addEventListener("pointerdown", (e) => {   // a click outside closes an open menu
+    for (const m of document.querySelectorAll(".fil-dd-menu:not([hidden])")) if (!m.parentNode.contains(e.target)) m.hidden = true;
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") for (const m of document.querySelectorAll(".fil-dd-menu:not([hidden])")) { m.hidden = true; m.parentNode.querySelector(".fil-dd-btn").focus(); }
+  });
+  function filPick(m) {                               // the selection chip (hose_bom.js select)
+    const box = document.getElementById("pick-fil"), show = !!(m && isPrinted(m) && FIL.map.get(m.userData.name) >= 0);
+    box.hidden = !show;
+    if (show) filSelect(box.querySelector(".fil-dd"), [m.userData.name]);
+  }
+  function filInspect(list) {                         // Inspect's card: every printed part in the set
+    const box = document.getElementById("insp-fil"), names = list.filter((m) => isPrinted(m) && FIL.map.get(m.userData.name) >= 0).map((m) => m.userData.name);
+    box.hidden = !names.length;
+    if (names.length) filSelect(box.querySelector(".fil-dd"), names);
+  }
+  function filUI() {                                  // the Look step's controls from FIL.s
+    const s = FIL.s, $ = (id) => document.getElementById(id);
+    const press = (id, v) => $(id).querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.v === v)));
+    const ed = LR4Filaments.edited(s, FIL.saved), mineOn = !!(s.saved && FIL.saved.some((p) => p.name === s.saved));
+    press("fil-preset", ed || mineOn ? "" : s.preset);
+    const mine = $("fil-mine");
+    mine.hidden = !FIL.saved.length;
+    mine.querySelectorAll("button").forEach((b) => b.remove());
+    for (const p of FIL.saved) {
+      const b = document.createElement("button");
+      b.type = "button"; b.dataset.v = p.name; b.textContent = p.name;
+      b.setAttribute("aria-pressed", String(!ed && s.saved === p.name));
+      mine.append(b);
+    }
+    $("fil-edited").hidden = !ed;
+    $("fil-from").textContent = LR4Filaments.sourceOf(s, FIL.saved).label;
+    $("fil-ed-what").textContent = mineOn ? "Unsaved changes to" : "Edited from";   // yours: save over it; a built-in: save as
+    $("fil-update").hidden = !mineOn;
+    if (mineOn) $("fil-update").textContent = `Save "${s.saved}"`;
+    $("fil-save").textContent = mineOn ? "Save as new…" : "Save as a preset…";
+    $("fil-del").hidden = !(mineOn && !ed);
+    $("fil-rename").hidden = !mineOn;
+    if (mineOn) $("fil-del").textContent = `Delete "${s.saved}"`;
+    press("fil-bed", s.bed);
+    const on = LR4Filaments.lookOn(s, lite);
+    press("fil-look", on ? "on" : "off");
+    if (document.activeElement !== $("fil-layer")) $("fil-layer").value = s.layer;
+    $("fil-layer-chips").querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(+b.dataset.v === s.layer)));
+    const count = s.spools.map(() => 0);
+    for (const v of FIL.map.values()) if (v >= 0) count[v]++;
+    const host = $("fil-spools");
+    host.textContent = "";
+    s.spools.forEach((sp, i) => {
+      const row = document.createElement("div");
+      row.className = "fil-row";
+      const nm = spoolText(i);
+      row.innerHTML = `<input type="color" list="fil-palette" aria-label="${nm}: color">`
+        + `<select aria-label="${nm}: material">${LR4Filaments.NAMES.filter((n) => n !== "TPU").map((n) => `<option>${n}</option>`).join("")}</select>`
+        + `<span class="fil-n">${nm}</span><em>${count[i]} part${count[i] === 1 ? "" : "s"}</em>`
+        + (s.spools.length > 1 ? `<button type="button" aria-label="Remove ${nm}" title="Remove (its parts go back to the preset)">✕</button>` : "");
+      const [col, mat] = [row.querySelector("input"), row.querySelector("select")];
+      col.value = sp.color;
+      mat.value = sp.mat;
+      col.addEventListener("input", () => {
+        sp.color = col.value;
+        host.querySelectorAll(".fil-n").forEach((e, j) => (e.textContent = spoolText(j)));
+        filSave(); applyColoursSoon();
+      });
+      mat.addEventListener("change", () => { sp.mat = mat.value; filSave(); applyColours(); });
+      const x = row.querySelector("button");
+      if (x) x.addEventListener("click", () => { FIL.s = LR4Filaments.removeSpool(s, i); filSave(); applyColours(); });
+      host.append(row);
+    });
+    const ph = $("fil-plates");
+    ph.textContent = "";
+    for (const k of ["front", "bottom"]) {
+      const p = s.plates[k], row = document.createElement("div");
+      row.className = "fil-row";
+      row.innerHTML = `<span class="fil-n">${k === "front" ? "Front" : "Bottom"}</span><select aria-label="${k} plate material">`
+        + Object.entries(LR4Filaments.PLATES).map(([v, P]) => `<option value="${v}">${P.label}</option>`).join("")
+        + `</select><input type="color" aria-label="${k} plate color">`;
+      const [mat, col] = [row.querySelector("select"), row.querySelector("input")];
+      mat.value = p.mat;
+      col.value = p.color;
+      mat.addEventListener("change", () => { s.plates[k] = { mat: mat.value, color: LR4Filaments.PLATES[mat.value].color }; filSave(); applyColours(); });
+      col.addEventListener("input", () => { p.color = col.value; filSave(); applyColoursSoon(); });
+      ph.append(row);
+    }
+    if (selected) filPick(selected);
+  }
+  let colourTimer = 0;                                // a color picker fires input while dragging: one redraw a frame,
+  function applyColoursSoon() {                       // and the rows aren't rebuilt under the open picker
+    if (!colourTimer) colourTimer = requestAnimationFrame(() => { colourTimer = 0; applyColours(true); });
   }
   function setupColours() {                           // once
-    for (const role of Object.keys(pick)) {
-      let saved = null;
-      try { saved = localStorage.getItem("print-" + role); } catch (e) { /* storage blocked: defaults */ }
-      if (saved && /^#[0-9a-f]{6}$/i.test(saved)) pick[role].value = saved;
-      pick[role].addEventListener("input", () => {
-        applyColours(role);
-        try { localStorage.setItem("print-" + role, pick[role].value); } catch (e) { /* not kept */ }
-      });
+    filLoad();
+    const $ = (id) => document.getElementById(id), dl = $("fil-palette");
+    for (const [name, c] of LR4Filaments.PALETTE) { const o = document.createElement("option"); o.value = c; o.label = name; dl.append(o); }
+    for (const [h, n] of LR4Filaments.LAYER.presets) {
+      const b = document.createElement("button");
+      b.type = "button"; b.dataset.v = h; b.textContent = h;
+      b.title = `${h} mm (${n} mm nozzle)`;
+      $("fil-layer-chips").append(b);
     }
-    document.getElementById("c-reset").addEventListener("click", () => {
-      for (const role of Object.keys(pick)) {
-        pick[role].value = PRINT_DEFAULT[role];
-        try { localStorage.removeItem("print-" + role); } catch (e) { /* fine */ }
+    $("fil-layer-chips").addEventListener("click", (e) => {
+      const b = e.target.closest("button");
+      if (b) { FIL.s.layer = +b.dataset.v; filSave(); applyColours(); }
+    });
+    $("fil-layer").addEventListener("change", () => {
+      const v = parseFloat($("fil-layer").value), L = LR4Filaments.LAYER;
+      if (v >= L.min && v <= L.max) FIL.s.layer = +v.toFixed(3);
+      filSave(); applyColours();
+    });
+    $("fil-preset").addEventListener("click", (e) => {
+      const b = e.target.closest("button");
+      if (b) { FIL.s = LR4Filaments.setPreset(FIL.s, b.dataset.v); filSave(); applyColours(); }
+    });
+    for (const [id, k] of [["fil-bed", "bed"], ["fil-look", "look"]])
+      $(id).addEventListener("click", (e) => {
+        const b = e.target.closest("button");
+        if (b) { FIL.s[k] = b.dataset.v; filSave(); applyColours(); }
+      });
+    $("fil-add").addEventListener("click", () => {
+      if (FIL.s.spools.length >= 12) return;
+      FIL.s.spools.push({ mat: "PLA", color: LR4Filaments.PALETTE[FIL.s.spools.length % LR4Filaments.PALETTE.length][1] });
+      filSave(); applyColours();
+    });
+    $("fil-mine").addEventListener("click", (e) => {
+      const b = e.target.closest("button"), p = b && FIL.saved.find((x) => x.name === b.dataset.v);
+      if (p) { FIL.s = LR4Filaments.useSaved(FIL.s, p); filSave(); applyColours(); }
+    });
+    $("fil-reset").addEventListener("click", () => { FIL.s = LR4Filaments.resetTo(FIL.s, FIL.saved); filSave(); applyColours(); });
+    const form = $("fil-save-form");
+    let renaming = false;                             // the name box saves a new preset, or renames yours
+    function askName(rename) {
+      renaming = rename;
+      form.hidden = false;
+      form.querySelector('button[type="submit"]').textContent = rename ? "Rename" : "Save";
+      $("fil-save-name").value = rename ? FIL.s.saved : "";
+      $("fil-save-name").focus();
+      $("fil-save-name").select();
+    }
+    $("fil-save").addEventListener("click", () => askName(false));
+    $("fil-rename").addEventListener("click", () => askName(true));
+    $("fil-save-x").addEventListener("click", () => { form.hidden = true; });
+    let okTimer = 0;
+    function saved(name) {                            // keep it, say so for a few seconds
+      [FIL.saved, FIL.s] = LR4Filaments.saveAs(FIL.saved, FIL.s, name);
+      form.hidden = true;
+      filSavePresets(); filSave(); applyColours();
+      $("fil-ok").textContent = `Saved to "${name}" ✓`;
+      clearTimeout(okTimer);
+      okTimer = setTimeout(() => ($("fil-ok").textContent = ""), 4000);
+    }
+    form.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const name = $("fil-save-name").value.trim();
+      if (!name) return;
+      const old = renaming && FIL.s.saved;
+      if (old === name) { form.hidden = true; return; }
+      if (FIL.saved.some((p) => p.name === name) && !confirm(`Replace your preset "${name}"?`)) return;
+      if (old) {                                      // rename: the stored preset keeps its filaments (edits stay unsaved)
+        FIL.saved = FIL.saved.filter((p) => p.name !== name).map((p) => (p.name === old ? Object.assign({}, p, { name }) : p));
+        FIL.s = Object.assign({}, FIL.s, { saved: name });
+        form.hidden = true;
+        filSavePresets(); filSave(); applyColours();
+        $("fil-ok").textContent = `Renamed to "${name}" ✓`;
+        clearTimeout(okTimer);
+        okTimer = setTimeout(() => ($("fil-ok").textContent = ""), 4000);
+        return;
       }
-      applyColours();
+      saved(name);
+    });
+    $("fil-update").addEventListener("click", () => { if (FIL.s.saved) saved(FIL.s.saved); });
+    $("fil-del").addEventListener("click", () => {
+      const name = FIL.s.saved;
+      if (!name || !confirm(`Delete the preset "${name}"? The filaments stay as they are.`)) return;
+      FIL.saved = FIL.saved.filter((p) => p.name !== name);
+      FIL.s = Object.assign({}, FIL.s, { saved: null });
+      filSavePresets(); filSave(); applyColours();
     });
   }
 

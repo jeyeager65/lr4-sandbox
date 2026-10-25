@@ -4,8 +4,10 @@
 // gantry comes up racked and the beam at a different height each side: random-ish, per power-up). Homing pulls each
 // side to its own switch and off by its own pulloff, so it squares / levels the machine. Not fixed by homing: the
 // spoilboard isn't flat (surfacing flattens it) and the router can be out of tram (shimming its mount fixes it).
-// Sides: the axis' motor0 = side 1 (the Min end, x = geo.xA), motor1 = side 2 (the Max end, geo.span further on) -
-// a GUESS of V1E's wiring; E = { y: side 2 - side 1 (rack, mm), z: side 2 - side 1 (beam tilt, mm) }. Table frame =
+// Sides: side 1 = the Min end (x = geo.xA), side 2 = the Max end (geo.span further on). Which motor is where: V1E's
+// docs: "Typically, as you face the machine, the left side is Y0 and Z0" -> motor0 = side 1 (settings motor0 "min",
+// the default); machines wired the other way: motor0 "max" (side2Motor). E = { y: side 2 - side 1 (rack, mm),
+// z: side 2 - side 1 (beam tilt, mm) }. Table frame =
 // mm from the cutting area's front-left corner, Z up from the spoilboard's top (as js/hand_setup.js).
 // Plain JS: tests/test_imperfect.js.
 (function (root) {
@@ -15,11 +17,12 @@
   // = how much higher the +X / back end is, bow = the middle above the edges, negative = dished); tram (deg: the bit's
   // bottom tilted down toward +X / +Y); exag = the drawing's factor on rack / tilt (0.5 mm is invisible at 1x).
   // Off by default (user 2026-10-23: "at least for now")
-  const DEFAULTS = { on: false, stop: { y: null, z: null }, power: true, rackMax: 2, tiltMax: 1.5,
+  const DEFAULTS = { on: false, motor0: "min", stop: { y: null, z: null }, power: true, rackMax: 2, tiltMax: 1.5,
     warp: { x: 0.3, y: -0.2, bow: 0.4 }, tram: { x: 0, y: 0 }, exag: 1, pull: null };
   // pull = { y: [p0, p1], z: [p0, p1] }: per-motor pulloff_mm in place of the config.yaml's (a video's stand-in for a
   // tuned config; FluidNC boots with them written in, withPulloffs), null = the config's
-  // the stop offsets used when the config's pulloffs are equal (V1E's file: 4 / 4), so it homes out by these - GUESSes
+  // the stop offsets used when the config's pulloffs are equal (V1E's file: 4 / 4), so it homes out by these: a typical
+  // amount (not measured; the user sets theirs in As built)
   const GUESS_STOP = { y: 0.8, z: 0.5 };
 
   function settings(saved) {
@@ -28,9 +31,13 @@
       for (const k of ["on", "power", "rackMax", "tiltMax", "exag"]) if (saved[k] !== undefined) s[k] = saved[k];
       for (const k of ["stop", "warp", "tram"]) if (saved[k]) Object.assign(s[k], saved[k]);
       if (saved.pull && typeof saved.pull === "object") s.pull = JSON.parse(JSON.stringify(saved.pull));
+      if (saved.motor0 === "max") s.motor0 = "max";
     }
     return s;
   }
+  const side2Motor = (set) => (set && set.motor0 === "max" ? 0 : 1);   // the motor number on the Max end (side 2)
+  // per-motor [p0, p1] -> per-side [Min end, Max end]
+  const bySide = (p, set) => (side2Motor(set) === 0 ? [p[1], p[0]] : p);
 
   // each Y / Z motor's pulloff_mm from parsed config values ({"/axes/y/motor1/pulloff_mm": 3.2, ...}; missing = the
   // axis' other motor, else fallback) -> { y: [p0, p1], z: [p0, p1] }
@@ -344,7 +351,33 @@
     return L.join("\n");
   }
 
-  const api = { DEFAULTS, GUESS_STOP, settings, pulloffs, withPulloffs, dirOf, residual, stops, powerUp, tipErr, slopes, warpAt, warpBoard,
+  // ---- the share link (user 2026-10-25): ab=1 (Real-world) + abx = what differs from the defaults, e.g.
+  // abx=m0_max~sy_0.5~wx_-0.3 (pull - a video's stand-in - isn't shared) ----
+  const LINK = [["m0", (s) => s.motor0, (s, v) => (s.motor0 = v === "max" ? "max" : "min")],
+    ["sy", (s) => s.stop.y, (s, v) => (s.stop.y = v === "" ? null : +v)], ["sz", (s) => s.stop.z, (s, v) => (s.stop.z = v === "" ? null : +v)],
+    ["pw", (s) => (s.power ? 1 : 0), (s, v) => (s.power = v !== "0")], ["rm", (s) => s.rackMax, (s, v) => (s.rackMax = +v)],
+    ["tm", (s) => s.tiltMax, (s, v) => (s.tiltMax = +v)], ["wx", (s) => s.warp.x, (s, v) => (s.warp.x = +v)],
+    ["wy", (s) => s.warp.y, (s, v) => (s.warp.y = +v)], ["wb", (s) => s.warp.bow, (s, v) => (s.warp.bow = +v)],
+    ["tx", (s) => s.tram.x, (s, v) => (s.tram.x = +v)], ["ty", (s) => s.tram.y, (s, v) => (s.tram.y = +v)],
+    ["ex", (s) => s.exag, (s, v) => (s.exag = +v || 1)]];
+  function toLink(set) {
+    const d = settings(), q = {}, x = [];
+    if (set.on) q.ab = "1";
+    for (const [k, get] of LINK) if (get(set) !== get(d)) x.push(`${k}_${get(set) === null ? "" : get(set)}`);
+    if (x.length) q.abx = x.join("~");
+    return q;
+  }
+  function fromLink(o) {                              // the link's keys -> settings (null if it has neither)
+    if (o.ab === undefined && o.abx === undefined) return null;
+    const s = settings();
+    s.on = o.ab === "1";
+    for (const t of (o.abx || "").split("~").filter(Boolean)) {
+      const i = t.indexOf("_"), f = LINK.find(([k]) => k === t.slice(0, i)), v = t.slice(i + 1);
+      if (f && (v === "" || f[0] === "m0" || Number.isFinite(+v))) f[2](s, v);
+    }
+    return settings(s);
+  }
+  const api = { DEFAULTS, GUESS_STOP, freshHeights, settings, toLink, fromLink, side2Motor, bySide, pulloffs, withPulloffs, dirOf, residual, stops, powerUp, tipErr, slopes, warpAt, warpBoard,
     freshHeights, boardCut, restField, follow, restAt, tiltPiece, tiltSweep, attach, squareness, diagonals, findCross, readSquare, squareJob };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.Imperfect = api;

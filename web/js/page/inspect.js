@@ -51,7 +51,8 @@
     if (JOB.group) JOB.group.visible = !INSPECT;
     if (!INSPECT) return;
     document.getElementById("insp-h").textContent = INSPECT.label;
-    const ud = meshes.filter((m) => INSPECT.set.has(partId(m)) && fitted(m) && variantOK(m)).map((m) => m.userData);
+    const inSet = meshes.filter((m) => INSPECT.set.has(partId(m)) && fitted(m) && variantOK(m)), ud = inSet.map((m) => m.userData);
+    filInspect(inSet);                                // Part 40: Printed in, for every printed part in the set
     const host = document.getElementById("insp-list");
     host.textContent = "";
     let n = 0;

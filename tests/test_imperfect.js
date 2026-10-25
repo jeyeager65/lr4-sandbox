@@ -163,5 +163,15 @@ for (const [E, d] of [[{ y: 2, z: 0 }, 3], [{ y: 0, z: 0 }, 3], [{ y: 0.8, z: 0.
   ok(!rd.missing && Math.abs(rd.diff - want.diff) < 0.05, `read the cut, rack ${E.y} ${d} mm deep (cell ${s.dx.toFixed(2)}): diagonals ${rd.d1 && rd.d1.toFixed(2)} / ${rd.d2 && rd.d2.toFixed(2)}, diff ${rd.diff && rd.diff.toFixed(3)} vs ${want.diff.toFixed(3)}`);
 }
 ok(IM.readSquare([{ sim: mk(), off: [0, 0, 0] }], { x0: 50, y0: 50, x1: 500, y1: 80 }).missing.length === 4, "nothing cut: missing");
+// which motor is on which end (V1E: Y0 / Z0 on the left = the Min end, the default; some machines the other way)
+ok(IM.settings({}).motor0 === "min" && IM.settings({ motor0: "max" }).motor0 === "max" && IM.settings({ motor0: "x" }).motor0 === "min", "motor0 setting");
+ok(IM.side2Motor(IM.settings({})) === 1 && IM.side2Motor(IM.settings({ motor0: "max" })) === 0, "side 2 (Max end) motor");
+ok(IM.bySide([3, 5], IM.settings({})).join() === "3,5" && IM.bySide([3, 5], IM.settings({ motor0: "max" })).join() === "5,3", "pulloffs by side");
+// the share link
+ok(Object.keys(IM.toLink(IM.settings({}))).length === 0, "link: defaults say nothing");
+const abs = IM.settings({ on: true, motor0: "max", stop: { y: 0.5, z: null }, power: false, warp: { x: -0.3, y: 0, bow: 0.4 }, tram: { x: 0.1, y: 0 }, exag: 25 });
+const abq = IM.toLink(abs);
+ok(abq.ab === "1" && JSON.stringify(IM.fromLink(abq)) === JSON.stringify(abs), `link round trip: ${JSON.stringify(abq)}`);
+ok(IM.fromLink({ units: "mm" }) === null && IM.fromLink({ abx: "sy_x~zz_1" }).stop.y === null, "link: none / junk");
 console.log(`${checks - fails}/${checks} checks passed`);
 process.exit(fails ? 1 : 0);
