@@ -36,9 +36,10 @@ function server(mode, port) {
   return spawn(PY, args, { stdio: "ignore" });
 }
 
-async function chromePage(cport) {
+async function chromePage(cport, o = {}) {           // o.gpu: the real GPU (live help videos), not SwiftShader
   const prof = fs.mkdtempSync(path.join(os.tmpdir(), "fluidnc_test_"));
-  const chrome = spawn(CHROME, ["--headless=new", "--use-angle=swiftshader", "--enable-unsafe-swiftshader",
+  const gl = o.gpu ? ["--use-angle=d3d11", "--ignore-gpu-blocklist", "--enable-gpu-rasterization"] : ["--use-angle=swiftshader", "--enable-unsafe-swiftshader"];
+  const chrome = spawn(CHROME, ["--headless=new", ...gl,
     `--remote-debugging-port=${cport}`, `--user-data-dir=${prof}`, "--window-size=1500,1000", "about:blank"], { stdio: "ignore" });
   let target;
   for (let i = 0; i < 50 && !target; i++) {

@@ -3,6 +3,14 @@
 The version is the sandbox page's (`VERSION` in `web/js/page/job.js`, shown in its footer). The footer also shows
 the date the model data was built and the Printables file set it was solved for.
 
+## 0.48.0 - 2026-10-25
+- **Help videos, played live in the page** (Help ▾ in the top bar, and the welcome card's "Watch the tour"): the
+  machine homes and cuts on its own FluidNC while titles and captions explain it - no recordings. Each one plays on a
+  temporary machine ("Help: <title>") set up the way the video needs; your machine, its settings and its SD card stay
+  as they are, and ✕ Exit brings you back. Pause with ⏸ / Space / a click on the view, drag to look round (Follow gives
+  the camera back). Sound comes on for the video. Jobs play at up to 5×.
+- A G-code file on the SD card with `(Video ...)` lines can be played the same way (⋯ > ▶ Play as a video).
+
 ## 0.44.0 - 2026-10-25
 - **Printed parts look printed** (Configure > Look > Printed look): layer lines along each part's own print direction
   (from how its STL sits on the bed), showing as you zoom in close and fading out further away; the bed face is

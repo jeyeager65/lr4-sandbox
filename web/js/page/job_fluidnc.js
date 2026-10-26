@@ -1,4 +1,4 @@
-// lr4-sandbox page, part 8 of 13: Run G-code on FluidNC (+ Preview's buttons), the SD card.
+// lr4-sandbox page, part 8 of 14: Run G-code on FluidNC (+ Preview's buttons), the SD card.
 // The page's scripts share one global scope (js/page/*.js, loaded in order by index.html): names declared
 // at the top level here are seen by the later files.
   // ---- Run G-code on FluidNC (Part 17): the picked file runs from FluidNC's SD card ($SD/Run=/file). The page
@@ -216,7 +216,11 @@
       go.addEventListener("click", () => sdStart(r.path, go));
       row.append(go, pv);
     }
-    row.append(rowMore(r.path, [["Download", () => save(r.path.split("/").pop(), r.bytes, "sd-status")], ["Delete", () => sdDelete(r.path)]]));
+    const more = [["Download", () => save(r.path.split("/").pop(), r.bytes, "sd-status")], ["Delete", () => sdDelete(r.path)]];
+    // Part 43b: a video script ((Video ...) lines near the top) plays as a help video, on the temporary help machine
+    if (!UI_FILE.test(r.path) && /\(\s*Video\b/i.test(new TextDecoder().decode(r.bytes.subarray(0, 65536))))
+      more.unshift(["▶ Play as a video", () => LR4Help.playFile(r.path.split("/").pop(), sdText(r))]);
+    row.append(rowMore(r.path, more));
     return row;
   }
   async function sdRefresh() {

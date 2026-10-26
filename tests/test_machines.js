@@ -54,6 +54,15 @@ s2.set("lr4-filaments", "x");
 const kept = s2.add("From Bob", M.SHARED);
 ok(s2.settingsOf(kept)["lr4-filaments"] === "x" && !s2.list().some((m) => m.id === M.SHARED), "Save as one of my machines copies it (shared never listed)");
 
+// a help video (Part 43b): the temporary machine "help", fresh each time, never listed; yours stays the active one
+const h = M.create(ls, "#help=why_home", now);
+ok(h.temp && h.help && h.id === M.HELP && h.name === "Help" && h.mine().id === b, "#help=<id> opens the help machine");
+h.set("lr4-opts", "{\"router\":false}");
+ok(ls.getItem("lr4@help/lr4-opts") === "{\"router\":false}" && a2.settingsOf(b)["lr4-opts"] === undefined && ls.getItem("lr4-machine") === b,
+  "its settings stay off yours; yours stays active");
+ok(M.create(ls, "#help=tour", now).get("lr4-opts") === null && !h.list().some((m) => m.id === M.HELP), "the next help video starts fresh; help never listed");
+ok(!M.create(ls, "#helpme", now).temp && !M.isHelpHash("#help=a b") && M.isHelpHash("#help=front_plate"), "only #help=<id> is a help video");
+
 // export / import
 const heights = new Float32Array([0, -0.25, 1.5]), bytes = new TextEncoder().encode("G0 X1\n");
 const file = JSON.parse(JSON.stringify(M.exportOf({ name: "Garage", settings: { "lr4-opts": "{}" },

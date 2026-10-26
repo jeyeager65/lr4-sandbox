@@ -1,4 +1,4 @@
-// lr4-sandbox page, part 3 of 13: the machine's pose (travel), Home ($H).
+// lr4-sandbox page, part 3 of 14: the machine's pose (travel), Home ($H).
 // The page's scripts share one global scope (js/page/*.js, loaded in order by index.html): names declared
 // at the top level here are seen by the later files.
   // ---- the model's pose store: X along the beam, Y along the table (inches from the home switch trip, lr4.STOPS),

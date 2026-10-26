@@ -65,10 +65,24 @@
     <span>Viewing a shared build: nothing of yours changes.</span>
     <button type="button" id="mc-save">Save as one of my machines</button><button type="button" id="mc-back">Back to mine</button>
   </div>
+  <div class="view-pop hv-pop" id="hv-pop" role="dialog" aria-label="Help videos" hidden>
+    <div class="lbl">Help videos <button type="button" class="q" data-help="help-hv" aria-label="About help videos" title="About help videos">?</button></div>
+    <div class="help" id="help-hv" hidden><p>Each video plays live in this page: the machine itself homes, jogs and cuts on
+      FluidNC while captions explain it. It plays on a temporary machine set up the way the video needs (its size,
+      table, As built), so <b>your machine and its files stay exactly as they are</b>; Exit brings you back to them.</p>
+      <p>While it plays: drag the view to look round (Follow gives the camera back), click the view or press Space to
+      pause, ▶ to go on. The sound comes on for the video. Jobs play at up to 5× real time.</p>
+      <p>Any G-code file with <code>(Video ...)</code> comments on the SD card can be played the same way (Run > SD
+      card > ▶ Play as a video).</p></div>
+    <div class="hv-list" id="hv-list" role="list"></div>
+    <p class="foot" id="hv-parts" hidden>Load your part files for the full picture (without them the parts show as grey
+      boxes): <button type="button" class="link" id="hv-parts-btn">Parts</button></p>
+  </div>
   <div class="modes" role="group" aria-label="Mode">
     <button type="button" id="t-design" aria-pressed="true">Configure</button><button type="button" id="t-run" aria-pressed="false">Run</button>
   </div>
   <div class="tb-right">
+    <button type="button" id="hv-btn" aria-expanded="false" aria-controls="hv-pop" title="Help videos, played live in this page">Help ▾</button>
     <button type="button" class="parts-chip" id="parts-chip" hidden aria-controls="welcome" title="Your part files: the official STLs, read in this browser">Parts</button>
     <button type="button" class="run-only" id="pw-btn" aria-expanded="false" aria-controls="pw-pop" title="FluidTouch pendant screen and web UIs (WebUI, FigUI) served by FluidNC">Pendant &amp; WebUI ▾</button>
     <button type="button" id="tb-files" title="BOM, cut list, strut plates, config.yaml">Get the files</button>
@@ -500,6 +514,7 @@
     <p class="wc-why">The official LowRider 4 STLs can't ship with this page, so it uses the ones you download. They're
       read in this browser only, nothing is uploaded, and they're kept here for next time. Run and G-code work without them;
       missing parts show as grey boxes.</p>
+    <p class="wc-tour">New here? <button type="button" class="link" id="wc-tour">Watch the tour</button> - it plays live in this page.</p>
     <div class="wc-step"><b>1</b><div><div class="lbl">Download them from Printables</div><div class="wc-src" id="wc-src"></div></div></div>
     <div class="wc-step"><b>2</b><div><div class="lbl">Drop them anywhere on this page</div>
       <p class="foot">The zips as they come, a folder, or the STL / DXF files.</p>
@@ -556,6 +571,18 @@
   <div class="rec-title" id="rec-title" hidden><div></div></div>
   <div class="rec-pip br" id="rec-pip" hidden><canvas id="rec-pip-c" width="800" height="480"></canvas></div>
   <div class="rec-msg" id="rec-msg" hidden></div>
+  <section class="hv-start" id="hv-start" role="dialog" aria-labelledby="hv-start-h" hidden>
+    <h2 id="hv-start-h"></h2><p id="hv-start-p"></p>
+    <p class="foot" id="hv-start-parts" hidden>Your part files aren't loaded, so the parts show as grey boxes - fine for this.</p>
+    <div class="buttons"><button type="button" id="hv-go">▶ Play (sound on)</button><button type="button" class="hv-exit">Exit</button></div>
+  </section>
+  <div class="hv-bar" id="hv-bar" role="toolbar" aria-label="Help video" hidden>
+    <span class="hv-t" id="hv-title"></span><span class="hv-m" id="hv-msg" role="status"></span>
+    <button type="button" id="hv-play" title="Pause (or click the view)" aria-label="Pause">⏸</button>
+    <button type="button" id="hv-again" hidden>Watch again</button>
+    <button type="button" id="hv-follow" hidden title="The camera follows the video again">Follow</button>
+    <button type="button" class="hv-exit" title="Back to your machine, as it was">✕ Exit</button>
+  </div>
   <div class="job-pop" id="job-pop" role="alertdialog" aria-labelledby="job-pop-h" hidden><b id="job-pop-h">Paused (M0)</b><p id="job-pop-msg"></p><div class="trio hs-bit" id="job-pop-bit" hidden>
     <label>Bit<select data-k="shape"><option value="flat">Flat end mill</option><option value="ball">Ball end</option><option value="vbit">V-bit</option></select></label>
     <label>Diameter<input data-k="d" type="number" step="any" min="0.1"></label><label>V angle<input data-k="angle" type="number" step="any" min="10" max="170"></label>
@@ -919,5 +946,6 @@
 <script src="js/page/ui.js"></script>
 <script src="js/page/scripting.js"></script>
 <script src="js/page/director.js"></script>
+<script src="js/page/help.js"></script>
 </body>
 </html>

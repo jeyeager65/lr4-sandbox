@@ -1,4 +1,4 @@
-// lr4-sandbox page, part 10 of 13: Inspect, Inspect tools, measure, touching the pendant's screen.
+// lr4-sandbox page, part 10 of 14: Inspect, Inspect tools, measure, touching the pendant's screen.
 // The page's scripts share one global scope (js/page/*.js, loaded in order by index.html): names declared
 // at the top level here are seen by the later files.
   // ---- Inspect (Part 27): one tree row's set (LR4ShowTree.inspectSet: its parts + the bolts joining them + the

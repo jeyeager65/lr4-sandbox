@@ -1,4 +1,4 @@
-// lr4-sandbox page, part 11 of 13: views, panel tabs, SpaceMouse, VR, share link / picture / keyboard.
+// lr4-sandbox page, part 11 of 14: views, panel tabs, SpaceMouse, VR, share link / picture / keyboard.
 // The page's scripts share one global scope (js/page/*.js, loaded in order by index.html): names declared
 // at the top level here are seen by the later files.
   // ---- views ----
@@ -562,7 +562,7 @@
       await MC.write(id, m);
       MC.go(id);
     });
-    if (MS.temp) {                                    // a shared build: the banner until saved or left
+    if (MS.temp && !MS.help) {                        // a shared build: the banner until saved or left (help: the player's bar)
       $("mc-back").textContent = `Back to ${MS.mine().name}`;
       $("mc-banner").hidden = false;
       $("mc-back").addEventListener("click", () => MC.go());

@@ -1,4 +1,4 @@
-// lr4-sandbox page, part 4 of 13: size inputs, V1E calculator, cut list, strut plate drawing + downloads.
+// lr4-sandbox page, part 4 of 14: size inputs, V1E calculator, cut list, strut plate drawing + downloads.
 // The page's scripts share one global scope (js/page/*.js, loaded in order by index.html): names declared
 // at the top level here are seen by the later files.
   // ---- size inputs, V1E calculator, cut list, strut plate drawing + downloads ----

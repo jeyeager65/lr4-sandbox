@@ -1,4 +1,4 @@
-// lr4-sandbox page, part 1 of 13: the 3D scene: renderer, metals, the machine at the chosen size, Lite mode, your own files, legs, the table, the FluidTouch pendant model, the workshop, Peter Plates.
+// lr4-sandbox page, part 1 of 14: the 3D scene: renderer, metals, the machine at the chosen size, Lite mode, your own files, legs, the table, the FluidTouch pendant model, the workshop, Peter Plates.
 // The page's scripts share one global scope (js/page/*.js, loaded in order by index.html): names declared
 // at the top level here are seen by the later files.
   const IN = 25.4;

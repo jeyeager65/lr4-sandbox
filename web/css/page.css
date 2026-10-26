@@ -839,3 +839,34 @@ button:disabled { opacity: 0.42; cursor: default; }
 .cam.ab h4 { margin: 14px 0 0; font-size: 13px; font-weight: 600; display: flex; align-items: center; }
 .cam.ab .pair { row-gap: 10px; }
 .cam.ab .check { margin-top: 10px; }
+
+/* Help videos (Part 43b, js/page/help.js): the top bar's Help menu, the start card and the player bar over the view */
+.hv-pop { right: 230px; }
+.hv-list { display: flex; flex-direction: column; gap: 2px; margin-top: 6px; }
+.hv-row { display: grid; grid-template-columns: 1fr auto; gap: 1px 10px; text-align: left; border: 1px solid transparent; border-radius: 5px;
+  padding: 6px 8px; background: none; color: var(--ink); font-size: 13px; }
+.hv-row:hover { border-color: var(--line); }
+.hv-row b { font-weight: 600; }
+.hv-row em { font-style: normal; color: var(--muted); font-size: 12px; white-space: nowrap; }
+.hv-row span { grid-column: 1 / -1; color: var(--muted); font-size: 12px; line-height: 1.4; }
+.hv-pop .foot { margin: 8px 0 0; }
+.wc-tour { margin: 0; font-size: 13px; }
+.hv-start { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 9; width: min(420px, calc(100% - 24px));
+  padding: 14px 16px; background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-left: 3px solid var(--accent);
+  border-radius: 8px; box-shadow: 0 10px 32px rgb(0 0 0 / 0.3); }
+#hv-start-h { margin: 0 0 6px; font: 700 17px var(--font-display); letter-spacing: 0; text-transform: none; color: var(--ink); }
+.hv-start p { margin: 0 0 10px; font-size: 13px; line-height: 1.5; color: var(--muted); }
+#hv-go, #hv-again { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.hv-bar { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); z-index: 8; display: flex; align-items: center; gap: 6px;
+  max-width: calc(100% - 24px); padding: 5px 6px 5px 12px; font-size: 13px; color: #fff; background: rgb(0 0 0 / 0.62); border-radius: 999px; }
+.hv-bar[hidden], .hv-start[hidden] { display: none; }
+.hv-bar .hv-t { font: 600 13px var(--font-display); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 40vw; }
+.hv-bar .hv-m { color: #ffe08a; white-space: nowrap; }
+.hv-bar button { border-radius: 999px; padding: 3px 11px; color: #fff; background: rgb(255 255 255 / 0.12); border: 1px solid rgb(255 255 255 / 0.25); }
+.hv-bar button:hover { background: rgb(255 255 255 / 0.22); }
+.hv-bar #hv-play { min-width: 40px; }
+.hv-bar.paused #hv-play { background: var(--accent); border-color: var(--accent); }
+body.help-on .rec-caption { bottom: calc(6% + 44px); }   /* clear of the player bar */
+body.help-on .welcome { display: none; }                 /* the start card says it instead */
+body.help-on.view-only .hv-bar { display: flex; }
+body.help-on :is(.rec-title, .rec-caption, .rec-msg, .rec-badge) { pointer-events: none; }   /* drags and clicks reach the view */

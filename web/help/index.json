@@ -1,0 +1,7 @@
+{
+  "about": "Help videos (Part 43): each is a (Video ...) G-code script the page plays live (js/page/help.js) and tools/record_demo.js records for YouTube. secs = about how long it plays live.",
+  "videos": [
+    { "id": "why_home", "file": "why_home.gcode", "kind": "machine", "secs": 75, "title": "Why home?",
+      "blurb": "Switched on, the gantry is racked and the beam off level: $H squares it, each side to its own switch." }
+  ]
+}

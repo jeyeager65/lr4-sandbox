@@ -6,19 +6,21 @@
 // named <db>@<id>, its spoilboard records keyed <prefix><size>. The first load makes "My LR4" and moves the plain
 // settings keys of older pages into it (the old SD / Flash / spoilboard databases are left behind - user 2026-10-25:
 // no need for backwards compatibility yet). Switching machines reloads the page. A shared link (#WxH&settings) opens as the temporary machine "shared", fresh each time: nothing of yours
-// changes until it is saved as one of yours.
+// changes until it is saved as one of yours. A help video (Part 43b: #help=<id>) plays on the temporary machine "help",
+// fresh each time the same way; Exit goes back to yours.
 // The page reads and writes its settings through MS (MS.get / set / remove: machine keys go to the active machine,
 // the rest pass through). Plain JS + a Storage-like object (tests/test_machines.js); copying the databases needs
 // IndexedDB (SdCard / HandSetup, in the page).
 (function (root) {
   "use strict";
   const MACHINE_KEY = /^(lr4-(asbuilt|cam|config-size|design|filaments|fil-presets|hand|jobdef:.*|lighting|opts|pendant|room|scenery|table-top|sd-sel)|detail|peter-style|peter-style-files|print-main|print-accent)$/;
-  const LIST = "lr4-machines", ACTIVE = "lr4-machine", SHARED = "shared", FIRST = "My LR4";
+  const LIST = "lr4-machines", ACTIVE = "lr4-machine", SHARED = "shared", HELP = "help", FIRST = "My LR4";
   const DBS = ["lr4-sandbox-sd", "lr4-sandbox-flash", "lr4-sandbox-design"];   // design: the front plate's SVG (Part 41)
   const isMachineKey = (k) => MACHINE_KEY.test(k);
   const prefix = (id) => `lr4@${id}/`;
   const dbOf = (id, name) => `${name}@${id}`;
   const isShareHash = (h) => /^#\d+(?:\.\d+)?x\d+(?:\.\d+)?&/.test(h || "");
+  const isHelpHash = (h) => /^#help=[\w.%-]+$/.test(h || "");
 
   // ls: localStorage (or anything with getItem / setItem / removeItem / key / length); hash: location.hash
   function create(ls, hash, now = () => Date.now()) {
@@ -32,7 +34,7 @@
       let l = null;
       try { l = JSON.parse(get(LIST) || "null"); } catch (e) { /* none yet */ }
       if (!Array.isArray(l)) l = [];
-      return l.filter((m) => m && typeof m.id === "string" && m.id && m.id !== SHARED && typeof m.name === "string");
+      return l.filter((m) => m && typeof m.id === "string" && m.id && m.id !== SHARED && m.id !== HELP && typeof m.name === "string");
     }
     const saveList = (l) => put(LIST, JSON.stringify(l));
     const find = (id) => list().find((m) => m.id === id) || null;
@@ -51,10 +53,10 @@
       for (const k of allKeys()) if (k && isMachineKey(k)) { put(prefix(m.id) + k, get(k)); del(k); }
       saveList([m]); put(ACTIVE, m.id);
     }
-    const temp = isShareHash(hash);
+    const help = isHelpHash(hash), temp = help || isShareHash(hash);
     const pick = () => { const a = get(ACTIVE) || ""; return find(a) ? a : list()[0].id; };
-    const id = temp ? SHARED : pick();
-    if (temp) clearSettings(SHARED);                 // fresh each time a link opens
+    const id = help ? HELP : temp ? SHARED : pick();
+    if (temp) clearSettings(id);                     // fresh each time a link / help video opens
 
     function uniqueName(name, skip) {                // "My LR4" taken -> "My LR4 (2)"
       const base = String(name || "").trim() || "Machine", taken = new Set(list().filter((m) => m.id !== skip).map((m) => m.name.toLowerCase()));
@@ -83,9 +85,9 @@
     }
     const use = (mid) => put(ACTIVE, mid);
 
-    const name = temp ? "Shared build" : find(id).name;
+    const name = help ? "Help" : temp ? "Shared build" : find(id).name;
     return {
-      id, temp, name, SHARED,
+      id, temp, help, name, SHARED, HELP,
       // the active machine's view of the store: machine keys under its prefix, the rest as they are
       key: (k) => (isMachineKey(k) ? prefix(id) + k : k),
       get: (k) => get(isMachineKey(k) ? prefix(id) + k : k),
@@ -136,20 +138,20 @@
   }
   const fileName = (name) => (String(name).replace(/[^A-Za-z0-9 _()-]+/g, "").trim().replace(/\s+/g, "_") || "machine") + ".lr4.json";
 
-  const api = { create, isMachineKey, isShareHash, prefix, dbOf, DBS, SHARED, exportOf, importOf, pack, unpack, fileName };
+  const api = { create, isMachineKey, isShareHash, isHelpHash, prefix, dbOf, DBS, SHARED, HELP, exportOf, importOf, pack, unpack, fileName };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else {
     root.LR4Machines = api;
     const ms = root.MS = create(root.localStorage, root.location ? root.location.hash : "");
-    // a shared build starts with empty cards and spoilboard: dropped before the page opens them (IndexedDB runs
-    // requests on one database name in the order they're made)
+    // a shared build / help video starts with empty cards and spoilboard: dropped before the page opens them (IndexedDB
+    // runs requests on one database name in the order they're made)
     if (ms.temp && root.indexedDB) {
-      for (const n of DBS) root.indexedDB.deleteDatabase(dbOf(SHARED, n));
+      for (const n of DBS) root.indexedDB.deleteDatabase(dbOf(ms.id, n));
       const r = root.indexedDB.open("lr4-spoilboard", 1);   // HandSetup.board's store
       r.onupgradeneeded = () => r.result.createObjectStore("boards", { keyPath: "key" });
       r.onsuccess = () => {
         const d = r.result, t = d.transaction("boards", "readwrite"), st = t.objectStore("boards");
-        st.openCursor().onsuccess = (e) => { const c = e.target.result; if (!c) return; if (String(c.key).startsWith(prefix(SHARED))) c.delete(); c.continue(); };
+        st.openCursor().onsuccess = (e) => { const c = e.target.result; if (!c) return; if (String(c.key).startsWith(prefix(ms.id))) c.delete(); c.continue(); };
         t.oncomplete = t.onerror = () => d.close();
       };
     }

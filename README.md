@@ -169,6 +169,17 @@ steppers (TMC2209s in StealthChop, pitched by each axis' step rate), the Kobalt 
 cutting load (it bogs down in a deep cut), the shop vac, the switch clicks when homing and the touch plate tap. The
 same menu has the volume and, for fun, a "robot noises" voice.
 
+### Help videos
+
+**Help ▾** (top bar) lists short videos that play **live in the page**, not as recordings: the machine homes, jogs
+and cuts on its own FluidNC while titles and captions explain it. Each one plays on a temporary machine set up the
+way the video needs (its size, table, As built), so your machine, its settings and its SD card stay exactly as they
+are; **✕ Exit** brings you back. While one plays: ⏸ / ▶ (or Space, or a click on the view) pauses, a drag looks round
+(**Follow** gives the camera back), and the sound comes on for the video. Jobs play at up to 5× (FluidNC's pace in the
+browser). The welcome card offers the tour. The videos are `(Video ...)` G-code scripts in [`web/help/`](web/help/)
+(the list: `web/help/index.json`); the same files make the YouTube versions with `tools/record_demo.js` (below), and
+any G-code file with `(Video ...)` lines on the SD card can be played the same way (its ⋯ menu: **▶ Play as a video**).
+
 ### Around the view
 
 - **Iso / Front / Top / Side / Back / Fit all** (keys **1**-**5**, **F**) set the camera; on a phone they fold into
@@ -290,6 +301,8 @@ node test_strut_cam.js                       # the page's strut plate G-code; vs
 node test_show_tree.js                       # the Show tree, its presets and the inspect sets
 node test_sounds.js                          # the machine sound helpers (stepper pitch, router, cutting load)
 node test_demo_script.js                     # (Video ...) comments -> the video's settings and commands
+node test_page_help.js                       # headless Chrome (GPU): a help video live on the temporary machine,
+                                             #   pause / Follow / the end, Exit leaves your machine as it was
 node test_gcode_play.js                      # G-code playback: pauses, probe, G20/G21, carving frees the plates
 node test_homing.js                          # homing helpers: FluidNC's homing order, pull-offs, MPos
 node test_fluidnc_sim.js                     # parsing FluidNC's output (status reports, ok / error, messages)

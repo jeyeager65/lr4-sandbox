@@ -1,4 +1,4 @@
-// lr4-sandbox page, part 13 of 13: the video director (Part 43a). A (Video ...) script (js/demo_script.js) played in the
+// lr4-sandbox page, part 13 of 14: the video director (Part 43a). A (Video ...) script (js/demo_script.js) played in the
 // page: the settings, shots and orbits, titles, captions, Home / Zero, the job's pace (Speed, REAL easing, the badge),
 // M0 resumes, MSG lines, Show / Inspect / AsBuilt, the park at the end - moved here from tools/record_demo.js word for
 // word (same calls in the same order, so the videos come out the same: the event log, record_demo.js --log).
