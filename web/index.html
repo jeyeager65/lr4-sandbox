@@ -571,6 +571,7 @@
   <div class="rec-title" id="rec-title" hidden><div></div></div>
   <div class="rec-pip br" id="rec-pip" hidden><canvas id="rec-pip-c" width="800" height="480"></canvas></div>
   <div class="rec-msg" id="rec-msg" hidden></div>
+  <div class="ab-exag" id="ab-exag" role="note" hidden></div>
   <section class="hv-start" id="hv-start" role="dialog" aria-labelledby="hv-start-h" hidden>
     <h2 id="hv-start-h"></h2><p id="hv-start-p"></p>
     <p class="foot" id="hv-start-parts" hidden>Your part files aren't loaded, so the parts show as grey boxes - fine for this.</p>
@@ -583,10 +584,29 @@
     <button type="button" id="hv-follow" hidden title="The camera follows the video again">Follow</button>
     <button type="button" class="hv-exit" title="Back to your machine, as it was">✕ Exit</button>
   </div>
-  <div class="job-pop" id="job-pop" role="alertdialog" aria-labelledby="job-pop-h" hidden><b id="job-pop-h">Paused (M0)</b><p id="job-pop-msg"></p><div class="trio hs-bit" id="job-pop-bit" hidden>
-    <label>Bit<select data-k="shape"><option value="flat">Flat end mill</option><option value="ball">Ball end</option><option value="vbit">V-bit</option></select></label>
-    <label>Diameter<input data-k="d" type="number" step="any" min="0.1"></label><label>V angle<input data-k="angle" type="number" step="any" min="10" max="170"></label>
-    <label>Sticks out<input data-k="len" type="number" step="any" min="0"></label></div><div class="buttons"><button type="button" id="job-resume">Resume (cycle start)</button></div></div>
+  <div class="job-pop" id="job-pop" role="alertdialog" aria-labelledby="job-pop-h" hidden><b id="job-pop-h">Paused (M0)</b><p id="job-pop-msg"></p><div id="job-pop-bit" hidden>
+    <div class="lbl">The bit <button type="button" class="q" data-help="help-job-bit" aria-label="About the bit" title="About the bit">?</button></div>
+    <div class="help" id="help-job-bit" hidden><p>The job changes bits here. Set the bit that goes in now - the file's own
+      <code>(ToolDef …)</code> fills it in when it has one - put it in the router, then resume.</p>
+      <p><b>Bit</b>: flat end mill, ball end, bullnose, V-bit, chamfer or tapered ball. <b>Diameter</b> in mm (the
+      cutting diameter). <b>Angle</b>: V-bit / chamfer / tapered ball, tip to tip. <b>Tip</b>: the flat at a V-bit's or
+      chamfer's point, or a tapered ball's ball diameter. <b>Corner radius</b>: a bullnose's. <b>Flutes</b>: how many
+      (0 = not said). <b>Sticks out</b>: mm below the collet, for the drawing only (0 = as the model's bit).
+      The router's collet takes 1/4" shanks at most, so a bit wider than that is drawn on a 1/4" shank.</p>
+      <p><b>From my bits</b>: your bits, kept in this browser for all your machines. They start as the bits in the
+      V1 Engineering store (store ↗ opens a bit's page) and a 3/4" surfacing bit; <b>Save to my bits</b> keeps the one
+      set here, <b>Delete</b> drops the picked one, <b>Reset my bits</b> goes back to the store's list.</p>
+      <p>Your pick is kept for this file.</p></div>
+    <div class="pair">
+      <div class="field bit-lib"><label>From my bits</label><div class="bit-lib-row"><select data-k="lib" aria-label="From my bits"></select><a class="bit-store" target="_blank" rel="noopener" hidden title="This bit in the V1 Engineering store">store ↗</a></div></div>
+      <div class="field"><label>Bit</label><select data-k="shape"><option value="flat">Flat end mill</option><option value="ball">Ball end</option><option value="bullnose">Bullnose</option><option value="vbit">V-bit</option><option value="chamfer">Chamfer</option><option value="taperball">Tapered ball</option></select></div>
+      <div class="field"><label>Diameter</label><div class="unit-input"><input data-k="d" type="number" step="any" min="0.1"><span>mm</span></div></div>
+      <div class="field" data-for="vbit chamfer taperball"><label>Angle</label><div class="unit-input"><input data-k="angle" type="number" step="any" min="10" max="170" title="tip to tip"><span>°</span></div></div>
+      <div class="field" data-for="vbit chamfer taperball"><label>Tip</label><div class="unit-input"><input data-k="tip" type="number" step="any" min="0" title="V-bit / chamfer: the flat at its point; tapered ball: the ball's diameter"><span>mm</span></div></div>
+      <div class="field" data-for="bullnose"><label>Corner radius</label><div class="unit-input"><input data-k="cr" type="number" step="any" min="0"><span>mm</span></div></div>
+      <div class="field"><label>Flutes</label><div class="unit-input"><input data-k="flutes" type="number" step="1" min="0" max="12" title="0 = not said (the drawing only)"><span>#</span></div></div>
+      <div class="field"><label>Sticks out</label><div class="unit-input"><input data-k="len" type="number" step="any" min="0"><span>mm</span></div></div>
+    </div></div><div class="buttons"><button type="button" id="job-resume">Resume (cycle start)</button></div></div>
   <div class="ft-pop" id="ft-pop" role="dialog" aria-labelledby="ft-pop-h" hidden><div class="ft-head"><b id="ft-pop-h">FluidTouch pendant</b>
     <button type="button" id="ft-pop-x" aria-label="Close the pendant screen" title="Close">✕</button></div>
     <canvas id="ft-pop-c" width="800" height="480" aria-label="FluidTouch's screen: click or drag to touch it"></canvas></div>
@@ -713,6 +733,7 @@
         <button type="button" id="ab-meas" title="Find the test's four corner crosses in the carved spoilboard / stock and measure both diagonals">Measure the diagonals</button>
       </div>
       <p class="foot" id="ab-sq-note" role="status"></p>
+      <p class="foot">Measure the diagonals with a steel tape: <a href="https://www.v1e.com/products/3m-metal-measuring-tape-for-calibration" target="_blank" rel="noopener">V1E's calibration tape ↗</a></p>
       <p class="foot">The machine is Real-world (Configure > 4 As built).</p>
     </div>
   </div>
@@ -849,20 +870,30 @@
           <summary>Bit: <span id="hs-bit-name"></span> <button type="button" class="q" data-help="help-bit" aria-label="About the bit" title="About the bit">?</button></summary>
           <div class="help" id="help-bit" hidden><p>What's in the router, for files that don't name their bits with a
             <code>(ToolDef …)</code> line.</p>
-            <p><b>Bit</b>: flat end mill, ball end or V-bit. <b>Diameter</b> in mm. <b>V angle</b>: a V-bit's angle, tip to
-            tip. <b>Sticks out</b>: mm below the collet, for the drawing only (0 = as the model's bit).</p>
+            <p><b>Bit</b>: flat end mill, ball end, bullnose, V-bit, chamfer or tapered ball. <b>Diameter</b> in mm (the
+            cutting diameter). <b>Angle</b>: V-bit / chamfer / tapered ball, tip to tip. <b>Tip</b>: the flat at a V-bit's or
+            chamfer's point, or a tapered ball's ball diameter. <b>Corner radius</b>: a bullnose's. <b>Flutes</b>: how many
+            (0 = not said). <b>Sticks out</b>: mm below the collet, for the drawing only (0 = as the model's bit).
+            The router's collet takes 1/4" shanks at most, so a bit wider than that is drawn on a 1/4" shank.</p>
+            <p><b>From my bits</b>: your bits, kept in this browser for all your machines. They start as the bits in the
+            V1 Engineering store (store ↗ opens a bit's page) and a 3/4" surfacing bit; <b>Save to my bits</b> keeps the one
+            set here, <b>Delete</b> drops the picked one, <b>Reset my bits</b> goes back to the store's list.</p>
             <p><b>Put it in the router</b> swaps it in. A job's tool change (<code>M6</code>) stops and asks which bit goes in,
             and remembers your pick for that file.</p></div>
           <div class="pair" id="hs-bit">
-            <div class="field"><label>Bit</label><select data-k="shape"><option value="flat">Flat end mill</option><option value="ball">Ball end</option><option value="vbit">V-bit</option></select></div>
+            <div class="field bit-lib"><label>From my bits</label><div class="bit-lib-row"><select data-k="lib" aria-label="From my bits"></select><a class="bit-store" target="_blank" rel="noopener" hidden title="This bit in the V1 Engineering store">store ↗</a></div></div>
+            <div class="field"><label>Bit</label><select data-k="shape"><option value="flat">Flat end mill</option><option value="ball">Ball end</option><option value="bullnose">Bullnose</option><option value="vbit">V-bit</option><option value="chamfer">Chamfer</option><option value="taperball">Tapered ball</option></select></div>
             <div class="field"><label>Diameter</label>
               <div class="unit-input"><input data-k="d" type="number" step="any" min="0.1"><span>mm</span></div></div>
-            <div class="field"><label>V angle</label>
+            <div class="field" data-for="vbit chamfer taperball"><label>Angle</label>
               <div class="unit-input"><input data-k="angle" type="number" step="any" min="10" max="170" title="a V-bit's angle, tip to tip"><span>°</span></div></div>
+            <div class="field" data-for="vbit chamfer taperball"><label>Tip</label><div class="unit-input"><input data-k="tip" type="number" step="any" min="0" title="V-bit / chamfer: the flat at its point; tapered ball: the ball's diameter"><span>mm</span></div></div>
+            <div class="field" data-for="bullnose"><label>Corner radius</label><div class="unit-input"><input data-k="cr" type="number" step="any" min="0"><span>mm</span></div></div>
+            <div class="field"><label>Flutes</label><div class="unit-input"><input data-k="flutes" type="number" step="1" min="0" max="12" title="0 = not said (the drawing only)"><span>#</span></div></div>
             <div class="field"><label>Sticks out</label>
               <div class="unit-input"><input data-k="len" type="number" step="any" min="0" title="below the collet (drawing only; 0 = as the model's bit)"><span>mm</span></div></div>
           </div>
-          <div class="buttons"><button type="button" id="hs-bit-use">Put it in the router</button></div>
+          <div class="buttons"><button type="button" id="hs-bit-use">Put it in the router</button><button type="button" id="hs-bit-save" title="Keep this bit in My bits (this browser, every machine)">Save to my bits</button><button type="button" id="hs-bit-del" title="Remove the picked bit from My bits">Delete</button><button type="button" id="hs-bit-reset" title="My bits back to the V1 Engineering store's bits">Reset my bits</button></div>
         </details>
         <details class="cam" id="hs-spoil-box">
           <summary>Spoilboard <button type="button" class="q" data-help="help-spoil" aria-label="About the spoilboard" title="About the spoilboard">?</button></summary>
@@ -906,6 +937,8 @@
 <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/lights/RectAreaLightUniformsLib.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/polygon-clipping@0.15.7/dist/polygon-clipping.umd.min.js"></script>
 <script src="js/machines.js"></script>
+<script src="js/bit_library.js"></script>
+<script src="js/v1e_store.js"></script>
 <script src="js/calculator.js"></script>
 <script src="js/table_model.js"></script>
 <script src="js/strut_plate.js"></script>

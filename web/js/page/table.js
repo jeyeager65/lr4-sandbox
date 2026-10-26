@@ -54,11 +54,44 @@
     $("hs-stock-name").textContent = js ? `${+(js.xmax - js.xmin).toFixed(1)} × ${+(js.ymax - js.ymin).toFixed(1)} × ${+(js.zmax - js.zmin).toFixed(2)} mm, from the job`
       : s.on ? `${+(s.x1 - s.x0).toFixed(1)} × ${+(s.y1 - s.y0).toFixed(1)} × ${+s.t.toFixed(2)} mm` : "none";
   }
+  const FIELDS_BIT = ["shape", "d", "angle", "tip", "cr", "flutes", "len"];
   function bitForm(box, b) {                         // fill / read a bit form (On the table > Bit, the tool-change popup)
     const q = (k) => box.querySelector(`[data-k="${k}"]`);
-    if (b) { q("shape").value = b.shape; q("d").value = +(+b.d).toFixed(4); q("angle").value = b.angle || 90; q("len").value = b.len || 0; return b; }
+    if (!box.dataset.byShape) {                      // the fields a shape uses (data-for): angle + tip, corner radius
+      box.dataset.byShape = "1";
+      box.byShape = () => { for (const f of box.querySelectorAll(".field[data-for]")) f.hidden = !f.dataset.for.split(" ").includes(q("shape").value); };
+      q("shape").addEventListener("change", box.byShape);
+      // My bits (js/bit_library.js): picking one fills the form; changing a field un-picks it
+      const lib = q("lib");
+      box.libFill = () => {
+        const cur = lib.value;
+        lib.replaceChildren(new Option("— set below —", ""), ...BITS.list().map((x) => new Option(x.name, x.id)));
+        lib.value = BITS.find(cur) ? cur : "";
+        box.libShow();
+      };
+      box.libShow = () => { const x = BITS.find(lib.value), a = box.querySelector(".bit-store"); a.hidden = !(x && x.url); if (x && x.url) a.href = x.url; };
+      lib.addEventListener("focus", box.libFill);
+      lib.addEventListener("change", () => { const x = BITS.find(lib.value); if (x) bitForm(box, x); else box.libShow(); });
+      for (const k of FIELDS_BIT) q(k).addEventListener(k === "shape" ? "change" : "input", () => {
+        if (lib.value && !BitLibrary.same(BITS.find(lib.value), bitForm(box))) { lib.value = ""; box.libShow(); }
+      });
+      box.libFill();
+    }
+    const num = (k) => Math.max(0, parseFloat(q(k).value) || 0);
+    if (b) {
+      q("shape").value = HandSetup.SHAPES.includes(b.shape) ? b.shape : "flat"; q("d").value = +(+b.d).toFixed(4); q("angle").value = b.angle || 90;
+      q("len").value = b.len || 0; q("tip").value = b.tip || 0; q("cr").value = b.cr || 0; q("flutes").value = b.flutes || 0;
+      box.byShape();
+      box.libFill();
+      const m = BITS.list().find((x) => (b.id && x.id === b.id) || BitLibrary.same(x, b));   // the form shows one of yours
+      q("lib").value = m ? m.id : ""; box.libShow();
+      return b;
+    }
     const d = parseFloat(q("d").value);
-    return d > 0 ? { shape: q("shape").value, d, angle: parseFloat(q("angle").value) || 90, len: Math.max(0, parseFloat(q("len").value) || 0) } : null;
+    const out = d > 0 ? { shape: q("shape").value, d, angle: parseFloat(q("angle").value) || 90, len: num("len"), tip: num("tip"), cr: num("cr"),
+      flutes: Math.round(num("flutes")) } : null;
+    const x = out && BITS.find(q("lib").value);      // one of yours, as it is: its name, flute length, store page too
+    return x && BitLibrary.same(x, out) ? Object.assign(out, { id: x.id, name: x.name, flen: x.flen, url: x.url }) : out;
   }
   // a bit into the router: drawn instead of the model's bit (its stick-out: the model bit's length if 0), carves the
   // hand moves; what's in the router is kept for next time (a job's bit going in counts too)
@@ -74,7 +107,7 @@
       const g = rb.geometry;
       if (!g.boundingBox) g.computeBoundingBox();
       const len = b.len > 0 ? b.len : (g.boundingBox.max.z - g.boundingBox.min.z) * rb.scale.z;
-      HAND.bitMesh = jobBitMesh(Object.assign(HandSetup.toDef(b), { overallLength: len, fluteLength: Math.min(len, b.d * 3) }), TOOL_RGB[0]);
+      HAND.bitMesh = jobBitMesh(Object.assign(HandSetup.toDef(b), { overallLength: len, fluteLength: b.flen > 0 ? b.flen : b.d > COLLET + 0.01 ? undefined : Math.min(len, b.d * 3) }), TOOL_RGB[0]);
       if (HAND.bitMesh) scene.add(HAND.bitMesh);
       applyVisibility();
       move(HOME.pose ? [HOME.pose.x, HOME.pose.y, HOME.pose.z] : undefined);
@@ -257,10 +290,11 @@
     JOB.toolAsk = e;
     bitForm($("job-pop-bit"), def ? HandSetup.fromDef(def) : saved || HAND.bit);
     $("job-pop-bit").hidden = false;
-    $("job-pop-h").textContent = `Tool change (M6 T${e.tool}) - line ${e.lineNum}`;
-    $("job-pop-msg").textContent = def ? `Put the file's T${e.tool} in the router (its ToolDef below), then resume.` :
-      `The file doesn't say which bit T${e.tool} is: say here, put it in the router, then resume.`;
-    $("job-resume").textContent = "Bit's in: resume";
+    $("job-pop-h").textContent = `Bit change: T${e.tool}`;
+    const mine = def && BITS.matchDef(def);
+    $("job-pop-msg").textContent = def ? `Put T${e.tool} in the router${mine ? ` - your ${mine.name}` : ""}.` :
+      `Which bit is T${e.tool}? The file doesn't say: set it below.`;
+    $("job-resume").textContent = "Install bit and resume";
   }
   function toolPut() {                               // Resume after a tool change: the picked bit goes in
     const e = JOB.toolAsk;
@@ -308,6 +342,25 @@
       t: JOB.tl.stock ? JOB.tl.stock.zmax - JOB.tl.stock.zmin : parseFloat($("hs-t").value) || 0 });
   });
   $("hs-bit-use").addEventListener("click", () => { const b = bitForm($("hs-bit")); if (b) { handBit(b); jobSetup(JOB.pageJob); } });
+  // My bits: save the form as a bit (named), drop the picked one, back to the store's list (every bit form refreshes)
+  const libRefresh = () => { for (const id of ["hs-bit", "job-pop-bit"]) { const bx = $(id); if (bx.libFill) bx.libFill(); } };
+  $("hs-bit-save").addEventListener("click", async () => {
+    const b = bitForm($("hs-bit"));
+    if (!b) return;
+    const name = await askBox({ title: "Save to my bits", text: "Its name (kept in this browser, for all your machines):", value: b.name || HandSetup.bitName(Object.assign({}, b, { name: "" })) });
+    if (!name) return;
+    const id = BITS.add(b, name);
+    libRefresh(); $("hs-bit").querySelector('[data-k="lib"]').value = id; $("hs-bit").libShow();
+  });
+  $("hs-bit-del").addEventListener("click", async () => {
+    const x = BITS.find($("hs-bit").querySelector('[data-k="lib"]').value);
+    if (!x || !await askBox({ title: `Delete ${x.name}?`, text: "It goes from My bits (Reset my bits brings the store's bits back).", ok: "Delete" })) return;
+    BITS.remove(x.id); libRefresh();
+  });
+  $("hs-bit-reset").addEventListener("click", async () => {
+    if (!await askBox({ title: "Reset my bits?", text: "My bits goes back to the V1 Engineering store's bits and a 3/4\" surfacing bit; bits you saved go.", ok: "Reset" })) return;
+    BITS.reset(); libRefresh();
+  });
   $("hs-show-stock").addEventListener("change", handShow);
   $("hs-new").addEventListener("click", async () => {
     if (!SPOIL.sim || !await askBox({ title: "Start a new spoilboard?", text: "Every cut in this one goes (as swapping or resurfacing it).", ok: "New spoilboard" })) return;

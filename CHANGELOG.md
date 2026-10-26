@@ -3,6 +3,30 @@
 The version is the sandbox page's (`VERSION` in `web/js/page/job.js`, shown in its footer). The footer also shows
 the date the model data was built and the Printables file set it was solved for.
 
+## 0.50.1 - 2026-10-26
+- **The bit change popup** laid out like As built: the fields in two columns with their units, a "?" for the
+  explanation, V angle only for a V-bit, and a shorter "Bit change: T2".
+- **Every bit the cut simulation knows** can be set by hand (On the table > Bit, and a job's bit change): bullnose,
+  chamfer and tapered ball join flat / ball / V-bit, with tip, corner radius and flute count.
+- **Bits wider than 1/4"** (a surfacing bit, a big V-bit) are drawn as they're made: a short cutting head on a 1/4"
+  shank - the router's collet takes no more - with 2 flutes unless the file says. Bits over 1/2" have straight flutes,
+  not a spiral; V-bits and chamfers show their 2 straight flutes.
+- **As built:** a router out of tram is drawn leaning (true size, about its bit's tip); when the rack / tilt drawing is
+  magnified, a label on the view says so ("Rack / tilt drawn 10× · cuts true size") - in the page and in videos.
+- **My bits** (Run > On the table > Bit, and a job's bit change): your bits, kept in this browser for all your
+  machines - starting with the bits in the V1 Engineering store (each with a store ↗ link) and a 3/4" surfacing bit.
+  Pick one to fill the form; Save to my bits / Delete / Reset my bits. A job's bit change names your matching bit;
+  its button now says "Install bit and resume".
+- **Where to buy** in the BOM: the rows V1 Engineering sells link to its store, and the ones its LowRider v4 Hardware
+  kit already includes say "in the kit" (the note at the top lists what the kit has and what it doesn't). EU links to
+  hawiwe.de (kit, printed parts, XZ plates, screw set) and the Jackpot3 at Elecrow for outside the US; partly / fully built LR4s and PET-CF printed parts from Northwoods
+  Custom Creations. As built's
+  squareness test links V1E's calibration tape.
+- **Surfacing bits:** flat bits over 1/2" are drawn as a body with gullets, 2-4 flat carbide blades (the file's
+  FLUTES, else 2) and a flared neck to the 1/4" shank.
+- Help videos: captions, messages and M0 popups stay up long enough to read; the dust shoe is off (so you see the bit
+  cut); a highlight ring stays inside the panel; As built's tram is 4 degrees, so its grooves and ridges show.
+
 ## 0.50.0 - 2026-10-26
 - **Five help videos** in Help ▾: **Tour + first job** (the Design steps, then Run: Home, Zero and a name plate
   engraved), **Why home?** (a racked gantry squared by $H), **Probing and zero** (work zero per axis, the touch plate

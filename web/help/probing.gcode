@@ -17,6 +17,8 @@
 (Video Point: ID=zero-x TIME=4.5 TEXT=Zero X, Y or Z sets that axis' zero right where the bit is)
 (Video Point: ID=zero-all TIME=3 TEXT=Zero All sets all three)
 (Video Point: ID=ctl-plate TIME=5 TEXT=Z is the hard one: a touch plate finds the stock's top for you)
+(Video Show: HIDE=Dust_Shoe*,Dust_Skirt*,Bristles_TPU*,hose)
+(Video Text: TIME=4 TEXT=The dust shoe is off for this video, so you can see the bit cut)
 (Video Click: ID=job-start TIME=0.8)
 (Video Click: ID=start-go TIME=0.5)
 G0 G54 G17 G21 G90 G94

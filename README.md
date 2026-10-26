@@ -116,6 +116,10 @@ Run has a Machine column on the left, the Job column on the right and the consol
 - **Hold / Resume** and **Stop** for a running job; FluidNC's **Feed** and **Rapid** overrides.
 - **The jog pad** jogs X / Y / Z by a step (0.1 to 100 mm) at a feed; ■ stops the jog.
 - **Touch plate under the bit** puts the plate on the stock so G38.2 stops on it.
+- **On the table > Bit** (and a job's bit change) takes any bit the cut simulation knows: flat end mill, ball end,
+  bullnose (corner radius), V-bit, chamfer (angle + tip flat) or tapered ball (angle + ball diameter), with its flute
+  count. A bit wider than 1/4" is drawn on a 1/4" shank (the router's collet takes no more), as a 2-flute bit unless
+  the file says otherwise.
 - **The console** takes any G-code or `$` command and shows FluidNC's replies (folded to one line until you open it).
 - **Speed** runs the machine at 1x to 20x.
 

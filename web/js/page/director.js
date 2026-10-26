@@ -13,6 +13,7 @@ window.LR4Director = (() => {
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const ease = (k) => k * k * (3 - 2 * k);
   const lerp = (a, b, k) => a.map((v, i) => v + (b[i] - v) * k);
+  const readT = (t) => 1.2 + String(t || "").replace(/\s+/g, " ").length / 16;   // s to read a line (~180 words a minute)
   const raf2 = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
   const videoKind = (sc) => (sc.settings.kind === "ui" ? "ui" : "machine");   // (Video: KIND=machine|ui), Part 43
   let RUN = null;                                    // the run: { o, script, job, g, clock, lines, events, frames, ... }
@@ -189,9 +190,15 @@ window.LR4Director = (() => {
     };
     function uiPlace() {
       if (ui.ptr) { ui.ptr.style.left = ui.at[0] + "px"; ui.ptr.style.top = ui.at[1] + "px"; }
-      if (ui.ring && !ui.ring.hidden && ui.ringEl) {
-        const r = ui.ringEl.getBoundingClientRect(), p = 6;
-        Object.assign(ui.ring.style, { left: r.left - p + "px", top: r.top - p + "px", width: r.width + 2 * p + "px", height: r.height + 2 * p + "px" });
+      if (ui.ring && !ui.ring.hidden && ui.ringEl) {   // round the control, kept inside the panel it scrolls in
+        const r = ui.ringEl.getBoundingClientRect(), p = 6, b = [r.left - p, r.top - p, r.right + p, r.bottom + p];
+        for (let c = ui.ringEl.parentElement; c && c !== document.body; c = c.parentElement) {
+          if (!/(auto|scroll|hidden)/.test(getComputedStyle(c).overflowY + getComputedStyle(c).overflowX)) continue;
+          const k = c.getBoundingClientRect(), x0 = k.left + c.clientLeft, y0 = k.top + c.clientTop;   // client box: no scrollbar
+          b[0] = Math.max(b[0], x0 + 2); b[1] = Math.max(b[1], y0 + 2); b[2] = Math.min(b[2], x0 + c.clientWidth - 2); b[3] = Math.min(b[3], y0 + c.clientHeight - 2);
+          break;
+        }
+        Object.assign(ui.ring.style, { left: b[0] + "px", top: b[1] + "px", width: Math.max(0, b[2] - b[0]) + "px", height: Math.max(0, b[3] - b[1]) + "px" });
       }
       if (ui.ringEnd && RUN.frames >= ui.ringEnd) ringOff();
     }
@@ -206,6 +213,7 @@ window.LR4Director = (() => {
     };
     function point(cmd, e) {                         // the ring (+ TEXT as a caption) for TIME s
       ev(`point #${cmd.kv.id}`);
+      if (cmd.kv.text) cmd = { kind: cmd.kind, line: cmd.line, kv: Object.assign({}, cmd.kv, { time: String(Math.max(DS.secsOf(cmd, 3), readT(cmd.kv.text))) }) };
       if (!ui.ring) { ui.ring = document.createElement("div"); ui.ring.className = "rec-ring"; document.body.append(ui.ring); }
       reveal(e);
       ui.ringEl = e; ui.ring.hidden = false; ui.ringEnd = RUN.frames + n(DS.secsOf(cmd, 3));
@@ -357,7 +365,15 @@ window.LR4Director = (() => {
       if (r === null) return;
       if (kv.for !== undefined) pace.temp = { rate: r, left: n(Number(kv.for)) }; else pace.base = r;
     };
-    const caption = (cmd) => { call("caption", DS.titleText(cmd)); captionEnd = RUN.frames + n(DS.secsOf(cmd, 4)); };
+    // captions stay up long enough to read (TIME or more): ~1.2 s + 16 characters a second; the next one waits for it
+    // (the intro holds; mid-job the job holds) - user 2026-10-26
+    let readUntil = 0;
+    const caption = (cmd) => {
+      const t = DS.titleText(cmd);
+      call("caption", t);
+      captionEnd = readUntil = RUN.frames + n(Math.max(DS.secsOf(cmd, 4), readT(t)));
+    };
+    const readWait = async (cam) => { while (RUN.frames < readUntil) await frame(cam); };
 
     const ncJog = async (cmd, maxSecs) => {          // FluidNC: a jog, frames till it stops (where the camera is)
       call("ncSend", cmd);
@@ -414,16 +430,20 @@ window.LR4Director = (() => {
         zero = DS.zeroOf(cmd);
         if (homed || !o.home) await jogToZero();     // else right after homing
       } else if (cmd.kind === "title") {
+        await readWait(cam);
         call("title", DS.titleText(cmd));
-        await hold(DS.secsOf(cmd, 3), cam);
+        await hold(Math.max(DS.secsOf(cmd, 3), readT(cmd.kv.text) * 0.8), cam);
         call("title", null);
-      } else if (cmd.kind === "text") caption(cmd);
+      } else if (cmd.kind === "text") { await readWait(cam); caption(cmd); }
       else if (cmd.kind === "pendant") pipCmd(cmd);
       else if (cmd.kind === "show") showCmd(cmd);
       else if (cmd.kind === "asbuilt") { /* set before the intro (prepare) */ }
       else if (cmd.kind === "inspect") cam = await inspectCmd(cmd, cam);
       else if (cmd.kind === "wait") await hold(DS.secsOf(cmd, 1), cam);
-      else if (cmd.kind === "point") { const e = uiEl(cmd); if (e) { point(cmd, e); await hold(DS.secsOf(cmd, 3), cam); ringOff(); } }
+      else if (cmd.kind === "point") {
+        const e = uiEl(cmd);
+        if (e) { await readWait(cam); point(cmd, e); await hold(cmd.kv.text ? (readUntil - RUN.frames) / o.fps : DS.secsOf(cmd, 3), cam); ringOff(); }
+      }
       else if (cmd.kind === "design") await designCmd(cmd, cam);
       else if (cmd.kind === "click" || cmd.kind === "step") {
         const got = await clickCmd(cmd, cam);
@@ -455,7 +475,7 @@ window.LR4Director = (() => {
     if (byClick) { ev("job started by a click"); D._ncRan = true; }   // the page's own ▶ ran it (ui videos)
     else if (!await call("ncPlay")) throw new Error("FluidNC didn't start the job: " + el("job-status").textContent);
     let held = 0, endHold = 0, s, rate = 0, badge = "", section = -1, realLeft = 0, ramp = -1, k = 0;
-    let shot = null, shotF = 0, titleEnd = 0, msgKey = null, msgEnd = 0, inspShot = null;   // inspShot: the shot from before an Inspect
+    let shot = null, shotF = 0, titleEnd = 0, msgKey = null, msgEnd = 0, inspShot = null, capQ = [];   // inspShot: the shot from before an Inspect
     const setRate = (r) => {
       ncS = r;
       if (Math.abs(r - rate) > 1e-9) { rate = r; D.rate(r); }
@@ -475,7 +495,7 @@ window.LR4Director = (() => {
           sideFetch(sh);
           shot = sh.name === "page" ? null : mkShot(sh, s.cam); shotF = 0;
           if (shot && !sh.orbit) { const keep = shot; shot = { frames: Infinity, at: (f) => keep.at(Math.min(f, keep.frames - 1)) }; }
-        } else if (cmd.kind === "text") caption(cmd);
+        } else if (cmd.kind === "text" || (cmd.kind === "point" && cmd.kv.text)) capQ.push(cmd);
         else if (cmd.kind === "pendant") pipCmd(cmd);
         else if (cmd.kind === "show") showCmd(cmd);
         else if (cmd.kind === "asbuilt") asbuilt(cmd);
@@ -500,11 +520,16 @@ window.LR4Director = (() => {
         }
         else paceCmd(cmd);
       }
+      while (capQ.length && RUN.frames >= readUntil) {   // the next caption once the last one has been read
+        const q = capQ.shift();
+        if (q.kind === "text") caption(q); else { const e = uiEl(q); if (e) point(q, e); }
+      }
+      if (capQ.length) pace.wait = Math.max(pace.wait, readUntil - RUN.frames);   // the job waits for it
       if (titleEnd && RUN.frames >= titleEnd) { titleEnd = 0; call("title", null); }
       // the file's MSG / PRINT lines on top (not the one an M0 popup is already showing)
       if (o.messages && s.msg && s.msg.key !== msgKey) {
         msgKey = s.msg.key;
-        if (s.msg.text !== s.popText) { call("msg", s.msg.text); msgEnd = RUN.frames + n(o.messagetime); }
+        if (s.msg.text !== s.popText) { call("msg", s.msg.text); msgEnd = RUN.frames + n(Math.max(o.messagetime, readT(s.msg.text))); }
       }
       if (msgEnd && RUN.frames >= msgEnd) { msgEnd = 0; call("msg", null); }
       // real time at each section's first cut, then ease up to the job's speed; the badge says which
@@ -517,7 +542,7 @@ window.LR4Director = (() => {
       else r = pace.base;
       setRate(r);
       if (s.paused) ncHeld += ncS * dt;
-      if (s.paused) { if (++held >= n(o.pause)) { call("resume"); held = 0; } }
+      if (s.paused) { if (++held >= n(Math.max(o.pause, readT(s.popText) + 0.5))) { call("resume"); held = 0; } }   // the popup read
       else held = 0;
       if (s.t >= s.total && !s.paused && ++endHold > n(1)) break;
     }

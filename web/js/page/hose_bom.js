@@ -230,6 +230,25 @@
     const open = new Set([...body.querySelectorAll("details")].filter((d) => d.open).map((d) => d.dataset.title));
     body.textContent = "";
     if (!secs.length) { sum.textContent = "Not in this export."; return; }
+    const ext = (url, text, title) => { const a = document.createElement("a"); a.href = url; a.target = "_blank"; a.rel = "noopener"; a.textContent = text; if (title) a.title = title; return a; };
+    {                                                  // buying from V1E: what the hardware kit covers (js/v1e_store.js)
+      const S = V1EStore, p = document.createElement("div");
+      p.className = "bom-store";
+      const line = (...xs) => { const q = document.createElement("p"); q.append(...xs); p.appendChild(q); };
+      line("V1 Engineering: the ", ext(S.KIT.url, S.KIT.name + " ↗"), ` covers the rows tagged "in the kit", and the Jackpot3 controller can be added to it (not the ${S.KIT_NOTE.not}); ` +
+        `"store ↗" opens a part on its own. Printed parts: the `, ext(S.PRINTED.url, S.PRINTED.name + " ↗"), ".");
+      line("EU: hawiwe.de sells the same ", ext(S.KIT_EU.url, "LowRider 4 hardware kit ↗"), ", ",
+        ext(S.PRINTED_EU.url, "printed parts ↗"), ", the XZ plates and a screw set. Outside the US, the Jackpot3 also comes from ", ext(S.JP3_ELECROW.url, "Elecrow ↗"), ".");
+      line("Built for you: Northwoods Custom Creations sells ", ext(S.NORTHWOODS.partial, "partly built ↗"), " and ",
+        ext(S.NORTHWOODS.full, "fully built ↗"), " LR4s, or just the main parts in PET-CF if your printer can't print it (",
+        ext(S.NORTHWOODS.petcf.url, "PET-CF printed parts ↗", S.NORTHWOODS.petcf.name), ").");
+      const src = document.createElement("p"); src.className = "src";
+      src.append(`We may have this wrong: kits, links and stock change. V1 Engineering's own pages are the source - `,
+        ext("https://www.v1e.com/collections/lowrider-parts", "the V1E store ↗"), " and ", ext("https://docs.v1e.com/lowrider/", "LowRider docs ↗"),
+        ` - and where they differ from this, they're right. (Checked ${S.CHECKED}.)`);
+      p.appendChild(src);
+      body.appendChild(p);
+    }
     for (const s of secs) {
       const d = document.createElement("details"), sm = document.createElement("summary");
       d.dataset.title = s.title;
@@ -240,10 +259,18 @@
       sm.appendChild(em);
       d.appendChild(sm);
       if (s.note) { const nt = document.createElement("p"); nt.className = "note"; nt.textContent = s.note; d.appendChild(nt); }
+      const sx = V1EStore.section(s.title);
+      if (sx) {
+        const nt = document.createElement("p"); nt.className = "note"; nt.append(sx.text + " ", ext(sx.url, sx.name + " ↗"));
+        for (const a of sx.alt) nt.append(" · ", ext(a.url, `${a.label} ↗`, a.name));
+        d.appendChild(nt);
+      }
+      const ic = s.columns.findIndex((c) => V1EStore.ITEM_COLS.includes(c));
+      const shop = s.rows.map((r) => (ic >= 0 ? V1EStore.lookup(s.title, r[ic]) : null)), shopCol = shop.some(Boolean);
       const wrap = document.createElement("div"), t = document.createElement("table");
       wrap.className = "bom-wrap";
       const hr = t.createTHead().insertRow();
-      for (const c of s.columns) { const th = document.createElement("th"); th.textContent = c; hr.appendChild(th); }
+      for (const c of [...s.columns, ...(shopCol ? ["Where to buy"] : [])]) { const th = document.createElement("th"); th.textContent = c; hr.appendChild(th); }
       const tb = t.createTBody();
       for (const r of s.rows) {
         const tr = tb.insertRow();
@@ -253,6 +280,18 @@
           if (typeof v === "number") td.className = "num";
           if (s.columns[i] === "Check") td.className = String(v).startsWith("CHECK") ? "bad" : "ok";
         });
+        if (shopCol) {                                 // in the hardware kit, or its own store page
+          const td = tr.insertCell(), x = shop[s.rows.indexOf(r)];
+          td.className = "store";
+          if (x && x.kit) {
+            const k = document.createElement("span"), opt = x.kit === "option";
+            k.className = opt ? "in-kit opt" : "in-kit"; k.textContent = opt ? "kit option" : "in the kit";
+            k.title = opt ? `Can be added to the ${V1EStore.KIT.name}` : `Comes in the ${V1EStore.KIT.name}`;
+            td.append(k);
+          }
+          if (x && x.url !== V1EStore.KIT.url) { if (x.kit) td.append(" "); td.append(ext(x.url, "store ↗", x.name)); }
+          for (const a of x ? x.alt : []) td.append(" · ", ext(a.url, `${a.label} ↗`, a.name));   // EU / outside the US
+        }
       }
       wrap.appendChild(t);
       d.appendChild(wrap);

@@ -24,6 +24,8 @@
 (Video Home: OFFSET=40 VIEW=gantry)
 (Video Text: TIME=4 TEXT=Square and level: per-motor pulloffs even out the switches)
 (Video Wait: TIME=3)
+(Video Show: HIDE=Dust_Shoe*,Dust_Skirt*,Bristles_TPU*,hose)
+(Video Text: TIME=4 TEXT=The dust shoe is off for this video, so you can see the bit cut)
 (Video Zero: X=150 Y=150)
 (Video Shot: VIEW=stock TIME=1.5)
 (Video Speed: FIT=10)

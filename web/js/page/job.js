@@ -2,7 +2,7 @@
 // The page's scripts share one global scope (js/page/*.js, loaded in order by index.html): names declared
 // at the top level here are seen by the later files.
   // ---- version + feedback: the issue link carries the size, data date and the loaded files' checksums ----
-  const VERSION = "0.50.0";
+  const VERSION = "0.50.1";
   function setupAbout() {
     const bits = [`lr4-sandbox ${VERSION}`];
     if (cfg.built) bits.push(`model data built ${cfg.built}`);
@@ -707,6 +707,7 @@
   // the bit as cnc-gcode-tools draws it (StockMeshRenderer.buildToolMesh + fluted: lathe profile, helical flute
   // gullies), run unchanged against a stand-in gl that keeps the arrays, and shaded like it too: its tool shader
   // (light from the camera, sky term, highlight), the cutting part in the tool's colour (its palette), shank grey
+  const COLLET = 25.4 / 4;                            // mm: the biggest shank the router's collet takes (1/4")
   const TOOL_RGB = ["#00ccff", "#00ff88", "#ff4dff", "#ffff00", "#ff8800", "#8888ff", "#ff0088", "#00ffff"];   // controller.js
   function jobToolMaterial(rgb) {
     const m = new THREE.ShaderMaterial({
@@ -724,17 +725,100 @@
         }` });
     return m;
   }
+  // The router's collet takes 1/4" shanks at most (user 2026-10-26): a bit wider than that (a surfacing bit, a big
+  // V-bit) is drawn as such a bit is made - a short cutting head (LEN, else ~0.4 x its diameter, 6-20 mm, and past
+  // its cutting edge) on a 1/4" shank, 2 flutes unless the file says - not as stock-sim's shank of the cutting diameter.
   function jobBitMesh(def, colour) {
-    const tool = compileStockTool(def);
+    let tool = compileStockTool(def);
     if (!tool) return null;
+    const big = tool.radius * 2 > COLLET + 0.01;
+    // flutes as the bits are made (user 2026-10-26): V-bits / chamfers 2 straight ones unless said; over 1/2" straight too
+    if ((def.shape === "vbit" || def.shape === "chamfer") && !tool.flutes) tool = Object.assign({}, tool, { flutes: 2 });
+    if (tool.radius * 2 > 12.7 + 0.01) tool = Object.assign({}, tool, { straightFlutes: true });
+    if (big) {
+      const edge = tool.profile(tool.radius);
+      tool = Object.assign({}, tool, { flutes: tool.flutes || 2,
+        fluteLength: tool.fluteLength || Math.max(edge + 2, Math.min(20, Math.max(6, tool.radius * 0.8))) });
+    }
+    const flatBottom = !def.shape || def.shape === "flat" || def.shape === "bullnose";
+    if (flatBottom && tool.radius * 2 > 12.7 + 0.01) return jobMeshOf(surfacingBitGeo(tool, def), colour);   // the user's photo
     let cur = null;
     const gl = { ARRAY_BUFFER: 0, STATIC_DRAW: 0, createBuffer: () => ({}), bindBuffer: (t, b) => { cur = b; },
       bufferData: (t, data) => { cur.data = data; } };
     const R = StockMeshRenderer.prototype, mb = R.buildToolMesh.call({ gl, fluted: R.fluted }, tool);
-    const geo = new THREE.BufferGeometry();
-    geo.setAttribute("position", new THREE.BufferAttribute(mb.position.data, 3));
-    geo.setAttribute("normal", new THREE.BufferAttribute(mb.normal.data, 3));
-    geo.addGroup(0, mb.cutterCount, 0); geo.addGroup(mb.cutterCount, mb.count - mb.cutterCount, 1);
+    let pos = mb.position.data, nor = mb.normal.data;
+    if (big) {                                       // its shank swapped for a 1/4" one: the head's top, then the shank
+      const n = mb.cutterCount * 3, fluteTop = tool.fluteLength, top = Math.max(tool.overallLength || 0, fluteTop + 25);
+      const S = COLLET / 2, r = tool.radius, p = Array.from(pos.subarray(0, n)), q = Array.from(nor.subarray(0, n));
+      const outline = [[r, fluteTop], [S, fluteTop], [S, top], [0, top]], sides = 32;
+      for (let k = 0; k + 1 < outline.length; k++) {   // lathe, as stock-sim's buildToolMesh
+        const [r0, z0] = outline[k], [r1, z1] = outline[k + 1], l = Math.hypot(z1 - z0, r1 - r0), nr = (z1 - z0) / l, nz = -(r1 - r0) / l;
+        for (let s = 0; s < sides; s++) {
+          const a0 = s / sides * 2 * Math.PI, a1 = (s + 1) / sides * 2 * Math.PI, c0 = Math.cos(a0), s0 = Math.sin(a0), c1 = Math.cos(a1), s1 = Math.sin(a1);
+          for (const [x, y, z, cx, cy] of [[r0 * c0, r0 * s0, z0, c0, s0], [r1 * c0, r1 * s0, z1, c0, s0], [r1 * c1, r1 * s1, z1, c1, s1],
+            [r0 * c0, r0 * s0, z0, c0, s0], [r1 * c1, r1 * s1, z1, c1, s1], [r0 * c1, r0 * s1, z0, c1, s1]]) { p.push(x, y, z); q.push(nr * cx, nr * cy, nz); }
+        }
+      }
+      pos = new Float32Array(p); nor = new Float32Array(q);
+    }
+    const count = pos.length / 3, geo = new THREE.BufferGeometry();
+    geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+    geo.setAttribute("normal", new THREE.BufferAttribute(nor, 3));
+    geo.addGroup(0, mb.cutterCount, 0); geo.addGroup(mb.cutterCount, count - mb.cutterCount, 1);
+    return jobMeshOf(geo, colour);
+  }
+  // A flat-bottomed bit over 1/2" (a spoilboard surfacing / dado-cleanout bit, user 2026-10-26 from a Freud photo): a
+  // body a little under the cut with a gullet ahead of each flute, flat carbide blades standing out to the full
+  // diameter (2-4: the file's FLUTES, else 2), a flared neck down from the 1/4" shank. Tip at z 0, up the axis (mm).
+  // Groups: 0 = the body in the tool's colour, 1 = carbide + shank (grey), as jobMeshOf shades them.
+  function surfacingBitGeo(tool, def) {
+    const R = tool.radius, S = COLLET / 2, N = Math.min(4, Math.max(2, tool.flutes || 2));
+    const head = tool.fluteLength || Math.min(22, Math.max(8, R * 0.9)), neck = Math.min(10, Math.max(5, R * 0.45)), a0 = Math.PI / 4;   // a0: the blades turned to face a front view
+    const top = Math.max(tool.overallLength || 0, head + neck + 25), body = R * 0.84, lift = 0.4;   // the body clears the cut
+    const parts = [[], []];                          // non-indexed geometries per group
+    const add = (g, grp) => parts[grp].push(g.index ? g.toNonIndexed() : g);
+    // body: a disc with N gullets, extruded up the head
+    const shape = new THREE.Shape(), steps = 96, gullet = Math.min(0.9, 2.4 / N), inner = body * 0.42;
+    for (let i = 0; i <= steps; i++) {
+      const a = i / steps * 2 * Math.PI + a0, k = (((a - a0) % (2 * Math.PI / N)) + 2 * Math.PI / N) % (2 * Math.PI / N);
+      const r = k < gullet ? inner + (body - inner) * Math.pow(k / gullet, 3) : body;   // a scooped pocket ahead of the blade
+      i ? shape.lineTo(r * Math.cos(a), r * Math.sin(a)) : shape.moveTo(r * Math.cos(a), r * Math.sin(a));
+    }
+    const bg = new THREE.ExtrudeGeometry(shape, { depth: head - lift, bevelEnabled: false, curveSegments: 1 });
+    bg.translate(0, 0, lift);
+    add(bg, 0);
+    // neck: a concave flare from the body down to the shank (a quarter circle), lathed about z
+    const prof = [];
+    for (let i = 0; i <= 12; i++) { const t = i / 12; prof.push(new THREE.Vector2(S + (body - S) * (1 - Math.sin(t * Math.PI / 2)), head + neck * (1 - Math.cos(t * Math.PI / 2)))); }
+    const ng = new THREE.LatheGeometry(prof.map((v) => new THREE.Vector2(v.x, v.y)), 48);
+    ng.rotateX(Math.PI / 2);
+    add(ng, 0);
+    const cap = new THREE.RingGeometry(0, body, 48); cap.translate(0, 0, head); add(cap, 0);   // the body's top under the flare
+    // shank
+    const sg = new THREE.CylinderGeometry(S, S, top - head - neck, 24, 1, false);
+    sg.rotateX(Math.PI / 2); sg.translate(0, 0, (top + head + neck) / 2);
+    add(sg, 1);
+    // blades: flat carbide plates on the trailing wall of each gullet, from near the axis out to the cutting diameter
+    const t = Math.max(1, R * 0.09), r0 = inner * 0.9;
+    for (let i = 0; i < N; i++) {
+      const a = a0 + i * 2 * Math.PI / N, b = new THREE.BoxGeometry(R - r0, t, head);
+      b.translate((R + r0) / 2, -t / 2, head / 2);
+      b.rotateZ(a);
+      add(b, 1);
+    }
+    const geo = new THREE.BufferGeometry(), pos = [], nor = [];
+    let n0 = 0;
+    for (const grp of [0, 1]) for (const g of parts[grp]) {
+      g.computeVertexNormals();
+      pos.push(...g.attributes.position.array); nor.push(...g.attributes.normal.array);
+      if (grp === 0) n0 = pos.length / 3;
+    }
+    geo.setAttribute("position", new THREE.BufferAttribute(new Float32Array(pos), 3));
+    geo.setAttribute("normal", new THREE.BufferAttribute(new Float32Array(nor), 3));
+    geo.addGroup(0, n0, 0); geo.addGroup(n0, pos.length / 3 - n0, 1);
+    return geo;
+  }
+  function jobMeshOf(geo, colour) {                  // shaded as stock-sim's tool shader: group 0 the tool's colour, 1 grey
     const mats = [jobToolMaterial(new THREE.Color(colour).toArray()), jobToolMaterial([0.62, 0.64, 0.67])];
     const mesh = new THREE.Mesh(geo, mats);
     mesh.onBeforeRender = (r, sc, cam) => {         // stock-sim drawMesh: light = back + 0.6 up - 0.3 right of the camera

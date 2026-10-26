@@ -23,9 +23,18 @@ const ok = (cond, msg) => { checks++; if (!cond) { fails++; console.log("FAIL " 
   const n1 = HS.needs("(Stock: XMIN=0 XMAX=1 YMIN=0 YMAX=1 ZMIN=-1 ZMAX=0)\n(ToolDef 2: SHAPE=flat D=3)\nT2 M6\nG0 X1 (T9 in a comment)\nM6 T3\n");
   ok(n1.stock && n1.tools.join() === "3", `own stock, T2 defined, T3 not: ${JSON.stringify(n1)}`);
   // bit form <-> def
-  const b = { shape: "vbit", d: 12.7, angle: 60, len: 30 }, d = HS.toDef(b);
+  const b = { shape: "vbit", d: 12.7, angle: 60, len: 30, tip: 0, cr: 0, flutes: 0 }, d = HS.toDef(b);
   ok(d.diameter === 12.7 && d.angle === 60 && d.overallLength === 30 && JSON.stringify(HS.fromDef(d)) === JSON.stringify(b), `toDef/fromDef ${JSON.stringify(d)}`);
   ok(/1\/4"/.test(HS.bitName({ shape: "flat", d: 6.35 })), HS.bitName({ shape: "flat", d: 6.35 }));
+  // every shape the simulator cuts (user 2026-10-26): bullnose, chamfer, tapered ball + tip / corner radius / flutes
+  for (const x of [{ shape: "bullnose", d: 6.35, angle: 90, len: 0, tip: 0, cr: 1, flutes: 2 }, { shape: "chamfer", d: 12.7, angle: 90, len: 0, tip: 1, cr: 0, flutes: 0 },
+    { shape: "taperball", d: 6.35, angle: 10, len: 25, tip: 1.5, cr: 0, flutes: 2 }]) {
+    const y = HS.toDef(x);
+    ok(JSON.stringify(HS.fromDef(y)) === JSON.stringify(x), `round trip ${x.shape}: ${JSON.stringify(y)}`);
+  }
+  ok(HS.toDef({ shape: "flat", d: 6, angle: 90, tip: 2, cr: 1 }).tip === undefined && HS.toDef({ shape: "flat", d: 6, cr: 1 }).cornerRadius === undefined,
+    "a flat bit carries no tip / corner radius");
+  ok(HS.SHAPES.length === 6 && /chamfer/.test(HS.bitName({ shape: "chamfer", d: 12.7, angle: 90 })) && /tapered ball/.test(HS.bitName({ shape: "taperball", d: 3 })), "names");
 
   // the offset view carves the same as the table's own frame
   const spoil = () => new StockSimulator({ xmin: -50, xmax: 250, ymin: -50, ymax: 250, zmin: -19, zmax: 0 }, new Map(), { maxCells: 9e4, snapshots: false });

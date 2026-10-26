@@ -18,7 +18,7 @@
 (Video Shot: VIEW=gantry TIME=2.5 DIST=750)
 (Video Text: TIME=5 TEXT=The 3D plate is cut from your design: the engraving, the pocket, the cut-throughs)
 (Video Wait: TIME=5)
-(Video Show: PRESET=all)
+(Video Show: SHOW=router,core)
 (Video Shot: VIEW=machine TIME=2)
 (Video Text: TIME=5 TEXT=The strut plate G-code engraves it first with a V-bit, then changes to the 1/8in bit)
 (Video Wait: TIME=2)
@@ -26,6 +26,8 @@
 (Video Zero: X=150 Y=150)
 (Video Click: ID=home TIME=0.7)
 (Video Shot: VIEW=stock TIME=1.5)
+(Video Show: HIDE=Dust_Shoe*,Dust_Skirt*,Bristles_TPU*,hose)
+(Video Text: TIME=4 TEXT=The dust shoe is off for this video, so you can see the bit cut)
 (Video Click: ID=job-start TIME=0.8)
 (Video Click: ID=start-go TIME=0.5)
 G0 G54 G17 G21 G90 G94

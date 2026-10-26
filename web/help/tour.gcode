@@ -27,6 +27,8 @@
 (Video Shot: VIEW=stock TIME=1.5)
 (Video Point: ID=zero-all TIME=4.5 TEXT=Zero: where the job starts - here, the stock's front-left corner)
 (Video Point: ID=src-sd TIME=4 TEXT=The SD card: the G-code files FluidNC can run)
+(Video Show: HIDE=Dust_Shoe*,Dust_Skirt*,Bristles_TPU*,hose)
+(Video Text: TIME=4 TEXT=The dust shoe is off for this video, so you can see the bit cut)
 (Video Click: ID=job-start TIME=0.8)
 (Video Point: ID=start-go TIME=3.5 TEXT=A check before it runs: homed, zero, the bit, the stock)
 (Video Click: ID=start-go TIME=0.5)

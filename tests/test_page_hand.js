@@ -130,7 +130,7 @@ const TWO = ["G21 G90", "T1", "G0 Z5", "G0 X20 Y40", "G1 Z-1 F600", "G1 X80 F150
       out.t2 = LR4Job.tl().tools.get(2).diameter; out.router = LR4Job.hand().bit.d;
       return out;
     })()`);
-    ok(/M6 T2/.test(d.h) && d.bit && d.t2 === 3 && d.router === 3, `M6 holds with the bit form; T2 = 3 mm, in the router: ${JSON.stringify(d)}`);
+    ok(/Bit change: T2/.test(d.h) && d.bit && d.t2 === 3 && d.router === 3, `M6 holds with the bit form; T2 = 3 mm, in the router: ${JSON.stringify(d)}`);
 
     // surfacing, stock off: 1.5 mm below the level takes the 1 mm mark away
     const e = await page.val(`(async () => {
