@@ -318,7 +318,8 @@
     if (text !== SND.planSrc) { SND.planSrc = text; SND.plan = LR4Sound.routerPlan(text); }
     const i = Math.min(FJ.job ? (FJ.job.P || FJ.job.T).i : GcodePlay.at(tl, JOB.t).index, tl.segs.length - 1), sg = tl.segs[Math.max(0, i)];
     const def = sg && tl.tools && tl.tools.get(sg.toolNumber);
-    return { rpm: LR4Sound.routerAt(SND.plan, sg ? sg.srcLine || 0 : 0), seg: i, flutes: (def && def.flutes) || 2 };
+    // not with the touch plate / clip out (job.js touchOut): the router waits till the clip is off the collet nut
+    return { rpm: touchOut() ? 0 : LR4Sound.routerAt(SND.plan, sg ? sg.srcLine || 0 : 0), seg: i, flutes: (def && def.flutes) || 2 };
   }
   function soundRemoved() {                          // mm^3 the stock lost since the last frame (0 after a reset)
     const sim = JOB.sim;
@@ -348,8 +349,10 @@
     const on = soundEngine().setOn(!SND.s.on());
     $("v-sound").setAttribute("aria-pressed", String(on));
     $("v-sound").textContent = on ? "🔊 Sound on" : "🔈 Sound off";
+    $("wc-sound").textContent = on ? "machine sounds on (click to turn off)" : "turn on the machine sounds";
   }
   $("v-sound").addEventListener("click", soundToggle);
+  $("wc-sound").addEventListener("click", soundToggle);   // the welcome card: so new visitors know it's there (user 2026-10-26)
   {
     const v = $("snd-vol"), out = $("snd-vol-out");
     try { const k = MS.get("lr4-snd-vol"); if (k !== null) v.value = k; } catch (e) { /* default */ }
@@ -382,6 +385,8 @@
     touchAnimTick(Math.min(raw, 0.5));               // the touch plate + clip going out / coming home (job.js): in about
                                                      // real time on a slow GPU too (a job's Resume waits for it)
     ctlTick();
+    spinTick(dt);                                     // the bit turning while a FluidNC job has the router on (machine.js;
+                                                      // dt capped: a slow frame at 0.5 s turned it exactly half a turn)
     soundTick();
     if (pendant && pendantOn() && (FT.ft || ++frameN % 8 === 0)) pendantScreen();
     ftPopDraw();

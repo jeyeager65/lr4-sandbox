@@ -206,7 +206,8 @@
       set(byName(q, 1, "Strut plate, front"), 3, `${strut} x ${(67.5 + 2 * WING).toFixed(1)} mm`);
       set(byName(q, 1, "Strut plate, bottom"), 3, `${strut} x 78.5 mm`);
       const bx = byName(q, 1, "Belt along X"), by = byName(q, 1, "Belt along Y");
-      set(bx, 3, `${Math.round(xbelt)} mm`); set(bx, 4, `modelled path ${Math.round(xbelt - 95)} mm loop screw to tensioner`);
+      // X: 87 since the Min loop's M3 moved into Z_Stub_Min's slot (2026-10-24; matched to the size builds 2026-10-26)
+      set(bx, 3, `${Math.round(xbelt)} mm`); set(bx, 4, `modelled path ${Math.round(xbelt - 87)} mm loop screw to tensioner`);
       set(by, 3, `${Math.round(ybelt)} mm`); set(by, 4, `modelled path ${Math.round(ybelt - 95)} mm lock to tension block`);
     }
     q = sec("Printed parts");

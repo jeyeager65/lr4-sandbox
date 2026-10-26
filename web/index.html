@@ -176,8 +176,8 @@
       <summary><span class="st-n">3</span><span class="st-t" id="h-shop">Table</span><span class="st-dot" id="dot-shop" hidden aria-label="needs a look"></span><span class="st-sum" id="sum-shop"></span></summary>
       <div class="st-body">
         <div class="variant" id="table-variant" title="The spoilboard and the two rail strips (3/4 in MDF) sit on this"><span>Base</span>
-          <button type="button" data-v="sheet" aria-pressed="true">MDF sheet</button>
-          <button type="button" data-v="torsion" aria-pressed="false">Torsion box</button></div>
+          <button type="button" id="table-sheet" data-v="sheet" aria-pressed="true">MDF sheet</button>
+          <button type="button" id="table-torsion" data-v="torsion" aria-pressed="false">Torsion box</button></div>
         <div class="field"><label for="table-top">Table height (top of the spoilboard; legs are drawn only)</label>
           <div class="unit-input"><input id="table-top" type="number" step="any" min="1"><span class="u">in</span></div></div>
       </div>
@@ -515,6 +515,9 @@
       read in this browser only, nothing is uploaded, and they're kept here for next time. Run and G-code work without them;
       missing parts show as grey boxes.</p>
     <p class="wc-tour">New here? <button type="button" class="link" id="wc-tour">Watch the tour</button> - it plays live in this page.</p>
+    <p class="wc-tour">Worth hearing: <button type="button" class="link" id="wc-sound">turn on the machine sounds</button> - the
+      steppers, the router and its cutting load, the shop vac, the switches. They tell you what the machine is doing
+      (⚙ > Sound later).</p>
     <div class="wc-step"><b>1</b><div><div class="lbl">Download them from Printables</div><div class="wc-src" id="wc-src"></div></div></div>
     <div class="wc-step"><b>2</b><div><div class="lbl">Drop them anywhere on this page</div>
       <p class="foot">The zips as they come, a folder, or the STL / DXF files.</p>
@@ -600,7 +603,7 @@
     <div class="pair">
       <div class="field bit-lib"><label>From my bits</label><div class="bit-lib-row"><select data-k="lib" aria-label="From my bits"></select><a class="bit-store" target="_blank" rel="noopener" hidden title="This bit in the V1 Engineering store">store ↗</a></div></div>
       <div class="field"><label>Bit</label><select data-k="shape"><option value="flat">Flat end mill</option><option value="ball">Ball end</option><option value="bullnose">Bullnose</option><option value="vbit">V-bit</option><option value="chamfer">Chamfer</option><option value="taperball">Tapered ball</option></select></div>
-      <div class="field"><label>Diameter</label><div class="unit-input"><input data-k="d" type="number" step="any" min="0.1"><span>mm</span></div></div>
+      <div class="field"><label>Diameter</label><div class="unit-input"><input data-k="d" type="number" step="any" min="0.1" max="38.1" title="up to 1-1/2&quot; (38.1 mm)"><span>mm</span></div></div>
       <div class="field" data-for="vbit chamfer taperball"><label>Angle</label><div class="unit-input"><input data-k="angle" type="number" step="any" min="10" max="170" title="tip to tip"><span>°</span></div></div>
       <div class="field" data-for="vbit chamfer taperball"><label>Tip</label><div class="unit-input"><input data-k="tip" type="number" step="any" min="0" title="V-bit / chamfer: the flat at its point; tapered ball: the ball's diameter"><span>mm</span></div></div>
       <div class="field" data-for="bullnose"><label>Corner radius</label><div class="unit-input"><input data-k="cr" type="number" step="any" min="0"><span>mm</span></div></div>
@@ -884,7 +887,7 @@
             <div class="field bit-lib"><label>From my bits</label><div class="bit-lib-row"><select data-k="lib" aria-label="From my bits"></select><a class="bit-store" target="_blank" rel="noopener" hidden title="This bit in the V1 Engineering store">store ↗</a></div></div>
             <div class="field"><label>Bit</label><select data-k="shape"><option value="flat">Flat end mill</option><option value="ball">Ball end</option><option value="bullnose">Bullnose</option><option value="vbit">V-bit</option><option value="chamfer">Chamfer</option><option value="taperball">Tapered ball</option></select></div>
             <div class="field"><label>Diameter</label>
-              <div class="unit-input"><input data-k="d" type="number" step="any" min="0.1"><span>mm</span></div></div>
+              <div class="unit-input"><input data-k="d" type="number" step="any" min="0.1" max="38.1" title="up to 1-1/2&quot; (38.1 mm)"><span>mm</span></div></div>
             <div class="field" data-for="vbit chamfer taperball"><label>Angle</label>
               <div class="unit-input"><input data-k="angle" type="number" step="any" min="10" max="170" title="a V-bit's angle, tip to tip"><span>°</span></div></div>
             <div class="field" data-for="vbit chamfer taperball"><label>Tip</label><div class="unit-input"><input data-k="tip" type="number" step="any" min="0" title="V-bit / chamfer: the flat at its point; tapered ball: the ball's diameter"><span>mm</span></div></div>
@@ -908,7 +911,7 @@
           <label class="check"><input type="checkbox" id="hs-show-stock" checked> Show the stock</label>
           <div class="pair">
             <div class="field"><label for="hs-sd">Surfacing bit</label>
-              <div class="unit-input"><input id="hs-sd" type="number" step="any" min="1" value="25.4" title="its diameter"><span>mm</span></div></div>
+              <div class="unit-input"><input id="hs-sd" type="number" step="any" min="1" max="38.1" value="25.4" title="its diameter, up to 1-1/2&quot; (38.1 mm)"><span>mm</span></div></div>
             <div class="field"><label for="hs-so">Step-over</label>
               <div class="unit-input"><input id="hs-so" type="number" step="any" min="5" max="95" value="40" title="of the bit, each pass"><span>%</span></div></div>
             <div class="field"><label for="hs-sz">Depth</label>

@@ -125,7 +125,7 @@ window.LR4Director = (() => {
       await waitLoaded();                            // braces / struts / table rebuild the machine
     }
     document.body.classList.toggle("rec-ui", videoKind(script) === "ui");   // ui (Part 43c): the whole page, as it is
-    if (videoKind(script) === "ui" && el("t-design").getAttribute("aria-pressed") !== "true") el("t-design").click();   // from Configure, as a first visit (the mode is kept per browser)
+    if (videoKind(script) === "ui") LR4ShowMode("design");   // from Configure, as a first visit (shown, not saved: the mode is kept per browser)
     if (!o.live && videoKind(script) === "ui") controls.enableDamping = false;
     else if (!o.live) D.recording(true);             // the 3D view, whole window
     else if (videoKind(script) === "machine" && el("v-only").getAttribute("aria-pressed") !== "true") { el("v-only").click(); resize(); }   // live: ⛶ view only
@@ -205,9 +205,13 @@ window.LR4Director = (() => {
     const ringOff = () => { ui.ringEnd = 0; if (ui.ring) ui.ring.hidden = true; };
     const reveal = (e) => {                          // a control inside a closed details (a sub-section): opened, scrolled to
       for (let d = e.parentElement && e.parentElement.closest("details:not([open])"); d; d = d.parentElement && d.parentElement.closest("details:not([open])")) d.open = true;
-      for (const m of ["t-design", "t-run"]) {       // still not shown: it's on the other mode's panel
-        if (e.getClientRects().length) break;
-        if (el(m).getAttribute("aria-pressed") !== "true") el(m).click();
+      // still not shown: it's on the other mode's panel, or in a folded panel / column (the viewer's own folds carry
+      // into the help machine - user 2026-10-26: a folded Configure panel left the tour in Run). Shown, not saved.
+      const off = () => !e.getClientRects().length;
+      for (const m of ["design", "run"]) {
+        if (!off()) break;
+        LR4ShowMode(m);
+        for (const side of ["p", "l", "r"]) if (off() && document.documentElement.classList.contains(side + "-off")) LR4Unfold(side);
       }
       e.scrollIntoView({ block: "center", inline: "nearest" });
     };
@@ -305,6 +309,7 @@ window.LR4Director = (() => {
       if (sh.name === "machine") return from(c, [0, -0.95, 0.5], d || span * 1.07);
       if (sh.name === "stock") return from(stockView.t, [0.42, -0.78, 0.72], d || stockView.dist);
       if (sh.name === "tool") return from((last && last.tip) || stockView.t, [0.42, -0.78, 0.55], d || 320);
+      if (sh.name === "toolfront") return from((last && last.tip) || stockView.t, [0, -1, 0.12], d || 260);   // the X tram lean square on
       if (sh.name === "core") return from(coreAt || c, [0.55, -0.85, 0.45], d || 700);
       if (sh.name === "gantry") return from(sideAt.gantry || c, [0, -0.8, 0.65], d || 1800);
       if (sh.name === "gantrytop") return from(sideAt.gantry || c, [0, -0.001, 1], d || 2000);

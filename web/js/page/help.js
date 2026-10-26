@@ -110,6 +110,9 @@
     $("hv-start-h").textContent = entry.title;
     $("hv-start-p").textContent = `${entry.blurb}${entry.secs ? ` (${helpSecs(entry.secs)})` : ""}`;
     $("hv-start-parts").hidden = !$("parts-chip").classList.contains("missing");
+    // a ui video starts from Configure (the director does too, but only once it plays): not Run behind the start card
+    // and its first seconds when you came from Run (user 2026-10-26: the tour showed Run while it talked about Configure)
+    if (/\(\s*Video:[^)\n]*\bKIND\s*=\s*ui\b/i.test(HELP.text)) LR4ShowMode("design");
     await LR4Director.waitLoaded();
     $("hv-start").hidden = false;
     $("hv-go").focus();

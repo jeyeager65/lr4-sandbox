@@ -30,7 +30,7 @@
 //       held; lines in a row run one after the other. Only the set is drawn until ID=off (a Shot moves the camera).
 //   (Video Shot: VIEW=name TIME=s ORBIT=s DIST=mm)   the camera: blends there over TIME (1.5), then turns once round
 //       it over ORBIT; DIST = how far from what it looks at. VIEW: workshop, machine, stock, tool (close on the bit,
-//       follows it), core (close on the router / core), iso, front, top, side, back, page (mid-job only: the page's own
+//       follows it), toolfront (the same, straight in from the front: an X tram lean), core (close on the router / core), iso, front, top, side, back, page (mid-job only: the page's own
 //       camera again, with its probe close-ups), pendant (straight at the pendant's screen; PENDANT=on), ymin / ymax
 //       (close on that end's Y carriage: the rack shows there), gantry (the whole gantry, front and above), gantrytop
 //       (straight down on the gantry: its rack)
@@ -82,7 +82,7 @@ const PRESETS = ["all", "no-hardware", "printed", "frame"];   // web/js/show_tre
 const KINDS = ["shot", "home", "zero", "title", "text", "wait", "speed", "pendant", "show", "inspect", "asbuilt", "point", "click", "step", "design"];
 const UI_ONLY = new Set(["point", "click", "step"]);   // KIND=ui videos (the page on screen) only
 const INTRO_ONLY = new Set(["home", "zero"]);
-const SHOTS = new Set(["workshop", "machine", "stock", "tool", "core", "iso", "front", "top", "side", "back", "page", "pendant", "ymin", "ymax", "gantry", "gantrytop"]);
+const SHOTS = new Set(["workshop", "machine", "stock", "tool", "toolfront", "core", "iso", "front", "top", "side", "back", "page", "pendant", "ymin", "ymax", "gantry", "gantrytop"]);
 const ASBUILT_NUM = ["rack", "tilt", "exag", "tram", "tramy", "warpx", "warpy", "bow", "rackmax", "tiltmax"];
 const MOTION = /(^|[^A-Z])G0*(0|1|2|3|38\.\d)(?![\d.])/;
 const IN = 25.4;
@@ -202,7 +202,7 @@ function check(c, intro) {
     }
     case "home": {
       const v = kv.view && kv.view.toLowerCase();
-      return !v || (SHOTS.has(v) && v !== "page" && v !== "tool") ? null : `Home VIEW= one of ${[...SHOTS].filter((s) => s !== "page" && s !== "tool").join(", ")}`;
+      return !v || (SHOTS.has(v) && v !== "page" && v !== "tool" && v !== "toolfront") ? null : `Home VIEW= one of ${[...SHOTS].filter((s) => s !== "page" && s !== "tool" && s !== "toolfront").join(", ")}`;
     }
     case "speed":
       if (kv.x !== undefined && (!num(kv.x) || Number(kv.x) <= 0)) return "Speed X= wants a number > 0";

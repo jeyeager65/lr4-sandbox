@@ -46,6 +46,11 @@ const ok = (cond, msg) => { checks++; console.log((cond ? "  ok   " : "  FAIL ")
     ok(b.hw > 0 && b.hwHidden, `its ${b.hw} hardware parts hidden with it`);
     ok(/^Parts \d+\/\d+ · add files$/.test(b.chip) && b.amber, `chip: "${b.chip}" (amber)`);
     ok(b.card && b.rows === b.sources, `the chip opens the card: ${b.rows} Download rows for ${b.sources} sources`);
+    // the card's sound link turns the machine sounds on and off, in step with ⚙ > Sound (user 2026-10-26)
+    const s = await page.val(`(() => { const w = document.getElementById("wc-sound"), v = document.getElementById("v-sound"), r = [];
+      w.click(); r.push([v.getAttribute("aria-pressed"), w.textContent]); w.click(); r.push([v.getAttribute("aria-pressed"), w.textContent]);
+      return r; })()`);
+    ok(s[0][0] === "true" && /on/.test(s[0][1]) && s[1][0] === "false" && /^turn on/.test(s[1][1]), `welcome card sound link: ${JSON.stringify(s)}`);
     // the file back (as dropped): the stand-in goes, the card closes itself
     const c = await page.val(`(async () => {
       const [path] = window.__keep;

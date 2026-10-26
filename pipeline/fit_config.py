@@ -47,19 +47,10 @@ TOL_FIT = 0.05          # mm: fitted position vs the build
 # Changes that don't depend on size, so only the ref build needs re-running (not all 25):
 # ANCHORED: parts fixed to a fitted part: placed by that part's fit + their ref offset (temp builds included)
 # REF_SHAPE: a reshaped part whose centre didn't move: rigid, its mesh from the ref build, older builds' centres still fit
-ANCHORED = (("TouchPlate", "Core"),    # touch plate (reshaped, angled), its connector, magnet + BU-45 clip (2026-10-24)
-            ("Dust_Shoe_Kobalt__", "Core"),   # the dust shoe's slot screw (2026-10-24)
-            # belt ends looped round their M3s (2026-10-24): each loop on its holder
-            ("Belt_Y_Min_Front_Loop", "Y_Belt_Min_Lock"), ("Belt_Y_Min_Back_Loop", "Y_Belt_Min_Tension"),
-            ("Belt_Y_Max_Front_Loop", "Y_Belt_Max_Lock"), ("Belt_Y_Max_Back_Loop", "Y_Belt_Max_Tension"),
-            ("Belt_X_Min_Loop", "XZ_Plate_Min"), ("Belt_X_Max_Loop", "X_Belt"),
-            ("Brace_#__XLoop1", "XZ_Plate_Min"),  # the X Min loop's M3, moved into Z_Stub_Min's slot (named after Brace_1)
-            ("X_Belt__XLoop1", "X_Belt"),          # the X Max loop's M3, moved into the tensioner's pocket
-            ("Bearing_FrontWheel_Min", "FrontWheel_Min"), ("Bearing_BackWheel_Min", "BackWheel_Min"))   # centred
-REF_SHAPE = ("Router_Nut",)            # round -> hex ER11 nut (2026-10-24)
+ANCHORED = ()       # emptied after the full size refresh 2026-10-26 (was: touch plate + clip, shoe screw, belt loops ...)
+REF_SHAPE = ()      # emptied 2026-10-26 (was: Router_Nut)
 # OLD_REF: changed in the ref build by work the other builds don't have yet: fitted without the ref build
-OLD_REF = ("TableMDF",                            # Part 33's table (the page draws the table itself; the rec stays as was)
-           "Belt_X_Min", "Belt_X_Max")            # X runs now stop 2.9 short of their loop screws (the loops overlap them)
+OLD_REF = ()        # emptied 2026-10-26 (was: TableMDF, Belt_X_Min / Max)
 # merged screws -> one part per screw, named after the part it holds (nearest in XY): name -> (owners, label)
 SPLIT = {
     "TableMDF__Screws": (r"^(Y_Clip_\d+|Y_Belt_(Min|Max)[FB])$", "Screw"),

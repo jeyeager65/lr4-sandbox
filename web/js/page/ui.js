@@ -69,16 +69,17 @@
   // the step numbers (step 1's red dot too); a number unfolds the panel at that step. Phones: never folded (css).
   {
     const root = document.documentElement, b = $("col-p"), strip = $("p-strip");
-    function foldP(off) {
+    function foldP(off, save = true) {
       root.classList.toggle("p-off", off);
       b.textContent = off ? "»" : "«";
       b.setAttribute("aria-expanded", String(!off));
       b.title = off ? "Unfold the panel (H)" : "Fold the panel (H)";
       b.setAttribute("aria-label", `${off ? "Unfold" : "Fold"} the Configure panel`);
-      try { MS.set("lr4-col-p", off ? "off" : "on"); } catch (e) { /* not kept */ }
+      if (save) try { MS.set("lr4-col-p", off ? "off" : "on"); } catch (e) { /* not kept */ }
       resize();
     }
     b.addEventListener("click", () => foldP(!root.classList.contains("p-off")));
+    window.LR4UnfoldPanel = () => foldP(false, false);   // help videos (LR4Unfold below): shown, not saved
     for (const d of steps) {
       const n = document.createElement("button"), dot = d.querySelector(".st-dot");
       n.type = "button"; n.textContent = d.querySelector(".st-n").textContent;
@@ -119,9 +120,14 @@
       if (save) kv.set("lr4-mode", m);
     }
     for (const [k, b] of Object.entries(modeBtns)) b.addEventListener("click", () => setMode(k));
+    window.LR4ShowMode = (m) => setMode(m, false);   // help videos: shown, not saved (the mode is shared with your machines)
     if (kv.get("lr4-mode") === null && kv.get("lr4-tab") === "t-run") setMode("run");   // the old Run tab
     else setMode(root.dataset.mode === "run" ? "run" : "design", false);
-    $("tb-files").addEventListener("click", () => { setMode("design"); showPanel(true); showStep($("st-files"), true); });
+    $("tb-files").addEventListener("click", () => {   // unfolds the panel (its « button) at step 6
+      setMode("design");
+      if (root.classList.contains("p-off")) $("col-p").click();
+      showStep($("st-files"), true);
+    });
 
     const themeBtns = [...document.querySelectorAll("#theme button")];
     function setTheme(t) {
@@ -164,6 +170,8 @@
       if (!narrow.matches) { userOff[side] = off; kv.set("lr4-col-" + side, off ? "off" : "on"); }
     });
     const fitCols = () => { for (const side of ["l", "r"]) fold(side, narrow.matches || userOff[side]); };
+    // help videos (director.js reveal): unfold the panel / a column a control is in - shown, not saved
+    window.LR4Unfold = (side) => { if (side === "p") LR4UnfoldPanel(); else { fold(side, false); resize(); } };
     narrow.addEventListener("change", fitCols);
     fitCols();
     // phone (Part 39): Jog and Files open as sheets from the bottom (html.ph-jog / html.ph-files, one at a time)

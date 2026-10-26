@@ -26,6 +26,14 @@ const ok = (cond, msg) => { checks++; console.log((cond ? "  ok   " : "  FAIL ")
     await sleep(800);
     await page.send("Page.navigate", { url: `http://127.0.0.1:${port}/web/index.html?parts=/parts/#26x50` });
     ok(await loaded(), "page loaded");
+    // the top bar's Get the files: from Run with the panel folded, back to Configure, unfolded, at step 6 (it threw
+    // from 0.45.0 to 0.51.0: a removed showPanel)
+    const tb = await page.val(`(() => { document.getElementById("t-run").click();
+      if (!document.documentElement.classList.contains("p-off")) document.getElementById("col-p").click();
+      try { document.getElementById("tb-files").click(); } catch (e) { return { err: String(e) }; }
+      return { mode: document.documentElement.dataset.mode, off: document.documentElement.classList.contains("p-off"),
+        open: document.getElementById("st-files").open }; })()`);
+    ok(!tb.err && tb.mode !== "run" && !tb.off && tb.open, `Get the files opens Configure > 6 ${JSON.stringify(tb)}`);
     // upload the template with the Example shown
     const up = (svg, name) => page.val(`(async () => {
       const dt = new DataTransfer(); dt.items.add(new File([${JSON.stringify(svg)}], ${JSON.stringify(name)}, { type: "image/svg+xml" }));

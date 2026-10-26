@@ -1,6 +1,6 @@
 // Screenshot a page in headless Chrome over CDP (the sandbox page stalls under --virtual-time-budget, so no
 // --screenshot): waits for #status to hide (and for files loaded by ?parts= to settle), runs optional JS, saves PNGs.
-//   node tools/page_shot.js <url> <out.png> [--size 1500x1000] [--eval "js" --shot out2.png]... [--mobile]
+//   node tools/page_shot.js <url> <out.png> [--size 1500x1000] [--eval "js" --shot out2.png]... [--mobile] [--gpu]
 // Each --eval runs (awaited) after the load; a --shot after it takes another picture. Logs console errors.
 // Needs Chrome (CHROME env or the usual Windows / Mac / Linux path); Node 22+ (fetch + WebSocket built in).
 "use strict";
@@ -8,10 +8,11 @@ const { spawn } = require("child_process"), fs = require("fs"), os = require("os
 
 const args = process.argv.slice(2);
 const url = args[0], steps = [{ shot: args[1] }];
-let size = [1500, 1000], mobile = false;
+let size = [1500, 1000], mobile = false, gpu = false;   // --gpu: the real GPU (Full detail, as record_demo), not SwiftShader
 for (let i = 2; i < args.length; i++) {
   if (args[i] === "--size") size = args[++i].split("x").map(Number);
   else if (args[i] === "--mobile") mobile = true;
+  else if (args[i] === "--gpu") gpu = true;
   else if (args[i] === "--eval") steps.push({ js: args[++i] });
   else if (args[i] === "--shot") steps.push({ shot: args[++i] });
 }
@@ -24,7 +25,9 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 (async () => {
   const prof = fs.mkdtempSync(path.join(os.tmpdir(), "page_shot_"));
   const port = 9300 + Math.floor(Math.random() * 500);
-  const chrome = spawn(CHROME, ["--headless=new", "--use-angle=swiftshader", "--enable-unsafe-swiftshader",
+  const angle = gpu ? ["--use-angle=d3d11", "--ignore-gpu-blocklist", "--enable-gpu-rasterization"]
+    : ["--use-angle=swiftshader", "--enable-unsafe-swiftshader"];
+  const chrome = spawn(CHROME, ["--headless=new", ...angle,
     `--remote-debugging-port=${port}`, `--user-data-dir=${prof}`, `--window-size=${size[0]},${size[1]}`, "about:blank"],
   { stdio: "ignore" });
   let ws, id = 0;

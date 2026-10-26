@@ -11,7 +11,7 @@
   // 1, mm): from a power-up (page load, Power cycle), then the motors' own steps (FluidNC).
   // geo = the Y carriages in the table frame (xA, span) + the bit's tip from their line (ty in front, tz below
   // the beam's middle), piv = the drawing's pivots (world, at pose 0).
-  const AB = { set: null, E: { y: 0, z: 0 }, geo: null, piv: null, posed: false, home: null, probeDz: 0 };
+  const AB = { set: null, E: { y: 0, z: 0 }, geo: null, piv: null, posed: false, home: null, probeDz: 0, magnified: false };
   try { AB.set = Imperfect.settings(JSON.parse(MS.get("lr4-asbuilt") || "null")); } catch (e) { AB.set = Imperfect.settings(); }
   AB.E = Imperfect.powerUp(AB.set);
   const abState = () => (AB.geo ? AB : null);
@@ -1040,7 +1040,9 @@ float lr4G(float x) { float s = 2.0 * fract(x) - 1.0; return floor(x) / 3.0 + (s
     const inst = LR4Model.instances(cfg, S);
     const missing = new Set();                       // the parts drawn as stand-ins (their names and ref names)
     for (const o of inst) {
-      if (o.name === "TableMDF") continue;           // Part 33: the table is drawn from table_model.js (tableMeshes)
+      // Part 33: the table is drawn from table_model.js (tableMeshes); the size builds' own table parts are left out
+      // (TableMDF before the 2026-10-26 refresh, TableBase / Spoilboard / RailStrip_* after)
+      if (o.name === "TableMDF" || TABLE_PART.test(o.name)) continue;
       const g = recGeometry(o.rec);
       if (!g) {
         const sg = standInGeo(o.rec);

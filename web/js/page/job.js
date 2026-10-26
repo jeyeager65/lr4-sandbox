@@ -2,7 +2,7 @@
 // The page's scripts share one global scope (js/page/*.js, loaded in order by index.html): names declared
 // at the top level here are seen by the later files.
   // ---- version + feedback: the issue link carries the size, data date and the loaded files' checksums ----
-  const VERSION = "0.50.1";
+  const VERSION = "0.51.0";
   function setupAbout() {
     const bits = [`lr4-sandbox ${VERSION}`];
     if (cfg.built) bits.push(`model data built ${cfg.built}`);
@@ -503,15 +503,18 @@
     } };
   }
   function touchClear() {                            // (world, parked) the +X side clear of the shoe, mounts and router,
-    let x = -Infinity, z = Infinity;                 // and the shoe's bottom (skirt off)
+    let x = -Infinity, z = Infinity, zNut = Infinity;   // and the shoe's bottom (skirt off)
     for (const m of meshes) {
       const n = m.userData.name;
       if (!/^(Dust_Shoe|Tool_Mount_|Router_Kobalt|Router_Nut|Router_Bit)/.test(n) || !m.visible) continue;
       const b = new THREE.Box3().setFromObject(m), mo = touchMotion();
       x = Math.max(x, b.max.x - mo.x);
       if (/^Dust_Shoe/.test(n)) z = Math.min(z, b.min.z - mo.z);
+      if (n === "Router_Nut") zNut = b.min.z - mo.z;
     }
-    return { x: x + 15, zShoe: z, y: touchFront() };
+    // no shoe drawn (Options, or hidden - the help videos hide it): under the collet nut instead (it was Infinity: the
+    // clip's route went off to infinity, 2026-10-26)
+    return { x: x + 15, zShoe: isFinite(z) ? z : zNut, y: touchFront() };
   }
   function touchFront() {                            // (world y, parked) just in front of the bottom mount, shoe, router
     let y = Infinity;
@@ -553,6 +556,8 @@
   // the probe animation still moving (out to the stock, or home again)? Every resume waits for it (user 2026-10-25:
   // the job carried on while the plate, clip and shoe bottom were still on their way back): touchSettled() resolves
   // once it's still (30 s at most, so nothing hangs)
+  // the plate or its clip anywhere but home (or on its way): the router stays off - no turning bit, no router sound
+  const touchOut = () => { const A = TOUCH_ANIM; return A.out || A.plate > 0 || A.clip > 0; };
   const touchBusy = () => { const A = TOUCH_ANIM; return A.out ? A.plate < 1 : A.plate > 0 || A.clip > 0 || A.skirt > 0; };
   function touchSettled() {
     const t0 = realNow();
@@ -671,6 +676,10 @@
       m.quaternion.copy(qk);
       if (m === N.mag) b.add(N.centre.clone().multiplyScalar(ease(at.r)));   // into the jaws' middle as it turns
       m.position.copy(b.sub(N.cs).applyQuaternion(qk).add(ck).add(mo));
+      if (AB.routerM) {                              // As built: with the router as it's drawn (racked, tilted, out of tram)
+        m.position.applyMatrix4(AB.routerM);
+        m.quaternion.premultiply(new THREE.Quaternion().setFromRotationMatrix(AB.routerM));
+      }
     }
   }
   function touchAnimTick(dt) {                       // out: skirt, clip, plate; home: plate, clip, skirt
@@ -771,6 +780,8 @@
   // body a little under the cut with a gullet ahead of each flute, flat carbide blades standing out to the full
   // diameter (2-4: the file's FLUTES, else 2), a flared neck down from the 1/4" shank. Tip at z 0, up the axis (mm).
   // Groups: 0 = the body in the tool's colour, 1 = carbide + shank (grey), as jobMeshOf shades them.
+  // Handed for the router's clockwise turn seen from above (user 2026-10-26: they were backwards): each blade's
+  // cutting face leads clockwise, its gullet just ahead of it - the angles below run clockwise (y mirrored, SY = -1).
   function surfacingBitGeo(tool, def) {
     const R = tool.radius, S = COLLET / 2, N = Math.min(4, Math.max(2, tool.flutes || 2));
     const head = tool.fluteLength || Math.min(22, Math.max(8, R * 0.9)), neck = Math.min(10, Math.max(5, R * 0.45)), a0 = Math.PI / 4;   // a0: the blades turned to face a front view
@@ -778,11 +789,11 @@
     const parts = [[], []];                          // non-indexed geometries per group
     const add = (g, grp) => parts[grp].push(g.index ? g.toNonIndexed() : g);
     // body: a disc with N gullets, extruded up the head
-    const shape = new THREE.Shape(), steps = 96, gullet = Math.min(0.9, 2.4 / N), inner = body * 0.42;
+    const shape = new THREE.Shape(), steps = 96, gullet = Math.min(0.9, 2.4 / N), inner = body * 0.42, SY = -1;
     for (let i = 0; i <= steps; i++) {
       const a = i / steps * 2 * Math.PI + a0, k = (((a - a0) % (2 * Math.PI / N)) + 2 * Math.PI / N) % (2 * Math.PI / N);
       const r = k < gullet ? inner + (body - inner) * Math.pow(k / gullet, 3) : body;   // a scooped pocket ahead of the blade
-      i ? shape.lineTo(r * Math.cos(a), r * Math.sin(a)) : shape.moveTo(r * Math.cos(a), r * Math.sin(a));
+      i ? shape.lineTo(r * Math.cos(a), SY * r * Math.sin(a)) : shape.moveTo(r * Math.cos(a), SY * r * Math.sin(a));
     }
     const bg = new THREE.ExtrudeGeometry(shape, { depth: head - lift, bevelEnabled: false, curveSegments: 1 });
     bg.translate(0, 0, lift);
@@ -802,8 +813,8 @@
     const t = Math.max(1, R * 0.09), r0 = inner * 0.9;
     for (let i = 0; i < N; i++) {
       const a = a0 + i * 2 * Math.PI / N, b = new THREE.BoxGeometry(R - r0, t, head);
-      b.translate((R + r0) / 2, -t / 2, head / 2);
-      b.rotateZ(a);
+      b.translate((R + r0) / 2, -SY * t / 2, head / 2);   // on the gullet's trailing wall, its face toward the gullet
+      b.rotateZ(SY * a);
       add(b, 1);
     }
     const geo = new THREE.BufferGeometry(), pos = [], nor = [];

@@ -20,16 +20,30 @@
     sx.dataset.init = "1";
     move();
   }
-  function spinNut() {                               // the collet nut turns with the bit, about the model bit's axis
-    const nut = meshes.find((m) => m.userData.name === "Router_Nut"), bit = meshes.find((m) => m.userData.name === "Router_Bit");
-    if (!nut || !bit || !(JOB.spinning && JOB.spin)) return;
-    const g = bit.geometry;                          // a plain cylinder: its box centre is on the axis
-    if (!g.boundingBox) g.computeBoundingBox();
-    const ax = (g.boundingBox.min.x + g.boundingBox.max.x) / 2 * bit.scale.x + bit.position.x;
-    const ay = (g.boundingBox.min.y + g.boundingBox.max.y) / 2 * bit.scale.y + bit.position.y;
-    const c = Math.cos(JOB.spin), sn = Math.sin(JOB.spin), px = nut.position.x - ax, py = nut.position.y - ay;
-    nut.quaternion.setFromAxisAngle(ZUP, JOB.spin);
-    nut.position.x = ax + c * px - sn * py; nut.position.y = ay + sn * px + c * py;
+  // the bit turning: the collet nut about the model bit's axis (as drawn: As built's tram leans it), the file's own bit
+  // and the hand-installed bit on that axis, tip at its tip. move() places the nut and calls this; spinTick turns it
+  // every frame a job has the router on (FluidNC: a dwell or a hold doesn't move the machine, the bit still turns)
+  function spinApply() {
+    const nut = meshes.find((m) => m.userData.name === "Router_Nut"), rb = meshes.find((m) => m.userData.name === "Router_Bit");
+    if (!rb) return;
+    const a = JOB.spinning && JOB.spin ? JOB.spin : 0, tip = bitTip(rb);
+    const R = new THREE.Quaternion().setFromAxisAngle(ZUP.clone().applyQuaternion(rb.quaternion), a);
+    if (nut && nut.userData.rest) {
+      nut.position.copy(nut.userData.rest.p).sub(tip).applyQuaternion(R).add(tip);
+      nut.quaternion.copy(R).multiply(nut.userData.rest.q);
+    }
+    const q = R.clone().multiply(rb.quaternion);
+    if (jobBit && JOB.bits) for (const b of JOB.bits.values()) if (b.visible) { b.position.copy(tip); b.quaternion.copy(q); }
+    if (HAND.bitMesh) { HAND.bitMesh.position.copy(tip); HAND.bitMesh.quaternion.copy(q); }
+  }
+  function spinTick(dt) {                            // FluidNC jobs (Preview: jobTick turns it and places its bit)
+    if (JOB.preview || !meta) return;
+    const j = FJ.job ? soundJob() : null, was = JOB.spinning;
+    // the router on (the file's own router plan, as the sound has it), not while the touch plate or its clip is out:
+    // the router mustn't start with the clip still on the collet nut (user 2026-10-26)
+    JOB.spinning = !!(j && j.rpm > 0) && !touchOut();
+    if (JOB.spinning) JOB.spin = ((JOB.spin || 0) - dt * 2 * Math.PI) % (2 * Math.PI);   // clockwise from above, 1 turn/s
+    if (JOB.spinning || was) spinApply();
   }
   // Part 32: the Y carriages (the gantry's ends at pose 0, from the meshes' own boxes): the table frame's geo for the
   // tip's error and the drawing's pivots. The span is the gantry's width (outer plate faces), near enough.
@@ -63,24 +77,33 @@
   }
   // the gantry racked (about Z) and the beam + core tilted (about Y) by AB.E, x the drawing's exaggeration, about the
   // Min end's carriage (side 1 stays put; at pose dy / dz); then the router out of tram (user 2026-10-26: so the cause
-  // shows next to its grooves): the router body, nut and bit leaned by As built's tram angles - true size, not
-  // exaggerated - about the bit's tip, which stays where the cut model has it (Imperfect: the tram tilts the bit's
-  // bottom, it doesn't move the tip). Bottom down toward +X = about +Y; toward +Y = about -X.
-  const AB_Y = new THREE.Vector3(0, 1, 0), AB_X = new THREE.Vector3(1, 0, 0), TRAMMED = /^Router_/;
-  function abExag(ex) {                              // the view says when its drawing is magnified (user 2026-10-26)
-    const t = ex > 1 ? `Rack / tilt drawn ${+ex.toFixed(1)}× · cuts true size` : "", b = $("ab-exag");
+  // shows next to its grooves): the router body, nut and bit leaned by As built's tram angles - true size (TRAM_EX 1:
+  // magnifying it was tried 2026-10-26 and dropped - the user: it breaks the router mounts' look, and a real tram error
+  // only shows when surfacing or with a big bit) - about the bit's tip, which stays where the cut model has it
+  // (Imperfect: the tram tilts the bit's bottom, it doesn't move the tip). Bottom down toward +X = about +Y; toward
+  // +Y = about -X.
+  const AB_Y = new THREE.Vector3(0, 1, 0), AB_X = new THREE.Vector3(1, 0, 0), TRAMMED = /^Router_/, TRAM_EX = 1;
+  function abExag(ex, tex) {                         // the view says when its drawing is magnified (user 2026-10-26)
+    const p = [ex > 1 ? `Rack / tilt drawn ${+ex.toFixed(1)}×` : "", tex > 1 ? `tram ${+tex.toFixed(1)}×` : ""].filter(Boolean);
+    const t = p.length ? `${p.join(" · ")} · cuts true size` : "", b = $("ab-exag");
     if (b.textContent !== t) { b.textContent = t; b.hidden = !t; }
   }
   function abPose(dy, dz) {
     const P = AB.piv, on = AB.set.on && P && !AB.square, ex = AB.set.exag || 1;   // square: tableFrame measuring
     const rack = on ? Math.atan2(AB.E.y * ex, P.span) : 0, tilt = on ? Math.atan2(AB.E.z * ex, P.span) : 0;
-    const tr = AB.set.on && !AB.square && AB.set.tram ? AB.set.tram : null;
-    const tx = tr ? (+tr.x || 0) * Math.PI / 180 : 0, ty = tr ? (+tr.y || 0) * Math.PI / 180 : 0;
-    abExag(rack || tilt ? ex : 1);
+    const tr = AB.set.on && !AB.square && AB.set.tram ? AB.set.tram : null, tex = Math.min(TRAM_EX, ex);
+    const tx = tr ? (+tr.x || 0) * tex * Math.PI / 180 : 0, ty = tr ? (+tr.y || 0) * tex * Math.PI / 180 : 0;
+    abExag(rack || tilt ? ex : 1, tx || ty ? tex : 1);
+    const mag = !!(rack || tilt) && ex > 1;            // panel.js applyVisibility hides the cord + sleeve meanwhile
+    if (mag !== !!AB.magnified) { AB.magnified = mag; applyVisibility(); }
+    AB.routerM = null;                                // the router's drawn pose (rack, tilt, tram): the clip on its nut follows it (job.js)
     if (!rack && !tilt && !tx && !ty && !AB.posed) return;
     AB.posed = !!(rack || tilt || tx || ty);
     const qr = new THREE.Quaternion().setFromAxisAngle(ZUP, rack), qt = new THREE.Quaternion().setFromAxisAngle(AB_Y, -tilt);
     const pr = new THREE.Vector3(P ? P.x : 0, P ? P.y + dy : 0, 0), pt = new THREE.Vector3(P ? P.x : 0, 0, P ? P.z + dz : 0);
+    const about = (q, p) => new THREE.Matrix4().makeTranslation(p.x, p.y, p.z).multiply(new THREE.Matrix4().makeRotationFromQuaternion(q))
+      .multiply(new THREE.Matrix4().makeTranslation(-p.x, -p.y, -p.z));
+    const coreM = about(qr, pr).multiply(about(qt, pt));   // tilt, then rack: as the loop below
     for (const m of meshes) {
       const k = m.userData.motion;
       if (m.userData.held || !(k === "gantry" || k === "beam" || k === "core")) continue;
@@ -88,6 +111,7 @@
       if (k !== "gantry" && tilt) { m.position.sub(pt).applyQuaternion(qt).add(pt); m.quaternion.premultiply(qt); }
       if (rack) { m.position.sub(pr).applyQuaternion(qr).add(pr); m.quaternion.premultiply(qr); }
     }
+    AB.routerM = coreM;
     const rb = (tx || ty) && meshes.find((m) => m.userData.name === "Router_Bit");
     if (rb) {
       const tip = bitTip(rb), q = new THREE.Quaternion().setFromAxisAngle(AB_Y, tx).multiply(new THREE.Quaternion().setFromAxisAngle(AB_X, -ty));
@@ -95,6 +119,7 @@
         if (m.userData.held || !TRAMMED.test(m.userData.name || "")) continue;
         m.position.sub(tip).applyQuaternion(q).add(tip); m.quaternion.premultiply(q);
       }
+      AB.routerM = about(q, tip).multiply(coreM);
     }
   }
   function move(pose) {
@@ -123,15 +148,10 @@
       }
     }
     abPose(dy, dz);
-    spinNut();
-    if (jobBit && JOB.bits) {                         // the file's own bit rides on the router (homing, jogs, the
-      const rb = meshes.find((m) => m.userData.name === "Router_Bit");   // video's moves), not left at the job's start
-      if (rb) { const c = bitTip(rb); for (const b of JOB.bits.values()) if (b.visible) { b.position.copy(c); b.quaternion.copy(rb.quaternion); } }
-    }
-    if (HAND.bitMesh) {                               // the hand-installed bit: on the model bit's axis, tip at its tip
-      const rb = meshes.find((m) => m.userData.name === "Router_Bit");
-      if (rb) { HAND.bitMesh.position.copy(bitTip(rb)); HAND.bitMesh.quaternion.copy(rb.quaternion); }   // + the router's lean
-    }
+    const nut = meshes.find((m) => m.userData.name === "Router_Nut");   // its pose unturned: spinApply turns it from here
+    if (nut) nut.userData.rest = { p: nut.position.clone(), q: nut.quaternion.clone() };
+    spinApply();                                      // the file's own bit rides on the router (homing, jogs, the video's
+                                                      // moves), the hand-installed one too; + the router's lean, turning
     if (hoseMesh) updateHose(dx, dy, dz);
     if (CAPS.list.length) placeSection();             // inspect's section cut follows the set
     HOME.pose = { x: dx, y: dy, z: dz };

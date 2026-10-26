@@ -87,7 +87,8 @@
       q("lib").value = m ? m.id : ""; box.libShow();
       return b;
     }
-    const d = parseFloat(q("d").value);
+    let d = parseFloat(q("d").value);
+    if (d > HandSetup.MAX_D) q("d").value = d = HandSetup.MAX_D;
     const out = d > 0 ? { shape: q("shape").value, d, angle: parseFloat(q("angle").value) || 90, len: num("len"), tip: num("tip"), cr: num("cr"),
       flutes: Math.round(num("flutes")) } : null;
     const x = out && BITS.find(q("lib").value);      // one of yours, as it is: its name, flute length, store page too
@@ -372,7 +373,9 @@
   });
   $("hs-surf").addEventListener("click", async () => {   // a surfacing job for this cutting area onto the SD card
     if (!SPOIL.sim) return;
-    const d = parseFloat($("hs-sd").value), over = parseFloat($("hs-so").value) / 100, depth = parseFloat($("hs-sz").value);
+    let d = parseFloat($("hs-sd").value);
+    if (d > HandSetup.MAX_D) $("hs-sd").value = d = HandSetup.MAX_D;
+    const over = parseFloat($("hs-so").value) / 100, depth = parseFloat($("hs-sz").value);
     if (!(d > 0 && over > 0 && over < 1 && depth > 0)) return;
     const z = HandSetup.level(SPOIL.sim, { x: [0, S.cutX], y: [0, S.cutY] }) - depth;
     const text = HandSetup.surfacing({ x: [0, S.cutX], y: [0, S.cutY], d, over, z });
@@ -548,7 +551,7 @@
     // work zero is the cutting area's corner = slider 0 (+ jobZ0); the tip's height above the table = stock + work Z
     const z0 = jobZ0(), mx = clamp(p.x + tv.x[0] + z0[0], tv.x), my = clamp(p.y + tv.y[0] + z0[1], tv.y);
     // the bit turns while the job runs, but not with the touch plate out (the router is off for the probe)
-    JOB.spinning = JOB.playing && !probing;
+    JOB.spinning = JOB.playing && !probing && !touchOut();   // not till the clip is off the collet nut too
     // Z too stops at its bottom stop (the Z nut on the couplers): a job asking for more is cut short there - the bit
     // needs to stick out further (jobZShort says how much; the carving still follows the file)
     const zLow = tv.z[0] + tableZ + meta.tip_above_table - at[2];   // the lowest work Z the bit reaches

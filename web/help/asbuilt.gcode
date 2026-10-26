@@ -7,13 +7,13 @@
 (ToolDef 1: SHAPE=vbit D=12.7 ANGLE=60 NAME=60 deg V-bit)
 (ToolDef 2: SHAPE=flat D=25.4 FLUTES=2 NAME=1in surfacing bit)
 (Video: KIND=ui MACHINE=26x50 FPS=30 VOLUME=0.6 PAUSE=3 MESSAGETIME=4 HOLD=2)
-(Video AsBuilt: ON=on RACK=4 TILT=2 STOPY=1.5 STOPZ=0.5 EXAG=10 TRAM=0 TRAMY=4 WARPX=0.8 WARPY=-0.5 BOW=0.6)
+(Video AsBuilt: ON=on RACK=4 TILT=2 STOPY=1.5 STOPZ=0.5 EXAG=10 TRAM=2 TRAMY=0 WARPX=0.8 WARPY=-0.5 BOW=0.6)
 (Video Title: TIME=3 TEXT=As built|No machine is perfect - this one shows it)
 (Video Step: ID=st-ab TIME=0.8)
 (Video Point: ID=ab-mode TIME=5 TEXT=Ideal or Real-world: Real-world gives the machine your build's errors)
 (Video Point: ID=ab-sy TIME=5 TEXT=One Y switch 1.5 mm further on than the other: homing leaves the gantry racked)
 (Video Point: ID=ab-wx TIME=5 TEXT=A spoilboard that isn't flat: higher at one end, bowed in the middle)
-(Video Point: ID=ab-ty TIME=5 TEXT=A router out of tram: the bit leans 4 degrees - a lot, so it shows)
+(Video Point: ID=ab-tx TIME=5 TEXT=A router out of tram: the bit leans 2 degrees toward +X - a lot, so it shows)
 (Video Text: TIME=4 TEXT=The drawing magnifies the rack 10x so you can see it - the cuts stay true)
 (Video Shot: VIEW=gantrytop TIME=2)
 (Video Wait: TIME=3)
@@ -63,20 +63,27 @@ M0 (MSG, Attach Probe)
 G38.2 Z-110 F200 P0.5
 G0 Z5
 M0 (MSG, Remove Probe and Turn On Router at Dial 5)
-G0 X60 Y80
+G0 X60 Y60
 G0 Z3
 (Video Shot: VIEW=tool TIME=2 DIST=420)
-(Video Text: TIME=6 TEXT=Surfacing 1 mm deep with a 1in bit, side by side passes)
-G1 Z-1 F300
-G1 X260 F1500
-G1 Y100
-G1 X60
-G1 Y120
-G1 X260
-G1 Y140
-G1 X60
-G0 Z10
-G0 X160 Y40
+(Video Text: TIME=6 TEXT=Surfacing 1.5 mm deep with a 1in bit, passes front to back at 75% step-over)
+G1 Z-1.5 F300
+G1 Y220 F1500
+G1 X79.05
+G1 Y60
+G1 X98.1
+G1 Y220
+G1 X117.15
+G1 Y60
+G1 X136.2
+G1 Y220
+G1 X155.25
+G1 Y60
+G0 Z8
+G0 X110 Y40
+(Video Shot: VIEW=toolfront TIME=2.5 DIST=260)
+(Video Text: TIME=6 TEXT=From the front: the bit leans, so only its low edge cuts the full depth)
+(Video Wait: TIME=3)
 (Video Shot: VIEW=tool TIME=2.5 DIST=330)
 (Video Text: TIME=6 TEXT=Out of tram, the bit cuts with one edge: grooves and ridges, not a flat floor)
 (Video Wait: TIME=4)

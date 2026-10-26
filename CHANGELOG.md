@@ -3,6 +3,41 @@
 The version is the sandbox page's (`VERSION` in `web/js/page/job.js`, shown in its footer). The footer also shows
 the date the model data was built and the Printables file set it was solved for.
 
+## 0.51.0 - 2026-10-26
+- **Model data rebuilt at every size** (all 25 size builds and the temporary-strut builds): the touch plate + clip,
+  the dust shoe screw, the belt end loops, the hex collet nut, the table and the 68 mm hose now come from each size's
+  own build instead of the reference size's.
+- **Bits are 1-1/2" across at most** (On the table > Bit, a job's bit change, the surfacing job): bigger isn't for a
+  LowRider's router.
+- The *As built + tram* help video: the router leans 2° toward +X, the surfacing passes run front to back at
+  75% step-over, and a front-on shot shows the lean. Video scripts: `(Video Shot: VIEW=toolfront)`.
+- BOM: the X belt's modelled path matches the model again (8 mm longer since the belt end loops).
+- Fixed: **Get the files** in the top bar did nothing since 0.45.0 (an error); it opens Configure > 6 again, unfolding
+  the panel if it's folded.
+- Fixed: with the new data the size builds' own table parts were drawn on top of the page's table (the torsion box
+  showed a flat sheet too).
+- Fixed: with the dust shoe hidden (as in every help video) the probe clip flew off instead of going onto the collet
+  nut; in As built it now goes onto the nut as drawn (racked, tilted, out of tram).
+- As built: the router cord and cable sleeve are hidden while the rack / tilt is drawn magnified (their routes don't
+  follow it).
+- The tour: opens in Configure even when you start it from Run, shows step 3 Table (the MDF sheet, then the
+  torsion box), and a help video no longer saves Configure / Run as your mode. Help videos unfold a folded Configure
+  panel or Run column to show what they point at (a folded panel left the tour showing Run), without changing your
+  folds.
+- **The bit turns again** when FluidNC runs a job (Run and the help videos; it only did in Preview), the collet nut
+  with it, about the router's axis as drawn (As built's tram too). The router (turning and its sound) waits until the
+  touch plate's clip is off the collet nut.
+- Fixed: in As built, a job's later bit could be carved as an earlier one (the help video's 1in surfacing passes came
+  out as thin V-bit lines): carving off the exact path now uses the bit of the move the job is on.
+- **Surfacing bits are the right hand:** each blade's cutting face leads for the router's clockwise turn (seen from
+  above), its gullet ahead of it - they were drawn backwards. The As built video's surfacing pass is 1.5 mm deep.
+- The README links each help video (`#help=<id>`).
+- The welcome card offers the **machine sounds** (a link that turns them on, in step with ⚙ > Sound), so new
+  visitors know they're there.
+- `tools/page_shot.js --gpu`: screenshots on the real GPU (Full detail).
+- README brought up to date (My machines, As built, filaments, front plate design, My bits, Where to buy) with new
+  screenshots.
+
 ## 0.50.1 - 2026-10-26
 - **The bit change popup** laid out like As built: the fields in two columns with their units, a "?" for the
   explanation, V angle only for a V-bit, and a shorter "Bit change: T2".

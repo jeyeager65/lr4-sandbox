@@ -24,7 +24,9 @@ const ok = (cond, msg) => { checks++; console.log((cond ? "  ok   " : "  FAIL ")
   };
   const until = async (js, secs) => { for (let i = 0; i < secs * 4; i++) { try { if (await page.val(js)) return true; } catch (e) { /* reloading */ } await sleep(250); } return false; };
   // your machine: its id, every setting, its SD card's files (path + bytes)
-  const mine = () => page.val(`(async () => JSON.stringify({ id: MS.id, temp: MS.temp, s: MS.settingsOf(MS.id),
+  // keys sorted: localStorage.key(i)'s order isn't kept (any write can reshuffle it), the values are what count
+  const mine = () => page.val(`(async () => JSON.stringify({ id: MS.id, temp: MS.temp,
+    s: Object.fromEntries(Object.entries(MS.settingsOf(MS.id)).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))),
     sd: (await SdCard.store.all()).map((r) => [r.path, Array.from(r.bytes).join(",")]) }))()`);
   try {
     await sleep(800);
@@ -93,7 +95,17 @@ const ok = (cond, msg) => { checks++; console.log((cond ? "  ok   " : "  FAIL ")
     try { await page.val(`document.querySelector("#hv-bar .hv-exit").click()`); } catch (e) { /* reloading */ }
     ok(await loaded(), "Exit reloads");
     const after = await mine();
-    ok(after === before, `Exit: your machine byte for byte as it was (${after.length} chars of settings + SD)`);
+    const diff = (() => {                            // which keys changed, to say what leaked
+      const a = JSON.parse(before), b = JSON.parse(after), out = [];
+      for (const k of ["id", "temp"]) if (a[k] !== b[k]) out.push(`${k}: ${a[k]} -> ${b[k]}`);
+      const sa = a.s || {}, sb = b.s || {};
+      for (const k of new Set([...Object.keys(sa), ...Object.keys(sb)])) if (JSON.stringify(sa[k]) !== JSON.stringify(sb[k])) out.push(`${k}: ${JSON.stringify(sa[k])} -> ${JSON.stringify(sb[k])}`.slice(0, 160));
+      if (JSON.stringify(a.sd) !== JSON.stringify(b.sd)) out.push("the SD card");
+      const ka = Object.keys(sa), kb = Object.keys(sb), i = ka.findIndex((k, j) => k !== kb[j]);
+      if (!out.length && i >= 0) out.push(`same values, key order changed at ${ka[i]} / ${kb[i]}`);
+      return out;
+    })();
+    ok(after === before, `Exit: your machine byte for byte as it was (${after.length} chars of settings + SD)${diff.length ? ": " + diff.join("; ") : ""}`);
     if (after !== before) {
       const A = JSON.parse(before), B = JSON.parse(after);
       for (const k of new Set([...Object.keys(A.s), ...Object.keys(B.s)])) if (A.s[k] !== B.s[k]) console.log(`    setting ${k}: ${String(A.s[k]).slice(0, 120)} -> ${String(B.s[k]).slice(0, 120)}`);

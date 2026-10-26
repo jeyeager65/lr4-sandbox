@@ -20,9 +20,16 @@ const A_HELPERS = `
       await LR4Job.add([new File([text], name)]);
       await T.until(() => LR4Job.src() && LR4Job.src().name === "/" + name && LR4Job.tl(), 15000);
       document.getElementById("job-play").click();   // Run on FluidNC (10x): wait for it to start, then to end
+      await T.sleep(500);                            // the Start check (a different bit in the router): its ▶ Start
+      const go = document.getElementById("start-go"); if (go && go.getClientRects().length && !go.disabled) go.click();
       const started = await T.until(() => LR4Job.running(), 20000);
       if (!started) (window.A.misses = window.A.misses || []).push(name + ": " + document.getElementById("job-status").textContent + " / " + LR4Ctl.state() + " homed " + LR4Ctl.homed());
-      await T.until(() => !LR4Job.running() && /^Done\\./.test(document.getElementById("job-status").textContent), 300000);
+      const t0 = performance.now();                  // M0 holds (the touch plate's): resumed
+      while (LR4Job.running() && performance.now() - t0 < 300000) {
+        await T.sleep(200);
+        if (LR4Job.held() && !document.getElementById("job-pop").hidden) document.getElementById("job-resume").click();
+      }
+      await T.until(() => !LR4Job.running() && /^Done\\./.test(document.getElementById("job-status").textContent), 30000);
     },
     // the spoilboard's heights across a row (table y), x from..to: { lo, hi }
     row(y, x0, x1) {
@@ -113,6 +120,27 @@ const PASSES = (() => {
     const ridge = 10.16 * Math.tan(0.5 * Math.PI / 180);
     ok(Math.abs(b.tram.hi - b.tram.lo - ridge) < 0.03, `0.5 deg out of tram: ridges ${(b.tram.hi - b.tram.lo).toFixed(3)} mm (~${ridge.toFixed(3)})`);
     ok(b.flat.hi - b.flat.lo < 0.01, `trammed: flat ${(b.flat.hi - b.flat.lo).toFixed(4)} mm ${b.flat.hi - b.flat.lo < 0.01 ? "" : JSON.stringify(b.flatWhy)}`);
+
+    // two bits, racked and off level, a probe first: the second bit's pass is cut with that bit, full width. (The bug
+    // it was written for - T1's V-bit carving the 1in passes thin, 2026-10-26 - only showed in a help video's frame
+    // clock: test_page_help_all checks the As built video's surfacing. This one passes with or without that fix.)
+    const tb = await page.val(`(async () => {
+      document.getElementById("hs-new").click(); await T.sleep(300);
+      LR4AsBuilt.set({ tram: { x: 0, y: 0 }, stop: { y: 1.5, z: 0.5 } });
+      LR4AsBuilt.setE({ y: 4, z: 2 });                // racked + off level at power-up, as the help video
+      await A.homeNC();
+      await A.play(${JSON.stringify(["(LR4 two bits)", "(Stock: XMIN=-10 XMAX=300 YMIN=-10 YMAX=260 ZMIN=-12.7 ZMAX=0)",
+        "(ToolDef 1: SHAPE=vbit D=12.7 ANGLE=60 NAME=V)", "(ToolDef 2: SHAPE=flat D=25.4 NAME=surfacing)",
+        "G21 G90", "T1", "G10 L20 P0 X0 Y0 Z0", "G0 X-5 Y-5", "M0 (MSG, Attach Probe)", "G38.2 Z-110 F200 P0.5", "G0 Z5",
+        "M0 (MSG, Remove Probe and Turn On Router at Dial 4)", "G0 X10 Y10 Z3", "G1 Z-1 F300", "G1 X60 F1500", "G0 Z15",
+        "T2", "G0 X60 Y60", "G0 Z3", "G1 Z-1.5 F300", "G1 Y220 F1500", "G0 Z20", "M30", ""].join("\n"))}, "two_bits.gcode");
+      const why = { status: document.getElementById("job-status").textContent, src: LR4Job.src() && LR4Job.src().name };
+      const s = LR4Job.sim(), j = Math.round((140 - s.stock.ymin) / s.dy); let n = 0;   // the stock across the pass
+      for (let x = 30; x <= 90; x += s.dx) if (s.heights[j * s.vx + Math.round((x - s.stock.xmin) / s.dx)] < -0.3) n++;
+      LR4AsBuilt.set({ stop: { y: null, z: null } });
+      return { wide: n * s.dx, why };
+    })()`);
+    ok(tb.wide > 22 && tb.wide < 28, `switches apart, T1 then T2: the 1in pass is ${tb.wide.toFixed(1)} mm wide ${tb.wide > 22 ? "" : JSON.stringify(tb.why)}`);
 
     // follow-ups: the drawn tip moves by tipErr (X shift too); a warp change lays an uncut board again, asks for a cut
     // one; the stock follows the board (or not); the squareness test read off the cut, racked vs square

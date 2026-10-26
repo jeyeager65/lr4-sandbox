@@ -110,7 +110,11 @@
     const pts = FJ.pts.splice(0);
     for (const q of pts) {
       const acts = J.T.feed(q, rate * q.dt * 1.5 + 1);
-      if (J.P) J.P.feed(q, rate * q.dt * 1.5 + 1);
+      if (J.P) {                                     // As built: the motors are off the path by its errors, so the
+        J.P.feed(q, rate * q.dt * 1.5 + 1);          // exact tracker carves straight lines from sample to sample, with
+        for (const a of acts) if (a.line && J.P.i > a.seg) a.seg = J.P.i;   // the bit of the move the job is on (the 2 mm
+      }                                              // tracker) - not the last move it matched (2026-10-26: T1's V-bit
+                                                     // carved the 1in surfacing passes as thin lines)
       if (JOB.sim && acts.length) MotionCarve.carve(JOB.sim, tl.segs, acts);
       if (JOB.spoil && acts.length && MotionCarve.carve(JOB.spoil, tl.segs, acts)) J.spoilCut = true;
     }

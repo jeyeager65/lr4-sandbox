@@ -41,6 +41,13 @@ const ok = (cond, msg) => { checks++; console.log((cond ? "  ok   " : "  FAIL ")
       const bad = await page.val(`LR4Director.events().filter((e) => /^[\\d.]+ log \\(Video\\):/.test(e))`);
       ok(!bad.length, `no script problems${bad.length ? ": " + bad.join(" | ") : ""}`);
       ok(await page.val(`document.body.classList.contains("view-only") === ${v.kind === "machine"}`), `${v.kind} layout`);
+      if (v.id === "asbuilt") {                      // its 1in surfacing passes (X 60..155, Y 60..220) cut full width -
+        const w = await page.val(`(() => {           // not thin lines from the V-bit before them (fixed 2026-10-26)
+          const s = LR4Job.sim(), j = Math.round((140 - s.stock.ymin) / s.dy); let n = 0;
+          for (let x = 40; x <= 180; x += s.dx) if (s.heights[j * s.vx + Math.round((x - s.stock.xmin) / s.dx)] < -0.2) n++;
+          return n * s.dx; })()`);
+        ok(w > 100, `As built: the surfacing passes cut ${w.toFixed(0)} mm across (six 1in passes, 75% step-over: ~120)`);
+      }
     }
     try { await page.val(`document.querySelector("#hv-bar .hv-exit").click()`); } catch (e) { /* reloading */ }
     ok(await loaded() && await page.val("!MS.temp"), "Exit: back on yours");

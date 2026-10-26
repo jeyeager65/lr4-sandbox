@@ -73,6 +73,22 @@ and pick the Peter Plates style (Open, Closed, Honeycomb or None). **3 Table** -
 **4 As built** - a real machine's faults (below). **5 Look** - the print colors and the scene. **6 Get the files**
 (also in the top bar).
 
+**My LR4 ▾** (top bar) holds **My machines**: several named machines, each with its own size, options, table,
+filaments, As built, spoilboard, SD card, Flash (config.yaml) and front plate design. New, Duplicate, Rename,
+Delete, and **Export** / **Import** as a `.lr4.json` file. A shared link opens as a temporary machine with a banner
+(**Save as one of my machines** keeps it); nothing of yours changes until you do.
+
+**As built** is off (Ideal) by default. **Real-world** gives the machine a real build's faults: the Y and Z switches
+not quite in line (homing leaves the gantry racked or the beam off level by that much), motors that let go at power-up
+(racked until it homes), a warped or bowed spoilboard and a router out of tram. Run then shows how far out it is, with
+Power cycle and a squareness test (a rectangle and its diagonals, sized to your machine, on the SD card). The view can
+magnify the rack and tilt (10x to 100x) so you can see which way it's off (the router's tram lean is drawn true size);
+the cuts and readouts always use the real values.
+
+**Look** sets the print colors: filament spools named by color, presets as starting points (save your own), and
+**Printed in** on any part's chip to print just that part in another filament. Printed parts are drawn with layer
+lines at your layer height. The strut plates can be drawn as MDF, hardboard, plywood or acrylic.
+
 **Layers** (on the view, or L) only hides parts from the view, never from the BOM: a tree of assembly > printed / cut / hardware /
 electronics > part (a bolt is listed under both assemblies it joins), with presets (All, No hardware, Printed parts
 only, Frame only). **Look** > **Scene** sets the detail (Full, or Lite for slower devices), the lighting (Realistic: the
@@ -88,13 +104,19 @@ and a measuring tool that snaps to corners and hole centres. Esc or **Back to th
 
 **Get the files** has the cut list from V1E's LowRider 4 calculator, the strut plates (DXF / SVG, or G-code to cut them on
 the machine itself), the full BOM with hardware counts for your size, and V1E's JP3_LR `config.yaml` with
-`max_travel_mm` set for your size (or your own config.yaml, adjusted the same way).
+`max_travel_mm` set for your size (or your own config.yaml, adjusted the same way). The BOM has a **Where to buy**
+column: V1E's store first (what's in the kit, what's a kit option), then EU and other sellers V1E lists.
+
+**Front plate design** (Get the files > Strut plates): download an SVG template for your plate's length, draw on it
+in Inkscape (Engrave, Pocket and Cut through layers; the red areas are off limits), and upload it. The page checks
+it, carves it into the front plate in the view and adds it to the strut plate G-code (a V-bit first, an optional
+1/16" clean-up, then the 1/8" bit for the plates).
 
 Building numbers (the cutting area, table, braces pitch, cut list, strut plate drawing) follow the inches / mm
 switch. Running numbers (tool position, MPos, work position, jogging, the G-code settings) are always mm with 3
 decimals, as FluidNC reports them.
 
-![Build: the BOM, the cut list and the strut plates](docs/img/build.webp)
+![Get the files: the BOM, the cut list and the strut plates](docs/img/build.webp)
 
 ### Run: FluidNC
 
@@ -118,8 +140,13 @@ Run has a Machine column on the left, the Job column on the right and the consol
 - **Touch plate under the bit** puts the plate on the stock so G38.2 stops on it.
 - **On the table > Bit** (and a job's bit change) takes any bit the cut simulation knows: flat end mill, ball end,
   bullnose (corner radius), V-bit, chamfer (angle + tip flat) or tapered ball (angle + ball diameter), with its flute
-  count. A bit wider than 1/4" is drawn on a 1/4" shank (the router's collet takes no more), as a 2-flute bit unless
-  the file says otherwise.
+  count, up to 1-1/2" across. A bit wider than 1/4" is drawn on a 1/4" shank (the router's collet takes no more), as
+  a 2-flute bit unless the file says otherwise; over 1/2" it's drawn as a surfacing bit. **My bits** keeps your bits
+  in this browser, starting with the V1E store's bits and a 3/4" surfacing bit. A job's tool change pops up its
+  bit: **Install bit and resume**.
+- **On the table > Stock** puts a board on the spoilboard by hand. **Spoilboard:** every cut into it stays (per
+  machine, in this browser); **Surfacing job to the SD card** writes a zigzag that flattens it; **New spoilboard**
+  lays a fresh one.
 - **The console** takes any G-code or `$` command and shows FluidNC's replies (folded to one line until you open it).
 - **Speed** runs the machine at 1x to 20x.
 
@@ -137,7 +164,7 @@ FluidNC is, in a player that takes the Job column's place: what Run would do, wi
 offsets. It carves a copy of the stock, never the spoilboard, and FluidNC doesn't move; **Exit preview** (or
 FluidNC moving) puts the model back where FluidNC is. Preview works even where FluidNC can't run.
 
-![Preview: the strut plate job on the temporary struts](docs/img/playback.webp)
+![Preview: the strut plate job at 100x, carving a copy of the stock](docs/img/playback.webp)
 
 **Web UIs:** put a web UI on FluidNC's SD card or Flash (WebUI 3, WebUI 2 or FigUI: their release `index.html.gz`,
 as they are) and **Pendant & WebUI > Web UIs > Open** (top bar, in Run) shows it in a window of its own, served by the page's FluidNC
@@ -147,7 +174,7 @@ web server the way a board serves it: watch and drive the machine from there, up
 it through its own service worker (`web/device/`; same browser only). Several UIs open at once can get errors from
 FluidNC, as on a board.
 
-![FluidNC mode, homed, with its console](docs/img/fluidnc.webp)
+![Run: FluidNC homed, with its console open](docs/img/fluidnc.webp)
 
 **Browser:** tested in desktop Chrome (and Edge for VR). FluidNC mode needs the page to be cross-origin isolated
 (its threads need SharedArrayBuffer). `tools/serve.py` sends the headers; on GitHub Pages the page reloads itself
@@ -164,20 +191,32 @@ zoom far out to see the closed building. Enter your own building's size (X, Y, c
 much room the machine takes: the page gives the gap to each wall and warns when a side is under 2 ft / 600 mm. The
 room and the table legs are drawn by the page only.
 
-![The workshop from outside](docs/img/outside.webp)
+![The workshop from the driveway: the LR4 through the open garage door](docs/img/outside.webp)
 
 ### Sound
 
 **⚙** (on the canvas) > **Sound** turns on machine sounds, synthesized live from what the machine is doing: the
 steppers (TMC2209s in StealthChop, pitched by each axis' step rate), the Kobalt router at its dial speed with the
 cutting load (it bogs down in a deep cut), the shop vac, the switch clicks when homing and the touch plate tap. The
-same menu has the volume and, for fun, a "robot noises" voice.
+same menu has the volume and, for fun, a "robot noises" voice. The welcome card has a link that turns them on.
 
 ### Help videos
 
-**Help ▾** (top bar) lists short videos that play **live in the page**, not as recordings - *Tour + first job*,
-*Why home?*, *Probing and zero*, *As built + tram* and *Your own front plate*: the machine homes, jogs
-and cuts on its own FluidNC while titles and captions explain it. Each one plays on a temporary machine set up the
+**Help ▾** (top bar) lists short videos that play **live in the page**, not as recordings - the machine homes, jogs
+and cuts on its own FluidNC while titles and captions explain it. Each one has its own link (`#help=<id>`):
+
+- [Tour + first job](https://jeyeager65.github.io/lr4-sandbox/#help=tour) - the Configure steps, then Run: Home, Zero
+  and a name plate engraved
+- [Why home?](https://jeyeager65.github.io/lr4-sandbox/#help=why_home) - switched on, the gantry is racked; `$H`
+  squares it
+- [Probing and zero](https://jeyeager65.github.io/lr4-sandbox/#help=probing) - work zero per axis, and the touch plate
+  finding the stock's top
+- [As built + tram](https://jeyeager65.github.io/lr4-sandbox/#help=asbuilt) - a racked gantry, a router out of tram,
+  a warped spoilboard, and the squareness test
+- [Your own front plate](https://jeyeager65.github.io/lr4-sandbox/#help=front_plate) - the template, your SVG, the
+  plate in 3D and its job
+
+Each one plays on a temporary machine set up the
 way the video needs (its size, table, As built), so your machine, its settings and its SD card stay exactly as they
 are; **✕ Exit** brings you back. While one plays: ⏸ / ▶ (or Space, or a click on the view) pauses, a drag looks round
 (**Follow** gives the camera back), and the sound comes on for the video. Jobs play at up to 5× (FluidNC's pace in the
@@ -243,7 +282,8 @@ shots and the FluidTouch pendant's screen in a corner. The comments:
 | `(Video: SIZE=1920x1080 FPS=30 SOUND=on ...)` | Settings, before the first move: size, frame rate, volume, `VOICE=robot`, `DETAIL`, `SCENERY=shop\|empty\|plain`, `MACHINE=26x50` (cutting area, in), the machine's options as on My LR4 (`TABLE=34in ROOM=16x20x9ft BRACES= STRUTS= PETER= ROUTER= SKIRT= HOSE= FAN= MAIN= ACCENT=`), `PENDANT=on`, `MODE=fluidnc` (run it on the page's FluidNC), how long M0 pauses and messages show (`PAUSE`, `MESSAGETIME`), `PARK=on`, `HOLD` on the result. |
 | `(Video Title: TIME=3 TEXT=Line one\|Line two)` | A full-screen title card. |
 | `(Video Text: TIME=4 TEXT=...)` | A caption over what comes next. |
-| `(Video Shot: VIEW=tool TIME=1.5 ORBIT=8 DIST=600)` | The camera: `workshop`, `machine`, `stock`, `tool` (follows the bit), `core`, `iso`, `front`, `top`, `side`, `back`, `page`, `pendant`; it blends there over TIME and turns round it over ORBIT. |
+| `(Video Shot: VIEW=tool TIME=1.5 ORBIT=8 DIST=600)` | The camera: `workshop`, `machine`, `stock`, `tool` (follows the bit), `toolfront` (the same, straight in from the front), `core`, `iso`, `front`, `top`, `side`, `back`, `page`, `pendant`, `ymin` / `ymax` (a Y carriage), `gantry`, `gantrytop` (straight down: the rack); it blends there over TIME and turns round it over ORBIT. |
+| `(Video AsBuilt: ON=on RACK=4 STOPY=1.5 TRAM=2 WARPX=0.8 EXAG=10 ...)` | The machine's As built faults for this video (Configure > 4 As built); the full list is in the script reference. |
 | `(Video Show: PRESET=frame HIDE=Dust_Skirt*,Bristles_TPU* SHOW=...)` | What's drawn, by Show's presets and ids (an assembly, `asm.kind`, a part name, `*` patterns). Mid-job too: hide the skirt and bristles to watch the bit. |
 | `(Video Inspect: ID=core EXPLODE=0.7 SECTION=y@0.5 FLIP=on VIEW=xray TIME=2 ORBIT=6)` | The inspect view, animated over TIME; `ID=off` goes back to the machine. |
 | `(Video Home: OFFSET=30)` / `(Video Zero: X=150 Y=120)` | Home at real speed, then jog to work zero (where the stock sits); before the first move. |
@@ -331,6 +371,13 @@ node test_page_fluidtouch.js                 # headless Chrome: FluidTouch's UI 
 node test_page_sound.js                      # headless Chrome: machine sounds start, follow the axes, render a WAV
 node test_page_parts.js                      # headless Chrome: part files - the Parts chip, welcome card, stand-ins
 node test_page_phone.js                      # headless Chrome: the phone layout (390 x 844): Run's sheets, console
+node test_page_help_all.js                   # every help video in web/help/ plays live to its end
+node test_page_hand.js                       # headless Chrome: stock / bit / touch plate by hand, moves carve, M6 holds
+node test_page_table.js                      # headless Chrome: the table base (MDF sheet / torsion box) and spoilboard
+node test_page_asbuilt.js                    # headless Chrome: As built - racked homing, power cycle, warp, tram
+node test_page_filaments.js                  # headless Chrome: filaments, presets, Printed in, the printed look
+node test_page_machines.js                   # headless Chrome: My machines - switch, duplicate, export / import, links
+node test_page_design.js                     # headless Chrome: the front plate design, uploaded and carved
 node test_strut_plate.js                     # JS strut plates vs Vector76's OpenSCAD generator (maintainer only)
 python ../tools/run.py test_strut_plate.py   # Python strut plates vs the same (maintainer only)
 node test_parts_files.js                     # the page's STL / DXF readers vs the reference build (needs parts/)
@@ -344,7 +391,8 @@ The rest need Chrome, `parts/`, the size builds or the OpenSCAD goldens, so they
 
 Something placed wrong, a file not recognised, a wrong number: use **Report a problem** in the page's footer. It
 opens a GitHub issue with your size and file checksums filled in. Questions about the LowRider itself go to the
-[V1E forum](https://forum.v1e.com/). Parts to buy: [LowRider parts in the V1E store](https://www.v1e.com/collections/lowrider-parts). What changed per version: [CHANGELOG.md](CHANGELOG.md).
+[V1E forum](https://forum.v1e.com/). Parts to buy: [LowRider parts in the V1E store](https://www.v1e.com/collections/lowrider-parts), or the BOM's
+Where to buy column. What changed per version: [CHANGELOG.md](CHANGELOG.md).
 
 ## Layout
 

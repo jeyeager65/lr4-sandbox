@@ -28,8 +28,12 @@ const RUN = (k) => `(async () => {
   document.getElementById("job-play").click();
   await T.until(() => LR4Job.running(), 10000);
   out.started = LR4Job.running();
+  const nut = meshes.find((m) => m.userData.name === "Router_Nut"), qs = new Set();
+  out.spinOn = 0;
   while (LR4Job.running()) {
     await T.sleep(100);
+    if (JOB.spinning && nut) { out.spinOn++; qs.add(nut.quaternion.w.toFixed(3)); }   // the bit + nut turning (router on)
+    if (JOB.spinning && touchOut()) out.spinClip = (out.spinClip || 0) + 1;            // never with the plate / clip out
     if (LR4Job.held() && !document.getElementById("job-pop").hidden) {
       out.holds.push(document.getElementById("job-pop-msg").textContent);
       out.plates.push(LR4Ctl.plate());
@@ -43,6 +47,7 @@ const RUN = (k) => `(async () => {
     }
     if (performance.now() - t0 > 900000) break;
   }
+  out.spinQ = qs.size;
   out.secs = (performance.now() - t0) / 1000;
   out.status = document.getElementById("job-status").textContent;
   out.plateAfter = LR4Ctl.plate();
@@ -201,6 +206,10 @@ const RUN = (k) => `(async () => {
     console.log(`  strut job 10x: ${s3.secs.toFixed(0)} s, holds ${JSON.stringify(s3.holds)}, plate ${s3.plates}, cut ${s3.cut} / ${s3.cutRef} cells`);
     if (s3.status !== "Done.") console.log("  console: " + s3.log.join("\n  console: "));
     ok(s3.started && s3.status === "Done.", `strut job at 10x: ${s3.status}`);
+    ok(!s3.spinClip && !s1.spinClip, `never turning with the touch plate or its clip out (${s3.spinClip || 0})`);
+    ok(s3.spinOn > 20 && s3.spinQ > 5, `the bit + collet nut turn while the router's on (FluidNC): ${s3.spinOn} samples, ${s3.spinQ} nut angles`);
+    // a file without router commands is run with the router on (as the sound has it: hand-switched routers' posts)
+    ok(s1.spinOn > 5 && s1.spinQ > 3, `small job (no M3: router assumed on) turns too: ${s1.spinOn} samples, ${s1.spinQ} nut angles`);
     ok(s3.holds.length === 2 && /Attach Probe/.test(s3.holds[0]) && /Remove Probe/.test(s3.holds[1]), `M0 holds: ${s3.holds}`);
     ok((s3.waits || []).every((w) => !w.busy || (w.held && w.btn)) && (s3.waits || []).every((w) => w.settled),
       `Resume waits for the touch plate's animation (busy at Resume -> still held, button off; moving on only once still): ${JSON.stringify(s3.waits)}`);

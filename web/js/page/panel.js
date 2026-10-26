@@ -244,6 +244,8 @@
   // take it off (user); jobBit = the file's own bit (from its ToolDef) is drawn instead of the model's Router_Bit
   let probing = false, jobBit = false, bitOK = true;   // bitOK: the job's bit shows where the model's would (Show, inspect)
   const PROBE_OFF = /^(Dust_Skirt|Bristles_TPU)/;
+  // the cord + sleeve routes don't follow a magnified rack / tilt (machine.js abPose): hidden while it's drawn so (user 2026-10-26)
+  const RACK_OFF = /^(Router_Cord_Run|Cable_Sleeve)$/;
   function applyVisibility() {
     const listed = meshes.filter((m) => m.userData.name && fitted(m) && variantOK(m) && !m.userData.missingHw);   // Part 38: not with its missing part
     const key = listed.map((m) => m.userData.name).join();
@@ -256,7 +258,7 @@
     const inTree = new Set(listed);
     for (const m of meshes) m.visible = inTree.has(m) && LR4ShowTree.on(tree, showOff, partId(m))
       && (!INSPECT || INSPECT.set.has(partId(m)))
-      && !(TOUCH_ANIM.skirt >= 1 && PROBE_OFF.test(m.userData.name)) && !(jobBit && m.userData.name === "Router_Bit");   // off once it's slid out (job.js)
+      && !(TOUCH_ANIM.skirt >= 1 && PROBE_OFF.test(m.userData.name)) && !(AB.magnified && RACK_OFF.test(m.userData.name)) && !(jobBit && m.userData.name === "Router_Bit");   // off once it's slid out (job.js)
     const rb = meshes.find((m) => m.userData.name === "Router_Bit");
     bitOK = !!rb && inTree.has(rb) && LR4ShowTree.on(tree, showOff, partId(rb)) && (!INSPECT || INSPECT.set.has(partId(rb)));
     if (!bitOK && JOB.bits) for (const b of JOB.bits.values()) b.visible = false;

@@ -2,7 +2,7 @@
   "about": "Help videos (Part 43): each is a (Video ...) G-code script the page plays live (js/page/help.js) and tools/record_demo.js records for YouTube. secs = about how long it plays live. kind: machine = the 3D view, ui = the whole page.",
   "videos": [
     { "id": "tour", "file": "tour.gcode", "kind": "ui", "secs": 125, "title": "Tour + first job",
-      "blurb": "The Design steps, then Run: Home, Zero and a name plate engraved on the page's own FluidNC." },
+      "blurb": "The Configure steps, then Run: Home, Zero and a name plate engraved on the page's own FluidNC." },
     { "id": "why_home", "file": "why_home.gcode", "kind": "machine", "secs": 80, "title": "Why home?",
       "blurb": "Switched on, the gantry is racked and the beam off level: $H squares it, each side to its own switch." },
     { "id": "probing", "file": "probing.gcode", "kind": "ui", "secs": 85, "title": "Probing and zero",

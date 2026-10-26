@@ -24,6 +24,7 @@
   // tip: V-bit / chamfer (tip = the flat at its point) and tapered ball (tip = the ball's diameter); cr: bullnose;
   // flutes: 0 = not said (drawing only)
   const SHAPES = ["flat", "ball", "bullnose", "vbit", "chamfer", "taperball"];
+  const MAX_D = 38.1;                                // no bits over 1-1/2" on an LR4 (user 2026-10-26); the forms clamp to it
   const ANGLED = ["vbit", "chamfer", "taperball"];
   const toDef = (b) => ({ shape: b.shape, diameter: b.d, angle: ANGLED.includes(b.shape) ? b.angle || 90 : undefined,
     tip: ANGLED.includes(b.shape) && b.tip > 0 ? b.tip : undefined, cornerRadius: b.shape === "bullnose" && b.cr > 0 ? b.cr : undefined,
@@ -134,7 +135,7 @@
     return L.join("\n");
   }
 
-  const api = { SHAPES, ANGLED, needs, toDef, fromDef, bitName, shifted, topAt, level, resample, board, surfacing };
+  const api = { SHAPES, MAX_D, ANGLED, needs, toDef, fromDef, bitName, shifted, topAt, level, resample, board, surfacing };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.HandSetup = api;
 })(typeof self !== "undefined" ? self : this);
