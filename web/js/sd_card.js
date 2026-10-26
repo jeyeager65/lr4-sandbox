@@ -87,6 +87,7 @@
   function card(DB, dir, skip = []) {
     const raw = async () => ((await tx(DB, "readonly", (st) => st.getAll())) || []).sort((a, b) => a.path.localeCompare(b.path));
     const store = {
+      records: raw,                                  // files + folders as stored (a machine's export / copy)
       all: async () => (await raw()).filter((r) => !r.dir),
       dirs: async () => (await raw()).filter((r) => r.dir).map((r) => r.path),
       get: (path) => tx(DB, "readonly", (st) => st.get(path)),
@@ -138,8 +139,10 @@
     const dirs = (paths) => paths.map((p) => dir + p);
     return { DIR: dir, store, writeLive, removeLive, mkdirLive, removeTreeLive, sync, files, dirs };
   }
-  const sd = card("lr4-sandbox-sd", DIR);
-  const flash = card("lr4-sandbox-flash", "/native_localfs", ["/sim_config.yaml"]);
+  // the active machine's card + Flash (machines.js: one database each per machine)
+  const mdb = (n) => (root.MS ? root.MS.db(n) : n);
+  const sd = card(mdb("lr4-sandbox-sd"), DIR);
+  const flash = card(mdb("lr4-sandbox-flash"), "/native_localfs", ["/sim_config.yaml"]);
 
   const api = Object.assign({ cleanName, pathOf, walk, walkDirs, parents, diff, card, flash }, sd);
   if (typeof module !== "undefined" && module.exports) module.exports = api;

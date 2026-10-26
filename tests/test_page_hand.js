@@ -48,7 +48,7 @@ const H_HELPERS = `
     pop: () => !document.getElementById("job-pop").hidden,
     done: () => !LR4Job.running() && /^Done\\./.test(document.getElementById("job-status").textContent),
   };
-  window.confirm = () => true;
+  askBox.auto = () => true;
   true`;
 const THROUGH = ["G21 G90", "T1", "G0 Z5", "G0 X20 Y20", "G1 Z-13 F600", "G1 X80 F1500", "G0 Z5", "M30", ""].join("\n");
 const TWO = ["G21 G90", "T1", "G0 Z5", "G0 X20 Y40", "G1 Z-1 F600", "G1 X80 F1500", "G0 Z5", "T2 M6", "G0 X20 Y60",
@@ -74,13 +74,13 @@ const TWO = ["G21 G90", "T1", "G0 Z5", "G0 X20 Y40", "G1 Z-1 F600", "G1 X80 F150
     // fresh board, home, then the hand stock: 100-300 x 100-300, 12 mm
     const a = await page.val(`(async () => {
       document.getElementById("t-run").click();
-      document.getElementById("hs-new").click();
+      document.getElementById("hs-new").click(); await T.sleep(100);   // it asks first (askBox: async)
       // a known bit (the router's bit is kept in this browser: a run before may have left the 25.4 mm surfacing one,
       // which sticks out less, so Z can't reach 8 mm above the table)
       for (const [k, v] of [["shape", "flat"], ["d", 6.35], ["len", 0]]) document.querySelector('#hs-bit [data-k="' + k + '"]').value = v;
       document.getElementById("hs-bit-use").click();
       const out0 = { homed: await H.home() };
-      for (const [id, v] of [["hs-x0", 100], ["hs-x1", 300], ["hs-y0", 100], ["hs-y1", 300], ["hs-t", 12]]) document.getElementById(id).value = v;
+      for (const [id, v] of [["hs-x", 100], ["hs-w", 200], ["hs-y", 100], ["hs-d", 200], ["hs-t", 12]]) document.getElementById(id).value = v;
       document.getElementById("hs-use").click();
       await T.sleep(300);
       const s = LR4Job.handSim(), out = Object.assign(out0, { on: !!s, top: s && Math.max(...s.heights), name: document.getElementById("hs-stock-name").textContent });

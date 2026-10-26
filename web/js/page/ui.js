@@ -19,13 +19,13 @@
     if (d) { d.open = true; if (scroll) d.scrollIntoView({ block: "start", behavior: "smooth" }); }
   }
   for (const d of steps) d.addEventListener("toggle", () => {
-    if (d.open) { showStep(d); try { localStorage.setItem("lr4-step", d.id); } catch (e) { /* not kept */ } }
-    else if (!steps.some((s) => s.open)) { try { localStorage.setItem("lr4-step", ""); } catch (e) { /* not kept */ } }
+    if (d.open) { showStep(d); try { MS.set("lr4-step", d.id); } catch (e) { /* not kept */ } }
+    else if (!steps.some((s) => s.open)) { try { MS.set("lr4-step", ""); } catch (e) { /* not kept */ } }
     stepSums();
   });
   {
     let id = null;
-    try { id = localStorage.getItem("lr4-step"); } catch (e) { /* step 1 */ }
+    try { id = MS.get("lr4-step"); } catch (e) { /* step 1 */ }
     const d = id === null ? steps[0] : steps.find((s) => s.id === id);
     if (d) showStep(d);
   }
@@ -65,19 +65,31 @@
     if (!viewPop.hidden && !viewPop.contains(e.target) && e.target !== viewMore) showViewPop(false);
   });
   document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !viewPop.hidden) { showViewPop(false); viewMore.focus(); } });
-  const panelBtn = document.getElementById("v-panel");
-  function showPanel(on) {
-    document.body.classList.toggle("panel-off", !on);
-    panelBtn.setAttribute("aria-pressed", String(!on));
-    panelBtn.title = on ? "Hide the panel" : "Show the panel";
-    panelBtn.setAttribute("aria-label", panelBtn.title);
+  // Configure's panel folds to a strip like Run's columns (user 2026-10-25; was the toolbar's ☰): « / », the strip =
+  // the step numbers (step 1's red dot too); a number unfolds the panel at that step. Phones: never folded (css).
+  {
+    const root = document.documentElement, b = $("col-p"), strip = $("p-strip");
+    function foldP(off) {
+      root.classList.toggle("p-off", off);
+      b.textContent = off ? "»" : "«";
+      b.setAttribute("aria-expanded", String(!off));
+      b.title = off ? "Unfold the panel (H)" : "Fold the panel (H)";
+      b.setAttribute("aria-label", `${off ? "Unfold" : "Fold"} the Configure panel`);
+      try { MS.set("lr4-col-p", off ? "off" : "on"); } catch (e) { /* not kept */ }
+      resize();
+    }
+    b.addEventListener("click", () => foldP(!root.classList.contains("p-off")));
+    for (const d of steps) {
+      const n = document.createElement("button"), dot = d.querySelector(".st-dot");
+      n.type = "button"; n.textContent = d.querySelector(".st-n").textContent;
+      n.title = d.querySelector(".st-t").textContent; n.setAttribute("aria-label", n.title);
+      n.addEventListener("click", () => { foldP(false); showStep(d, true); });
+      if (dot) new MutationObserver(() => n.classList.toggle("dot", !dot.hidden)).observe(dot, { attributes: true, attributeFilter: ["hidden"] });
+      if (dot) n.classList.toggle("dot", !dot.hidden);
+      strip.append(n);
+    }
+    foldP(root.classList.contains("p-off"));
   }
-  panelBtn.addEventListener("click", () => {
-    const on = document.body.classList.contains("panel-off");
-    showPanel(on);
-    try { localStorage.setItem("lr4-panel", on ? "on" : "off"); } catch (e) { /* not kept */ }
-  });
-  try { if (localStorage.getItem("lr4-panel") === "off") showPanel(false); } catch (e) { /* shown */ }
   const vrPop = document.getElementById("vr-pop"), vrMin = document.getElementById("vr-min");
   function minVrPop(min) {
     vrPop.classList.toggle("min", min);
@@ -89,17 +101,17 @@
   vrMin.addEventListener("click", () => {
     const min = !vrPop.classList.contains("min");
     minVrPop(min);
-    try { localStorage.setItem("lr4-vr-pop", min ? "min" : "open"); } catch (e) { /* not kept */ }
+    try { MS.set("lr4-vr-pop", min ? "min" : "open"); } catch (e) { /* not kept */ }
   });
-  try { if (localStorage.getItem("lr4-vr-pop") === "min") minVrPop(true); } catch (e) { /* open */ }
+  try { if (MS.get("lr4-vr-pop") === "min") minVrPop(true); } catch (e) { /* open */ }
 
   // ---- the page shell (Part 35): Design | Run, the theme, Run's columns and console, "?" help. The mode, theme and
   // folds live on <html> (data-mode, data-theme, l-off / r-off, con-open / con-big); index.html's head sets them from
   // localStorage before the first paint, this keeps them and the buttons in step. ----
   {
     const root = document.documentElement;
-    const kv = { get: (k) => { try { return localStorage.getItem(k); } catch (e) { return null; } },
-                 set: (k, v) => { try { localStorage.setItem(k, v); } catch (e) { /* not kept */ } } };
+    const kv = { get: (k) => { try { return MS.get(k); } catch (e) { return null; } },
+                 set: (k, v) => { try { MS.set(k, v); } catch (e) { /* not kept */ } } };
     const modeBtns = { design: $("t-design"), run: $("t-run") };
     function setMode(m, save = true) {
       root.dataset.mode = m;
@@ -267,8 +279,8 @@
   const sm = { t: [0, 0, 0], r: [0, 0, 0], last: 0, dev: null };
   const smStatus = document.getElementById("sm-status"), smSpeed = document.getElementById("sm-speed");
   const smInvT = document.getElementById("sm-inv-t"), smInvR = document.getElementById("sm-inv-r");
-  const store = { get: (k) => { try { return localStorage.getItem(k); } catch (e) { return null; } },
-                  set: (k, v) => { try { localStorage.setItem(k, v); } catch (e) { /* storage blocked: fine */ } } };
+  const store = { get: (k) => { try { return MS.get(k); } catch (e) { return null; } },
+                  set: (k, v) => { try { MS.set(k, v); } catch (e) { /* storage blocked: fine */ } } };
   if (store.get("sm-speed")) smSpeed.value = store.get("sm-speed");
   smInvT.checked = store.get("sm-inv-t") === "1";
   smInvR.checked = store.get("sm-inv-r") === "1";
@@ -373,7 +385,7 @@
     if (room.every((v) => v > 0)) add("room", room.map((v) => Math.round(v * roomU())).join(","));
     for (const [k, v] of Object.entries(LR4Filaments.toLink(FIL.s))) add(k, v);   // Part 40: spools, overrides, look, plates
     for (const [k, v] of Object.entries(Imperfect.toLink(AB.set))) add(k, v);       // As built (ab=1 = Real-world, abx = its errors)
-    if (U.unit === "mm") add("units", "mm");
+    add("units", U.unit);                            // always: a link with settings (#WxH&...) opens as a shared build (My machines)
     return q.join("&");
   }
   function applyLink(o) {                             // o: the hash's settings (default) or what waited for the files
@@ -405,21 +417,162 @@
   }
   const flashText = (b, text) => { const was = b.dataset.was || (b.dataset.was = b.textContent); b.textContent = text;
     clearTimeout(b._t); b._t = setTimeout(() => (b.textContent = was), 2000); };
+  // the page's own question box (user 2026-10-25: no browser popups): { title, text, value (shows a text field with it),
+  // ok, cancel (false = no Cancel), copy (the field read-only, selected) } -> true / the text typed (blank = value) / null
+  // Tests: askBox.auto = (title) => answer skips the box.
+  function askBox({ title, text = "", value = null, ok = "OK", cancel = "Cancel", copy = false }) {
+    if (askBox.auto) return Promise.resolve(askBox.auto(title));
+    const d = $("ask-dlg"), inp = $("ask-in");
+    $("ask-h").textContent = title;
+    $("ask-text").textContent = text; $("ask-text").hidden = !text;
+    inp.hidden = value === null; inp.readOnly = copy; inp.value = value === null ? "" : value;
+    $("ask-ok").textContent = ok;
+    $("ask-no").textContent = cancel || ""; $("ask-no").hidden = !cancel;
+    d.returnValue = "";
+    d.showModal();
+    if (value !== null) { inp.focus(); inp.select(); }
+    return new Promise((res) => d.addEventListener("close", () =>
+      res(d.returnValue !== "ok" ? null : value === null ? true : inp.value.trim() || value), { once: true }));
+  }
+  $("ask-in").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); $("ask-dlg").close("ok"); } });
   $("copy-link").addEventListener("click", async (e) => {
+    // not into the address bar: reloading a link with settings would open your own build as a shared one
     const url = location.href.split("#")[0] + "#" + shareLink();
-    history.replaceState(null, "", url);
-    let ok = true;
-    try { await navigator.clipboard.writeText(url); } catch (err) { ok = false; }
-    flashText(e.target, ok ? "Link copied" : "The link is in the address bar");
+    try { await navigator.clipboard.writeText(url); flashText(e.target, "Link copied"); }
+    catch (err) { askBox({ title: "Copy this link", value: url, copy: true, ok: "Done", cancel: false }); }
   });
-  $("reset-all").addEventListener("click", () => {
-    if (!confirm("Put every setting back to the default? Your part files and SD card stay.")) return;
-    try {
-      for (const k of Object.keys(localStorage))
-        if (/^(lr4-|print-|peter-style|detail$)/.test(k) && !/^lr4-(sd-sel)$/.test(k)) localStorage.removeItem(k);
-    } catch (e) { /* storage blocked: nothing kept anyway */ }
-    location.replace(location.href.split("#")[0]);
+  $("reset-all").addEventListener("click", async () => {       // this machine's settings (My machines); the layout stays
+    if (!await askBox({ title: "Reset settings?", text: `Put ${MS.temp ? "this shared build's" : MS.name + "'s"} settings back to the defaults? Its SD card and your part files stay.`, ok: "Reset" })) return;
+    MS.clear();
+    location.replace(location.href.split("#")[0] + (MS.temp ? location.hash : ""));
   });
+
+  // ---- My machines (Part 42, js/machines.js): the machine's name in the top bar opens the list - pick one, New,
+  // Duplicate, Rename, Delete, Export / Import (.lr4.json). A shared link opens as the temporary machine with the banner
+  // (Save as one of my machines / Back to mine). Switching reloads the page: FluidNC boots with that machine's cards. ----
+  const MC = {
+    plain: () => location.href.split("#")[0],
+    go(id) { if (id !== undefined) MS.use(id); location.replace(MC.plain()); },
+    cards: (id) => [["sd", SdCard.card(LR4Machines.dbOf(id, "lr4-sandbox-sd"), SdCard.DIR)],
+      ["flash", SdCard.card(LR4Machines.dbOf(id, "lr4-sandbox-flash"), "/native_localfs")]],
+    // a machine's databases -> { sd, flash, spoilboard } (spoilboard keys without the machine's prefix)
+    async data(id, files = true, spoil = true) {
+      const out = {}, p = LR4Machines.prefix(id);
+      if (files) for (const [k, c] of MC.cards(id)) out[k] = await c.store.records();
+      if (spoil) out.spoilboard = (await HandSetup.board.all(p)).map((r) => Object.assign({}, r, { key: r.key.slice(p.length) }));
+      return out;
+    },
+    async write(id, d) {
+      for (const [k, c] of MC.cards(id)) if (d[k] && d[k].length) await c.store.putAll(d[k]);
+      const p = LR4Machines.prefix(id);
+      if (d.spoilboard && d.spoilboard.length) await HandSetup.board.putAll(d.spoilboard.map((r) => Object.assign({}, r, { key: p + r.key })));
+    },
+    async drop(id) {
+      for (const n of LR4Machines.DBS) await new Promise((res) => { const r = indexedDB.deleteDatabase(LR4Machines.dbOf(id, n)); r.onsuccess = r.onerror = r.onblocked = res; });
+      for (const r of await HandSetup.board.all(LR4Machines.prefix(id))) await HandSetup.board.remove(r.key);
+    },
+    say: (t) => ($("mc-status").textContent = t || ""),
+    ask: (title, value, text) => askBox({ title, text, value }),
+  };
+  {
+    const btn = $("mc-btn"), pop = $("mc-pop");
+    btn.textContent = MS.name + " ▾";
+    btn.classList.toggle("shared", MS.temp);
+    const render = () => {
+      const list = $("mc-list");
+      list.replaceChildren(...MS.list().map((m) => {
+        const b = document.createElement("button");
+        b.type = "button"; b.setAttribute("role", "listitem"); b.textContent = m.name;
+        b.setAttribute("aria-current", String(m.id === MS.id));
+        b.title = m.id === MS.id ? "The machine you're on" : `Switch to ${m.name} (the page reloads)`;
+        b.addEventListener("click", () => { if (m.id !== MS.id) MC.go(m.id); });
+        return b;
+      }));
+      for (const id of ["mc-dup", "mc-ren", "mc-del"]) $(id).disabled = MS.temp;
+      $("mc-del").disabled = MS.temp || MS.list().length < 2;
+      MC.say("");
+    };
+    // a name typed in the list itself (user 2026-10-25: no box over it): in place of `row` (Rename) or as a new last
+    // row (New / Duplicate); Enter or ✓ = done, Esc or clicking away = never mind
+    const nameRow = (value, note, done, row) => {
+      const wrap = document.createElement("div"), inp = document.createElement("input"), ok = document.createElement("button");
+      wrap.className = "mc-edit"; wrap.setAttribute("role", "listitem");
+      inp.value = value; inp.setAttribute("aria-label", "Machine name"); inp.spellcheck = false;
+      ok.type = "button"; ok.textContent = "✓"; ok.title = "Done (Enter)"; ok.setAttribute("aria-label", "Done");
+      let over = false;
+      const finish = (yes) => { if (over) return; over = true; const v = inp.value.trim(); if (yes && v) done(v); else render(); };
+      inp.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") { e.preventDefault(); finish(true); }
+        else if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); finish(false); }
+      });
+      inp.addEventListener("blur", () => finish(false));
+      ok.addEventListener("pointerdown", (e) => e.preventDefault());   // keeps the field's focus: no blur first
+      ok.addEventListener("click", () => finish(true));
+      wrap.append(inp, ok);
+      if (row) row.replaceWith(wrap); else $("mc-list").append(wrap);
+      for (const id of ["mc-new", "mc-dup", "mc-ren", "mc-del"]) $(id).disabled = true;
+      MC.say(note);
+      inp.focus(); inp.select();
+    };
+    btn.addEventListener("click", () => { render(); popToggle(btn, pop); });
+    document.addEventListener("pointerdown", (e) => { if (!pop.hidden && !e.target.closest("#mc-pop, #mc-btn, #help-pop")) popToggle(btn, pop, false); });
+    document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !pop.hidden) popToggle(btn, pop, false); });
+    $("mc-new").addEventListener("click", () => nameRow(MS.uniqueName("New machine"), "A new machine starts from the defaults.",
+      (name) => MC.go(MS.add(name))));
+    $("mc-dup").addEventListener("click", () => nameRow(MS.uniqueName(MS.name + " copy"), "The copy gets its settings, SD card, Flash and spoilboard.",
+      async (name) => {
+        const id = MS.add(name, MS.id);
+        MC.say("Copying its SD card, Flash and spoilboard…");
+        await MC.write(id, await MC.data(MS.id));
+        MC.go(id);
+      }));
+    $("mc-ren").addEventListener("click", () => nameRow(MS.name, "", (name) => {
+      MS.name = MS.rename(MS.id, name);
+      btn.textContent = MS.name + " ▾"; render();
+    }, $("mc-list").querySelector('[aria-current="true"]')));
+    $("mc-del").addEventListener("click", async () => {
+      if (!await askBox({ title: `Delete ${MS.name}?`, text: "Its settings, SD card, Flash and spoilboard go, and can't come back (Export it first to keep a copy).", ok: "Delete" })) return;
+      await MC.drop(MS.id);
+      MS.remove(MS.id);
+      MC.go();
+    });
+    $("mc-export").addEventListener("click", async () => {
+      MC.say("Exporting…");
+      const m = Object.assign({ name: MS.name, settings: MS.settingsOf(MS.id) }, await MC.data(MS.id, $("mc-x-files").checked, $("mc-x-spoil").checked));
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(new Blob([JSON.stringify(LR4Machines.exportOf(m))], { type: "application/json" }));
+      a.download = LR4Machines.fileName(MS.name);
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+      MC.say(`Saved ${a.download}`);
+    });
+    $("mc-import").addEventListener("change", async (e) => {
+      const f = e.target.files[0];
+      e.target.value = "";
+      if (!f) return;
+      let m;
+      try { m = LR4Machines.importOf(JSON.parse(await f.text())); } catch (err) { MC.say(`${f.name}: ${err.message}`); return; }
+      let name = m.name;
+      if (MS.uniqueName(name) !== name) name = await MC.ask("Import a machine", MS.uniqueName(name), `You already have a machine called ${name}. The imported one's name:`);
+      if (name === null) return;
+      const id = MS.add(name);
+      MS.writeSettings(id, m.settings);
+      await MC.write(id, m);
+      MC.go(id);
+    });
+    if (MS.temp) {                                    // a shared build: the banner until saved or left
+      $("mc-back").textContent = `Back to ${MS.mine().name}`;
+      $("mc-banner").hidden = false;
+      $("mc-back").addEventListener("click", () => MC.go());
+      $("mc-save").addEventListener("click", async () => {
+        const name = await MC.ask("Save as one of my machines", MS.uniqueName("Shared build"), "Its name:");
+        if (name === null) return;
+        const id = MS.add(name, MS.SHARED);
+        await MC.write(id, await MC.data(MS.SHARED));
+        MC.go(id);
+      });
+    }
+  }
 
   function saveImage() {                              // preserveDrawingBuffer: the canvas holds the last frame
     canvas.toBlob((b) => {
@@ -456,7 +609,7 @@
     else if (k === "f") click("v-fit");
     else if (k === "m") click("v-meas");
     else if (k === "p") saveImage();
-    else if (k === "h") click("v-panel");
+    else if (k === "h") click(document.documentElement.dataset.mode === "run" ? "col-l" : "col-p");
     else if (k === "v") click("v-only");
     else if (k === "l") click("v-layers");
     else if (k === "?") $("keys-dlg").showModal();

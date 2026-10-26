@@ -63,8 +63,7 @@
   }
   function updateText() {
     const area = U.unit === "in" ? `${+(S.cutX / IN).toFixed(2)} × ${+(S.cutY / IN).toFixed(2)} in`
-      : `${Math.round(S.cutX)} × ${Math.round(S.cutY)} mm`;   // the size's own units, here and in the line below
-    $("tb-size").textContent = `${area} cutting area`;
+      : `${Math.round(S.cutX)} × ${Math.round(S.cutY)} mm`;   // the size's own units
     $("sub").textContent = `V1E LowRider 4 for a ${area} cutting area, on a ` +
       (U.unit === "in" ? `${frac(S.TW / IN)} × ${frac(S.TL / IN)} in` : `${Math.round(S.TW)} × ${Math.round(S.TL)} mm`) +
       ` ${S.base === "torsion" ? "torsion box" : "MDF sheet"} table. Every printed part is the official STL, placed from its holes.`;
@@ -110,12 +109,12 @@
   }
   function setupSize() {
     try {                                            // last size used in this browser
-      const saved = JSON.parse(localStorage.getItem("lr4-config-size") || "null");
+      const saved = JSON.parse(MS.get("lr4-config-size") || "null");
       if (saved && saved.cutX > 0 && saved.cutY > 0) Object.assign(U, saved);
     } catch (e) { /* defaults */ }
     const hm = /^#(\d+(?:\.\d+)?)x(\d+(?:\.\d+)?)(?:&|$)/.exec(location.hash);   // deep link: #48x96 = 48 x 96 in (+ applyLink)
     if (hm) Object.assign(U, { cutX: +hm[1] * IN, cutY: +hm[2] * IN, braces: 0 });
-    const keep = () => { try { localStorage.setItem("lr4-config-size", JSON.stringify(U)); } catch (e) { /* not kept */ } };
+    const keep = () => { try { MS.set("lr4-config-size", JSON.stringify(U)); } catch (e) { /* not kept */ } };
     for (const [id, k] of Object.entries(lenFields)) $(id).addEventListener("input", (e) => {
       const v = parseFloat(e.target.value);
       if (!isFinite(v) || v <= 0) return;

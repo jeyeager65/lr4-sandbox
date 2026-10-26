@@ -47,7 +47,7 @@ const steps = [
    LR4Inspect.open('XZ_Plate_Min'); T.measure(true);
    const c = document.querySelector('canvas').getBoundingClientRect(), holes = [];
    for (let y = 0.15; y < 0.9; y += 0.04) for (let x = 0.2; x < 0.8; x += 0.04) {
-     const q = T.snap(c.left + c.width * x, c.top + c.height * y); if (q && q.what === 'hole centre') holes.push([x, y]); }
+     const q = T.snap(c.left + c.width * x, c.top + c.height * y); if (q && q.what === 'hole center') holes.push([x, y]); }
    if (holes.length > 1) { const a = holes[0], b = holes[holes.length - 1];
      T.click(c.left + c.width * a[0], c.top + c.height * a[1]); T.click(c.left + c.width * b[0], c.top + c.height * b[1]); }
    const meas = T.result();
@@ -134,7 +134,7 @@ else {
   ok(t.sec.x === "true" && t.sec.cut, "section X: on, its slider shows");
   ok(t.sec.caps > 10 && t.sec.xray && t.sec.xrayCaps < t.sec.caps && t.sec.look === "lines" && t.sec.lineCaps === 0 && t.sec.capsBack === t.sec.caps,
     "caps on the cut parts; X-ray / Lines: see-through or line-only parts lose their caps, back after: " + JSON.stringify(t.sec));
-  ok(t.holes > 1 && / mm \(.* in\).*hole centre → hole centre/.test(t.meas), `measure: hole centre to hole centre (${t.holes} snaps): ${t.meas}`);
+  ok(t.holes > 1 && / mm \(.* in\).*hole center → hole center/.test(t.meas), `measure: hole center to hole center (${t.holes} snaps): ${t.meas}`);
   ok(t.after === 0 && t.clip === "true", "Back: explode + section reset");
   ok(f.m.bad.length === 1 && /^PETER=nope/.test(f.m.bad[0]) && !f.m.hose && f.m.table === "30", "LR4Machine: set what it can, report the rest: " + JSON.stringify(f.m));
   ok(f.sb.join() === "nope" && f.clips === 0 && !f.core && f.xz && f.brace, "LR4Show: frame preset, Y_Clip_* hidden, a part shown: " + JSON.stringify(f));

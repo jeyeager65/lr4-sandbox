@@ -280,6 +280,31 @@
 
   // ---- picking ----
   const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
+  // the spoilboard and stock height fields aren't in meshes (and are far too big to raycast): picked and snapped as their
+  // boxes (user 2026-10-25: a click on them selected the table under them; Measure didn't snap to them)
+  // -> [{ box (world), owner: the model part it stands for or null, name }]
+  function tableBlocks() {
+    const out = [], tm = meshes.find((m) => m.userData.name === "Spoilboard");
+    const add = (mesh, owner, name) => {
+      if (!mesh || !mesh.visible || !mesh.userData.box || (mesh.parent && !mesh.parent.visible)) return;
+      mesh.updateMatrixWorld();
+      out.push({ box: mesh.userData.box.clone().applyMatrix4(mesh.matrixWorld), owner, name });
+    };
+    add(SPOIL.mesh, tm || null, "spoilboard"); add(HAND.mesh, null, "stock"); add(JOB.stock, null, "stock");
+    return out;
+  }
+  // a ray's nearest hit on the parts or those boxes (keep(p): not cut away; noBolts: through screws, nuts and washers -
+  // Measure, user 2026-10-25: "I never want to select the screw, but would want the hole center") -> { point, distance,
+  // object | block } or null
+  function pickRay(rc, keep = () => true, noBolts = false) {
+    const ms = meshes.filter((m) => m.visible && !m.userData.shadowOnly && !(noBolts && (m.userData.name || "").includes("__")));
+    let best = rc.intersectObjects(ms, false).find((h) => keep(h.point)) || null;
+    for (const b of tableBlocks()) {
+      const p = rc.ray.intersectBox(b.box, new THREE.Vector3());
+      if (p && keep(p)) { const d = p.distanceTo(rc.ray.origin); if (!best || d < best.distance) best = { point: p, distance: d, block: b }; }
+    }
+    return best;
+  }
   let down = null;
   canvas.addEventListener("pointerdown", (e) => (down = [e.clientX, e.clientY]));
   canvas.addEventListener("pointerup", (e) => {
@@ -288,8 +313,8 @@
     const r = canvas.getBoundingClientRect();
     ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
     ray.setFromCamera(ndc, camera);
-    const hit = ray.intersectObjects(meshes.filter((m) => m.visible && !m.userData.shadowOnly), false)[0];
-    select(hit ? hit.object : null);
+    const hit = pickRay(ray);                         // the spoilboard selects its part; the stock, nothing
+    select(hit ? (hit.block ? hit.block.owner : hit.object) : null);
   });
   function select(m) {
     if (selected) selected.material.emissive.setHex(0x000000);

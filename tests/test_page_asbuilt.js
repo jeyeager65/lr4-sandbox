@@ -41,7 +41,7 @@ const A_HELPERS = `
       return LR4Ctl.homed();
     },
   };
-  window.confirm = () => true;
+  askBox.auto = () => true;
   true`;
 // passes along Y at 40% step-over of a 25.4 mm bit, 1.5 mm into the spoilboard (below its warp)
 const PASSES = (() => {
@@ -125,25 +125,20 @@ const PASSES = (() => {
       LR4AsBuilt.setE({ y: 0, z: 0 });
       // warp: the board above was cut (passes) -> the form asks; No keeps it, Yes lays it again; uncut -> at once
       const wx = document.getElementById("ab-wx"), form = (v) => { wx.value = String(v); wx.dispatchEvent(new Event("change")); };
-      window.confirm = () => false; form(0.5);
+      askBox.auto = () => false; form(0.5); await T.sleep(50);
       out.kept = JSON.stringify(LR4AsBuilt.laid());
-      window.confirm = () => true; form(0.6);
+      askBox.auto = () => true; form(0.6); await T.sleep(50);
       out.relaid = JSON.stringify(LR4AsBuilt.laid());
       let asked = false;
-      window.confirm = () => { asked = true; return true; };
+      askBox.auto = () => { asked = true; return true; };
       LR4AsBuilt.set({ warp: { x: 0.3 } });
       out.uncut = JSON.stringify(LR4AsBuilt.laid()); out.asked = asked;
-      window.confirm = () => true;
-      // the stock follows the board: its cuts / plate go through a rest field; Stays flat = none
-      const fol = document.getElementById("hs-follow");
-      document.getElementById("hs-x0").value = "100"; document.getElementById("hs-x1").value = "500";
-      document.getElementById("hs-y0").value = "100"; document.getElementById("hs-y1").value = "400"; document.getElementById("hs-t").value = "18";
+      askBox.auto = () => true;
+      // the stock follows the board: its cuts / plate go through a rest field
+      document.getElementById("hs-x").value = "100"; document.getElementById("hs-w").value = "400";
+      document.getElementById("hs-y").value = "100"; document.getElementById("hs-d").value = "300"; document.getElementById("hs-t").value = "18";
       document.getElementById("hs-use").click(); await T.sleep(200);
-      fol.value = "1"; fol.dispatchEvent(new Event("change")); await T.sleep(100);
       const h = LR4Job.handSim(); out.follow = [Imperfect.restAt(h, 110, 110), Imperfect.restAt(h, 300, 250)];
-      fol.value = "0"; fol.dispatchEvent(new Event("change")); await T.sleep(100);
-      out.flat = Imperfect.restAt(LR4Job.handSim(), 110, 110);
-      fol.value = "1"; fol.dispatchEvent(new Event("change"));
       document.getElementById("hs-off").click(); await T.sleep(100);
       // squareness: racked 2 mm after homing square, then square
       const job = Imperfect.squareJob(LR4AsBuilt.sqRect()), r = LR4AsBuilt.sqRect(), rect = { x0: r.x, x1: r.x + r.w, y0: r.y, y1: r.y + r.h };
@@ -167,7 +162,6 @@ const PASSES = (() => {
       `drawn tip moves as the cuts: ${tm.map((v) => v.toFixed(3)).join(" / ")} vs ${[tw.dx, tw.dy, tw.dz].map((v) => v.toFixed(3)).join(" / ")} (ty ${d.tip.geo.ty.toFixed(1)}, tz ${d.tip.geo.tz.toFixed(1)})`);
     ok(!/"x":0\.5/.test(d.kept) && /"x":0\.6/.test(d.relaid) && /"x":0\.3/.test(d.uncut) && !d.asked, `warp change: cut board kept on No (${d.kept}), laid again on Yes (${d.relaid}), uncut at once without asking (${d.uncut})`);
     ok(d.follow[0] < -0.05 && near(d.follow[1], 0, 0.05) || d.follow[0] < d.follow[1] - 0.05, `stock follows: sag ${d.follow.map((v) => v.toFixed(3)).join(" / ")}`);
-    ok(d.flat === 0, "stays flat: no sag");
     ok(d.racked && !d.racked.missing && Math.abs(d.racked.diff - d.wantR) < 0.15, `measured racked: ${d.racked.diff && d.racked.diff.toFixed(3)} vs ${d.wantR.toFixed(3)} (${d.depth} mm deep) - ${d.noteR}`);
     ok(d.none.missing && d.none.missing.length === 4, "new board: nothing to measure");
     ok(d.square && !d.square.missing && Math.abs(d.square.diff) < 0.1 && near(d.homedE.y, 0, 0.02), `measured after $H: ${d.square.diff && d.square.diff.toFixed(3)} - ${d.noteS}`);

@@ -9,7 +9,7 @@
   // (HandSetup.board). Table frame: mm from the cutting area's front-left corner, Z up from the spoilboard's top. ----
   const defKey = (src) => "lr4-jobdef:" + (src.kind === "sd" ? src.name : src.kind);
   function defLoad(src) {
-    try { return JSON.parse(localStorage.getItem(defKey(src)) || "null"); } catch (e) { return null; }
+    try { return JSON.parse(MS.get(defKey(src)) || "null"); } catch (e) { return null; }
   }
   function handHeader(src) {
     const n = HandSetup.needs(src.text), saved = (defLoad(src) || {}).tools || {}, tools = {}, z0 = jobZ0(), s = HAND.stock;
@@ -41,8 +41,8 @@
     }
     return fr;
   }
-  try { Object.assign(HAND, JSON.parse(localStorage.getItem("lr4-hand") || "{}")); } catch (e) { /* defaults */ }
-  const handSave = () => { try { localStorage.setItem("lr4-hand", JSON.stringify({ stock: HAND.stock, bit: HAND.bit, follow: HAND.follow })); } catch (e) { /* not kept */ } };
+  try { Object.assign(HAND, JSON.parse(MS.get("lr4-hand") || "{}")); } catch (e) { /* defaults */ }
+  const handSave = () => { try { MS.set("lr4-hand", JSON.stringify({ stock: HAND.stock, bit: HAND.bit })); } catch (e) { /* not kept */ } };
   function handShow() {                              // which stock shows: the job's, else the hand one (Show the stock)
     const on = $("hs-show-stock").checked;
     if (HAND.mesh) HAND.mesh.visible = on && !JOB.stock;
@@ -81,15 +81,14 @@
     }
   }
   // the hand stock (no job loaded): a StockSimulator in the table's frame, bottom on the spoilboard
-  // Part 32: a stock following the warped spoilboard (Stock > On a warped spoilboard): its sag over box (table frame),
-  // or null (flat on the board's high spot: As built off, Stays flat, a flat board)
-  function stockRest(box) { return AB.set.on && HAND.follow && SPOIL.sim ? Imperfect.restField(SPOIL.sim, box) : null; }
+  // Part 32: stock follows a warped spoilboard (always - user 2026-10-25, as clamped down): its sag over box (table
+  // frame), or null (As built off: a flat board)
+  function stockRest(box) { return AB.set.on && SPOIL.sim ? Imperfect.restField(SPOIL.sim, box) : null; }
   function handStock() {
-    const s = HAND.stock, fr = SPOIL.frame, fol = AB.set.on && HAND.follow ? SPOIL.ver : "flat";
+    const s = HAND.stock, fr = SPOIL.frame, fol = AB.set.on ? SPOIL.ver : "flat";
     const key = `${JSON.stringify(s)}|${fr && fr.join()}|${lite}|${fol}`;
-    $("hs-follow").value = HAND.follow ? "1" : "0";
     stockName();
-    for (const [id, v] of [["hs-x0", s.x0], ["hs-x1", s.x1], ["hs-y0", s.y0], ["hs-y1", s.y1], ["hs-t", s.t]]) $(id).value = +v.toFixed(2);
+    stockFields(s);
     if (key === HAND.key) return;
     HAND.key = key;
     if (HAND.mesh) { scene.remove(HAND.mesh); HAND.mesh.traverse((o) => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); }); HAND.mesh = null; }
@@ -103,11 +102,11 @@
     meshUpdate(HAND.sim, HAND.mesh, true);
     handShow();
   }
-  // the spoilboard: the Spoilboard's top as a height field (Z 0 = its top when new), kept per machine size
+  // the spoilboard: the Spoilboard's top as a height field (Z 0 = its top when new), kept per machine (My machines) and size
   function spoilSetup() {
     const t = meshes.find((m) => m.userData.name === "Spoilboard"), fr = tableFrame();
     if (!t || !fr) return;
-    const bb = new THREE.Box3().setFromObject(t), key = `${S.cutX.toFixed(1)}x${S.cutY.toFixed(1)}`;
+    const bb = new THREE.Box3().setFromObject(t), key = MS.spoilKey(`${S.cutX.toFixed(1)}x${S.cutY.toFixed(1)}`);
     const look = `${key}|${fr.map((v) => v.toFixed(2)).join()}|${lite}`;
     SPOIL.frame = fr;
     if (look === SPOIL.look) return;
@@ -162,12 +161,12 @@
   }
   // As built's warp changed (or it went on / off): a board without cuts is laid again with it at once; one with cuts
   // only if ask (the form) and the user says so - else it stays, the warp waits for the next New spoilboard
-  function spoilRelay(ask) {
+  async function spoilRelay(ask) {
     if (!SPOIL.sim) return;
     const want = AB.set.on ? AB.set.warp : null;
     if (JSON.stringify(want) === JSON.stringify(SPOIL.laid)) return;
     if (Imperfect.boardCut(SPOIL.sim, SPOIL.laid, spoilBox()) &&
-      !(ask && confirm(`Lay a new spoilboard ${want ? "with this warp" : "(flat)"}? Its cuts go.`))) return;
+      !(ask && await askBox({ title: `Lay a new spoilboard ${want ? "with this warp" : "(flat)"}?`, text: "Its cuts go.", ok: "Lay it" }))) return;
     spoilFresh(SPOIL.sim);
     meshUpdate(SPOIL.sim, SPOIL.mesh, true);
     HandSetup.board.remove(SPOIL.key).catch(() => {});
@@ -176,7 +175,7 @@
   function spoilNote() {
     if (!SPOIL.sim) return;
     const lv = HandSetup.level(SPOIL.sim, { x: [0, S.cutX], y: [0, S.cutY] });
-    $("hs-spoil-note").textContent = `The table's top: it keeps every cut below the stock, in this browser, per machine size. ` +
+    $("hs-spoil-note").textContent = `Keeps every cut that goes below the stock. ` +
       `Level now ${lv < -0.005 ? `${(-lv).toFixed(2)} mm below new (surfaced)` : "as new"}; ` +
       `${((SPOIL.sim.stock.zmax - SPOIL.sim.stock.zmin) + lv).toFixed(1)} mm thick.`;
   }
@@ -274,7 +273,7 @@
     if (e.defined) return;                           // the file's own: carved with its ToolDef
     const d = defLoad(JOB.src) || {};
     d.tools = Object.assign({}, d.tools, { [e.tool]: b });
-    try { localStorage.setItem(defKey(JOB.src), JSON.stringify(d)); } catch (err) { /* not kept */ }
+    try { MS.set(defKey(JOB.src), JSON.stringify(d)); } catch (err) { /* not kept */ }
     // this job carves on with it (no reload: the stock keeps its cuts): its tool def, compiled, and its bit drawn
     const def = HandSetup.toDef(b), tool = compileStockTool(def);
     JOB.tl.tools.set(e.tool, def);
@@ -285,9 +284,15 @@
       if (m) { m.visible = false; JOB.bits.set(e.tool, m); JOB.group.add(m); }
     }
   }
+  // the Stock fields (user 2026-10-25: placed by size + position): width / depth / thickness, X / Y of its front-left
+  // corner from the cutting area's; HAND.stock keeps x0 x1 y0 y1 t
+  function stockFields(s) {
+    for (const [id, v] of [["hs-w", s.x1 - s.x0], ["hs-d", s.y1 - s.y0], ["hs-t", s.t], ["hs-x", s.x0], ["hs-y", s.y0]]) $(id).value = +v.toFixed(2);
+  }
   for (const id of ["hs-use", "hs-off"]) $(id).addEventListener("click", () => {
-    const num = (k) => parseFloat($(k).value), s = { on: id === "hs-use", x0: num("hs-x0"), x1: num("hs-x1"), y0: num("hs-y0"), y1: num("hs-y1"), t: num("hs-t") };
-    if (s.on && !(s.x1 > s.x0 && s.y1 > s.y0 && s.t > 0)) { $("hs-plate-note").textContent = "Stock: each 'to' must be past its 'from', and the thickness above 0."; return; }
+    const num = (k) => parseFloat($(k).value), x0 = num("hs-x"), y0 = num("hs-y");
+    const s = { on: id === "hs-use", x0, x1: x0 + num("hs-w"), y0, y1: y0 + num("hs-d"), t: num("hs-t") };
+    if (s.on && !(s.x1 > s.x0 && s.y1 > s.y0 && s.t > 0)) { $("hs-plate-note").textContent = "Stock: the width, depth and thickness must be above 0 (and X / Y numbers)."; return; }
     HAND.stock = s.on ? s : Object.assign({}, HAND.stock, { on: false });
     // Take it off takes a loaded job's own stock (its (Stock: ...) comment) off too: the job stays, with nothing to cut
     // (user 2026-10-24: the strut plate MDF couldn't be removed); Put it on the table brings stock back
@@ -299,20 +304,13 @@
   $("hs-fit").addEventListener("click", () => {      // round the loaded job's cuts (work mm -> the table's)
     const g = JOB.tl && GcodePlay.missing(JOB.tl).guess, z0 = jobZ0();
     if (!g) return;
-    $("hs-x0").value = +(g.xmin + z0[0]).toFixed(2); $("hs-x1").value = +(g.xmax + z0[0]).toFixed(2);
-    $("hs-y0").value = +(g.ymin + z0[1]).toFixed(2); $("hs-y1").value = +(g.ymax + z0[1]).toFixed(2);
-    if (JOB.tl.stock) $("hs-t").value = +(JOB.tl.stock.zmax - JOB.tl.stock.zmin).toFixed(2);
-  });
-  $("hs-follow").addEventListener("change", (e) => {   // the stock laid again, bent onto the board or flat
-    HAND.follow = e.target.value === "1";
-    handSave();
-    handStock();
-    jobSetup(JOB.pageJob);
+    stockFields({ x0: g.xmin + z0[0], x1: g.xmax + z0[0], y0: g.ymin + z0[1], y1: g.ymax + z0[1],
+      t: JOB.tl.stock ? JOB.tl.stock.zmax - JOB.tl.stock.zmin : parseFloat($("hs-t").value) || 0 });
   });
   $("hs-bit-use").addEventListener("click", () => { const b = bitForm($("hs-bit")); if (b) { handBit(b); jobSetup(JOB.pageJob); } });
   $("hs-show-stock").addEventListener("change", handShow);
-  $("hs-new").addEventListener("click", () => {
-    if (!SPOIL.sim || !confirm("Start a new spoilboard? Every cut in this one goes (as swapping or resurfacing it).")) return;
+  $("hs-new").addEventListener("click", async () => {
+    if (!SPOIL.sim || !await askBox({ title: "Start a new spoilboard?", text: "Every cut in this one goes (as swapping or resurfacing it).", ok: "New spoilboard" })) return;
     spoilFresh(SPOIL.sim);
     meshUpdate(SPOIL.sim, SPOIL.mesh, true);
     HandSetup.board.remove(SPOIL.key).catch(() => {});
@@ -405,7 +403,7 @@
     }
     const rewired = cur.motor0 !== AB.set.motor0;
     AB.set = Imperfect.settings(cur);
-    try { localStorage.setItem("lr4-asbuilt", JSON.stringify(AB.set)); } catch (e) { /* not kept */ }
+    try { MS.set("lr4-asbuilt", JSON.stringify(AB.set)); } catch (e) { /* not kept */ }
     abForm();
     if (rewired && CTL.sim) ctlBoot();                // which motor is where: FluidNC restarts with each motor on its side
     else if (CTL.sim && CTL.bootM && meta) { ctlSwitches(); ctlProbe(); }

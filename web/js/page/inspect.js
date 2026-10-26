@@ -92,9 +92,9 @@
   // ---- Inspect tools (Part 28): exploded slider, section cut, measure. Explode: LR4ShowTree.explode's unit steps along
   // the bolt lines (meta.axis / chain; a family bolt's chain names mapped to this size's names) times the slider; the
   // offsets ride on top of the machine's motion (userData.ex, added in move()). Section: one global clipping plane across
-  // the set's box (the parts drawn two-sided while cut, so you see into them; no caps). Measure: two clicks, snapped to the
-  // nearest vertex of the triangle hit or a hole centre (meta.holes: each screw's axis where it enters / leaves a part)
-  // within SNAP_PX. ----
+  // the set's box (the parts drawn two-sided while cut, so you see into them; no caps). Measure: two clicks, each snapped
+  // to a corner, edge midpoint or edge of the part under the cursor or a hole center (meta.holes: each screw's axis where
+  // it enters / leaves a part) within about SNAP_PX, shown while hovering (measureSnap / measureHover). ----
   const SNAP_PX = 14;
   const SEC = { axis: "", flip: false, plane: new THREE.Plane() };
   const MEAS = { on: false, pts: [], group: new THREE.Group() };
@@ -302,27 +302,64 @@
   function measureClear() {
     MEAS.pts = [];
     for (const c of [...MEAS.group.children]) { MEAS.group.remove(c); c.geometry.dispose(); c.material.dispose(); }
-    document.getElementById(MEAS.main ? "meas-main" : "meas-out").textContent = MEAS.on ? "Click a point (snaps to corners and hole centres)." : "";
+    if (!MEAS.on && MEAS.live) measureHover(null);
+    document.getElementById(MEAS.main ? "meas-main" : "meas-out").textContent = MEAS.on
+      ? "Hover a corner, edge or hole: the marker shows what it snaps to. Click two points." : "";
   }
+  // snaps (user 2026-10-25: "it snaps but you don't know where until you click"; never surface to surface): corners
+  // and edges from each part's feature edges (EdgesGeometry, cached per geometry), edge midpoints, hole centers.
+  // Nothing in reach = no point. The pick shows as you hover (measureHover): its marker shape says what it is.
+  const SNAPS = [["hole center", SNAP_PX + 4, -1], ["corner", SNAP_PX + 4, 0], ["midpoint", SNAP_PX, 1], ["edge", SNAP_PX - 2, 2]];
+  const EDGES = new WeakMap();                        // geometry -> its feature edges (local, 6 floats a segment)
+  function edgesOf(geo) {
+    let a = EDGES.get(geo);
+    if (!a) { const eg = new THREE.EdgesGeometry(geo, 25); a = eg.attributes.position.array; eg.dispose(); EDGES.set(geo, a); }
+    return a;
+  }
+  const segDist = (p, a, b) => {                      // point to segment
+    const ab = b.clone().sub(a), t = Math.max(0, Math.min(1, ab.lengthSq() ? p.clone().sub(a).dot(ab) / ab.lengthSq() : 0));
+    return a.clone().addScaledVector(ab, t).distanceTo(p);
+  };
   function measureSnap(e) {                           // -> { p: world point, what } or null
     const r = canvas.getBoundingClientRect(), px = [e.clientX - r.left, e.clientY - r.top];
     ndc.set((px[0] / r.width) * 2 - 1, -(px[1] / r.height) * 2 + 1);
     ray.setFromCamera(ndc, camera);
     const keep = (p) => !renderer.clippingPlanes.length || SEC.plane.distanceToPoint(p) >= 0;
-    const hit = ray.intersectObjects(meshes.filter((m) => m.visible && !m.userData.shadowOnly), false).find((h) => keep(h.point));
+    const hit = pickRay(ray, keep, true);             // a part (never a screw: through it to its hole), or the spoilboard / stock box
     const scr = (p) => { const q = p.clone().project(camera); return [(q.x + 1) / 2 * r.width, (1 - q.y) / 2 * r.height, q.z]; };
-    let best = null;
-    const offer = (p, what) => {
+    const lim = Object.fromEntries(SNAPS.map(([k, l, rank]) => [k, [l, rank]]));
+    const wpp = (dist) => 2 * dist * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2) / r.height;   // mm per pixel that far
+    const found = [];
+    const offer = (p, what, check = true) => {         // check: only if it can be seen (user 2026-10-25: a thin board's hidden edges)
       if (!keep(p)) return;
-      const s = scr(p), d = Math.hypot(s[0] - px[0], s[1] - px[1]);
-      if (s[2] < 1 && d <= SNAP_PX && (!best || d < best.d)) best = { p, what, d };
+      const s = scr(p), d = Math.hypot(s[0] - px[0], s[1] - px[1]), [l, rank] = lim[what];
+      if (s[2] < 1 && d <= l) found.push({ p, what, d, rank, check });
     };
-    if (hit && hit.face) {
-      const pos = hit.object.geometry.attributes.position;
-      for (const k of ["a", "b", "c"]) offer(hit.object.localToWorld(new THREE.Vector3().fromBufferAttribute(pos, hit.face[k])), "corner");
+    const offerSeg = (a, b, check) => {                // its ends, its middle, its nearest point (on screen)
+      const sa = scr(a), sb = scr(b);
+      offer(a, "corner", check); offer(b, "corner", check);
+      offer(a.clone().lerp(b, 0.5), "midpoint", check);
+      const vx = sb[0] - sa[0], vy = sb[1] - sa[1], L2 = vx * vx + vy * vy;
+      offer(a.clone().lerp(b, L2 ? Math.max(0, Math.min(1, ((px[0] - sa[0]) * vx + (px[1] - sa[1]) * vy) / L2)) : 0), "edge", check);
+    };
+    if (hit && hit.object) {                          // the part under the cursor: its edges near the hit point
+      const m = hit.object, arr = edgesOf(m.geometry);
+      m.updateMatrixWorld();
+      const loc = m.worldToLocal(hit.point.clone()), reach = (SNAP_PX + 6) * wpp(hit.distance) / (m.matrixWorld.getMaxScaleOnAxis() || 1);
+      const A = new THREE.Vector3(), B = new THREE.Vector3();
+      for (let i = 0; i < arr.length; i += 6) {
+        A.set(arr[i], arr[i + 1], arr[i + 2]); B.set(arr[i + 3], arr[i + 4], arr[i + 5]);
+        if (segDist(loc, A, B) <= reach) offerSeg(m.localToWorld(A.clone()), m.localToWorld(B.clone()));
+      }
+    }
+    // the spoilboard's and stock's box edges, wherever the cursor is (an edge is often just off them); checked below
+    // for being hidden
+    for (const b of tableBlocks()) {
+      const v = [0, 1, 2, 3, 4, 5, 6, 7].map((i) => new THREE.Vector3(i & 1 ? b.box.max.x : b.box.min.x, i & 2 ? b.box.max.y : b.box.min.y, i & 4 ? b.box.max.z : b.box.min.z));
+      for (const [i, j] of [[0, 1], [2, 3], [4, 5], [6, 7], [0, 2], [1, 3], [4, 6], [5, 7], [0, 4], [1, 5], [2, 6], [3, 7]]) offerSeg(v[i], v[j], true);
     }
     const byName = new Map(meshes.map((m) => [m.userData.name, m]));
-    for (const m of meshes) {                         // hole centres, on the parts as they sit (exploded too)
+    for (const m of meshes) {                         // hole centers, on the parts as they sit (exploded too)
       const ud = m.userData;
       if (!m.visible || !ud.holes) continue;
       const nm = chainNames(ud), bx = exVec(m);
@@ -330,22 +367,82 @@
       for (const [part, x, y, z] of ud.holes) {
         const pm = byName.get(nm(part));
         if (pm && !pm.visible) continue;
-        offer(m.localToWorld(new THREE.Vector3(x, y, z)).sub(bx).add(pm ? exVec(pm) : bx), "hole centre");
+        offer(m.localToWorld(new THREE.Vector3(x, y, z)).sub(bx).add(pm ? exVec(pm) : bx), "hole center");
       }
     }
-    return best || (hit ? { p: hit.point.clone(), what: "surface" } : null);
+    // the best that can be seen: nothing in front of it on a ray from the camera (screws aside)
+    const cam = camera.getWorldPosition(new THREE.Vector3()), rc = new THREE.Raycaster();
+    const seen = (p) => {
+      const L = p.distanceTo(cam);
+      rc.set(cam, p.clone().sub(cam).normalize()); rc.far = L;
+      const h = pickRay(rc, keep, true);
+      return !h || h.distance >= L - 2 * wpp(L) - 0.5;
+    };
+    found.sort((a, b) => a.rank - b.rank || a.d - b.d);
+    const best = found.find((c) => !c.check || seen(c.p));
+    return best ? { p: best.p, what: best.what } : null;
   }
+  // the markers (user 2026-10-25: "the indicator circle is large"): a few pixels on screen whatever the zoom, one shape
+  // per snap - □ corner, ⊕ hole center, △ midpoint, ◇ edge - in the accent colour with a dark outline
+  const MARK = {};
+  function markTex(kind) {
+    if (MARK[kind]) return MARK[kind];
+    const c = document.createElement("canvas"); c.width = c.height = 32;
+    const g = c.getContext("2d"), shape = () => {
+      g.beginPath();
+      if (kind === "corner") g.rect(6, 6, 20, 20);
+      else if (kind === "hole center") { g.arc(16, 16, 10, 0, 7); g.moveTo(16, 3); g.lineTo(16, 29); g.moveTo(3, 16); g.lineTo(29, 16); }
+      else if (kind === "midpoint") { g.moveTo(16, 4); g.lineTo(28, 26); g.lineTo(4, 26); g.closePath(); }
+      else { g.moveTo(16, 3); g.lineTo(29, 16); g.lineTo(16, 29); g.lineTo(3, 16); g.closePath(); }
+    };
+    g.lineJoin = "round";
+    shape(); g.lineWidth = 6; g.strokeStyle = "#000"; g.stroke();   // the outline (stays dark: the colour multiplies white)
+    shape(); g.lineWidth = 3; g.strokeStyle = "#fff"; g.stroke();
+    return (MARK[kind] = new THREE.CanvasTexture(c));
+  }
+  function markPoint(p, kind) {
+    const m = new THREE.Points(new THREE.BufferGeometry().setFromPoints([p]), new THREE.PointsMaterial({ map: markTex(kind),
+      color: css("--accent") || "#c8241b", size: 18 * renderer.getPixelRatio(), sizeAttenuation: false, transparent: true, depthTest: false }));
+    m.renderOrder = 11;
+    return m;
+  }
+  // as the cursor moves: the snap it would take (marker + a tip: what it is, or the distance from the first point) and
+  // a line from the first point; nothing in reach = nothing shown (a click there does nothing)
+  MEAS.live = new THREE.Group(); MEAS.live.renderOrder = 11; scene.add(MEAS.live);
+  function measureHover(e) {
+    const s = e && MEAS.on ? measureSnap(e) : null, tip = document.getElementById("meas-tip");
+    for (const c of [...MEAS.live.children]) { MEAS.live.remove(c); c.geometry.dispose(); c.material.dispose(); }
+    tip.hidden = !s;
+    if (!s) return;
+    MEAS.live.add(markPoint(s.p, s.what));
+    let text = s.what[0].toUpperCase() + s.what.slice(1);
+    if (MEAS.pts.length === 1) {
+      const a = MEAS.pts[0].p, line = new THREE.Line(new THREE.BufferGeometry().setFromPoints([a, s.p]),
+        new THREE.LineDashedMaterial({ color: css("--accent") || "#c8241b", depthTest: false, dashSize: 4, gapSize: 3, scale: 1 / Math.max(1, camera.position.distanceTo(a) / 400) }));
+      line.computeLineDistances(); line.renderOrder = 10;
+      MEAS.live.add(line);
+      text = `${a.distanceTo(s.p).toFixed(2)} mm · ${text}`;
+    }
+    const r = canvas.getBoundingClientRect();
+    tip.textContent = text;
+    tip.style.left = (e.clientX - r.left + 14) + "px"; tip.style.top = (e.clientY - r.top + 14) + "px";
+  }
+  canvas.addEventListener("pointermove", (e) => {
+    if (!MEAS.on) return;
+    if (e.buttons || e.pointerType === "touch") { if (MEAS.live.children.length) measureHover(null); return; }   // orbiting
+    if (!MEAS.q) requestAnimationFrame(() => { const q = MEAS.q; MEAS.q = null; measureHover(q); });
+    MEAS.q = e;
+  });
+  canvas.addEventListener("pointerleave", () => { MEAS.q = null; measureHover(null); });
   function measureClick(e) {
     const s = measureSnap(e);
     if (!s) return;
     if (MEAS.pts.length === 2) measureClear();
     MEAS.pts.push(s);
-    const dot = new THREE.Mesh(new THREE.SphereGeometry(Math.max(0.6, radius * 0.006), 16, 12),
-      new THREE.MeshBasicMaterial({ color: css("--accent") || "#c8241b", depthTest: false }));
-    dot.position.copy(s.p); dot.renderOrder = 10;
-    MEAS.group.add(dot);
+    MEAS.group.add(markPoint(s.p, s.what));
+    measureHover(e.pointerType === "touch" ? null : e);
     const out = document.getElementById(MEAS.main ? "meas-main" : "meas-out");
-    if (MEAS.pts.length === 1) { out.textContent = `First point (${s.what}). Click the second.`; return; }
+    if (MEAS.pts.length === 1) { out.textContent = `First point: ${s.what}. Now the second.`; return; }
     const [a, b] = MEAS.pts.map((q) => q.p), d = b.clone().sub(a), L = d.length();
     const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints([a, b]),
       new THREE.LineBasicMaterial({ color: css("--accent") || "#c8241b", depthTest: false }));

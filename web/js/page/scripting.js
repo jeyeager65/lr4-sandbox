@@ -352,19 +352,19 @@
   $("v-sound").addEventListener("click", soundToggle);
   {
     const v = $("snd-vol"), out = $("snd-vol-out");
-    try { const k = localStorage.getItem("lr4-snd-vol"); if (k !== null) v.value = k; } catch (e) { /* default */ }
+    try { const k = MS.get("lr4-snd-vol"); if (k !== null) v.value = k; } catch (e) { /* default */ }
     const show = () => { out.textContent = `${Math.round(v.value * 100)}%`; };
     show();
     v.addEventListener("input", () => {
       show();
       if (SND.s) SND.s.setVolume(Number(v.value));
-      try { localStorage.setItem("lr4-snd-vol", v.value); } catch (e) { /* not kept */ }
+      try { MS.set("lr4-snd-vol", v.value); } catch (e) { /* not kept */ }
     });
     const vc = $("snd-voice");                       // Part 23: realistic or the joke voice (kept)
-    try { const k = localStorage.getItem("lr4-snd-voice"); if (k) vc.value = k; } catch (e) { /* default */ }
+    try { const k = MS.get("lr4-snd-voice"); if (k) vc.value = k; } catch (e) { /* default */ }
     vc.addEventListener("change", () => {
       if (SND.s) SND.s.setVoice(vc.value);
-      try { localStorage.setItem("lr4-snd-voice", vc.value); } catch (e) { /* not kept */ }
+      try { MS.set("lr4-snd-voice", vc.value); } catch (e) { /* not kept */ }
     });
   }
 

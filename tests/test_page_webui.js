@@ -114,7 +114,7 @@ async function run(mode) {
 
     // folders: New folder on the SD card (and adding into it), one a web UI makes over WebDAV, one on the Flash
     const f = await page.val(`(async () => {
-      window.prompt = () => "jobs"; window.confirm = () => true;
+      askBox.auto = () => "jobs";
       document.getElementById("sd-mkdir").click();   // New folder goes into it: the folder bar says so
       await T.until(() => document.getElementById("sd-path").textContent === "/jobs/", 5000);
       const dt = new DataTransfer(); dt.items.add(new File(["G0 X1\\n"], "in_jobs.gcode"));
@@ -134,7 +134,7 @@ async function run(mode) {
       document.querySelector("#sd-path button").click();
       await T.until(() => jobsRow(), 5000);
       const top = [...document.querySelectorAll("#sd-list .sd-row")].map((r) => r.querySelector(".sd-name").textContent);
-      window.prompt = () => "flashdir";
+      askBox.auto = () => "flashdir";
       document.getElementById("flash-mkdir").click();
       await T.until(() => document.getElementById("flash-path").textContent === "/flashdir/", 5000);
       document.querySelector("#flash-path button").click();

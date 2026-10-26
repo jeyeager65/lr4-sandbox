@@ -127,7 +127,8 @@
         `<em>${n} of ${paths.length}${all ? " ✓" : ""}</em></div>`;
     }).join("");
     const chip = document.getElementById("parts-chip"), ok = have === total;
-    chip.textContent = ok ? `Parts ${have}/${total} ✓` : `Parts ${have}/${total} · add files`;
+    chip.innerHTML = `Parts <span class="pc-n">${have}/${total} </span>${ok ? "✓" : "<span class=\"pc-add\">· add files</span>"}`;   // phones: no count, + for add files (css)
+    chip.classList.toggle("missing", !ok);
     chip.classList.toggle("warn", !ok || !!diff);
     if (ok && WELCOME.loadedSome) welcome(false);    // everything there after a load: the card closes itself
   }
@@ -136,8 +137,8 @@
   // IndexedDB; the page reads the zips there whose names look like the Printables sources (and any loose STL / DXF
   // it needs), now or on a later visit with one click (the browser asks for permission again). ----
   const WELCOME = { loadedSome: false, dir: null };
-  const kvGet = (k) => { try { return localStorage.getItem(k); } catch (e) { return null; } };
-  const kvSet = (k, v) => { try { localStorage.setItem(k, v); } catch (e) { /* not kept */ } };
+  const kvGet = (k) => { try { return MS.get(k); } catch (e) { return null; } };
+  const kvSet = (k, v) => { try { MS.set(k, v); } catch (e) { /* not kept */ } };
   function welcome(on) {
     const w = document.getElementById("welcome");
     w.hidden = !on;
@@ -214,14 +215,14 @@
     return Object.keys(OPT_PARTS).every((k) => o[k] || !OPT_PARTS[k].test(n));
   }
   function setupOpts() {                              // once
-    try { Object.assign(OPT, JSON.parse(localStorage.getItem("lr4-opts") || "{}")); } catch (e) { /* defaults */ }
+    try { Object.assign(OPT, JSON.parse(MS.get("lr4-opts") || "{}")); } catch (e) { /* defaults */ }
     const mark = () => {
       for (const k of Object.keys(OPT)) document.getElementById("opt-" + k).checked = OPT[k];
       for (const k of ["skirt", "hose"]) document.getElementById("opt-" + k).disabled = !OPT.router || (k === "skirt" && !OPT.hose);
     };
     for (const k of Object.keys(OPT)) document.getElementById("opt-" + k).addEventListener("change", (e) => {
       OPT[k] = e.target.checked;
-      try { localStorage.setItem("lr4-opts", JSON.stringify(OPT)); } catch (err) { /* not kept */ }
+      try { MS.set("lr4-opts", JSON.stringify(OPT)); } catch (err) { /* not kept */ }
       mark();
       if (meta) { applyVisibility(); renderBom(); }
     });
@@ -364,21 +365,21 @@
   // starting points; the user's own are saved (lr4-fil-presets). Kept in this browser (lr4-filaments) + the share link. Also the printed look (scene.js PRINT) and the strut plates' material. ----
   const PRINT_ROLE = { main: [0.16, 0.16, 0.18], accent: [0.80, 0.12, 0.10] };   // build.py PRINT_MAIN / PRINT_ACCENT
   const FIL = { s: LR4Filaments.defaults(), map: new Map(), saved: [] };
-  function filSave() { try { localStorage.setItem("lr4-filaments", JSON.stringify(FIL.s)); } catch (e) { /* not kept */ } }
-  function filSavePresets() { try { localStorage.setItem("lr4-fil-presets", JSON.stringify(FIL.saved)); } catch (e) { /* not kept */ } }
+  function filSave() { try { MS.set("lr4-filaments", JSON.stringify(FIL.s)); } catch (e) { /* not kept */ } }
+  function filSavePresets() { try { MS.set("lr4-fil-presets", JSON.stringify(FIL.saved)); } catch (e) { /* not kept */ } }
   function filLoad() {
     let s = null;
-    try { s = JSON.parse(localStorage.getItem("lr4-filaments") || "null"); } catch (e) { /* defaults */ }
+    try { s = JSON.parse(MS.get("lr4-filaments") || "null"); } catch (e) { /* defaults */ }
     if (!s) {                                         // before Part 40: two colors (print-main / print-accent)
       s = LR4Filaments.defaults();
       try {
-        const c0 = localStorage.getItem("print-main"), c1 = localStorage.getItem("print-accent");
+        const c0 = MS.get("print-main"), c1 = MS.get("print-accent");
         if (c0) s.spools[0].color = c0;
         if (c1) s.spools[1].color = s.spools[2].color = c1;
       } catch (e) { /* defaults */ }
     }
     FIL.s = LR4Filaments.clean(s);
-    try { FIL.saved = LR4Filaments.cleanSaved(JSON.parse(localStorage.getItem("lr4-fil-presets") || "[]")); } catch (e) { FIL.saved = []; }
+    try { FIL.saved = LR4Filaments.cleanSaved(JSON.parse(MS.get("lr4-fil-presets") || "[]")); } catch (e) { FIL.saved = []; }
   }
   const isPrinted = (m) => !m.userData.standin && !!m.userData.role && !!(m.material.userData && m.material.userData.print);
   function assignRoles() {
@@ -609,13 +610,13 @@
       clearTimeout(okTimer);
       okTimer = setTimeout(() => ($("fil-ok").textContent = ""), 4000);
     }
-    form.addEventListener("submit", (e) => {
+    form.addEventListener("submit", async (e) => {
       e.preventDefault();
       const name = $("fil-save-name").value.trim();
       if (!name) return;
       const old = renaming && FIL.s.saved;
       if (old === name) { form.hidden = true; return; }
-      if (FIL.saved.some((p) => p.name === name) && !confirm(`Replace your preset "${name}"?`)) return;
+      if (FIL.saved.some((p) => p.name === name) && !await askBox({ title: `Replace "${name}"?`, text: "You already have a preset with that name.", ok: "Replace" })) return;
       if (old) {                                      // rename: the stored preset keeps its filaments (edits stay unsaved)
         FIL.saved = FIL.saved.filter((p) => p.name !== name).map((p) => (p.name === old ? Object.assign({}, p, { name }) : p));
         FIL.s = Object.assign({}, FIL.s, { saved: name });
@@ -629,9 +630,9 @@
       saved(name);
     });
     $("fil-update").addEventListener("click", () => { if (FIL.s.saved) saved(FIL.s.saved); });
-    $("fil-del").addEventListener("click", () => {
+    $("fil-del").addEventListener("click", async () => {
       const name = FIL.s.saved;
-      if (!name || !confirm(`Delete the preset "${name}"? The filaments stay as they are.`)) return;
+      if (!name || !await askBox({ title: `Delete the preset "${name}"?`, text: "The filaments stay as they are.", ok: "Delete" })) return;
       FIL.saved = FIL.saved.filter((p) => p.name !== name);
       FIL.s = Object.assign({}, FIL.s, { saved: null });
       filSavePresets(); filSave(); applyColours();

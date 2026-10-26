@@ -185,9 +185,9 @@
     jobSeek(e.target.value / 1000 * JOB.tl.total);
     JOB.k = GcodePlay.pending(JOB.tl, JOB.t);
   });
-  try { $("job-closeup").checked = localStorage.getItem("lr4-probe-closeup") !== "0"; } catch (e) { /* on */ }
+  try { $("job-closeup").checked = MS.get("lr4-probe-closeup") !== "0"; } catch (e) { /* on */ }
   $("job-closeup").addEventListener("change", (e) => {
-    try { localStorage.setItem("lr4-probe-closeup", e.target.checked ? "1" : "0"); } catch (err) { /* not kept */ }
+    try { MS.set("lr4-probe-closeup", e.target.checked ? "1" : "0"); } catch (err) { /* not kept */ }
     if (!e.target.checked) jobCloseUp(null);
   });
   $("job-moves").addEventListener("change", (e) => { if (JOB.ahead) JOB.ahead.visible = JOB.done.visible = JOB.partial.visible = e.target.checked; });
@@ -241,7 +241,7 @@
     const r = SDC.recs.find((q) => q.path === path);
     if (!r) return;
     JOB.file = { kind: "sd", name: path, text: sdText(r) };
-    try { localStorage.setItem("lr4-sd-sel", path); } catch (e) { /* not kept */ }
+    try { MS.set("lr4-sd-sel", path); } catch (e) { /* not kept */ }
     sdRefresh();
     await jobSetup(JOB.pageJob);
   }
@@ -355,7 +355,7 @@
       if (was && (old === PAGE_OLD || sdText(was) === SDC.saved) && !(FJ.job && FJ.job.path === old)) {
         await SdCard.store.remove(old); SdCard.removeLive(CTL.sim, old);
       }
-      try { if (localStorage.getItem("lr4-sd-sel") === old) localStorage.setItem("lr4-sd-sel", path); } catch (e) { /* not kept */ }
+      try { if (MS.get("lr4-sd-sel") === old) MS.set("lr4-sd-sel", path); } catch (e) { /* not kept */ }
     }
     PAGE_SD = path;
     SDC.saved = j.gcode;
@@ -377,13 +377,13 @@
   flashRefresh();
   sdRefresh().then(() => {                           // the file picked last time
     let p = null;
-    try { p = localStorage.getItem("lr4-sd-sel"); } catch (e) { /* none */ }
+    try { p = MS.get("lr4-sd-sel"); } catch (e) { /* none */ }
     if (p && !UI_FILE.test(p) && SDC.recs.some((r) => r.path === p)) sdSelect(p);
   });
   $("job-unload").addEventListener("click", () => {   // no job loaded: its stock, moves and bits off (user 2026-10-24)
     if (FJ.job) { $("job-status").textContent = "A job is running on FluidNC: stop it first."; return; }
     Object.assign(JOB, { file: null, stockOff: null });
-    try { localStorage.removeItem("lr4-sd-sel"); } catch (e) { /* nothing kept */ }
+    try { MS.remove("lr4-sd-sel"); } catch (e) { /* nothing kept */ }
     jobSetup(JOB.pageJob);
     sdRefresh();
   });

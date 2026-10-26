@@ -100,6 +100,9 @@
     get: (key) => tx("readonly", (st) => st.get(key)),
     put: (key, sim, extra) => tx("readwrite", (st) => { st.put(Object.assign({}, extra, { key, nx: sim.nx, ny: sim.ny, heights: sim.heights.slice(), mtime: Date.now() })); }),
     remove: (key) => tx("readwrite", (st) => { st.delete(key); }),
+    // a machine's records (keys starting with prefix, machines.js) - its export / copy / delete
+    all: async (prefix) => ((await tx("readonly", (st) => st.getAll())) || []).filter((r) => r.key.startsWith(prefix)),
+    putAll: (recs) => tx("readwrite", (st) => { for (const r of recs) st.put(r); }),
   };
 
   // a surfacing job for the cut area (mm, work zero = the spoilboard's original top, as a job with no stock):

@@ -65,7 +65,6 @@ body {
 .tb-icon { width: 26px; height: 26px; flex: 0 0 auto; }
 .tb-name { font-family: var(--font-display); font-weight: 700; font-size: 18px; white-space: nowrap; }
 .tb-name span { color: var(--accent); }
-.tb-size { color: var(--muted); font-family: var(--font-data); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .modes { position: absolute; left: 50%; transform: translateX(-50%); display: inline-flex; gap: 2px; padding: 3px;
   border: 1px solid var(--line); border-radius: 8px; background: var(--bg); }
 .modes button { border: 0; border-radius: 6px; padding: 5px 22px; font: 600 14px var(--font-display); letter-spacing: 0.04em; color: var(--muted); }
@@ -81,6 +80,18 @@ body {
 .side-r { border-left: 1px solid var(--line); }
 .colhead { display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 8px 8px 6px 16px; }
 .col-btn { padding: 2px 9px; font-size: 15px; line-height: 1.2; color: var(--muted); }
+/* Configure's panel folds like Run's columns (html.p-off, user 2026-10-25): a strip of the step numbers */
+.p-head { margin: -10px -8px -12px 0; padding: 0; }
+.p-strip .dot { position: relative; }
+.p-strip .dot::after { content: ""; position: absolute; top: 3px; right: 3px; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
+@media (min-width: 761px) {
+  :root[data-mode="design"].p-off body { grid-template-columns: 44px minmax(0, 1fr); }
+  :root.p-off .panel { padding: 8px 0; gap: 0; overflow: hidden; }
+  :root.p-off .panel > :not(.p-head, .p-strip) { display: none; }
+  :root.p-off .p-head { justify-content: center; margin: 0; }
+  :root.p-off .p-head .lbl { display: none; }
+  :root.p-off .p-strip { display: flex; }
+}
 .col-body { overflow-y: auto; min-height: 0; flex: 1; display: flex; flex-direction: column; gap: 20px; padding: 4px 16px 24px; }
 :root.l-off .side-l .col-body, :root.r-off .side-r .col-body, :root.l-off .side-l .colhead .lbl, :root.r-off .side-r .colhead .lbl { display: none; }
 :root.l-off .side-l .colhead, :root.r-off .side-r .colhead { justify-content: center; padding: 8px 0; }
@@ -222,6 +233,11 @@ dialog.about { width: min(520px, calc(100vw - 32px)); border: 1px solid var(--li
 dialog.about::backdrop { background: rgb(0 0 0 / 0.45); }
 dialog.about h2 { font-size: 14px; color: var(--ink); }
 dialog.about p { margin: 0 0 10px; color: var(--muted); font-size: 13px; }
+dialog.ask { width: min(400px, calc(100vw - 32px)); }
+dialog.ask #ask-in { width: 100%; box-sizing: border-box; margin: 0 0 12px; padding: 7px 9px; font: 14px var(--font-body); color: var(--ink);
+  background: var(--bg); border: 1px solid var(--line); border-radius: 5px; }
+dialog.ask .buttons { justify-content: flex-end; }
+#ask-ok { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
 /* on the canvas: view toolbar + settings popover (top left), the selected part (bottom left) */
 .toolbar { position: absolute; left: 12px; top: 12px; right: 56px; display: flex; flex-wrap: wrap; gap: 4px; pointer-events: none; }
 .toolbar button, .pick { background: color-mix(in srgb, var(--panel) 90%, transparent); backdrop-filter: blur(4px); }
@@ -254,6 +270,8 @@ p.foot:empty { display: none; }
 #insp-meas { align-self: flex-start; }
 #meas-out { margin: 0; font-family: var(--font-data); font-size: 12px; }
 canvas.measuring { cursor: crosshair; }
+.meas-tip { position: absolute; z-index: 3; pointer-events: none; padding: 2px 7px; border-radius: 4px; white-space: nowrap;
+  font: 12px var(--font-data); background: var(--panel); color: var(--ink); border: 1px solid var(--line); box-shadow: 0 2px 8px rgb(0 0 0 / 0.2); }
 .insp-card { width: 100%; min-height: 0; overflow-y: auto; border: 1px solid var(--line); border-radius: 6px; padding: 6px 12px 10px;
   background: color-mix(in srgb, var(--panel) 92%, transparent); backdrop-filter: blur(4px); }
 .insp-card summary { cursor: pointer; display: flex; gap: 8px; align-items: baseline; }
@@ -456,7 +474,7 @@ label.btn:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; 
   :root { --top-h: 44px; }
   body { grid-template-areas: "top" "stage" "panel"; grid-template-columns: 1fr; grid-template-rows: var(--top-h) minmax(0, 52%) minmax(0, 1fr); }
   .panel { border-right: 0; border-top: 1px solid var(--line); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
-  .tb-name span, .tb-size { display: none; }
+  .tb-name span { display: none; }
   .modes { position: static; transform: none; margin-left: auto; }
   .modes button { padding: 4px 12px; font-size: 13px; }
   .tb-right { margin-left: 0; }
@@ -473,12 +491,6 @@ label.btn:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; 
   .pick { left: 8px; bottom: 8px; }
   .insp { right: 8px; top: 74px; max-height: calc(100% - 140px); }
 }
-/* panel collapsed (toolbar ☰): the model fills the window under the top bar (Run: the console stays), on phones too */
-body.panel-off { grid-template-areas: "top" "stage"; grid-template-columns: 1fr; grid-template-rows: var(--top-h) minmax(0, 1fr); }
-:root[data-mode="run"] body.panel-off { display: grid; grid-template-areas: "top" "stage" "con"; grid-template-columns: 1fr;
-  grid-template-rows: var(--top-h) minmax(0, 1fr) auto; }
-:root[data-mode="run"] body.panel-off .stage { position: relative; top: 0; height: auto; }
-body.panel-off :is(.panel, .side) { display: none !important; }
 /* view only (⛶ top right of the view, V): the 3D view fills the window; the same button brings the panels back */
 .v-only { position: absolute; right: 12px; top: 12px; padding: 4px 8px; font-size: 16px; line-height: 1;
   background: color-mix(in srgb, var(--panel) 90%, transparent); backdrop-filter: blur(4px); }
@@ -488,7 +500,6 @@ body.view-only :is(.topbar, .panel, .side, .console, .toolbar, .view-pop, .hint,
 body.rec .v-only, body.vr-on .v-only { display: none; }
 /* VR on: the stage fills the window, a popup card instead (js/vr.js toggles body.vr-on) */
 body.vr-on .stage { position: fixed; inset: 0; }
-#v-panel[aria-pressed="true"] { border-color: var(--accent); }
 body.vr-on :is(.meas-main, .panel, .hint, .toolbar, .view-pop, .pick, .insp, .topbar, .side, .console, .mini-dro) { display: none !important; }
 .vr-pop {
   position: absolute; right: 16px; top: 16px; width: min(400px, calc(100% - 32px));
@@ -522,6 +533,28 @@ body.vr-on :is(.meas-main, .panel, .hint, .toolbar, .view-pop, .pick, .insp, .to
 .run-only { display: none; }
 :root[data-mode="run"] .run-only { display: inline-block; }
 :root[data-mode="design"] .pw-pop { display: none; }
+/* My machines (Part 42): the name in the top bar opens the list; a shared build gets the banner under the bar */
+.mc-btn { flex: 0 1 auto; min-width: 0; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  border: 1px solid var(--line); border-radius: 6px; padding: 3px 9px; font: 600 13px var(--font-display); background: var(--bg); color: var(--ink); }
+.mc-btn.shared { border-color: var(--accent); color: var(--accent); }
+@media (min-width: 761px) { .mc-pop { left: 8px; right: auto; } }   /* phones: the bottom sheet, as the other menus */
+.mc-sec + .mc-sec { margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--line); }
+.mc-sec .buttons { margin-top: 8px; }
+.mc-sec .foot { margin: 6px 0 0; }
+.mc-list { display: flex; flex-direction: column; gap: 2px; margin-top: 6px; }
+.mc-list button { display: flex; justify-content: space-between; gap: 8px; text-align: left; border: 1px solid transparent; border-radius: 5px;
+  padding: 5px 8px; font-size: 13px; background: none; color: var(--ink); }
+.mc-list button:hover { border-color: var(--line); }
+.mc-list button[aria-current="true"] { background: color-mix(in srgb, var(--accent) 14%, transparent); font-weight: 600; }   /* not outlined: an outline reads as a field */
+.mc-edit { display: flex; gap: 4px; }
+.mc-edit input { flex: 1; min-width: 0; padding: 5px 8px; font: 13px var(--font-body); color: var(--ink); background: var(--bg);
+  border: 1px solid var(--accent); border-radius: 5px; }
+.mc-edit button { padding: 4px 10px; background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.mc-list button[aria-current="true"]::after { content: "✓"; color: var(--accent); }
+.mc-banner { position: absolute; left: 50%; top: calc(var(--top-h) + 6px); transform: translateX(-50%); z-index: 7; display: flex; flex-wrap: wrap;
+  align-items: center; gap: 8px; max-width: calc(100vw - 24px); padding: 6px 8px 6px 12px; font-size: 13px; background: var(--panel);
+  border: 1px solid var(--line); border-left: 3px solid var(--accent); border-radius: 6px; box-shadow: 0 6px 20px rgb(0 0 0 / 0.18); }
+#mc-save { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
 .pw-pop { right: 120px; }
 .pw-sec + .pw-sec { margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--line); }
 .pw-sec .foot { margin: 6px 0 0; }
@@ -669,6 +702,8 @@ button:disabled { opacity: 0.42; cursor: default; }
 @media (max-width: 760px) {
   .no-phone, #pw-btn, #src-flash, #flash-box, .col-strip, .pw-pop { display: none !important; }
   .parts-chip { padding: 3px 9px; font-size: 11px; }
+  .parts-chip :is(.pc-n, .pc-add) { display: none; }   /* "Parts ✓" / "Parts +": room for the machine's name */
+  .parts-chip.missing::after { content: "+"; font-weight: 700; }                    /* add files */
   :root[data-mode="run"] body { display: block; overflow-y: auto; height: 100%; padding-bottom: 46px; }
   :root[data-mode="run"] .topbar { position: sticky; top: 0; height: var(--top-h); }
   :root[data-mode="run"] .stage { position: sticky; top: var(--top-h); height: 42dvh; z-index: 4; }
@@ -679,6 +714,13 @@ button:disabled { opacity: 0.42; cursor: default; }
   :root.ph-files .side-r .colhead > :is(.col-lbl, .sheet-x) { display: inline-flex !important; }
   :root.ph-files.pv-on .side-r .colhead > .pv-lbl { display: inline !important; }
   .tb-name { display: none; }
+  .p-head { display: none; }
+  .tb-icon { display: none; }                                                       /* room for the machine's name */
+  .mc-btn { padding: 3px 7px; font-size: 12px; }
+  .modes button { padding: 4px 9px; }
+  .mc-pop { max-height: 80dvh; }
+  .mc-list button { padding: 9px 8px; font-size: 14px; }                          /* finger-sized rows */
+  .mc-banner { top: calc(var(--top-h) + 4px); font-size: 12px; }
   .side-l .hz, .side-l .ovr, .side-l #ctl-src { display: none; }
   .ph-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
   .ph-row button { padding: 10px 2px; font: 600 13px var(--font-display); }

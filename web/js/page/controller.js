@@ -67,7 +67,7 @@
           onDropIn([...e.dataTransfer.files]);
         });
       }
-      row.append(name, n, rowMore(d, [[`Delete ${base(d)}/ and everything in it`, () => { if (confirm(`Delete ${d} and everything in it?`)) onDelDir(d); }]]));
+      row.append(name, n, rowMore(d, [[`Delete ${base(d)}/ and everything in it`, async () => { if (await askBox({ title: `Delete ${d}?`, text: "The folder and everything in it go.", ok: "Delete" })) onDelDir(d); }]]));
       list.appendChild(row);
     }
     for (const r of files.filter((f) => parent(f.path) === st.cur)) list.appendChild(fileRow(r));
@@ -120,7 +120,7 @@
     nav.title = `${label}${st.cur || "/"}: Add files and New folder go here`;
   }
   async function cardMkdir(card, st, refresh, status) {   // New folder: in the folder picked, or at the top
-    const name = (prompt(`New folder in ${st.cur || "the top"}:`) || "").trim();
+    const name = (await askBox({ title: "New folder", text: `In ${st.cur || "the top"}. Its name:`, value: "" }) || "").trim();
     if (!name) return;
     const clean = SdCard.cleanName(name).replace(/\./g, "_");
     const path = `${st.cur}/${clean}`;
@@ -635,14 +635,14 @@
   function pendantSet(on) {                          // the option: the pendant model + FluidTouch, or neither
     $("ft-on").checked = on;
     $("ft-pop-btn").hidden = !on; $("ft-off-note").hidden = on;
-    try { localStorage.setItem("lr4-pendant", on ? "1" : "0"); } catch (e) { /* not kept */ }
+    try { MS.set("lr4-pendant", on ? "1" : "0"); } catch (e) { /* not kept */ }
     if (on) ftStart(CTL.sim);
     else ftStop();
     if (meta) { applyVisibility(); renderBom(); }
   }
   {
     let k = null;
-    try { k = localStorage.getItem("lr4-pendant"); } catch (e) { /* default */ }
+    try { k = MS.get("lr4-pendant"); } catch (e) { /* default */ }
     $("ft-on").checked = k === "1";                   // off unless turned on: most people have no pendant
     $("ft-pop-btn").hidden = !pendantOn(); $("ft-off-note").hidden = pendantOn();
     $("ft-on").addEventListener("change", () => pendantSet(pendantOn()));

@@ -97,9 +97,9 @@ const RUN = (k) => `(async () => {
       out.stock0 = !!LR4Job.tl().stock;
       out.tool0 = LR4Job.tl().tools.get(1) && LR4Job.tl().tools.get(1).diameter - LR4Job.hand().bit.d;
       document.getElementById("hs-fit").click();
-      out.guess = ["hs-x0", "hs-x1", "hs-y0", "hs-y1"].map((id) => +document.getElementById(id).value);
+      out.guess = (([x, w, y, d]) => [x, x + w, y, y + d])(["hs-x", "hs-w", "hs-y", "hs-d"].map((id) => +document.getElementById(id).value));
       const set = (id, v) => { document.getElementById(id).value = v; };
-      set("hs-x0", -10); set("hs-x1", 80); set("hs-y0", 0); set("hs-y1", 60); set("hs-t", 12);
+      set("hs-x", -10); set("hs-w", 90); set("hs-y", 0); set("hs-d", 60); set("hs-t", 12);
       document.getElementById("hs-use").click();
       await T.until(() => LR4Job.tl() && LR4Job.tl().stock, 10000);
       document.querySelector('#hs-bit [data-k="d"]').value = 3.175;

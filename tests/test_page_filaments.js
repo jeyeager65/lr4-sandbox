@@ -39,7 +39,7 @@ const STATE = `(() => {
     }
     ok(up, "page loaded");
     await page.val(HELPERS);
-    await page.val(`localStorage.removeItem("lr4-filaments"); FIL.s = LR4Filaments.defaults(); LR4Machine.apply({ struts: "mdf" }); true`);
+    await page.val(`MS.remove("lr4-filaments"); FIL.s = LR4Filaments.defaults(); LR4Machine.apply({ struts: "mdf" }); true`);
     await sleep(2000);
     await page.val(`FIL.s = Object.assign(LR4Filaments.defaults(), { look: "on" }); applyColours(); true`);
     let a = await page.val(STATE);
@@ -75,10 +75,10 @@ const STATE = `(() => {
       pressed: document.querySelectorAll('#fil-preset button[aria-pressed="true"]').length }; })()`);
     ok(ed.shown && ed.from === "Fiber upgrade" && ed.pressed === 0, `edited from "${ed.from}", no preset pressed`);
     // save it as my own preset, then it's the pressed one under Mine
-    await page.val(`(async () => { localStorage.removeItem("lr4-fil-presets"); FIL.saved = []; document.getElementById("fil-save").click();
+    await page.val(`(async () => { MS.remove("lr4-fil-presets"); FIL.saved = []; document.getElementById("fil-save").click();
       document.getElementById("fil-save-name").value = "My fiber"; document.getElementById("fil-save-form").requestSubmit(); return true; })()`);
     const mine = await page.val(`(() => ({ mine: [...document.querySelectorAll('#fil-mine button')].map((b) => b.textContent + ":" + b.getAttribute("aria-pressed")),
-      edited: !document.getElementById("fil-edited").hidden, stored: JSON.parse(localStorage.getItem("lr4-fil-presets") || "[]").length,
+      edited: !document.getElementById("fil-edited").hidden, stored: JSON.parse(MS.get("lr4-fil-presets") || "[]").length,
       names: [...document.querySelectorAll("#fil-spools .fil-n")].map((e) => e.textContent) }))()`);
     ok(mine.mine.join() === "My fiber:true" && !mine.edited && mine.stored === 1, `saved preset: ${mine.mine.join()} (stored ${mine.stored})`);
     ok(mine.names.join() === "Black PLA,Red PLA,Black PET-CF", `filament names: ${mine.names.join(", ")}`);
@@ -88,19 +88,19 @@ const STATE = `(() => {
         shown: !document.getElementById("fil-update").hidden };
       document.getElementById("fil-update").click();
       return Object.assign(w, { ok: document.getElementById("fil-ok").textContent, edited: !document.getElementById("fil-edited").hidden,
-        stored: JSON.parse(localStorage.getItem("lr4-fil-presets"))[0].spools[1].color }); })()`);
+        stored: JSON.parse(MS.get("lr4-fil-presets"))[0].spools[1].color }); })()`);
     ok(upd.what === "Unsaved changes to" && upd.shown && upd.btn === 'Save "My fiber"', `edited own preset: "${upd.what}" + ${upd.btn}`);
     ok(/Saved to "My fiber"/.test(upd.ok) && !upd.edited && upd.stored === "#1f5fbf", `saved: "${upd.ok}", stored ${upd.stored}`);
     const rn = await page.val(`(() => { document.getElementById("fil-rename").click(); document.getElementById("fil-save-name").value = "Fiber v2";
       document.getElementById("fil-save-form").requestSubmit();
       return { mine: [...document.querySelectorAll('#fil-mine button')].map((b) => b.textContent).join(), saved: FIL.s.saved,
-        ok: document.getElementById("fil-ok").textContent, stored: JSON.parse(localStorage.getItem("lr4-fil-presets")).map((p) => p.name).join() }; })()`);
+        ok: document.getElementById("fil-ok").textContent, stored: JSON.parse(MS.get("lr4-fil-presets")).map((p) => p.name).join() }; })()`);
     ok(rn.mine === "Fiber v2" && rn.saved === "Fiber v2" && rn.stored === "Fiber v2" && /Renamed/.test(rn.ok), `rename: ${JSON.stringify(rn)}`);
     await page.val(`document.querySelector('#fil-preset button[data-v="classic"]').click(); true`);
     await page.val(`document.querySelector('#fil-mine button').click(); true`);
     a = await page.val(STATE);
     ok(a.stub === 0 && a.preset === "fiber", "the saved preset comes back with its override");
-    await page.val(`(() => { FIL.s.parts = {}; FIL.saved = []; localStorage.removeItem("lr4-fil-presets"); FIL.s.saved = null; applyColours(); select(null); return true; })()`);
+    await page.val(`(() => { FIL.s.parts = {}; FIL.saved = []; MS.remove("lr4-fil-presets"); FIL.s.saved = null; applyColours(); select(null); return true; })()`);
     a = await page.val(STATE);
     ok(a.stub === 1, "override cleared");
 
@@ -136,9 +136,9 @@ const STATE = `(() => {
       controls.target.copy(m); camera.position.set(m.x + 90, m.y - 150, m.z + 70); controls.update(); return true; })()`);
     await sleep(800);
     await shot(page, "filaments_close.png");
-    await page.val(`LR4Inspect.close(); document.querySelector('#fil-preset button[data-v="classic"]').click(); localStorage.removeItem("lr4-filaments"); true`);
+    await page.val(`LR4Inspect.close(); document.querySelector('#fil-preset button[data-v="classic"]').click(); MS.remove("lr4-filaments"); true`);
     // a link opened in a fresh page: its filaments win over this browser's saved ones
-    await page.val(`localStorage.setItem("lr4-filaments", JSON.stringify(LR4Filaments.defaults())); true`);
+    await page.val(`MS.set("lr4-filaments", JSON.stringify(LR4Filaments.defaults())); true`);
     await page.send("Page.navigate", { url: `http://127.0.0.1:${port}/web/index.html?parts=/parts/&fresh=1#26x50&preset=single&spools=PETG_1f5fbf~PLA_cc1f1a&parts=Core.2~Brace_1.2&layer=0.28&plates=acrylic_e8eef0~plywood_dbad70&ab=1&abx=m0_max~wx_-0.3` });
     let up2 = false;
     for (let i = 0; i < 120 && !up2; i++) { await sleep(500); try { up2 = await page.val("location.hash.includes('preset=single') && !!window.LR4Job && document.getElementById('status').hidden && !!LR4Job.spoil()"); } catch (e) { /* loading */ } }
@@ -151,7 +151,7 @@ const STATE = `(() => {
     const abl = await page.val(`(() => { const a = LR4AsBuilt.get(); const l = shareLink(); LR4AsBuilt.set({ on: false, motor0: "min", warp: { x: 0.3 } });
       return { on: a.on, m0: a.motor0, wx: a.warp.x, link: /ab=1/.test(l) && /abx=m0_max~wx_-0.3/.test(l) }; })()`);
     ok(abl.on && abl.m0 === "max" && abl.wx === -0.3 && abl.link, `As built from the link and back into it: ${JSON.stringify(abl)}`);
-    await page.val(`localStorage.removeItem("lr4-filaments"); true`);
+    await page.val(`MS.remove("lr4-filaments"); true`);
   } catch (e) {
     ok(false, "error: " + e.message);
   } finally {

@@ -12,7 +12,7 @@
   // geo = the Y carriages in the table frame (xA, span) + the bit's tip from their line (ty in front, tz below
   // the beam's middle), piv = the drawing's pivots (world, at pose 0).
   const AB = { set: null, E: { y: 0, z: 0 }, geo: null, piv: null, posed: false, home: null, probeDz: 0 };
-  try { AB.set = Imperfect.settings(JSON.parse(localStorage.getItem("lr4-asbuilt") || "null")); } catch (e) { AB.set = Imperfect.settings(); }
+  try { AB.set = Imperfect.settings(JSON.parse(MS.get("lr4-asbuilt") || "null")); } catch (e) { AB.set = Imperfect.settings(); }
   AB.E = Imperfect.powerUp(AB.set);
   const abState = () => (AB.geo ? AB : null);
   const DUST_PARTS = /^(Dust_Skirt|Bristles_TPU)/;   // the shoe's bottom: own group (Shoe); its top stays with the core
@@ -293,7 +293,7 @@
   }
 
   function setupLighting() {                          // once: the Lighting buttons
-    try { LIGHT.saved = localStorage.getItem("lr4-lighting"); } catch (e) { /* auto */ }
+    try { LIGHT.saved = MS.get("lr4-lighting"); } catch (e) { /* auto */ }
     const box = document.getElementById("lighting");
     const mark = () => {
       const q = lightQ();
@@ -307,7 +307,7 @@
       const b = e.target.closest("button[data-v]");   // not the "?"
       if (!b) return;
       LIGHT.saved = b.dataset.v;
-      try { localStorage.setItem("lr4-lighting", LIGHT.saved); } catch (e2) { /* not kept */ }
+      try { MS.set("lr4-lighting", LIGHT.saved); } catch (e2) { /* not kept */ }
       mark();
     });
     LIGHT.mark = mark;
@@ -406,7 +406,7 @@
   function setupDetail() {                            // once, before the first build
     const box = document.getElementById("detail");
     let saved = null;
-    try { saved = localStorage.getItem("detail"); } catch (e) { /* auto */ }
+    try { saved = MS.get("detail"); } catch (e) { /* auto */ }
     const auto = autoLite();
     lite = saved ? saved === "lite" : auto;
     const mark = () => {
@@ -427,7 +427,7 @@
       busy = true;
       lite = b.dataset.v === "lite";
       saved = b.dataset.v;
-      try { localStorage.setItem("detail", saved); } catch (e) { /* not kept */ }
+      try { MS.set("detail", saved); } catch (e) { /* not kept */ }
       const title = lite ? "Switching to Lite…" : "Switching to Full detail…";
       statusEl.hidden = false;
       progress(title, 0, "Preparing the part meshes");
@@ -690,7 +690,7 @@ float lr4G(float x) { float s = 2.0 * fract(x) - 1.0; return floor(x) / 3.0 + (s
   // kept in this browser; default 34 in) ----
   const LEG = 3.5 * IN, APRON_T = 1.5 * IN, APRON_H = 3.5 * IN, LEG_GAP = 1800, TOP_DEFAULT = 34 * IN;
   let tableTop = TOP_DEFAULT;
-  try { tableTop = +localStorage.getItem("lr4-table-top") || TOP_DEFAULT; } catch (e) { /* default */ }
+  try { tableTop = +MS.get("lr4-table-top") || TOP_DEFAULT; } catch (e) { /* default */ }
   // [x0, y0, z0, x1, y1, z1] boxes as one flat-shaded geometry. UVs in mm / GRAIN_MM, u along each box's longest side
   // (the grain runs along the board; end grain gets the cross-section), for the wood textures (woodTex)
   const GRAIN_MM = [600, 150];
@@ -980,8 +980,8 @@ float lr4G(float x) { float s = 2.0 * fract(x) - 1.0; return floor(x) / 3.0 + (s
   }
   function setupScenery() {
     try {
-      scenery = localStorage.getItem("lr4-scenery") || "shop";
-      Object.assign(ROOM, JSON.parse(localStorage.getItem("lr4-room") || "{}"));
+      scenery = MS.get("lr4-scenery") || "shop";
+      Object.assign(ROOM, JSON.parse(MS.get("lr4-room") || "{}"));
     } catch (e) { /* defaults */ }
     const box = document.getElementById("scenery");
     const mark = () => {
@@ -990,13 +990,13 @@ float lr4G(float x) { float s = 2.0 * fract(x) - 1.0; return floor(x) / 3.0 + (s
     };
     box.querySelectorAll("button").forEach((b) => b.addEventListener("click", () => {
       scenery = b.dataset.v;
-      try { localStorage.setItem("lr4-scenery", scenery); } catch (e) { /* not kept */ }
+      try { MS.set("lr4-scenery", scenery); } catch (e) { /* not kept */ }
       mark(); updateShop();
     }));
     for (const k of ["w", "d", "h"]) document.getElementById("room-" + k).addEventListener("change", (e) => {
       const v = parseFloat(e.target.value);
       ROOM[k] = isFinite(v) && v > 0 ? v * roomU() : 0;
-      try { localStorage.setItem("lr4-room", JSON.stringify(ROOM)); } catch (err) { /* not kept */ }
+      try { MS.set("lr4-room", JSON.stringify(ROOM)); } catch (err) { /* not kept */ }
       updateShop();
     });
     ["u-in", "u-mm"].forEach((id) => document.getElementById(id).addEventListener("click", () => { fillRoom(); fillTop(); updateShop(); }));
@@ -1006,7 +1006,7 @@ float lr4G(float x) { float s = 2.0 * fract(x) - 1.0; return floor(x) / 3.0 + (s
       const v = parseFloat(topEl.value), mm = v * (U.unit === "in" ? IN : 1);
       if (!(mm >= 300 && mm <= 1500)) { fillTop(); return; }   // 12 - 59 in
       tableTop = mm;
-      try { localStorage.setItem("lr4-table-top", String(mm)); } catch (e) { /* not kept */ }
+      try { MS.set("lr4-table-top", String(mm)); } catch (e) { /* not kept */ }
       rebuild();                                      // new legs, workshop gaps; VR follows the new floor
     });
     mark(); fillRoom(); fillTop();
@@ -1119,12 +1119,12 @@ float lr4G(float x) { float s = 2.0 * fract(x) - 1.0; return floor(x) / 3.0 + (s
     if (have.size < 2) return;
     have.add("none");
     let saved = null;
-    try { saved = localStorage.getItem("peter-style"); } catch (e) { /* defaults */ }
+    try { saved = MS.get("peter-style"); } catch (e) { /* defaults */ }
     peterStyle = saved && have.has(saved) ? saved : (meta.peter_style || "solid");
     const mark = () => box.querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.v === peterStyle)));
     box.querySelectorAll("button").forEach((b) => b.addEventListener("click", () => {
       peterStyle = b.dataset.v;
-      try { localStorage.setItem("peter-style", peterStyle); } catch (e) { /* not kept */ }
+      try { MS.set("peter-style", peterStyle); } catch (e) { /* not kept */ }
       mark();
       applyVisibility();
     }));
@@ -1145,13 +1145,13 @@ float lr4G(float x) { float s = 2.0 * fract(x) - 1.0; return floor(x) / 3.0 + (s
       box.appendChild(b);
     }
     let saved = null;
-    try { saved = localStorage.getItem("peter-style-files"); } catch (e) { /* defaults */ }
+    try { saved = MS.get("peter-style-files"); } catch (e) { /* defaults */ }
     peterStyle = STYLES.some(([v]) => v === saved) ? saved : "closed";
     const mark = () => box.querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.v === peterStyle)));
     box.querySelectorAll("button").forEach((b) => b.addEventListener("click", () => {
       if (peterStyle === b.dataset.v) return;
       peterStyle = b.dataset.v;
-      try { localStorage.setItem("peter-style-files", peterStyle); } catch (e) { /* not kept */ }
+      try { MS.set("peter-style-files", peterStyle); } catch (e) { /* not kept */ }
       mark();
       rebuild();
     }));

@@ -2,7 +2,7 @@
 // The page's scripts share one global scope (js/page/*.js, loaded in order by index.html): names declared
 // at the top level here are seen by the later files.
   // ---- version + feedback: the issue link carries the size, data date and the loaded files' checksums ----
-  const VERSION = "0.44.0";
+  const VERSION = "0.45.0";
   function setupAbout() {
     const bits = [`lr4-sandbox ${VERSION}`];
     if (cfg.built) bits.push(`model data built ${cfg.built}`);
@@ -63,14 +63,14 @@
     jobSetup(j);
   }
   for (const k of Object.keys(StrutCam.ROUTERS)) $("cam-router").add(new Option(StrutCam.ROUTERS[k].name, k));
-  { let o = {}; try { o = JSON.parse(localStorage.getItem("lr4-cam") || "{}"); } catch (e) { /* defaults */ } camFill(o); }
+  { let o = {}; try { o = JSON.parse(MS.get("lr4-cam") || "{}"); } catch (e) { /* defaults */ } camFill(o); }
   $("cam-box").addEventListener("change", () => {
-    try { localStorage.setItem("lr4-cam", JSON.stringify(camSettings())); } catch (e) { /* not kept */ }
+    try { MS.set("lr4-cam", JSON.stringify(camSettings())); } catch (e) { /* not kept */ }
     camNote();
   });
   $("cam-reset").addEventListener("click", () => {
     camFill({});
-    try { localStorage.removeItem("lr4-cam"); } catch (e) { /* nothing kept */ }
+    try { MS.remove("lr4-cam"); } catch (e) { /* nothing kept */ }
     camNote();
   });
   $("dl-nc").addEventListener("click", () => {
@@ -198,6 +198,7 @@
     wg.computeVertexNormals();
     top.add(new THREE.Mesh(wg, jobStockMaterial(z1, z0, -Infinity, true, rgb)));
     top.userData.z = at[2];
+    top.userData.box = new THREE.Box3(new THREE.Vector3(x0, y0, z0), new THREE.Vector3(x1, y1, z1));   // picked / snapped as this (hose_bom.js tableBlocks)
     top.onBeforeRender = camLight([top.material]);
     top.children[0].onBeforeRender = camLight([top.children[0].material]);
     return top;
