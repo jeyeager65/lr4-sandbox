@@ -58,6 +58,7 @@ for (const [k, v] of Object.entries(script.settings)) {
   if (k === "machine") opt.url = opt.url.replace(/#.*$/, "") + `#${v[0]}x${v[1]}`;
   else opt[k] = v;
 }
+if (script.settings.kind === "ui" && !given.has("size") && !script.settings.size) opt.size = [1920, 1080];   // ui videos: the whole page
 opt.mode = String(opt.mode).toLowerCase();   // (fluidnc only: Basic was retired in Part 34)
 if (opt.mode !== "fluidnc") { console.log(`--mode / MODE=${opt.mode}: videos run on FluidNC now (Basic was retired; leave MODE out)`); process.exit(1); }
 opt.trace = !!process.env.LR4_NC_TRACE;

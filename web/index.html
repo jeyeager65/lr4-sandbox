@@ -679,8 +679,8 @@
       <button type="button" data-run="home" title="Home all ($H)">⌂ Home</button><button type="button" data-run="zero" title="Zero all here (G10 L20 P1 X0 Y0 Z0)">⊙ Zero</button><button type="button" id="ph-jog" aria-expanded="false" aria-controls="pos-jog">✥ Jog</button><button type="button" id="ph-files" aria-expanded="false" aria-controls="run-right">▤ Files</button>
     </div>
     <div class="hz">
-      <span class="lbl">Home</span><button type="button" id="home" title="Home all ($H): Z up to its switch, then X and Y">All</button><button type="button" data-home="X">X</button><button type="button" data-home="Y">Y</button><button type="button" data-home="Z">Z</button>
-      <span class="lbl">Zero</span><button type="button" data-zero="XYZ" title="Work zero here: G10 L20 P1 X0 Y0 Z0">All</button><button type="button" data-zero="X">X</button><button type="button" data-zero="Y">Y</button><button type="button" data-zero="Z">Z</button>
+      <span class="lbl">Home</span><button type="button" id="home" title="Home all ($H): Z up to its switch, then X and Y">All</button><button type="button" id="home-x" data-home="X">X</button><button type="button" id="home-y" data-home="Y">Y</button><button type="button" id="home-z" data-home="Z">Z</button>
+      <span class="lbl">Zero</span><button type="button" id="zero-all" data-zero="XYZ" title="Work zero here: G10 L20 P1 X0 Y0 Z0">All</button><button type="button" id="zero-x" data-zero="X">X</button><button type="button" id="zero-y" data-zero="Y">Y</button><button type="button" id="zero-z" data-zero="Z">Z</button>
     </div>
     <p class="foot" id="home-status" role="status">Not homed. Home runs FluidNC's $H: Z up to its switch, then X and Y
       together to theirs (each Y motor stops on its own switch, squaring the gantry).</p>

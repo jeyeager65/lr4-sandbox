@@ -8,6 +8,9 @@
 //       PARK=on (drive the gantry back at the end)  HOLD=3 (s on the result)
 //       PENDANT=on (the FluidTouch pendant on the table, its live screen in a corner of the video; off by default)
 //       MODE=fluidnc (the default and the only one since Part 34: the job runs on the page's FluidNC)
+//       KIND=machine|ui (Part 43): machine (the default) = the 3D view only; ui = the whole page (panel, top bar, Run
+//       columns; recorded at 1920x1080 unless SIZE= says otherwise), to show how to use it - the only kind that takes
+//       Point / Click / Step lines
 //       HOMING=z,x,y (Home in that order: FluidNC's axis homing commands $HZ, $HX, $HY one after another, the
 //       config.yaml unchanged; z,xy = $HZ then $HXY)
 //     the machine (Part 29; the page's My machine, set before anything is filmed):
@@ -54,6 +57,13 @@
 //   (Video Speed: X=62 | FIT=75 | FOR=8 REAL=5 BADGE=on)   the job's pace: X times, or fit its moves into FIT s of
 //       video; FOR = only for that many s of video, then back; REAL = s at 1x at each section's first cut (after a
 //       message or an M0), then easing up (0 = off); BADGE = the speed badge
+//   ui videos (KIND=ui) only - an element id of the page (e.g. t-run, st-size, home, home-x, zero-all, job-play, hv-btn):
+//   (Video Point: ID=home TIME=3 TEXT=This is Home)   a ring round that control, and TEXT as a caption, for TIME s (the
+//       intro waits; mid-job it shows while the job goes on)
+//   (Video Click: ID=home TIME=0.8)   a pointer moves there over TIME s and clicks it: the page does what a user's click
+//       does (Home homes, ▶ runs the job - the intro ends when a click starts the job)
+//   (Video Step: ID=st-ab TIME=0.8)   the same, but only opens: a Design step (st-size ...), a tab (t-run) or a menu
+//       (hv-btn) already open is just pointed at. Mid-job, Click / Step hold the job while the pointer moves
 // Lines before the first move are the intro, run in order; later ones run when playback reaches their line (Shot,
 // Text, Title, Wait, Speed). A file whose intro has no Shot / Home / Title / Text / Wait gets the default intro
 // (workshop orbit, home, machine orbit, stock).
@@ -66,7 +76,8 @@ const SETTINGS = { size: "wxh", machine: "wxh", fps: "num", volume: "num", pause
   fan: "bool", main: "colour", accent: "colour" };
 const MACHINE_KEYS = ["table", "room", "braces", "struts", "base", "peter", "router", "skirt", "hose", "fan", "main", "accent"];
 const PRESETS = ["all", "no-hardware", "printed", "frame"];   // web/js/show_tree.js PRESETS
-const KINDS = ["shot", "home", "zero", "title", "text", "wait", "speed", "pendant", "show", "inspect", "asbuilt"];
+const KINDS = ["shot", "home", "zero", "title", "text", "wait", "speed", "pendant", "show", "inspect", "asbuilt", "point", "click", "step"];
+const UI_ONLY = new Set(["point", "click", "step"]);   // KIND=ui videos (the page on screen) only
 const INTRO_ONLY = new Set(["home", "zero"]);
 const SHOTS = new Set(["workshop", "machine", "stock", "tool", "core", "iso", "front", "top", "side", "back", "page", "pendant", "ymin", "ymax", "gantry", "gantrytop"]);
 const ASBUILT_NUM = ["rack", "tilt", "exag", "tram", "tramy", "warpx", "warpy", "bow", "rackmax", "tiltmax"];
@@ -136,6 +147,15 @@ function parse(text) {
     if (bad) { warn(bad); continue; }
     (before ? out.intro : out.at).push(cmd);
   }
+  if (out.settings.kind !== undefined && !["machine", "ui"].includes(out.settings.kind)) {
+    out.warnings.push(`KIND=${out.settings.kind}: machine or ui`); delete out.settings.kind;
+  }
+  if (out.settings.kind !== "ui") for (const list of [out.intro, out.at]) for (let i = list.length - 1; i >= 0; i--) {
+    if (!UI_ONLY.has(list[i].kind)) continue;
+    out.warnings.push(`line ${list[i].line}: (Video ${list[i].kind}:) is for KIND=ui videos (the page on screen) - this one shows the machine only`);
+    list.splice(i, 1);
+  }
+  out.warnings.sort((a, b) => (+(/^line (\d+)/.exec(a) || [0, 1e9])[1]) - (+(/^line (\d+)/.exec(b) || [0, 1e9])[1]));
   return out;
 }
 
@@ -152,6 +172,9 @@ function check(c, intro) {
     case "zero": return Number.isFinite(mm(kv.x)) && Number.isFinite(mm(kv.y)) ? null : "Zero wants X= and Y= (mm, or 4in)";
     case "title": case "text": return kv.text ? null : `${k[0].toUpperCase() + k.slice(1)} wants TEXT=`;
     case "wait": return num(kv.time) ? null : "Wait wants TIME=";
+    case "point": case "click": case "step":
+      if (!kv.id) return `${k[0].toUpperCase() + k.slice(1)} wants ID= (an element id of the page)`;
+      return /^[A-Za-z][\w-]*$/.test(kv.id) ? null : `${k[0].toUpperCase() + k.slice(1)} ID=${kv.id}: an element id (letters, digits, - and _)`;
     case "inspect":
       if (kv.id === undefined && kv.explode === undefined && kv.section === undefined && kv.xray === undefined && kv.view === undefined)
         return "Inspect wants ID=, EXPLODE=, SECTION= or VIEW=";
@@ -232,7 +255,7 @@ function defaultIntro(o) {
   return [c("shot", { view: "workshop", time: "1", orbit: String(o.orbit) }), ...(o.home ? [c("home", { offset: "30" })] : []),
     c("shot", { view: "machine", time: "2", orbit: String(o.orbit) }), c("shot", { view: "stock", time: "2.5" }), c("wait", { time: "0.5" })];
 }
-const hasOwnIntro = (s) => s.intro.some((c) => ["shot", "home", "title", "text", "wait"].includes(c.kind));
+const hasOwnIntro = (s) => s.intro.some((c) => ["shot", "home", "title", "text", "wait", "point", "click", "step"].includes(c.kind));
 
 // a video's options before its (Video: ...) settings (record_demo.js's flags win over both; the page's player uses them too)
 const DEFAULTS = { size: [2560, 1440], fps: 30, job: 75, pause: 2, orbit: 10, sound: true, volume: 0.6, home: true, real: 5,

@@ -123,11 +123,13 @@ window.LR4Director = (() => {
       say("machine: " + Object.entries(mach).map(([k, v]) => `${k}=${Array.isArray(v) ? v.map((q) => Math.round(q)).join("x") : v}`).join(" "));
       await waitLoaded();                            // braces / struts / table rebuild the machine
     }
-    if (!o.live) D.recording(true);                  // the 3D view, whole window
+    document.body.classList.toggle("rec-ui", videoKind(script) === "ui");   // ui (Part 43c): the whole page, as it is
+    if (!o.live && videoKind(script) === "ui") controls.enableDamping = false;
+    else if (!o.live) D.recording(true);             // the 3D view, whole window
     else if (videoKind(script) === "machine" && el("v-only").getAttribute("aria-pressed") !== "true") { el("v-only").click(); resize(); }   // live: ⛶ view only
     await sleep(500);
     const introAll = DS.hasOwnIntro(script) ? script.intro : DS.defaultIntro(o);
-    const homeCmd = introAll.find((q) => q.kind === "home");
+    const homeCmd = introAll.find((q) => q.kind === "home" || (q.kind === "click" && /^home(-[xyz])?$/.test(q.kv.id)));   // (a clicked Home too)
     if (o.homing && !D.homingOrder(String(o.homing))) say(`(Video): HOMING=${o.homing}: not an order (e.g. z,x,y)`);
     else if (o.homing) say(`homing order: ${o.homing}`);
     for (const q of introAll.filter((c) => c.kind === "asbuilt")) { asbuilt(q); }   // the machine as built, before FluidNC boots on it
@@ -164,6 +166,7 @@ window.LR4Director = (() => {
     let evBadge = "-", last = null, captionEnd = 0;  // captionEnd: the caption comes off at this frame (0 = none showing)
     const frame = async (cam) => {
       ncM += ncS * dt;
+      uiPlace();
       const st = await clock.frame(cam || null, dt, [ncM, ncS * dt, o.kmax]);
       if (S.frames % o.fps === 0) ev(`sec rate=${+ncS.toPrecision(3)} line=${st.line} t=${st.t.toFixed(1)} badge=${evBadge}`);
       if (o.trace && S.frames < 600) S.lines.push("nc " + S.frames + " " + JSON.stringify(D.ncTrace()));
@@ -174,6 +177,61 @@ window.LR4Director = (() => {
     };
     const n = (sec) => Math.max(1, Math.round(sec * o.fps));
     const hold = async (secs, cam) => { for (let i = 0, m = n(secs); i < m; i++) await frame(cam); };
+
+    // ---- ui videos (Part 43c): the page's own controls by element id - a ring round one (Point), a pointer that moves
+    // to one and clicks it (Click; Step only opens what isn't open). The page then does what a user's click does. ----
+    const ui = { ptr: null, at: null, ring: null, ringEl: null, ringEnd: 0 };
+    const uiEl = (cmd) => {
+      const e = el(cmd.kv.id);
+      if (!e) say(`(Video): line ${cmd.line}: the page has no element #${cmd.kv.id}`);
+      return e;
+    };
+    function uiPlace() {
+      if (ui.ptr) { ui.ptr.style.left = ui.at[0] + "px"; ui.ptr.style.top = ui.at[1] + "px"; }
+      if (ui.ring && !ui.ring.hidden && ui.ringEl) {
+        const r = ui.ringEl.getBoundingClientRect(), p = 6;
+        Object.assign(ui.ring.style, { left: r.left - p + "px", top: r.top - p + "px", width: r.width + 2 * p + "px", height: r.height + 2 * p + "px" });
+      }
+      if (ui.ringEnd && S.frames >= ui.ringEnd) ringOff();
+    }
+    const ringOff = () => { ui.ringEnd = 0; if (ui.ring) ui.ring.hidden = true; };
+    function point(cmd, e) {                         // the ring (+ TEXT as a caption) for TIME s
+      ev(`point #${cmd.kv.id}`);
+      if (!ui.ring) { ui.ring = document.createElement("div"); ui.ring.className = "rec-ring"; document.body.append(ui.ring); }
+      e.scrollIntoView({ block: "nearest", inline: "nearest" });
+      ui.ringEl = e; ui.ring.hidden = false; ui.ringEnd = S.frames + n(DS.secsOf(cmd, 3));
+      if (cmd.kv.text) caption({ kv: { text: cmd.kv.text, time: cmd.kv.time } });
+    }
+    const POINTER = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 2 L3 19 L7.6 14.8 L10.6 21.6 L13.6 20.3 L10.7 13.6 L17 13.4 Z"/></svg>';
+    async function pointerTo(cmd, e, cam) {          // the pointer moves to e's middle over TIME s (0.8)
+      if (!ui.ptr) {
+        ui.ptr = document.createElement("div"); ui.ptr.className = "rec-pointer"; ui.ptr.innerHTML = POINTER;
+        document.body.append(ui.ptr);
+        ui.at = [innerWidth * 0.6, innerHeight * 0.6];
+      }
+      e.scrollIntoView({ block: "nearest", inline: "nearest" });
+      const r = e.getBoundingClientRect(), a = ui.at.slice(), b = [r.left + r.width / 2, r.top + r.height / 2], m = n(DS.secsOf(cmd, 0.8));
+      if (!r.width && !r.height) say(`(Video): line ${cmd.line}: #${cmd.kv.id} isn't on screen (a closed step or menu?)`);
+      for (let f = 1; f <= m; f++) { const k = ease(f / m); ui.at = [a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k]; await frame(cam); }
+    }
+    const isOpen = (e) => (e.tagName === "DETAILS" ? e.open : e.getAttribute("aria-pressed") === "true" || e.getAttribute("aria-expanded") === "true");
+    async function clickCmd(cmd, cam) {              // Click / Step -> what the click started: "home" | "job" | ""
+      const e = uiEl(cmd);
+      if (!e) return "";
+      const target = e.tagName === "DETAILS" ? e.querySelector("summary") : e;   // a Design step: its header
+      await pointerTo(cmd, target, cam);
+      ev(`${cmd.kind} #${cmd.kv.id}`);
+      if (cmd.kind === "step" && isOpen(e)) { await hold(0.3, cam); return ""; }   // open already: just pointed at
+      ui.ptr.classList.add("down");
+      await hold(0.12, cam);
+      target.click();
+      ui.ptr.classList.remove("down");
+      // a Home / Run control: its homing or job starts after FluidNC answers - wait for it (a few s), else go on
+      const starts = cmd.kind === "click" && /^(home|home-[xyz]|job-play|start-go)$/.test(cmd.kv.id);
+      for (let i = 0, m = n(starts ? 6 : 0.3); i < m && !D.homing() && !FJ.job; i++) await frame(cam);
+      return D.homing() ? "home" : FJ.job ? "job" : "";
+    }
+    const uiDone = () => { ringOff(); if (ui.ptr) ui.ptr.remove(); if (ui.ring) ui.ring.remove(); };
 
     // shots: [camera position, target]
     const c = g.c, span = Math.max(g.s[0], g.s[1]);
@@ -295,8 +353,8 @@ window.LR4Director = (() => {
 
     // the intro: the file's own (or the default one), in order
     const intro = DS.hasOwnIntro(script) ? script.intro : [...DS.defaultIntro(o), ...script.intro];
-    let homed = false;
-    for (const cmd of intro.filter((q) => o.home || q.kind !== "home")) {
+    let homed = false, byClick = false;              // byClick: a Click started the job (ui videos): the intro ends there
+    intro: for (const cmd of intro.filter((q) => o.home || q.kind !== "home")) {
       if (cmd.kind === "shot") {
         const sh = DS.shotOf(cmd), s = mkShot(sh, cam);
         say(`shot ${sh.name}${sh.orbit ? ` orbit ${sh.orbit}` : ""}`);
@@ -333,10 +391,26 @@ window.LR4Director = (() => {
       else if (cmd.kind === "asbuilt") { /* set before the intro (prepare) */ }
       else if (cmd.kind === "inspect") cam = await inspectCmd(cmd, cam);
       else if (cmd.kind === "wait") await hold(DS.secsOf(cmd, 1), cam);
+      else if (cmd.kind === "point") { const e = uiEl(cmd); if (e) { point(cmd, e); await hold(DS.secsOf(cmd, 3), cam); ringOff(); } }
+      else if (cmd.kind === "click" || cmd.kind === "step") {
+        const got = await clickCmd(cmd, cam);
+        if (got === "home") {                        // Home clicked: frames till it is done, then as (Video Home:)
+          say("homing (clicked)");
+          for (let i = 0; i < n(120) && D.homing(); i++) await frame(cam);
+          await hold(0.7, cam);
+          homed = CTL.homed;
+          if (homed) {
+            if (zero) call("zero", zero[0], zero[1]);
+            const lay = await D.layout();
+            stockView = viewOf(lay.stock, lay.at);
+            if (zero) await jogToZero();
+          }
+        } else if (got === "job") { byClick = true; break intro; }
+      }
       else paceCmd(cmd);
     }
 
-    if (!homed) {                                    // FluidNC runs nothing till it has homed
+    if (!homed && !byClick) {                        // FluidNC runs nothing till it has homed
       say("homing (FluidNC must, before a job)");
       call("home", true);
       for (let i = 0; i < n(120) && D.homing(); i++) await frame(cam);
@@ -345,7 +419,8 @@ window.LR4Director = (() => {
     say(`job (at ${(S.frames / o.fps).toFixed(1)} s, ${pace.base}x)`);
     const ncJob0 = ncM;
     let ncHeld = 0;                                  // machine ms spent in M0 holds
-    if (!await call("ncPlay")) throw new Error("FluidNC didn't start the job: " + el("job-status").textContent);
+    if (byClick) { ev("job started by a click"); D._ncRan = true; }   // the page's own ▶ ran it (ui videos)
+    else if (!await call("ncPlay")) throw new Error("FluidNC didn't start the job: " + el("job-status").textContent);
     let held = 0, endHold = 0, s, rate = 0, badge = "", section = -1, realLeft = 0, ramp = -1, k = 0;
     let shot = null, shotF = 0, titleEnd = 0, msgKey = null, msgEnd = 0, inspShot = null;   // inspShot: the shot from before an Inspect
     const setRate = (r) => {
@@ -382,6 +457,13 @@ window.LR4Director = (() => {
         }
         else if (cmd.kind === "title") { titleEnd = S.frames + n(DS.secsOf(cmd, 3)); call("title", DS.titleText(cmd)); }
         else if (cmd.kind === "wait") pace.wait = n(DS.secsOf(cmd, 1));
+        else if (cmd.kind === "point") { const e = uiEl(cmd); if (e) point(cmd, e); }
+        else if (cmd.kind === "click" || cmd.kind === "step") {   // the job held while the pointer moves and clicks
+          const r0 = rate;
+          pace.wait = 1; setRate(1e-9);
+          await clickCmd(cmd, shot ? shot.at(Math.max(0, shotF - 1)) : null);
+          pace.wait = 0; setRate(r0);
+        }
         else paceCmd(cmd);
       }
       if (titleEnd && S.frames >= titleEnd) { titleEnd = 0; call("title", null); }
@@ -419,6 +501,7 @@ window.LR4Director = (() => {
       }
     }
     await hold(o.hold, endCam);
+    uiDone();
   }
 
   return {

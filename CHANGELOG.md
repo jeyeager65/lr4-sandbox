@@ -3,6 +3,12 @@
 The version is the sandbox page's (`VERSION` in `web/js/page/job.js`, shown in its footer). The footer also shows
 the date the model data was built and the Printables file set it was solved for.
 
+## 0.49.0 - 2026-10-26
+- **Videos of the page itself** (`(Video: KIND=ui)`): the whole page on screen, with `(Video Point:)` (a ring round a
+  control and a caption), `(Video Click:)` (a pointer moves there and clicks it: Home homes, Start runs the job) and
+  `(Video Step:)` (opens a Design step, the Run tab or a menu). Help videos and `tools/record_demo.js` both play them.
+- Home X / Y / Z and Zero All / X / Y / Z have element ids (home-x ... zero-z) for scripts.
+
 ## 0.48.0 - 2026-10-25
 - **Help videos, played live in the page** (Help ▾ in the top bar, and the welcome card's "Watch the tour"): the
   machine homes and cuts on its own FluidNC while titles and captions explain it - no recordings. Each one plays on a

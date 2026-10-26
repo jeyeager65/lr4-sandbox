@@ -870,3 +870,13 @@ body.help-on .rec-caption { bottom: calc(6% + 44px); }   /* clear of the player 
 body.help-on .welcome { display: none; }                 /* the start card says it instead */
 body.help-on.view-only .hv-bar { display: flex; }
 body.help-on :is(.rec-title, .rec-caption, .rec-msg, .rec-badge) { pointer-events: none; }   /* drags and clicks reach the view */
+/* ui videos (Part 43c, js/page/director.js): the pointer that clicks the page's controls, the ring round one (Point) */
+.rec-pointer { position: fixed; z-index: 60; left: 0; top: 0; width: clamp(24px, 3vh, 52px); pointer-events: none; transform: translate(-12%, -8%); transition: transform 0.08s; }
+.rec-pointer svg { display: block; width: 100%; height: auto; fill: #fff; stroke: #111; stroke-width: 1.4; stroke-linejoin: round; filter: drop-shadow(0 2px 3px rgb(0 0 0 / 0.45)); }
+.rec-pointer.down { transform: translate(-12%, -8%) scale(0.82); }
+.rec-ring { position: fixed; z-index: 59; pointer-events: none; border: 3px solid var(--accent); border-radius: 10px;
+  box-shadow: 0 0 0 5px color-mix(in srgb, var(--accent) 30%, transparent), 0 0 24px color-mix(in srgb, var(--accent) 55%, transparent); }
+.rec-ring[hidden] { display: none; }
+body.rec-ui .rec-badge { top: calc(3.5% + 44px); font-size: clamp(18px, 3.4vh, 52px); }   /* ui videos: under the view's toolbar */
+body.rec-ui .rec-caption { font-size: clamp(16px, 2.7vh, 42px); }
+body.rec-ui .rec-msg { top: calc(3.5% + 44px); font-size: clamp(15px, 2.4vh, 38px); }

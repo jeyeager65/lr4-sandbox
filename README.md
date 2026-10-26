@@ -244,6 +244,9 @@ shots and the FluidTouch pendant's screen in a corner. The comments:
 | `(Video Home: OFFSET=30)` / `(Video Zero: X=150 Y=120)` | Home at real speed, then jog to work zero (where the stock sits); before the first move. |
 | `(Video Speed: FIT=25 REAL=3)` | The job's pace: `X=` times, or fit its moves into FIT seconds; REAL = seconds at 1x at each section's first cut. |
 | `(Video Wait: TIME=2)` / `(Video Pendant: SHOW=on CORNER=br SIZE=24)` | Hold; the pendant's screen in a corner. |
+| `(Video: KIND=ui)` | A video of the whole page (panel, top bar, Run columns; 1920x1080 unless `SIZE=`), to show how to use it. The default, `KIND=machine`, shows only the 3D view. |
+| `(Video Point: ID=home TIME=3 TEXT=This is Home)` | ui videos: a ring round a control (by its element id) and a caption. |
+| `(Video Click: ID=home)` / `(Video Step: ID=t-run)` | ui videos: a pointer moves to the control and clicks it, and the page does what a click does (Home homes, the Start check's ▶ Start runs the job); Step only opens a Design step, tab or menu that isn't open. |
 
 Lines before the first move are the intro and run in order; later ones run when the job reaches their line. `MSG`
 comments show on top as the job reaches them, and M0 pauses show their popup. The full reference is the header of
@@ -303,6 +306,8 @@ node test_sounds.js                          # the machine sound helpers (steppe
 node test_demo_script.js                     # (Video ...) comments -> the video's settings and commands
 node test_page_help.js                       # headless Chrome (GPU): a help video live on the temporary machine,
                                              #   pause / Follow / the end, Exit leaves your machine as it was
+node test_page_help_ui.js                    # a ui video (tests/video_ui.gcode) live: Step / Point / Click, the job
+                                             #   started by the page's own Start
 node test_gcode_play.js                      # G-code playback: pauses, probe, G20/G21, carving frees the plates
 node test_homing.js                          # homing helpers: FluidNC's homing order, pull-offs, MPos
 node test_fluidnc_sim.js                     # parsing FluidNC's output (status reports, ok / error, messages)

@@ -114,5 +114,16 @@ ok(DS.parse("( video  shot : view=CORE time=2 )\nG0 X1").intro[0].kv.view === "C
   const k = P.parse("(Video: KIND=ui)\nG0 X1\n");
   ok(k.settings.kind === "ui" && !k.warnings.length, `KIND=ui: ${JSON.stringify(k.settings)} ${k.warnings.join()}`);
 }
+{                                                      // Part 43c: Point / Click / Step, ui videos only
+  const U = DS.parse("(Video: KIND=ui)\n(Video Step: ID=t-run)\n(Video Point: ID=home TIME=2 TEXT=This is Home)\n(Video Click: ID=home)\n" +
+    "(Video Click:)\n(Video Point: ID=#x)\nG0 X1\n(Video Click: ID=run-hold)\nM30\n");
+  ok(U.intro.map((c) => c.kind + ":" + c.kv.id).join() === "step:t-run,point:home,click:home" && U.at.length === 1 && U.at[0].kv.id === "run-hold",
+    `ui lines: ${U.intro.map((c) => c.kind).join()} + ${U.at.length} later`);
+  ok(U.intro[1].kv.text === "This is Home" && DS.secsOf(U.intro[1], 3) === 2, "Point TEXT / TIME");
+  ok(U.warnings.length === 2 && /Click wants ID=/.test(U.warnings[0]) && /an element id/.test(U.warnings[1]), `bad ui lines warned: ${JSON.stringify(U.warnings)}`);
+  const M = DS.parse("(Video: SIZE=960x540)\n(Video Point: ID=home TEXT=x)\nG0 X1\n(Video Click: ID=home)\n");
+  ok(!M.intro.length && !M.at.length && M.warnings.length === 2 && M.warnings.every((w) => /for KIND=ui videos/.test(w)), `machine video: ui lines dropped, warned (${M.warnings.length})`);
+  ok(/KIND=film: machine or ui/.test(DS.parse("(Video: KIND=film)\nG0 X1").warnings.join()), "KIND=film warned");
+}
 console.log(fails ? `demo_script: ${fails} of ${checks} failed` : `demo_script: all ${checks} passed`);
 process.exit(fails ? 1 : 0);
