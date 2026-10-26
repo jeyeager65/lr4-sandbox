@@ -241,8 +241,8 @@
       const tl = JOB.tl, J = FJ.job;
       if (!tl) return 0;
       if (!J) return this._ncRan ? tl.total : 0;
-      const i = Math.min(J.T.i, tl.segs.length - 1), a = i > 0 ? tl.t[i - 1] : 0;
-      return J.T.carved >= tl.segs.length ? tl.total : a + Math.min(1, J.T.f) * (tl.t[i] - a);
+      const T = J.P || J.T, i = Math.min(T.i, tl.segs.length - 1), a = i > 0 ? tl.t[i - 1] : 0;   // P: As built's
+      return T.carved >= tl.segs.length ? tl.total : a + Math.min(1, T.f) * (tl.t[i] - a);
     },
     ncSend(line) {                                   // sent; its reply (ncReply: null, true or the error code) comes as frames run
       this._ncR = null;                              // (FluidNC all but stops between frames, so don't wait for it here)
@@ -316,7 +316,7 @@
     if (!active) return null;
     const text = JOB.src && JOB.src.text;
     if (text !== SND.planSrc) { SND.planSrc = text; SND.plan = LR4Sound.routerPlan(text); }
-    const i = Math.min(FJ.job ? FJ.job.T.i : GcodePlay.at(tl, JOB.t).index, tl.segs.length - 1), sg = tl.segs[Math.max(0, i)];
+    const i = Math.min(FJ.job ? (FJ.job.P || FJ.job.T).i : GcodePlay.at(tl, JOB.t).index, tl.segs.length - 1), sg = tl.segs[Math.max(0, i)];
     const def = sg && tl.tools && tl.tools.get(sg.toolNumber);
     return { rpm: LR4Sound.routerAt(SND.plan, sg ? sg.srcLine || 0 : 0), seg: i, flutes: (def && def.flutes) || 2 };
   }

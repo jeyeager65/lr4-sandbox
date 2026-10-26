@@ -171,7 +171,8 @@ same menu has the volume and, for fun, a "robot noises" voice.
 
 ### Help videos
 
-**Help ▾** (top bar) lists short videos that play **live in the page**, not as recordings: the machine homes, jogs
+**Help ▾** (top bar) lists short videos that play **live in the page**, not as recordings - *Tour + first job*,
+*Why home?*, *Probing and zero*, *As built + tram* and *Your own front plate*: the machine homes, jogs
 and cuts on its own FluidNC while titles and captions explain it. Each one plays on a temporary machine set up the
 way the video needs (its size, table, As built), so your machine, its settings and its SD card stay exactly as they
 are; **✕ Exit** brings you back. While one plays: ⏸ / ▶ (or Space, or a click on the view) pauses, a drag looks round
@@ -246,6 +247,7 @@ shots and the FluidTouch pendant's screen in a corner. The comments:
 | `(Video Wait: TIME=2)` / `(Video Pendant: SHOW=on CORNER=br SIZE=24)` | Hold; the pendant's screen in a corner. |
 | `(Video: KIND=ui)` | A video of the whole page (panel, top bar, Run columns; 1920x1080 unless `SIZE=`), to show how to use it. The default, `KIND=machine`, shows only the 3D view. |
 | `(Video Point: ID=home TIME=3 TEXT=This is Home)` | ui videos: a ring round a control (by its element id) and a caption. |
+| `(Video Design: EXAMPLE=on)` / `(Video Design: FILE=help/plate.svg)` | The front plate design, as if uploaded (Configure > 6 Get the files): the template's own Example, or an SVG next to the page. |
 | `(Video Click: ID=home)` / `(Video Step: ID=t-run)` | ui videos: a pointer moves to the control and clicks it, and the page does what a click does (Home homes, the Start check's ▶ Start runs the job); Step only opens a Design step, tab or menu that isn't open. |
 
 Lines before the first move are the intro and run in order; later ones run when the job reaches their line. `MSG`
@@ -304,6 +306,7 @@ node test_strut_cam.js                       # the page's strut plate G-code; vs
 node test_show_tree.js                       # the Show tree, its presets and the inspect sets
 node test_sounds.js                          # the machine sound helpers (stepper pitch, router, cutting load)
 node test_demo_script.js                     # (Video ...) comments -> the video's settings and commands
+node test_help_scripts.js                    # web/help/: every help video parses clean, fits FluidNC, names real ids
 node test_page_help.js                       # headless Chrome (GPU): a help video live on the temporary machine,
                                              #   pause / Follow / the end, Exit leaves your machine as it was
 node test_page_help_ui.js                    # a ui video (tests/video_ui.gcode) live: Step / Point / Click, the job

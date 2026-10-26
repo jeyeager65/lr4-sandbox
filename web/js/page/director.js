@@ -15,7 +15,7 @@ window.LR4Director = (() => {
   const lerp = (a, b, k) => a.map((v, i) => v + (b[i] - v) * k);
   const raf2 = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
   const videoKind = (sc) => (sc.settings.kind === "ui" ? "ui" : "machine");   // (Video: KIND=machine|ui), Part 43
-  let S = null;                                      // the run: { o, script, job, g, clock, lines, events, frames, ... }
+  let RUN = null;                                    // the run: { o, script, job, g, clock, lines, events, frames, ... }
 
   async function waitLoaded(timeout = 180000) {      // the status box hidden twice, 1.5 s apart, and the part files placed
     const t0 = Date.now();
@@ -89,15 +89,15 @@ window.LR4Director = (() => {
     return c;
   }
   function hand(m) {                                 // to the recorder waiting in next()
-    const c = S && S.clock, out = c && c.out;
+    const c = RUN && RUN.clock, out = c && c.out;
     if (!out) return;
     c.out = null;
-    out(Object.assign(m, { log: S.lines.splice(0) }));
+    out(Object.assign(m, { log: RUN.lines.splice(0) }));
   }
 
   // ---- the run ----
-  const say = (s) => { S.lines.push(s); if (S.logOn) ev("log " + s); };
-  const ev = (what) => S.events.push(`${(S.frames / S.o.fps).toFixed(2)} ${what}`);
+  const say = (s) => { RUN.lines.push(s); if (RUN.logOn) ev("log " + s); };
+  const ev = (what) => RUN.events.push(`${(RUN.frames / RUN.o.fps).toFixed(2)} ${what}`);
   const call = (name, ...args) => {                  // an LR4Demo call the event log keeps (title, caption, Home ...)
     ev(`${name} ${args.map((a) => JSON.stringify(a)).join(", ")}`);
     return D[name](...args);
@@ -106,9 +106,9 @@ window.LR4Director = (() => {
   // the page set up as the script says: detail, background, My machine, as built, FluidNC (re)booted near its switches,
   // the pendant, the file on the SD card -> { job } (the lines said go to the recorder)
   async function prepare(text, name, o) {
-    S = { o, text, name, script: DS.parse(text), lines: [], events: [], frames: 0, logOn: false };
-    for (const w of S.script.warnings) say("(Video): " + w);
-    const script = S.script;
+    RUN = { o, text, name, script: DS.parse(text), lines: [], events: [], frames: 0, logOn: false };
+    for (const w of RUN.script.warnings) say("(Video): " + w);
+    const script = RUN.script;
     if (o.live && script.settings.machine) {        // live: MACHINE= as typed in the size fields (the recorder opens #WxH)
       const [w, h] = script.settings.machine, f = (id, v) => { const e = el(id); e.value = +(U.unit === "in" ? v : v * IN).toFixed(3); e.dispatchEvent(new Event("input")); };
       if (Math.abs(U.cutX - w * IN) > 0.5 || Math.abs(U.cutY - h * IN) > 0.5) { f("cut-x", w); f("cut-y", h); await waitLoaded(); }
@@ -124,6 +124,7 @@ window.LR4Director = (() => {
       await waitLoaded();                            // braces / struts / table rebuild the machine
     }
     document.body.classList.toggle("rec-ui", videoKind(script) === "ui");   // ui (Part 43c): the whole page, as it is
+    if (videoKind(script) === "ui" && el("t-design").getAttribute("aria-pressed") !== "true") el("t-design").click();   // from Configure, as a first visit (the mode is kept per browser)
     if (!o.live && videoKind(script) === "ui") controls.enableDamping = false;
     else if (!o.live) D.recording(true);             // the 3D view, whole window
     else if (videoKind(script) === "machine" && el("v-only").getAttribute("aria-pressed") !== "true") { el("v-only").click(); resize(); }   // live: ⛶ view only
@@ -140,12 +141,12 @@ window.LR4Director = (() => {
       if (!await D.pendant()) say("pendant: FluidTouch didn't connect (is the page cross-origin isolated? serve it with tools/serve.py)");
       else { await sleep(2500); D.pip({ on: true }); say("pendant: on, its screen at the bottom right"); }
     }
-    const job = S.job = await D.ncFile(name, text);
+    const job = RUN.job = await D.ncFile(name, text);
     say(`job: ${(job.total / 60).toFixed(1)} min of moves, ${job.pauses} M0 pauses; script: ${script.intro.length} intro + ${script.at.length} later (Video) lines`);
     const mb = D.machineBox(), c = mb.getCenter(new THREE.Vector3()), s = mb.getSize(new THREE.Vector3());
-    S.g = { c: c.toArray(), s: s.toArray(), floor: D.floorZ(), fov: camera.fov, aspect: camera.aspect,
+    RUN.g = { c: c.toArray(), s: s.toArray(), floor: D.floorZ(), fov: camera.fov, aspect: camera.aspect,
       cam: camera.position.toArray(), tgt: controls.target.toArray() };
-    return { job, lines: S.lines.splice(0) };
+    return { job, lines: RUN.lines.splice(0) };
   }
   function asbuilt(cmd) {                            // (Video AsBuilt:) the machine as built (Part 32)
     const q = DS.asbuiltOf(cmd);
@@ -154,25 +155,25 @@ window.LR4Director = (() => {
     say(`as built: ${LR4AsBuilt.note()}`);
   }
 
-  // the video itself, frame by frame on S.clock (record_demo.js's director, Part 25 - 33)
+  // the video itself, frame by frame on RUN.clock (record_demo.js's director, Part 25 - 33)
   async function direct() {
-    const { o, script, g } = S, clock = S.clock, job = S.job;
+    const { o, script, g } = RUN, clock = RUN.clock, job = RUN.job;
     clock.install();
     await raf2();                                    // the tick that sees the clock stop goes by before the sound trace starts
     let ncM = D.ncCrawl(), ncS = 1;                  // FluidNC: the next frame's machine time (ms), machine s per video s
     if (o.sound) { const v = el("snd-vol"); v.value = o.volume; v.dispatchEvent(new Event("input")); D.sound(true, o.voice); }
-    S.logOn = true;
+    RUN.logOn = true;
     const dt = 1000 / o.fps;
     let evBadge = "-", last = null, captionEnd = 0;  // captionEnd: the caption comes off at this frame (0 = none showing)
     const frame = async (cam) => {
       ncM += ncS * dt;
       uiPlace();
       const st = await clock.frame(cam || null, dt, [ncM, ncS * dt, o.kmax]);
-      if (S.frames % o.fps === 0) ev(`sec rate=${+ncS.toPrecision(3)} line=${st.line} t=${st.t.toFixed(1)} badge=${evBadge}`);
-      if (o.trace && S.frames < 600) S.lines.push("nc " + S.frames + " " + JSON.stringify(D.ncTrace()));
+      if (RUN.frames % o.fps === 0) ev(`sec rate=${+ncS.toPrecision(3)} line=${st.line} t=${st.t.toFixed(1)} badge=${evBadge}`);
+      if (o.trace && RUN.frames < 600) RUN.lines.push("nc " + RUN.frames + " " + JSON.stringify(D.ncTrace()));
       last = st;
-      if (captionEnd && S.frames + 1 >= captionEnd) { captionEnd = 0; call("caption", null); }
-      S.frames++;
+      if (captionEnd && RUN.frames + 1 >= captionEnd) { captionEnd = 0; call("caption", null); }
+      RUN.frames++;
       return st;
     };
     const n = (sec) => Math.max(1, Math.round(sec * o.fps));
@@ -192,14 +193,22 @@ window.LR4Director = (() => {
         const r = ui.ringEl.getBoundingClientRect(), p = 6;
         Object.assign(ui.ring.style, { left: r.left - p + "px", top: r.top - p + "px", width: r.width + 2 * p + "px", height: r.height + 2 * p + "px" });
       }
-      if (ui.ringEnd && S.frames >= ui.ringEnd) ringOff();
+      if (ui.ringEnd && RUN.frames >= ui.ringEnd) ringOff();
     }
     const ringOff = () => { ui.ringEnd = 0; if (ui.ring) ui.ring.hidden = true; };
+    const reveal = (e) => {                          // a control inside a closed details (a sub-section): opened, scrolled to
+      for (let d = e.parentElement && e.parentElement.closest("details:not([open])"); d; d = d.parentElement && d.parentElement.closest("details:not([open])")) d.open = true;
+      for (const m of ["t-design", "t-run"]) {       // still not shown: it's on the other mode's panel
+        if (e.getClientRects().length) break;
+        if (el(m).getAttribute("aria-pressed") !== "true") el(m).click();
+      }
+      e.scrollIntoView({ block: "center", inline: "nearest" });
+    };
     function point(cmd, e) {                         // the ring (+ TEXT as a caption) for TIME s
       ev(`point #${cmd.kv.id}`);
       if (!ui.ring) { ui.ring = document.createElement("div"); ui.ring.className = "rec-ring"; document.body.append(ui.ring); }
-      e.scrollIntoView({ block: "nearest", inline: "nearest" });
-      ui.ringEl = e; ui.ring.hidden = false; ui.ringEnd = S.frames + n(DS.secsOf(cmd, 3));
+      reveal(e);
+      ui.ringEl = e; ui.ring.hidden = false; ui.ringEnd = RUN.frames + n(DS.secsOf(cmd, 3));
       if (cmd.kv.text) caption({ kv: { text: cmd.kv.text, time: cmd.kv.time } });
     }
     const POINTER = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 2 L3 19 L7.6 14.8 L10.6 21.6 L13.6 20.3 L10.7 13.6 L17 13.4 Z"/></svg>';
@@ -209,7 +218,7 @@ window.LR4Director = (() => {
         document.body.append(ui.ptr);
         ui.at = [innerWidth * 0.6, innerHeight * 0.6];
       }
-      e.scrollIntoView({ block: "nearest", inline: "nearest" });
+      reveal(e);
       const r = e.getBoundingClientRect(), a = ui.at.slice(), b = [r.left + r.width / 2, r.top + r.height / 2], m = n(DS.secsOf(cmd, 0.8));
       if (!r.width && !r.height) say(`(Video): line ${cmd.line}: #${cmd.kv.id} isn't on screen (a closed step or menu?)`);
       for (let f = 1; f <= m; f++) { const k = ease(f / m); ui.at = [a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k]; await frame(cam); }
@@ -230,6 +239,29 @@ window.LR4Director = (() => {
       const starts = cmd.kind === "click" && /^(home|home-[xyz]|job-play|start-go)$/.test(cmd.kv.id);
       for (let i = 0, m = n(starts ? 6 : 0.3); i < m && !D.homing() && !FJ.job; i++) await frame(cam);
       return D.homing() ? "home" : FJ.job ? "job" : "";
+    }
+    // (Video Design:) the front plate design, through the page's own upload (#pd-file): EXAMPLE = the template with
+    // its Example layer shown (made for this plate), FILE = an SVG next to the page
+    async function designCmd(cmd, cam) {
+      let svg, name;
+      if (cmd.kv.file) {
+        name = cmd.kv.file.split("/").pop();
+        try { const r = await fetch(lr4v(cmd.kv.file)); if (!r.ok) throw new Error(r.status); svg = await r.text(); }
+        catch (e) { say(`(Video): line ${cmd.line}: Design FILE=${cmd.kv.file}: ${e.message}`); return; }
+      } else {
+        if (/^(off|no|0)$/i.test(cmd.kv.example)) return;
+        name = "example.svg";
+        svg = PlateDesign.template(polygonClipping, S.strut, { nbraces: S.n === S.auto ? 0 : S.n, wing: WING, dogbones: DOGBONE })
+          .replace(/(inkscape:label="Example"[^>]*) style="display:none"/, "$1");
+      }
+      ev(`design ${name}`);
+      const dt = new DataTransfer();
+      dt.items.add(new File([svg], name, { type: "image/svg+xml" }));
+      const inp = el("pd-file");
+      inp.files = dt.files; inp.dispatchEvent(new Event("change"));
+      for (let i = 0; i < n(10) && !(DESIGN.rec && DESIGN.rec.name === name); i++) await frame(cam);
+      say(`design ${name}: ${[...document.querySelectorAll("#pd-checks li")].map((l) => l.textContent).join(" | ") || "?"}`);
+      RUN.job = await D.ncFile(RUN.name, RUN.text);  // the video's own file the selected job again (the strut job was redone)
     }
     const uiDone = () => { ringOff(); if (ui.ptr) ui.ptr.remove(); if (ui.ring) ui.ring.remove(); };
 
@@ -325,7 +357,7 @@ window.LR4Director = (() => {
       if (r === null) return;
       if (kv.for !== undefined) pace.temp = { rate: r, left: n(Number(kv.for)) }; else pace.base = r;
     };
-    const caption = (cmd) => { call("caption", DS.titleText(cmd)); captionEnd = S.frames + n(DS.secsOf(cmd, 4)); };
+    const caption = (cmd) => { call("caption", DS.titleText(cmd)); captionEnd = RUN.frames + n(DS.secsOf(cmd, 4)); };
 
     const ncJog = async (cmd, maxSecs) => {          // FluidNC: a jog, frames till it stops (where the camera is)
       call("ncSend", cmd);
@@ -392,6 +424,7 @@ window.LR4Director = (() => {
       else if (cmd.kind === "inspect") cam = await inspectCmd(cmd, cam);
       else if (cmd.kind === "wait") await hold(DS.secsOf(cmd, 1), cam);
       else if (cmd.kind === "point") { const e = uiEl(cmd); if (e) { point(cmd, e); await hold(DS.secsOf(cmd, 3), cam); ringOff(); } }
+      else if (cmd.kind === "design") await designCmd(cmd, cam);
       else if (cmd.kind === "click" || cmd.kind === "step") {
         const got = await clickCmd(cmd, cam);
         if (got === "home") {                        // Home clicked: frames till it is done, then as (Video Home:)
@@ -416,7 +449,7 @@ window.LR4Director = (() => {
       for (let i = 0; i < n(120) && D.homing(); i++) await frame(cam);
       await D.layout();
     }
-    say(`job (at ${(S.frames / o.fps).toFixed(1)} s, ${pace.base}x)`);
+    say(`job (at ${(RUN.frames / o.fps).toFixed(1)} s, ${pace.base}x)`);
     const ncJob0 = ncM;
     let ncHeld = 0;                                  // machine ms spent in M0 holds
     if (byClick) { ev("job started by a click"); D._ncRan = true; }   // the page's own ▶ ran it (ui videos)
@@ -455,9 +488,10 @@ window.LR4Director = (() => {
           if (off && inspShot) { ({ shot, shotF } = inspShot); inspShot = null; }
           else { shot = { frames: Infinity, at: () => end }; shotF = 0; }
         }
-        else if (cmd.kind === "title") { titleEnd = S.frames + n(DS.secsOf(cmd, 3)); call("title", DS.titleText(cmd)); }
+        else if (cmd.kind === "title") { titleEnd = RUN.frames + n(DS.secsOf(cmd, 3)); call("title", DS.titleText(cmd)); }
         else if (cmd.kind === "wait") pace.wait = n(DS.secsOf(cmd, 1));
         else if (cmd.kind === "point") { const e = uiEl(cmd); if (e) point(cmd, e); }
+        else if (cmd.kind === "design") await designCmd(cmd, shot ? shot.at(Math.max(0, shotF - 1)) : null);
         else if (cmd.kind === "click" || cmd.kind === "step") {   // the job held while the pointer moves and clicks
           const r0 = rate;
           pace.wait = 1; setRate(1e-9);
@@ -466,13 +500,13 @@ window.LR4Director = (() => {
         }
         else paceCmd(cmd);
       }
-      if (titleEnd && S.frames >= titleEnd) { titleEnd = 0; call("title", null); }
+      if (titleEnd && RUN.frames >= titleEnd) { titleEnd = 0; call("title", null); }
       // the file's MSG / PRINT lines on top (not the one an M0 popup is already showing)
       if (o.messages && s.msg && s.msg.key !== msgKey) {
         msgKey = s.msg.key;
-        if (s.msg.text !== s.popText) { call("msg", s.msg.text); msgEnd = S.frames + n(o.messagetime); }
+        if (s.msg.text !== s.popText) { call("msg", s.msg.text); msgEnd = RUN.frames + n(o.messagetime); }
       }
-      if (msgEnd && S.frames >= msgEnd) { msgEnd = 0; call("msg", null); }
+      if (msgEnd && RUN.frames >= msgEnd) { msgEnd = 0; call("msg", null); }
       // real time at each section's first cut, then ease up to the job's speed; the badge says which
       if (pace.real > 0 && s.cut && s.section !== section) { section = s.section; realLeft = n(pace.real); ramp = -1; }
       let r;
@@ -509,28 +543,28 @@ window.LR4Director = (() => {
     // the page's player (js/page/help.js): the whole video on `clock` (liveClock); started() once it is set up
     async play(text, name, o, clock, started) {
       await prepare(text, name, o);
-      S.lines.splice(0);
-      S.clock = clock;
+      RUN.lines.splice(0);
+      RUN.clock = clock;
       if (started) started();
       await direct();
     },
-    running: () => !!S && !!S.clock && S.logOn,
-    events: () => (S ? S.events.slice() : []),
+    running: () => !!RUN && !!RUN.clock && RUN.logOn,
+    events: () => (RUN ? RUN.events.slice() : []),
     // tools/record_demo.js: prepare(...) first, then recStart() -> the first frame drawn; next() after grabbing each
     // one -> { frame, st, log } | { done, log } | { error, log }
     recStart() {
-      S.clock = recordClock();
-      const first = new Promise((r) => { S.clock.out = r; });
+      RUN.clock = recordClock();
+      const first = new Promise((r) => { RUN.clock.out = r; });
       direct().then(() => hand({ done: true }), (e) => hand({ error: String(e && e.stack || e) }));
       return first;
     },
     next() {
-      const c = S.clock, p = new Promise((r) => { c.out = r; }), go = c.go;
+      const c = RUN.clock, p = new Promise((r) => { c.out = r; }), go = c.go;
       c.go = null;
       if (go) go();
       return p;
     },
-    frames: () => (S ? S.frames : 0),
-    note(s) { if (S) ev("log " + s); },              // a line the recorder printed, into the event log
+    frames: () => (RUN ? RUN.frames : 0),
+    note(s) { if (RUN) ev("log " + s); },              // a line the recorder printed, into the event log
   };
 })();

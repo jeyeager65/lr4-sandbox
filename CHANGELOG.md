@@ -3,6 +3,18 @@
 The version is the sandbox page's (`VERSION` in `web/js/page/job.js`, shown in its footer). The footer also shows
 the date the model data was built and the Printables file set it was solved for.
 
+## 0.50.0 - 2026-10-26
+- **Five help videos** in Help ▾: **Tour + first job** (the Design steps, then Run: Home, Zero and a name plate
+  engraved), **Why home?** (a racked gantry squared by $H), **Probing and zero** (work zero per axis, the touch plate
+  and its clip), **As built + tram** (a racked gantry, a router out of tram, a warped spoilboard, the squareness test)
+  and **Your own front plate** (the template, an upload, the checks, the plate in 3D, the job's bit change).
+- `(Video Design: EXAMPLE=on | FILE=...)` puts a front plate design in a video.
+- A ui video's pointer opens the sub-section a control is in, and scrolls it to the middle of the panel.
+- **Fixed:** with As built on Real-world, a job on FluidNC could look stuck at its start (no messages, M0 popups or
+  router sound until the end, a frozen time left) once the machine ran a little off the G-code's path - after a
+  probe on a warped spoilboard, or with the gantry left racked. With As built on, its progress now follows within
+  2 mm; the cuts are carved as before.
+
 ## 0.49.0 - 2026-10-26
 - **Videos of the page itself** (`(Video: KIND=ui)`): the whole page on screen, with `(Video Point:)` (a ring round a
   control and a caption), `(Video Click:)` (a pointer moves there and clicks it: Home homes, Start runs the job) and

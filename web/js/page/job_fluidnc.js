@@ -40,7 +40,7 @@
     FJ.job.at = now;
   }
   async function fjRun() {
-    if (!(await fjPrepare())) return;
+    if (!(await fjPrepare()) || !FJ.job) return;     // (gone meanwhile: stopped, or a second Run beat it)
     ctlLastSent = `$SD/Run=${FJ.job.path}`;
     ctlAdd("> " + ctlLastSent, "in");
     CTL.sim.send(ctlLastSent);                       // its ok comes when the file ends; an error ends the job (ctlLine)
@@ -78,7 +78,12 @@
     }
     if (JOB.sim) JOB.sim.reset();
     jobUpdateMesh(true);
-    FJ.job = { path, T: MotionCarve.tracker(JOB.tl.segs), seenSD: false, held: false, k: 0, at: ncTime(), t0: ncTime(), plate: null };
+    // T carves (on the G-code's moves within 0.1 mm) and says how far the job has got (messages, M0s, tool stops, the
+    // sound, videos). As built on Real-world (Part 43d): P says that instead - the same samples within 2 mm, as the
+    // machine runs a little off the G-code's own path there (a probe on a warped board sets Z where the page's ideal one
+    // wouldn't, a gantry left racked), where T has left the path (it carves the motors' own lines then) and would stay
+    // at the move it left. Only then: on small arcs a 2 mm band holds P back (a 3 mm circle is all inside it).
+    FJ.job = { path, T: MotionCarve.tracker(JOB.tl.segs), P: AB.set.on ? MotionCarve.tracker(JOB.tl.segs, { tol: 2 }) : null, seenSD: false, held: false, k: 0, at: ncTime(), t0: ncTime(), plate: null };
     FJ.pts = []; FJ.lastMsg = "";
     clearInterval(FJ.timer);
     FJ.timer = setInterval(fjSample, 4);
@@ -105,6 +110,7 @@
     const pts = FJ.pts.splice(0);
     for (const q of pts) {
       const acts = J.T.feed(q, rate * q.dt * 1.5 + 1);
+      if (J.P) J.P.feed(q, rate * q.dt * 1.5 + 1);
       if (JOB.sim && acts.length) MotionCarve.carve(JOB.sim, tl.segs, acts);
       if (JOB.spoil && acts.length && MotionCarve.carve(JOB.spoil, tl.segs, acts)) J.spoilCut = true;
     }
@@ -114,7 +120,7 @@
     JOB.partial.geometry.setDrawRange(0, 0);
     const w = J.T.last;
     if (w) { $("wx").textContent = w.x.toFixed(3); $("wy").textContent = w.y.toFixed(3); $("wz").textContent = w.z.toFixed(3); }
-    for (; J.k < tl.events.length && tl.events[J.k].index <= J.T.i; J.k++) {
+    for (; J.k < tl.events.length && tl.events[J.k].index <= (J.P || J.T).i; J.k++) {
       const e = tl.events[J.k];                      // a tool change (M6): hold it there for the bit - also when the
       if (e.kind === "tool") {                       // hold beat this tick there (slow frames): fjHold's own tick then
         J.toolStop = e;                              // still finds it, so the popup asks for the bit, not "Paused (M0)"
@@ -132,7 +138,7 @@
   }
   function fjHold() {                                // FluidNC is holding (M0, or ! from here): the popup
     fjTick();                                        // the motion up to now first: the status can beat the frame
-    const J = FJ.job, tl = JOB.tl, segs = tl.segs, c = J.T.i;
+    const J = FJ.job, tl = JOB.tl, segs = tl.segs, c = (J.P || J.T).i;
     const noCut = (a, b) => { for (let i = a; i < b; i++) if (segs[i].type === "cut") return false; return true; };
     const attach = tl.plates.find((q) => q.index >= c && noCut(c, q.index));
     const remove = !attach && J.plate && noCut(J.plate.index + 1, c + 1);

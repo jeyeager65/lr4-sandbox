@@ -7,7 +7,7 @@
 (CNCSIM 1 UNITS=mm)
 (Stock: XMIN=0 XMAX=200 YMIN=0 YMAX=120 ZMIN=-6.35 ZMAX=0)
 (ToolDef 1: SHAPE=vbit D=6.35 ANGLE=60 NAME=60 deg V-bit)
-(Video: SIZE=1920x1080 FPS=30 VOLUME=0.6 MESSAGETIME=4 HOLD=2 HOMING=z,x,y KIND=machine)
+(Video: SIZE=1920x1080 FPS=30 VOLUME=0.6 MESSAGETIME=4 HOLD=2 HOMING=z,x,y KIND=machine MACHINE=26x50)
 (Video AsBuilt: ON=on RACK=8 TILT=5 EXAG=1 TRAM=0)
 (Video AsBuilt: STOPY=auto STOPZ=auto PULLOFFY=4/3.2 PULLOFFZ=4/3.5)
 (Video Title: TIME=3 TEXT=Why home?|Powered down, the motors let go)

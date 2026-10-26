@@ -49,7 +49,7 @@ const ok = (cond, msg) => { checks++; console.log((cond ? "  ok   " : "  FAIL ")
       row.querySelector(".sd-more").click(); const t = document.getElementById("row-menu").textContent; document.getElementById("row-menu").hidden = true; return /Play as a video/.test(t); })()`),
       "an SD file with (Video ...) lines offers ▶ Play as a video");
     // play one: the page reloads as the help machine
-    try { await page.val(`document.querySelector("#hv-list .hv-row").click()`); } catch (e) { /* reloading */ }
+    try { await page.val(`[...document.querySelectorAll("#hv-list .hv-row")].find((b) => /Why home/.test(b.textContent)).click()`); } catch (e) { /* reloading */ }
     ok(await loaded(), "reloaded");
     const h = await page.val(`({ id: MS.id, help: MS.help, hash: location.hash, btn: document.getElementById("mc-btn").textContent,
       router: document.getElementById("opt-router").checked, banner: !document.getElementById("mc-banner").hidden })`);

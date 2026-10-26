@@ -64,6 +64,9 @@
 //       does (Home homes, ▶ runs the job - the intro ends when a click starts the job)
 //   (Video Step: ID=st-ab TIME=0.8)   the same, but only opens: a Design step (st-size ...), a tab (t-run) or a menu
 //       (hv-btn) already open is just pointed at. Mid-job, Click / Step hold the job while the pointer moves
+//   (Video Design: EXAMPLE=on | FILE=help/plate.svg)   the front plate design (Configure > 6 Get the files, Part 41), as if
+//       uploaded: EXAMPLE = the template's own Example layer for this machine's plate; FILE = an SVG next to the page
+//       (made for this MACHINE='s plate length). The 3D plate and the strut plate job follow it
 // Lines before the first move are the intro, run in order; later ones run when playback reaches their line (Shot,
 // Text, Title, Wait, Speed). A file whose intro has no Shot / Home / Title / Text / Wait gets the default intro
 // (workshop orbit, home, machine orbit, stock).
@@ -76,7 +79,7 @@ const SETTINGS = { size: "wxh", machine: "wxh", fps: "num", volume: "num", pause
   fan: "bool", main: "colour", accent: "colour" };
 const MACHINE_KEYS = ["table", "room", "braces", "struts", "base", "peter", "router", "skirt", "hose", "fan", "main", "accent"];
 const PRESETS = ["all", "no-hardware", "printed", "frame"];   // web/js/show_tree.js PRESETS
-const KINDS = ["shot", "home", "zero", "title", "text", "wait", "speed", "pendant", "show", "inspect", "asbuilt", "point", "click", "step"];
+const KINDS = ["shot", "home", "zero", "title", "text", "wait", "speed", "pendant", "show", "inspect", "asbuilt", "point", "click", "step", "design"];
 const UI_ONLY = new Set(["point", "click", "step"]);   // KIND=ui videos (the page on screen) only
 const INTRO_ONLY = new Set(["home", "zero"]);
 const SHOTS = new Set(["workshop", "machine", "stock", "tool", "core", "iso", "front", "top", "side", "back", "page", "pendant", "ymin", "ymax", "gantry", "gantrytop"]);
@@ -172,6 +175,9 @@ function check(c, intro) {
     case "zero": return Number.isFinite(mm(kv.x)) && Number.isFinite(mm(kv.y)) ? null : "Zero wants X= and Y= (mm, or 4in)";
     case "title": case "text": return kv.text ? null : `${k[0].toUpperCase() + k.slice(1)} wants TEXT=`;
     case "wait": return num(kv.time) ? null : "Wait wants TIME=";
+    case "design":
+      if (kv.file !== undefined) return /^[\w./-]+\.svg$/i.test(kv.file) && !/\.\./.test(kv.file) ? null : "Design FILE= wants an .svg path next to the page (help/plate.svg)";
+      return kv.example !== undefined ? null : "Design wants EXAMPLE=on or FILE=";
     case "point": case "click": case "step":
       if (!kv.id) return `${k[0].toUpperCase() + k.slice(1)} wants ID= (an element id of the page)`;
       return /^[A-Za-z][\w-]*$/.test(kv.id) ? null : `${k[0].toUpperCase() + k.slice(1)} ID=${kv.id}: an element id (letters, digits, - and _)`;
