@@ -57,11 +57,12 @@ ok(s2.settingsOf(kept)["lr4-filaments"] === "x" && !s2.list().some((m) => m.id =
 // export / import
 const heights = new Float32Array([0, -0.25, 1.5]), bytes = new TextEncoder().encode("G0 X1\n");
 const file = JSON.parse(JSON.stringify(M.exportOf({ name: "Garage", settings: { "lr4-opts": "{}" },
-  sd: [{ path: "/a.nc", bytes, mtime: 5 }], spoilboard: [{ key: "660x1270", nx: 1, ny: 1, heights }] })));
+  sd: [{ path: "/a.nc", bytes, mtime: 5 }], spoilboard: [{ key: "660x1270", nx: 1, ny: 1, heights }] })));   // spoilboard: never written
 const back = M.importOf(file);
 ok(back.name === "Garage" && back.settings["lr4-opts"] === "{}" && back.flash === null, "import: name + settings");
-ok(new TextDecoder().decode(back.sd[0].bytes) === "G0 X1\n" && back.spoilboard[0].heights instanceof Float32Array && back.spoilboard[0].heights[2] === 1.5,
-  "import: file bytes + spoilboard heights come back typed");
+ok(new TextDecoder().decode(back.sd[0].bytes) === "G0 X1\n" && file.spoilboard === undefined && back.spoilboard === undefined,
+  "export: file bytes come back typed; never the spoilboard");
+ok(M.unpack(M.pack({ h: heights })).h instanceof Float32Array && M.unpack(M.pack({ h: heights })).h[2] === 1.5, "typed arrays round-trip");
 let threw = false;
 try { M.importOf({ format: "x" }); } catch (e) { threw = true; }
 ok(threw, "not a machine file -> an error");

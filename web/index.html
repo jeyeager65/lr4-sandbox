@@ -40,11 +40,11 @@
     <div class="mc-sec"><div class="lbl">My machines <button type="button" class="q" data-help="help-mc" aria-label="About My machines" title="About My machines">?</button></div>
       <div class="help" id="help-mc" hidden><p>Each machine keeps everything about it: its size, options and table,
         filaments and saved presets, As built, the scene, the spoilboard's cuts and its own SD card and Flash
-        (config.yaml). The theme, the page layout, sound and your part files are shared by all of them. Pick one to switch to it (the page reloads).</p>
+        (config.yaml), its front plate design. The theme, the page layout, sound and your part files are shared by all of them. Pick one to switch to it (the page reloads).</p>
         <p><b>New</b> starts from the defaults. <b>Duplicate</b> copies this one, its SD card, Flash and spoilboard
         included. <b>Rename</b> and <b>Delete</b> act on the one you're on; Delete asks first, and the last one can't go.</p>
         <p><b>Export</b> saves this machine as a <code>.lr4.json</code> file: its settings always; its SD card + Flash files
-        and the spoilboard's cuts if ticked (they make the file bigger). <b>Import</b> adds a machine from such a file
+        if ticked (they make the file bigger); its front plate design always. The spoilboard's cuts stay in this browser. <b>Import</b> adds a machine from such a file
         and switches to it.</p>
         <p>A link someone sent you (Configure > Copy a link) opens as a <b>shared build</b>: look and change all you like,
         nothing of yours changes. <b>Save as one of my machines</b> keeps it; <b>Back</b> returns to yours.</p>
@@ -55,7 +55,6 @@
       </div></div>
     <div class="mc-sec"><div class="lbl">Export / import</div>
       <label class="check"><input type="checkbox" id="mc-x-files" checked> SD card + Flash files</label>
-      <label class="check"><input type="checkbox" id="mc-x-spoil"> Spoilboard cuts</label>
       <div class="buttons">
         <button type="button" id="mc-export">Export</button>
         <label class="btn">Import…<input type="file" id="mc-import" accept=".json,application/json" hidden></label>
@@ -354,6 +353,37 @@
           <div class="buttons"><button type="button" id="cam-reset">Defaults</button></div>
         </details>
         <p class="foot" id="cam-note"></p>
+        <details class="cam" id="pd-box">
+          <summary>Front plate design: <span id="pd-name">none</span> <button type="button" class="q" data-help="help-pd" aria-label="About the front plate design" title="About the front plate design">?</button></summary>
+          <div class="help" id="help-pd" hidden><p>Your own design engraved, pocketed or cut into the front strut plate (the one you
+            see). It goes into the strut plate G-code (Download G-code, and the job on the SD card) and shows on the plate in the view.</p>
+            <p><b>Download the template</b>: an SVG for this machine's plate length, to draw on in Inkscape. Its layers:
+            <b>Plate (guide)</b> is locked: the outline, and in red where nothing can go (the screw heads and the edge).
+            <b>Engrave</b>: lines a V-bit follows. <b>Pocket</b>: closed shapes cleared with the 1/8" bit to the pocket depth
+            (a layer named like "Pocket 2mm" sets its own). <b>Cut through</b>: closed shapes cut right out, inside the line
+            (long ones keep 2 small tabs). <b>Notes</b> is ignored. <b>Example</b> is a hidden sample: show it to try it.
+            Without layers, the line colour picks: black engrave, blue pocket, red cut through.</p>
+            <p><b>Upload a design</b>: the SVG back. Text has to be turned into paths first (Inkscape: Path &gt; Object to
+            Path). The list under the buttons says what's wrong, if anything; a design with problems isn't cut or shown.</p>
+            <p><b>Engrave depth</b> and <b>Pocket depth</b> in mm; <b>V-bit</b>: its angle, 60° or 90°.</p>
+            <p>The job then starts with the V-bit (T2): zero, engrave, and it stops for you to put the 1/8" bit in, zeroes Z
+            again and cuts the plates as usual.</p>
+            <p>A design fits one plate length: after a size change it's set aside until you upload one made from the new
+            template. It's kept with this machine (My machines: Duplicate and Export carry it; share links don't).</p></div>
+          <div class="buttons">
+            <button type="button" id="pd-template">Download the template</button>
+            <label class="btn">Upload a design…<input type="file" id="pd-file" accept=".svg,image/svg+xml" hidden></label>
+            <button type="button" id="pd-remove" hidden>Remove</button>
+          </div>
+          <ul class="pd-checks" id="pd-checks" role="status"></ul>
+          <div class="pair">
+            <div class="field"><label for="pd-ed">Engrave depth</label>
+              <div class="unit-input"><input id="pd-ed" type="number" step="any" min="0.05"><span>mm</span></div></div>
+            <div class="field"><label for="pd-pd">Pocket depth</label>
+              <div class="unit-input"><input id="pd-pd" type="number" step="any" min="0.1"><span>mm</span></div></div>
+          </div>
+          <div class="variant" id="pd-angle"><span>V-bit</span><button type="button" data-v="60" aria-pressed="false">60°</button><button type="button" data-v="90" aria-pressed="true">90°</button></div>
+        </details>
         <details class="cam more">
           <summary>About these files</summary>
           <p class="foot">Vector76's strut plate generator, ported to the browser and checked against the original OpenSCAD output
@@ -845,6 +875,7 @@
 <script src="js/table_model.js"></script>
 <script src="js/strut_plate.js"></script>
 <script src="js/strut_cam.js"></script>
+<script src="js/plate_design.js"></script>
 <script src="js/lib/cnc-gcode-tools/gcode-expander.js"></script>
 <script src="js/lib/cnc-gcode-tools/stock-sim.js"></script>
 <script src="js/lib/cnc-gcode-tools/parser.js"></script>

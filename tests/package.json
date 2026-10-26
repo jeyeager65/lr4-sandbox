@@ -6,8 +6,8 @@
   "license": "MIT",
   "type": "commonjs",
   "scripts": {
-    "test": "node test_calculator.js && node test_show_tree.js && node test_vr.js && node test_strut_cam.js && node test_gcode_play.js && node test_motion_carve.js && node test_hand_setup.js && node test_imperfect.js && node test_table_model.js && node test_homing.js && node test_fluidnc_sim.js && node test_sim_config.js && node test_sounds.js && node test_demo_script.js && node test_filaments.js && node test_machines.js",
-    "test:local": "node test_calculator.js && node test_show_tree.js && node test_vr.js && node test_config_model.js && node test_parts_files.js && node test_strut_plate.js && node test_strut_cam.js && node test_gcode_play.js && node test_motion_carve.js && node test_hand_setup.js && node test_imperfect.js && node test_table_model.js && node test_homing.js && node test_fluidnc_sim.js && node test_sim_config.js && node test_sounds.js && node test_demo_script.js && node test_filaments.js && node test_machines.js"
+    "test": "node test_calculator.js && node test_show_tree.js && node test_vr.js && node test_strut_cam.js && node test_gcode_play.js && node test_motion_carve.js && node test_hand_setup.js && node test_imperfect.js && node test_table_model.js && node test_homing.js && node test_fluidnc_sim.js && node test_sim_config.js && node test_sounds.js && node test_demo_script.js && node test_filaments.js && node test_machines.js && node test_plate_design.js",
+    "test:local": "node test_calculator.js && node test_show_tree.js && node test_vr.js && node test_config_model.js && node test_parts_files.js && node test_strut_plate.js && node test_strut_cam.js && node test_gcode_play.js && node test_motion_carve.js && node test_hand_setup.js && node test_imperfect.js && node test_table_model.js && node test_homing.js && node test_fluidnc_sim.js && node test_sim_config.js && node test_sounds.js && node test_demo_script.js && node test_filaments.js && node test_machines.js && node test_plate_design.js"
   },
   "dependencies": {
     "polygon-clipping": "^0.15.7"

@@ -454,11 +454,13 @@
     plain: () => location.href.split("#")[0],
     go(id) { if (id !== undefined) MS.use(id); location.replace(MC.plain()); },
     cards: (id) => [["sd", SdCard.card(LR4Machines.dbOf(id, "lr4-sandbox-sd"), SdCard.DIR)],
-      ["flash", SdCard.card(LR4Machines.dbOf(id, "lr4-sandbox-flash"), "/native_localfs")]],
-    // a machine's databases -> { sd, flash, spoilboard } (spoilboard keys without the machine's prefix)
+      ["flash", SdCard.card(LR4Machines.dbOf(id, "lr4-sandbox-flash"), "/native_localfs")],
+      ["design", SdCard.card(LR4Machines.dbOf(id, "lr4-sandbox-design"), "/design")]],
+    // a machine's databases -> { sd, flash, design, spoilboard } (spoilboard keys without the machine's prefix; the
+    // front plate design always, the cards only with files)
     async data(id, files = true, spoil = true) {
       const out = {}, p = LR4Machines.prefix(id);
-      if (files) for (const [k, c] of MC.cards(id)) out[k] = await c.store.records();
+      for (const [k, c] of MC.cards(id)) if (files || k === "design") out[k] = await c.store.records();
       if (spoil) out.spoilboard = (await HandSetup.board.all(p)).map((r) => Object.assign({}, r, { key: r.key.slice(p.length) }));
       return out;
     },
@@ -538,7 +540,7 @@
     });
     $("mc-export").addEventListener("click", async () => {
       MC.say("Exporting…");
-      const m = Object.assign({ name: MS.name, settings: MS.settingsOf(MS.id) }, await MC.data(MS.id, $("mc-x-files").checked, $("mc-x-spoil").checked));
+      const m = Object.assign({ name: MS.name, settings: MS.settingsOf(MS.id) }, await MC.data(MS.id, $("mc-x-files").checked, false));   // never the spoilboard (user)
       const a = document.createElement("a");
       a.href = URL.createObjectURL(new Blob([JSON.stringify(LR4Machines.exportOf(m))], { type: "application/json" }));
       a.download = LR4Machines.fileName(MS.name);

@@ -1,6 +1,6 @@
 // My machines (Part 42, user 2026-10-25): several named machines in one browser - yours, a second build, a shared one.
 // A machine = everything about it: size + options + table, filaments (+ saved presets), As built, Scene, the
-// spoilboard's cuts, the SD card + Flash (its config.yaml). Per browser (not per machine): theme, page mode / layout /
+// spoilboard's cuts, the SD card + Flash (its config.yaml), the front plate design (Part 41). Per browser (not per machine): theme, page mode / layout /
 // folds, sound, the part files, the Downloads folder.
 // Storage: each machine's localStorage keys under its own prefix (lr4@<id>/lr4-opts ...), its SD / Flash databases
 // named <db>@<id>, its spoilboard records keyed <prefix><size>. The first load makes "My LR4" and moves the plain
@@ -12,9 +12,9 @@
 // IndexedDB (SdCard / HandSetup, in the page).
 (function (root) {
   "use strict";
-  const MACHINE_KEY = /^(lr4-(asbuilt|cam|config-size|filaments|fil-presets|hand|jobdef:.*|lighting|opts|pendant|room|scenery|table-top|sd-sel)|detail|peter-style|peter-style-files|print-main|print-accent)$/;
+  const MACHINE_KEY = /^(lr4-(asbuilt|cam|config-size|design|filaments|fil-presets|hand|jobdef:.*|lighting|opts|pendant|room|scenery|table-top|sd-sel)|detail|peter-style|peter-style-files|print-main|print-accent)$/;
   const LIST = "lr4-machines", ACTIVE = "lr4-machine", SHARED = "shared", FIRST = "My LR4";
-  const DBS = ["lr4-sandbox-sd", "lr4-sandbox-flash"];
+  const DBS = ["lr4-sandbox-sd", "lr4-sandbox-flash", "lr4-sandbox-design"];   // design: the front plate's SVG (Part 41)
   const isMachineKey = (k) => MACHINE_KEY.test(k);
   const prefix = (id) => `lr4@${id}/`;
   const dbOf = (id, name) => `${name}@${id}`;
@@ -100,7 +100,8 @@
     };
   }
 
-  // ---- export / import: a machine as JSON. Typed arrays (file bytes, spoilboard heights) as base64. ----
+  // ---- export / import: a machine as JSON (settings + optionally its SD / Flash files; never the spoilboard - user
+  // 2026-10-25: the cuts are that browser's). File bytes as base64. ----
   const TA = { Uint8Array, Float32Array, Float64Array, Int16Array, Uint16Array, Int32Array };
   const b64 = (u8) => { let s = ""; for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000)); return btoa(s); };
   const unb64 = (s) => { const t = atob(s), u8 = new Uint8Array(t.length); for (let i = 0; i < t.length; i++) u8[i] = t.charCodeAt(i); return u8; };
@@ -119,19 +120,19 @@
     return v;
   }
   const FORMAT = "lr4-sandbox-machine";
-  // { name, settings, sd?, flash?, spoilboard? } -> the file's object (records packed)
+  // { name, settings, sd?, flash?, design? } -> the file's object (records packed)
   function exportOf(m) {
     const o = { format: FORMAT, version: 1, name: m.name, exported: new Date().toISOString(), settings: m.settings || {} };
-    for (const k of ["sd", "flash", "spoilboard"]) if (m[k]) o[k] = pack(m[k]);
+    for (const k of ["sd", "flash", "design"]) if (m[k]) o[k] = pack(m[k]);
     return o;
   }
-  // a parsed file -> { name, settings, sd, flash, spoilboard } or throws (not a machine file)
+  // a parsed file -> { name, settings, sd, flash, design } or throws (not a machine file)
   function importOf(o) {
     if (!o || o.format !== FORMAT || typeof o.settings !== "object") throw new Error("not an LR4 Sandbox machine file");
     const settings = {};
     for (const [k, v] of Object.entries(o.settings)) if (isMachineKey(k) && typeof v === "string") settings[k] = v;
     return { name: String(o.name || "Imported machine"), settings,
-      sd: o.sd ? unpack(o.sd) : null, flash: o.flash ? unpack(o.flash) : null, spoilboard: o.spoilboard ? unpack(o.spoilboard) : null };
+      sd: o.sd ? unpack(o.sd) : null, flash: o.flash ? unpack(o.flash) : null, design: o.design ? unpack(o.design) : null };
   }
   const fileName = (name) => (String(name).replace(/[^A-Za-z0-9 _()-]+/g, "").trim().replace(/\s+/g, "_") || "machine") + ".lr4.json";
 

@@ -652,12 +652,13 @@ button:disabled { opacity: 0.42; cursor: default; }
 #alarm-x { margin-left: auto; }
 .start-pop { position: fixed; z-index: 20; width: 290px; padding: 10px 12px; background: var(--panel); border: 1px solid var(--line);
   border-left: 3px solid var(--accent); border-radius: 6px; box-shadow: 0 10px 32px rgb(0 0 0 / 0.25); }
-.start-pop .chk { list-style: none; margin: 8px 0 10px; padding: 0; font-size: 12.5px; line-height: 1.4; }
-.start-pop .chk li { padding-left: 20px; position: relative; margin-top: 4px; }
-.start-pop .chk li::before { position: absolute; left: 0; font-weight: 700; }
-.start-pop .chk .ok::before { content: "✓"; color: var(--ok); }
-.start-pop .chk .warn::before { content: "!"; color: var(--warn); left: 4px; }
-.start-pop .chk .bad::before { content: "✕"; color: var(--accent); }
+.start-pop .chk, .pd-checks { list-style: none; margin: 8px 0 10px; padding: 0; font-size: 12.5px; line-height: 1.4; }
+:is(.start-pop .chk, .pd-checks) li { padding-left: 20px; position: relative; margin-top: 4px; }
+:is(.start-pop .chk, .pd-checks) li::before { position: absolute; left: 0; font-weight: 700; }
+:is(.start-pop .chk, .pd-checks) .ok::before { content: "✓"; color: var(--ok); }
+:is(.start-pop .chk, .pd-checks) .warn::before { content: "!"; color: var(--warn); left: 4px; }
+:is(.start-pop .chk, .pd-checks) .bad::before { content: "✕"; color: var(--accent); }
+.pd-checks:empty { display: none; }
 .start-pop .chk .bad { color: var(--accent); }
 .start-pop .buttons { justify-content: flex-end; }
 .sd-go { color: var(--accent); }

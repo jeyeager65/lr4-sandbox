@@ -2,7 +2,7 @@
 // The page's scripts share one global scope (js/page/*.js, loaded in order by index.html): names declared
 // at the top level here are seen by the later files.
   // ---- version + feedback: the issue link carries the size, data date and the loaded files' checksums ----
-  const VERSION = "0.45.0";
+  const VERSION = "0.46.0";
   function setupAbout() {
     const bits = [`lr4-sandbox ${VERSION}`];
     if (cfg.built) bits.push(`model data built ${cfg.built}`);
@@ -45,9 +45,11 @@
     return o;
   }
   const camJob = () => StrutCam.job(polygonClipping, S.strut,
-    Object.assign(camSettings(), { nbraces: S.n === S.auto ? 0 : S.n, wing: WING, dogbones: DOGBONE }));
+    Object.assign(camSettings(), { nbraces: S.n === S.auto ? 0 : S.n, wing: WING, dogbones: DOGBONE },
+      DESIGN.ok ? { design: Object.assign({}, DESIGN.tp, { angle: DESIGN.opts.angle, vbitD: DESIGN.opts.vbitD }) } : {}));
   function camNote() {
     let j;
+    designUpdate();                                  // the front plate design first: it goes into the job
     try { j = camJob(); } catch (e) { $("cam-note").textContent = `G-code: ${e.message}`; $("dl-nc").disabled = true; return; }
     $("dl-nc").disabled = false;
     $("cam-rpm").textContent = `(~${Math.round(j.rpm / 100) * 100} RPM)`;
@@ -55,6 +57,7 @@
     let note = `G-code: stock ${w.toFixed(0)} × ${l.toFixed(0)} mm (${ins(w)} × ${ins(l)} in), long side along Y, zero at its ` +
       `front-left corner on the top; screw it down outside the plates. ${j.depths.length} passes, ~${Math.round(j.minutes)} min, ` +
       `chip load ${j.chipLoad.toFixed(3)} mm per tooth.`;
+    if (DESIGN.ok) note += ` Front plate design: the V-bit (T2) first, then it stops for the 1/8" bit and zeroes Z again.`;
     try {
       const t = LR4Model.travel(cfg, S);
       if (l > t.y[1] - t.y[0] || w > t.x[1] - t.x[0]) note += " The stock is bigger than this machine's travel: cut the plates on another machine.";
@@ -74,9 +77,175 @@
     camNote();
   });
   $("dl-nc").addEventListener("click", () => {
-    try { const j = camJob(); save(`${baseName()}_T1_eighth.gcode`, j.gcode); }
+    try { const j = camJob(); save(`${baseName()}${DESIGN.ok ? "_T2_vbit_T1_eighth" : "_T1_eighth"}.gcode`, j.gcode); }
     catch (e) { dlStatus(`G-code: ${e.message}`); }
   });
+
+  // ---- the front plate design (Part 41, plate_design.js): Configure > Get the files > Strut plates > Front plate
+  // design. The SVG is kept per machine (IndexedDB, as an SD-card-like store: My machines copies / exports it, share
+  // links never carry it); read once on upload into shapes (pdParse), then checked and turned into toolpaths for this
+  // size (designUpdate). A design fits the plate length it was made for: another size sets it aside. ----
+  const PD_CARD = SdCard.card(MS.db("lr4-sandbox-design"), "/design"), PD_PATH = "/front.svg";
+  function pdOpts() {
+    let o = {};
+    try { o = JSON.parse(MS.get("lr4-design") || "{}"); } catch (e) { /* defaults */ }
+    return Object.assign({}, PlateDesign.DEFAULTS, o);
+  }
+  function pdFill() {
+    const o = pdOpts();
+    $("pd-ed").value = o.engraveDepth; $("pd-pd").value = o.pocketDepth;
+    for (const b of $("pd-angle").querySelectorAll("button")) b.setAttribute("aria-pressed", String(+b.dataset.v === +o.angle));
+  }
+  function pdSave(angle) {
+    const o = pdOpts(), num = (id, k) => { const v = parseFloat($(id).value); return v > 0 ? v : PlateDesign.DEFAULTS[k]; };
+    MS.set("lr4-design", JSON.stringify({ engraveDepth: num("pd-ed", "engraveDepth"), pocketDepth: num("pd-pd", "pocketDepth"), angle: angle || o.angle }));
+    pdFill();
+    camNote();
+  }
+  // the SVG -> { items (PlateDesign.design's), text: text objects, ignored: shapes on other layers, length: the
+  // template's plate length or null }. Layers by their Inkscape label (none: by line colour); every shape flattened
+  // by the browser's own SVG geometry (curves, arcs, transforms) every ~0.25 mm, in the file's mm. Scripts, foreign
+  // objects, images, event handlers and outside links are stripped before it's put in the page (hidden) to measure.
+  function pdParse(text) {
+    const doc = new DOMParser().parseFromString(text, "image/svg+xml"), svg = doc.documentElement;
+    if (!svg || svg.nodeName.toLowerCase() !== "svg" || doc.getElementsByTagName("parsererror").length) throw new Error("not an SVG file");
+    for (const el of [...svg.querySelectorAll("script, foreignObject, iframe, image, audio, video")]) el.remove();
+    for (const el of [svg, ...svg.querySelectorAll("*")]) for (const at of [...el.attributes])
+      if (/^on/i.test(at.name) || (/href$/i.test(at.name) && !/^#/.test(at.value))) el.removeAttribute(at.name);
+    const vb = (svg.getAttribute("viewBox") || "").trim().split(/[\s,]+/).map(Number);
+    const mmOf = (v) => { const m = /^([\d.]+)\s*(mm|cm|in|pt|pc|px)?$/.exec((v || "").trim()); return m ? +m[1] * { mm: 1, cm: 10, in: 25.4, pt: 25.4 / 72, pc: 25.4 / 6, px: 25.4 / 96 }[m[2] || "px"] : null; };
+    const w = mmOf(svg.getAttribute("width")), scale = vb.length === 4 && vb[2] > 0 ? (w ? w / vb[2] : 1) : 25.4 / 96;
+    const host = document.createElement("div");
+    host.style.cssText = "position:absolute;left:-20000px;top:0;width:10px;height:10px;overflow:hidden;visibility:hidden;pointer-events:none";
+    const live = document.importNode(svg, true);
+    host.appendChild(live); document.body.appendChild(host);
+    try {
+      const INK = "http://www.inkscape.org/namespaces/inkscape", out = { items: [], text: 0, ignored: 0, length: PlateDesign.lengthOf(text) };
+      const layersOf = (el) => { const l = []; for (let p = el.parentElement; p && p !== host; p = p.parentElement) if (p.getAttributeNS(INK, "groupmode") === "layer") l.push(p); return l; };
+      const hidden = (el) => { for (let p = el; p && p !== host; p = p.parentElement) if (p.getAttribute("display") === "none" || /display\s*:\s*none/.test(p.getAttribute("style") || "")) return true; return false; };
+      const kindOf = (el) => {                      // { kind, depth } | "skip" (guide / notes / hidden) | null (ignored)
+        if (hidden(el) || el.closest("defs, clipPath, mask, marker, symbol, pattern")) return "skip";
+        const ls = layersOf(el), names = ls.map((l) => l.getAttributeNS(INK, "label") || l.id || "");
+        if (names.some((n) => /^(plate|notes)/i.test(n))) return "skip";
+        if (ls.length) {
+          const n = names[0], d = /([\d.]+)\s*mm/i.exec(n);
+          return /^engrave/i.test(n) ? { kind: "engrave" } : /^pocket/i.test(n) ? { kind: "pocket", depth: d ? +d[1] : null }
+            : /^cut/i.test(n) ? { kind: "through" } : null;
+        }
+        const c = /rgba?\((\d+),\s*(\d+),\s*(\d+)/.exec(getComputedStyle(el).stroke || "");   // no layers: the line colour
+        if (!c) return null;
+        const [r, g, b] = c.slice(1).map(Number);
+        return r < 90 && g < 90 && b < 90 ? { kind: "engrave" } : b > 150 && r < 110 && g < 160 ? { kind: "pocket", depth: null }
+          : r > 150 && g < 110 && b < 110 ? { kind: "through" } : null;
+      };
+      for (const el of live.querySelectorAll("text")) { const k = kindOf(el); if (k && k !== "skip") out.text++; }
+      const root = live.getScreenCTM().inverse();
+      [...live.querySelectorAll("path, rect, circle, ellipse, line, polyline, polygon")].forEach((el, n) => {
+        const k = kindOf(el);
+        if (k === "skip") return;
+        if (!k) { out.ignored++; return; }
+        const m = root.multiply(el.getScreenCTM()), at = (x, y) => { const p = new DOMPoint(x, y).matrixTransform(m); return [p.x * scale, p.y * scale]; };
+        const tag = el.nodeName.toLowerCase(), subs = [];
+        if (tag === "polygon" || tag === "polyline") subs.push({ pts: [...el.points].map((p) => at(p.x, p.y)), closed: tag === "polygon" });
+        else if (tag === "line") subs.push({ pts: [at(+el.getAttribute("x1"), +el.getAttribute("y1")), at(+el.getAttribute("x2"), +el.getAttribute("y2"))], closed: false });
+        else {                                       // sampled along its length; a jump = a new subpath
+          const total = el.getTotalLength();
+          if (!(total > 0)) return;
+          const step = Math.min(0.25 / scale, total / 8), N = Math.ceil(total / step);
+          let cur = [], last = null;
+          for (let i = 0; i <= N; i++) {
+            const p = el.getPointAtLength(Math.min(total, i * total / N));
+            if (last && Math.hypot(p.x - last.x, p.y - last.y) > (total / N) * 1.5 + 1e-6) { subs.push({ pts: cur }); cur = []; }
+            cur.push(at(p.x, p.y)); last = p;
+          }
+          subs.push({ pts: cur });
+          for (const s of subs) s.closed = /^(rect|circle|ellipse)$/.test(tag) || (s.pts.length > 2 && Math.hypot(s.pts[0][0] - s.pts[s.pts.length - 1][0], s.pts[0][1] - s.pts[s.pts.length - 1][1]) < 0.05);
+        }
+        for (const s of subs) {
+          const pts = pdSimplify(s.pts, 0.01);
+          if (pts.length > 1) out.items.push({ kind: k.kind, depth: k.depth ?? null, el: n, closed: !!s.closed, pts });
+        }
+      });
+      return out;
+    } finally { host.remove(); }
+  }
+  // fewer points, none further than tol from the line kept (each run from the last point kept, up to 200 samples)
+  function pdSimplify(a, tol) {
+    if (a.length < 3) return a;
+    const off = (p, q, r) => { const dx = r[0] - q[0], dy = r[1] - q[1], L = Math.hypot(dx, dy);
+      return L ? Math.abs((p[0] - q[0]) * dy - (p[1] - q[1]) * dx) / L : Math.hypot(p[0] - q[0], p[1] - q[1]); };
+    const out = [a[0]];
+    let s = 0;
+    while (s < a.length - 1) {
+      let e = s + 1;
+      while (e + 1 < a.length && e + 1 - s <= 200) {
+        let fine = true;
+        for (let i = s + 1; i <= e && fine; i++) fine = off(a[i], a[s], a[e + 1]) <= tol;
+        if (!fine) break;
+        e++;
+      }
+      out.push(a[e]); s = e;
+    }
+    return out;
+  }
+  // DESIGN (scene.js) from the stored design, this size and the settings; the strut job and the 3D plate follow
+  function designUpdate() {
+    const rec = DESIGN.rec, o = pdOpts(), cam = Object.assign({}, StrutCam.DEFAULTS, camSettings()), list = [];
+    const key = rec ? JSON.stringify([rec.mtime, o, cam.t, cam.step, cam.tabH, cam.through, S.strut, S.n]) : "";
+    if (key !== DESIGN.key) {
+      Object.assign(DESIGN, { ok: false, problems: [], D: null, tp: null, len: rec ? rec.length : null, opts: o });
+      if (rec && Math.abs(rec.length - S.strut) <= 0.05) {
+        const P = PlateDesign.plate(polygonClipping, S.strut, { nbraces: S.n === S.auto ? 0 : S.n, wing: WING, dogbones: DOGBONE });
+        DESIGN.D = Object.assign(PlateDesign.design(rec.items), { text: rec.nText || 0, ignored: rec.ignored || 0 });
+        DESIGN.problems = PlateDesign.check(DESIGN.D, P, Object.assign({ bit: cam.bit }, o));
+        if (!DESIGN.problems.some((p) => p.level === "error")) {
+          try { DESIGN.tp = PlateDesign.toolpaths(DESIGN.D, Object.assign({}, cam, o)); DESIGN.ok = true; }
+          catch (e) { DESIGN.problems.push({ level: "error", text: e.message }); }
+        }
+      }
+      DESIGN.key = key;
+      refreshFrontPlate();
+    }
+    $("pd-name").textContent = rec ? rec.name : "none";
+    $("pd-remove").hidden = !rec;
+    if (rec && Math.abs(rec.length - S.strut) > 0.05)
+      list.push(["bad", `Made for a ${rec.length.toFixed(1)} mm plate; this size's is ${S.strut.toFixed(1)} mm. Download the template again and upload a design made from it.`]);
+    for (const p of DESIGN.problems) list.push([p.level === "error" ? "bad" : "warn", p.text]);
+    if (DESIGN.ok) {
+      const D = DESIGN.D, n = (v, w) => `${v} ${w}${v === 1 ? "" : "s"}`;
+      list.push(["ok", `In the strut plate G-code: ${[D.engrave.length && n(D.engrave.length, "engraved line"), D.pockets.length && n(D.pockets.length, "pocket"),
+        D.through.length && n(D.through.length, "cut-through")].filter(Boolean).join(", ")}.`]);
+    }
+    $("pd-checks").replaceChildren(...list.map(([c, t]) => { const li = document.createElement("li"); li.className = c; li.textContent = t; return li; }));
+  }
+  async function pdLoad() {                         // this machine's design, at start
+    try { const r = await PD_CARD.store.get(PD_PATH); DESIGN.rec = r || null; } catch (e) { DESIGN.rec = null; }
+    if (DESIGN.rec && S && S.strut) camNote();     // else the first size does (applySize -> camNote)
+  }
+  pdFill();
+  pdLoad();
+  $("pd-template").addEventListener("click", () => save(`LR4_front_plate_${S.strut}mm_template.svg`,
+    PlateDesign.template(polygonClipping, S.strut, { nbraces: S.n === S.auto ? 0 : S.n, wing: WING, dogbones: DOGBONE })));
+  $("pd-file").addEventListener("change", async (e) => {
+    const f = e.target.files[0];
+    e.target.value = "";
+    if (!f) return;
+    let p;
+    const text = await f.text();
+    try { p = pdParse(text); } catch (err) { dlStatus(`${f.name}: ${err.message}`); return; }
+    await PD_CARD.store.put(PD_PATH, text, { name: f.name, length: p.length || S.strut, items: p.items, nText: p.text, ignored: p.ignored });
+    DESIGN.rec = await PD_CARD.store.get(PD_PATH);
+    $("pd-box").open = true;
+    camNote();
+  });
+  $("pd-remove").addEventListener("click", async () => {
+    if (!await askBox({ title: "Remove the front plate design?", text: "The plate and the strut job go back to plain.", ok: "Remove" })) return;
+    await PD_CARD.store.remove(PD_PATH);
+    DESIGN.rec = null;
+    camNote();
+  });
+  for (const id of ["pd-ed", "pd-pd"]) $(id).addEventListener("change", () => pdSave());
+  $("pd-angle").addEventListener("click", (e) => { const b = e.target.closest("button[data-v]"); if (b) pdSave(+b.dataset.v); });
 
   // ---- Run G-code (simulator stage 1; js/gcode_play.js over js/lib/cnc-gcode-tools): the strut plate G-code above
   // (Temporary struts) or a file the user picks, parsed from its TEXT and played on the machine, all in mm whatever

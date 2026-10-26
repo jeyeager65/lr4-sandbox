@@ -668,22 +668,102 @@ float lr4G(float x) { float s = 2.0 * fract(x) - 1.0; return floor(x) / 3.0 + (s
   function updatePlatePolys() {                     // every size, Temporary struts too (the drawing + downloads use it)
     platePolys = StrutPlate.plates(polygonClipping, S.strut, { nbraces: S.n === S.auto ? 0 : S.n, wing: WING, dogbones: DOGBONE, layout: false });
   }
+  const plateShapes = (mp) => mp.map((poly) => {
+    const sh = new THREE.Shape(poly[0].slice(0, -1).map(([x, y]) => new THREE.Vector2(x, y)));
+    sh.holes = poly.slice(1).map((r) => new THREE.Path(r.slice(0, -1).map(([x, y]) => new THREE.Vector2(x, y))));
+    return sh;
+  });
+  function plateGeo(key, mp) {                       // generator 2D, extruded STRUT_T, uv in mm / grain, in the machine
+    const geo = key === "StrutPlate_Front" && DESIGN.ok && Math.abs(DESIGN.len - S.strut) <= 0.05 ? designPlateGeo(mp)
+      : new THREE.ExtrudeGeometry(plateShapes(mp), { depth: STRUT_T, bevelEnabled: false, curveSegments: 1 });
+    const uv = geo.attributes.uv.array;               // mm -> the wood textures' scale (plywood plates, Part 40)
+    for (let i = 0; i < uv.length; i += 2) { uv[i] /= GRAIN_MM[0]; uv[i + 1] /= GRAIN_MM[1]; }
+    geo.applyMatrix4(new THREE.Matrix4().set(...LR4Model.plateFrame(cfg, key, S), 0, 0, 0, 1));
+    return geo;
+  }
   function plateMeshes() {
-    const out = [];
-    for (const [key, mp] of [["StrutPlate_Front", platePolys.front], ["StrutPlate_Bottom", platePolys.bottom]]) {
-      const rec = cfg.parts.find((q) => q.key === key);
-      const shapes = mp.map((poly) => {
-        const sh = new THREE.Shape(poly[0].slice(0, -1).map(([x, y]) => new THREE.Vector2(x, y)));
-        sh.holes = poly.slice(1).map((r) => new THREE.Path(r.slice(0, -1).map(([x, y]) => new THREE.Vector2(x, y))));
-        return sh;
-      });
-      const geo = new THREE.ExtrudeGeometry(shapes, { depth: STRUT_T, bevelEnabled: false, curveSegments: 1 });
-      const uv = geo.attributes.uv.array;               // mm -> the wood textures' scale (plywood plates, Part 40)
-      for (let i = 0; i < uv.length; i += 2) { uv[i] /= GRAIN_MM[0]; uv[i + 1] /= GRAIN_MM[1]; }
-      geo.applyMatrix4(new THREE.Matrix4().set(...LR4Model.plateFrame(cfg, key, S), 0, 0, 0, 1));
-      out.push({ rec, geo });
+    return [["StrutPlate_Front", platePolys.front], ["StrutPlate_Bottom", platePolys.bottom]]
+      .map(([key, mp]) => ({ rec: cfg.parts.find((q) => q.key === key), geo: plateGeo(key, mp) }));
+  }
+  // ---- the front plate design (Part 41: plate_design.js; its row, upload and checks in job.js). DESIGN.ok -> its
+  // toolpaths (plate frame) carved into the front plate: outside the design's box the plain extrusion; inside it the
+  // outline's walls and back (cut-throughs left open, no front face) and a height field from the stock simulator for
+  // the face. Always simulated from the design (user 2026-10-25), cached by design + size + detail. ----
+  const DESIGN = { rec: null, D: null, tp: null, opts: null, problems: [], ok: false, key: "", len: null, cache: null };
+  function designPlateGeo(mp) {
+    const ck = `${DESIGN.key}|${S.strut}|${lite}`;
+    if (!DESIGN.cache || DESIGN.cache.key !== ck) DESIGN.cache = { key: ck, arrays: designPlateArrays(mp) };
+    const geo = new THREE.BufferGeometry(), a = DESIGN.cache.arrays;
+    geo.setAttribute("position", new THREE.Float32BufferAttribute(a.pos.slice(), 3));
+    geo.setAttribute("normal", new THREE.Float32BufferAttribute(a.nor.slice(), 3));
+    geo.setAttribute("uv", new THREE.Float32BufferAttribute(a.uv.slice(), 2));
+    return geo;
+  }
+  function designPlateArrays(mp) {
+    const tp = DESIGN.tp, ops = [...(tp.engrave ? [[tp.engrave, "v"]] : []), ...tp.t1.map((op) => [op, "f"])];
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    for (const [op] of ops) for (const m of op.moves) if (m.g && m.x !== undefined) { x0 = Math.min(x0, m.x); x1 = Math.max(x1, m.x); y0 = Math.min(y0, m.y); y1 = Math.max(y1, m.y); }
+    const pad = Math.max(DESIGN.opts.vbitD, StrutCam.DEFAULTS.bit) / 2 + 1;
+    x0 -= pad; y0 -= pad; x1 += pad; y1 += pad;
+    const T = STRUT_T, R = [[[x0, y0], [x1, y0], [x1, y1], [x0, y1], [x0, y0]]];
+    const through = DESIGN.D.through.flatMap((s) => s.rings.filter((q) => s.rings.filter((o) => o !== q && PlateDesign.inRings(q[0], [o])).length % 2 === 0))
+      .map((q) => [[...q, q[0]]]);
+    const outside = polygonClipping.difference(mp, R), inside = polygonClipping.difference(polygonClipping.intersection(mp, R), ...through);
+    const parts = [];
+    if (outside.length) parts.push(new THREE.ExtrudeGeometry(plateShapes(outside), { depth: T, bevelEnabled: false, curveSegments: 1 }));
+    if (inside.length) {                              // walls + back only: its front is the height field
+      const g = new THREE.ExtrudeGeometry(plateShapes(inside), { depth: T, bevelEnabled: false, curveSegments: 1 });   // non-indexed already
+      const p = g.attributes.position.array, keep = [];
+      for (let t = 0; t < p.length / 9; t++) if (!(Math.abs(p[9 * t + 2] - T) < 1e-4 && Math.abs(p[9 * t + 5] - T) < 1e-4 && Math.abs(p[9 * t + 8] - T) < 1e-4)) keep.push(t);
+      parts.push(pickTris(g, keep));
     }
+    // the face: carved by the design's moves, z 0 = the face (T in the extrusion)
+    const sim = new StockSimulator({ xmin: x0, xmax: x1, ymin: y0, ymax: y1, zmin: -T - 1, zmax: 0 }, new Map(), { maxCells: lite ? 1.5e5 : 6e5, snapshots: false });
+    const tools = { v: compileStockTool({ shape: "vbit", diameter: DESIGN.opts.vbitD, angle: DESIGN.opts.angle }), f: compileStockTool({ shape: "flat", diameter: StrutCam.DEFAULTS.bit }) };
+    for (const [op, k] of ops) for (const q of PlateDesign.pieces(op.moves)) sim.sweep(...q, tools[k]);
+    const { nx, ny, vx, dx, dy, heights } = sim, pos = new Float32Array(vx * (ny + 1) * 3), uvs = new Float32Array(vx * (ny + 1) * 2), idx = [];
+    for (let j = 0, k = 0; j <= ny; j++) for (let i = 0; i <= nx; i++, k++) {
+      pos[3 * k] = x0 + i * dx; pos[3 * k + 1] = y0 + j * dy; pos[3 * k + 2] = Math.max(-T, Math.min(0, heights[k])) + T;
+      uvs[2 * k] = pos[3 * k]; uvs[2 * k + 1] = pos[3 * k + 1];
+    }
+    const segs = inside.flatMap((poly) => poly.flatMap((r) => r.slice(0, -1).map((p, i) => [p, r[i + 1]])));
+    for (let j = 0; j < ny; j++) {                    // the cells whose middle is on the plate (not cut through): per row
+      const y = y0 + (j + 0.5) * dy, xs = [];
+      for (const [a, b] of segs) if ((a[1] > y) !== (b[1] > y)) xs.push(a[0] + (b[0] - a[0]) * (y - a[1]) / (b[1] - a[1]));
+      xs.sort((a, b) => a - b);
+      for (let n = 0; n + 1 < xs.length; n += 2) {
+        const i0 = Math.max(0, Math.ceil((xs[n] - x0) / dx - 0.5)), i1 = Math.min(nx - 1, Math.floor((xs[n + 1] - x0) / dx - 0.5));
+        for (let i = i0; i <= i1; i++) { const a = j * vx + i; idx.push(a, a + 1, a + vx + 1, a, a + vx + 1, a + vx); }
+      }
+    }
+    const face = new THREE.BufferGeometry();
+    face.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+    face.setAttribute("uv", new THREE.BufferAttribute(uvs, 2));
+    face.setIndex(idx);
+    face.computeVertexNormals();
+    parts.push(face.toNonIndexed());
+    const cat = (name, n) => { const out = new Float32Array(parts.reduce((s, g) => s + g.attributes[name].array.length, 0)); let o = 0;
+      for (const g of parts) { out.set(g.attributes[name].array, o); o += g.attributes[name].array.length; } return out; };
+    const arrays = { pos: cat("position"), nor: cat("normal"), uv: cat("uv") };
+    for (const g of parts) g.dispose();
+    face.dispose();
+    return arrays;
+  }
+  function pickTris(g, keep) {                       // a non-indexed geometry's triangles `keep`
+    const out = new THREE.BufferGeometry();
+    for (const [name, n] of [["position", 3], ["normal", 3], ["uv", 2]]) {
+      const src = g.attributes[name].array, dst = new Float32Array(keep.length * 3 * n);
+      keep.forEach((t, i) => dst.set(src.subarray(t * 3 * n, (t + 1) * 3 * n), i * 3 * n));
+      out.setAttribute(name, new THREE.BufferAttribute(dst, n));
+    }
+    g.dispose();
     return out;
+  }
+  function refreshFrontPlate() {                     // the design changed: the front plate's geometry again, nothing else
+    const m = meshes.find((q) => q.userData.name === "StrutPlate_Front");
+    if (!m || !platePolys) return;
+    m.geometry.dispose();
+    m.geometry = plateGeo("StrutPlate_Front", platePolys.front);
   }
   // ---- basic table legs - drawn here only (not in the FreeCAD model, cut list or BOM): doubled-2x4 legs inside a 2x4
   // apron round the MDF's edge, at most LEG_GAP apart; the MDF's top tableTop above the floor (View > Table height,
