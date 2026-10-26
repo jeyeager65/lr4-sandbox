@@ -678,6 +678,11 @@ float lr4G(float x) { float s = 2.0 * fract(x) - 1.0; return floor(x) / 3.0 + (s
       : new THREE.ExtrudeGeometry(plateShapes(mp), { depth: STRUT_T, bevelEnabled: false, curveSegments: 1 });
     const uv = geo.attributes.uv.array;               // mm -> the wood textures' scale (plywood plates, Part 40)
     for (let i = 0; i < uv.length; i += 2) { uv[i] /= GRAIN_MM[0]; uv[i + 1] /= GRAIN_MM[1]; }
+    if (!geo.userData.paint) {                       // a plain plate: paint on the front and the edges (not the back)
+      const nz = geo.attributes.normal.array, paint = new Uint8Array(nz.length / 3);
+      for (let i = 0; i < paint.length; i++) paint[i] = nz[3 * i + 2] > -0.5 ? 1 : 0;
+      geo.userData.paint = paint;
+    }
     geo.applyMatrix4(new THREE.Matrix4().set(...LR4Model.plateFrame(cfg, key, S), 0, 0, 0, 1));
     return geo;
   }
@@ -697,10 +702,11 @@ float lr4G(float x) { float s = 2.0 * fract(x) - 1.0; return floor(x) / 3.0 + (s
     geo.setAttribute("position", new THREE.Float32BufferAttribute(a.pos.slice(), 3));
     geo.setAttribute("normal", new THREE.Float32BufferAttribute(a.nor.slice(), 3));
     geo.setAttribute("uv", new THREE.Float32BufferAttribute(a.uv.slice(), 2));
+    geo.userData.paint = a.paint;
     return geo;
   }
   function designPlateArrays(mp) {
-    const tp = DESIGN.tp, ops = [...(tp.engrave ? [[tp.engrave, "v"]] : []), ...tp.t1.map((op) => [op, "f"])];
+    const tp = DESIGN.tp, ops = [...(tp.engrave ? [[tp.engrave, "v"]] : []), ...(tp.t3 || []).map((op) => [op, "d"]), ...tp.t1.map((op) => [op, "f"])];
     let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
     for (const [op] of ops) for (const m of op.moves) if (m.g && m.x !== undefined) { x0 = Math.min(x0, m.x); x1 = Math.max(x1, m.x); y0 = Math.min(y0, m.y); y1 = Math.max(y1, m.y); }
     const pad = Math.max(DESIGN.opts.vbitD, StrutCam.DEFAULTS.bit) / 2 + 1;
@@ -709,17 +715,34 @@ float lr4G(float x) { float s = 2.0 * fract(x) - 1.0; return floor(x) / 3.0 + (s
     const through = DESIGN.D.through.flatMap((s) => s.rings.filter((q) => s.rings.filter((o) => o !== q && PlateDesign.inRings(q[0], [o])).length % 2 === 0))
       .map((q) => [[...q, q[0]]]);
     const outside = polygonClipping.difference(mp, R), inside = polygonClipping.difference(polygonClipping.intersection(mp, R), ...through);
+    // both pieces lose their walls along the box's edges (inside the solid, but their top edges showed through the
+    // face as a thin line round the design); the inside piece its front too (the height field is that)
+    const onBox = (p, t) => [[0, x0], [0, x1], [1, y0], [1, y1]].some(([a, v]) => [0, 1, 2].every((q) => Math.abs(p[9 * t + 3 * q + a] - v) < 1e-4));
+    const isFront = (p, t) => [0, 1, 2].every((q) => Math.abs(p[9 * t + 3 * q + 2] - T) < 1e-4);
+    // paintable (painted plates): the front and the plate's own walls (outline, notches, bolt holes); not the back, not
+    // the design's cut-through walls
+    const tSegs = through.flatMap((poly) => poly[0].slice(0, -1).map((q, i) => [q, poly[0][i + 1]]));
+    const nearThrough = (x, y) => tSegs.some(([a, b]) => { const dx = b[0] - a[0], dy = b[1] - a[1], L2 = dx * dx + dy * dy, t = L2 ? Math.max(0, Math.min(1, ((x - a[0]) * dx + (y - a[1]) * dy) / L2)) : 0;
+      return Math.hypot(x - a[0] - dx * t, y - a[1] - dy * t) < 0.01; });
+    const trimmed = (mp, front) => {
+      const g = new THREE.ExtrudeGeometry(plateShapes(mp), { depth: T, bevelEnabled: false, curveSegments: 1 }), p = g.attributes.position.array, keep = [];   // non-indexed already
+      for (let t = 0; t < p.length / 9; t++) if (!onBox(p, t) && !(front && isFront(p, t))) keep.push(t);
+      const out = pickTris(g, keep), q = out.attributes.position.array, nz = out.attributes.normal.array, paint = new Uint8Array(q.length / 3);
+      for (let t = 0; t < q.length / 9; t++) {
+        const n = nz[9 * t + 2], cx = (q[9 * t] + q[9 * t + 3] + q[9 * t + 6]) / 3, cy = (q[9 * t + 1] + q[9 * t + 4] + q[9 * t + 7]) / 3;
+        const v = n > 0.5 ? 1 : n < -0.5 ? 0 : nearThrough(cx, cy) ? 0 : 1;
+        paint[3 * t] = paint[3 * t + 1] = paint[3 * t + 2] = v;
+      }
+      out.userData.paint = paint;
+      return out;
+    };
     const parts = [];
-    if (outside.length) parts.push(new THREE.ExtrudeGeometry(plateShapes(outside), { depth: T, bevelEnabled: false, curveSegments: 1 }));
-    if (inside.length) {                              // walls + back only: its front is the height field
-      const g = new THREE.ExtrudeGeometry(plateShapes(inside), { depth: T, bevelEnabled: false, curveSegments: 1 });   // non-indexed already
-      const p = g.attributes.position.array, keep = [];
-      for (let t = 0; t < p.length / 9; t++) if (!(Math.abs(p[9 * t + 2] - T) < 1e-4 && Math.abs(p[9 * t + 5] - T) < 1e-4 && Math.abs(p[9 * t + 8] - T) < 1e-4)) keep.push(t);
-      parts.push(pickTris(g, keep));
-    }
+    if (outside.length) parts.push(trimmed(outside, false));
+    if (inside.length) parts.push(trimmed(inside, true));
     // the face: carved by the design's moves, z 0 = the face (T in the extrusion)
     const sim = new StockSimulator({ xmin: x0, xmax: x1, ymin: y0, ymax: y1, zmin: -T - 1, zmax: 0 }, new Map(), { maxCells: lite ? 1.5e5 : 6e5, snapshots: false });
-    const tools = { v: compileStockTool({ shape: "vbit", diameter: DESIGN.opts.vbitD, angle: DESIGN.opts.angle }), f: compileStockTool({ shape: "flat", diameter: StrutCam.DEFAULTS.bit }) };
+    const tools = { v: compileStockTool({ shape: "vbit", diameter: DESIGN.opts.vbitD, angle: DESIGN.opts.angle }), f: compileStockTool({ shape: "flat", diameter: StrutCam.DEFAULTS.bit }),
+      d: compileStockTool({ shape: "flat", diameter: tp.detail ? tp.detail.d : StrutCam.DEFAULTS.bit }) };
     for (const [op, k] of ops) for (const q of PlateDesign.pieces(op.moves)) sim.sweep(...q, tools[k]);
     const { nx, ny, vx, dx, dy, heights } = sim, pos = new Float32Array(vx * (ny + 1) * 3), uvs = new Float32Array(vx * (ny + 1) * 2), idx = [];
     for (let j = 0, k = 0; j <= ny; j++) for (let i = 0; i <= nx; i++, k++) {
@@ -741,10 +764,16 @@ float lr4G(float x) { float s = 2.0 * fract(x) - 1.0; return floor(x) / 3.0 + (s
     face.setAttribute("uv", new THREE.BufferAttribute(uvs, 2));
     face.setIndex(idx);
     face.computeVertexNormals();
-    parts.push(face.toNonIndexed());
+    const fni = face.toNonIndexed(), fz = fni.attributes.position.array, fpaint = new Uint8Array(fz.length / 3);
+    for (let i = 0; i < fpaint.length; i++) fpaint[i] = fz[3 * i + 2] > T - 0.02 ? 1 : 0;   // the uncut face
+    fni.userData.paint = fpaint;
+    parts.push(fni);
     const cat = (name, n) => { const out = new Float32Array(parts.reduce((s, g) => s + g.attributes[name].array.length, 0)); let o = 0;
       for (const g of parts) { out.set(g.attributes[name].array, o); o += g.attributes[name].array.length; } return out; };
-    const arrays = { pos: cat("position"), nor: cat("normal"), uv: cat("uv") };
+    const paint = new Uint8Array(parts.reduce((s, g) => s + g.userData.paint.length, 0));
+    let po = 0;
+    for (const g of parts) { paint.set(g.userData.paint, po); po += g.userData.paint.length; }
+    const arrays = { pos: cat("position"), nor: cat("normal"), uv: cat("uv"), paint };
     for (const g of parts) g.dispose();
     face.dispose();
     return arrays;
@@ -759,11 +788,26 @@ float lr4G(float x) { float s = 2.0 * fract(x) - 1.0; return floor(x) / 3.0 + (s
     g.dispose();
     return out;
   }
+  // the X belt's band across the front plate in the plate's frame ([y0, y1], the runs in front of it), or null
+  function beltBand() {
+    const inv = new THREE.Matrix4().set(...LR4Model.plateFrame(cfg, "StrutPlate_Front", S), 0, 0, 0, 1).invert(), v = new THREE.Vector3();
+    let y0 = Infinity, y1 = -Infinity;
+    for (const m of meshes) if (/^Belt_X_(Min|Max)$/.test(m.userData.name)) {
+      m.updateMatrixWorld();
+      const p = m.geometry.attributes.position;
+      for (let i = 0; i < p.count; i++) {
+        v.fromBufferAttribute(p, i).applyMatrix4(m.matrixWorld).applyMatrix4(inv);
+        if (v.x > 0 && v.x < S.strut && v.z > STRUT_T - 1 && v.z < STRUT_T + 40) { y0 = Math.min(y0, v.y); y1 = Math.max(y1, v.y); }
+      }
+    }
+    return y1 > y0 ? [+y0.toFixed(2), +y1.toFixed(2)] : null;
+  }
   function refreshFrontPlate() {                     // the design changed: the front plate's geometry again, nothing else
     const m = meshes.find((q) => q.userData.name === "StrutPlate_Front");
     if (!m || !platePolys) return;
     m.geometry.dispose();
     m.geometry = plateGeo("StrutPlate_Front", platePolys.front);
+    if (typeof applyColours === "function") applyColours(true);   // its vertex colors (paint) again
   }
   // ---- basic table legs - drawn here only (not in the FreeCAD model, cut list or BOM): doubled-2x4 legs inside a 2x4
   // apron round the MDF's edge, at most LEG_GAP apart; the MDF's top tableTop above the floor (View > Table height,

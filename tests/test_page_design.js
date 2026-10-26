@@ -64,6 +64,13 @@ const ok = (cond, msg) => { checks++; console.log((cond ? "  ok   " : "  FAIL ")
       fs.writeFileSync(shot, Buffer.from(s.data, "base64"));
       await page.val("LR4Inspect.close(), true");
     }
+    // painted: the uncut face in the paint, the cuts in the material
+    const pt = await page.val(`(() => { FIL.s.plates.front.paint = "#ff0000"; applyColours(true);
+      const g = meshes.find((q) => q.userData.name === "StrutPlate_Front").geometry, c = g.attributes.color.array, mask = g.userData.paint;
+      let red = 0, other = 0; for (let i = 0; i < mask.length; i++) (c[3 * i] > 0.99 && c[3 * i + 1] < 0.01 ? red++ : other++);
+      const painted = mask.reduce((s, v) => s + v, 0); FIL.s.plates.front.paint = null; applyColours(true);
+      return { red, other, painted, after: g.attributes.color.array[0] }; })()`);
+    ok(pt.red === pt.painted && pt.red > 0 && pt.other > 0 && pt.after < 0.99, `painted: ${pt.red} face vertices red, ${pt.other} in the material (cuts, walls, edges); off again`);
     // another size: set aside; back: the design again
     const other = await page.val(`(async () => { const i = document.getElementById("cut-x"); i.value = "30"; i.dispatchEvent(new Event("input"));
       await new Promise((r) => setTimeout(r, 2500)); return { ok: DESIGN.ok, strut: S.strut, checks: [...document.querySelectorAll("#pd-checks li")].map((l) => l.textContent),

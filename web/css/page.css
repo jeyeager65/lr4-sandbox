@@ -796,6 +796,7 @@ button:disabled { opacity: 0.42; cursor: default; }
 .fil-row .fil-n { min-width: 7.5em; font-size: 13px; }
 .fil-row input[type=color] { width: 36px; height: 28px; padding: 0; border: 1px solid var(--line); border-radius: 4px; background: none; cursor: pointer; }
 .fil-row select { flex: 0 1 auto; }
+.fil-paint { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--muted); white-space: nowrap; }
 .fil-row em { color: var(--muted); font-size: 12px; font-style: normal; flex: 1; }
 .fil-row button { padding: 2px 8px; }
 .fil-buttons { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }

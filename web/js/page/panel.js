@@ -417,7 +417,9 @@
       const k = { StrutPlate_Front: "front", StrutPlate_Bottom: "bottom" }[m.userData.name];
       if (!k) continue;
       const p = FIL.s.plates[k], P = LR4Filaments.PLATES[p.mat], mat = m.material, map = P.grain ? woodTex(P.grain) : null, see = !!P.opacity;
-      mat.color.set(p.color).convertSRGBToLinear();
+      plateColors(m, p);                            // the material, the paint on its uncut face (vertex colors)
+      if (!mat.vertexColors) { mat.vertexColors = true; mat.needsUpdate = true; }
+      mat.color.set("#ffffff");
       if (mat.map !== map || mat.transparent !== see) {
         Object.assign(mat, { map, bumpMap: map, bumpScale: 0.25, transparent: see, depthWrite: !see, needsUpdate: true });
       }
@@ -425,6 +427,15 @@
       mat.roughness = P.rough;
     }
     if (!quiet) filUI();
+  }
+  // a strut plate's vertex colors: the paint where geometry.userData.paint (the uncut face) says, else the material
+  function plateColors(m, p) {
+    const g = m.geometry, mask = g.userData.paint, n = g.attributes.position.count;
+    let a = g.attributes.color;
+    if (!a || a.count !== n) { a = new THREE.BufferAttribute(new Float32Array(n * 3), 3); g.setAttribute("color", a); }
+    const base = new THREE.Color(p.color).convertSRGBToLinear(), paint = p.paint ? new THREE.Color(p.paint).convertSRGBToLinear() : base;
+    for (let i = 0; i < n; i++) { const c = mask && mask[i] ? paint : base; a.array[3 * i] = c.r; a.array[3 * i + 1] = c.g; a.array[3 * i + 2] = c.b; }
+    a.needsUpdate = true;
   }
   // a "Printed in" menu for these parts (mesh names): By the preset, or a spool, each with its color swatch + name (a
   // native select can't show colors); several parts may be mixed. host: the .pick-fil label's .fil-dd
@@ -536,12 +547,18 @@
       row.className = "fil-row";
       row.innerHTML = `<span class="fil-n">${k === "front" ? "Front" : "Bottom"}</span><select aria-label="${k} plate material">`
         + Object.entries(LR4Filaments.PLATES).map(([v, P]) => `<option value="${v}">${P.label}</option>`).join("")
-        + `</select><input type="color" aria-label="${k} plate color">`;
+        + `</select><input type="color" aria-label="${k} plate material color" title="The material's color: what cuts and edges show (the whole plate unless Painted)">`
+        + `<label class="fil-paint" title="Its face painted before cutting, in the color next to it: the cuts show the material color"><input type="checkbox"> Painted</label>`
+        + `<input type="color" class="fil-paint-c" aria-label="${k} plate paint color">`;
       const [mat, col] = [row.querySelector("select"), row.querySelector("input")];
+      const pOn = row.querySelector(".fil-paint input"), pCol = row.querySelector(".fil-paint-c");
       mat.value = p.mat;
       col.value = p.color;
-      mat.addEventListener("change", () => { s.plates[k] = { mat: mat.value, color: LR4Filaments.PLATES[mat.value].color }; filSave(); applyColours(); });
+      pOn.checked = !!p.paint; pCol.value = p.paint || "#202020"; pCol.hidden = !p.paint;
+      mat.addEventListener("change", () => { s.plates[k] = { mat: mat.value, color: LR4Filaments.PLATES[mat.value].color, paint: p.paint }; filSave(); applyColours(); });
       col.addEventListener("input", () => { p.color = col.value; filSave(); applyColoursSoon(); });
+      pOn.addEventListener("change", () => { p.paint = pOn.checked ? pCol.value : null; pCol.hidden = !pOn.checked; filSave(); applyColours(); });
+      pCol.addEventListener("input", () => { p.paint = pCol.value; filSave(); applyColoursSoon(); });
       ph.append(row);
     }
     if (selected) filPick(selected);

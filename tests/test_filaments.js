@@ -64,5 +64,15 @@ mine[0].spools[1].color = "#0000ff";                  // the stored list isn't s
 ok(e3.spools[1].color !== "#0000ff", "useSaved copies");
 ok(F.cleanSaved([{ name: "", spools: [] }, { name: "x", preset: "nope", spools: [{ mat: "PLA", color: "#123456" }] }]).length === 1, "cleanSaved");
 ok(F.resetTo(Object.assign(F.defaults(), { saved: "gone" }), []).saved === null, "a deleted saved preset resets to its built-in");
+// painted plates: paint kept (clean), in the link (mdf_a7865f!202020) and back; an old link (no paint) has none
+{
+  const s = F.defaults();
+  s.plates.front = { mat: "mdf", color: "#a7865f", paint: "#202020" };
+  const c = F.clean(s), q = F.toLink(c), back = F.fromLink(q);
+  ok(c.plates.front.paint === "#202020" && c.plates.bottom.paint === null, "clean keeps the paint (none on the bottom)");
+  ok(q.plates === "mdf_a7865f!202020~mdf_a7865f" && back.plates.front.paint === "#202020" && back.plates.bottom.paint === null, `paint in the link: ${q.plates}`);
+  ok(F.fromLink({ plates: "plywood_dbad70~mdf_a7865f" }).plates.front.paint === null, "an old link: unpainted");
+  ok(F.clean({ plates: { front: { mat: "mdf", color: "#a7865f", paint: "red" } } }).plates.front.paint === null, "a bad paint color: none");
+}
 console.log(`${checks - fails}/${checks} filament checks passed`);
 process.exit(fails ? 1 : 0);

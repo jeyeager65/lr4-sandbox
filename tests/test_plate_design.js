@@ -13,7 +13,7 @@ let fails = 0, checks = 0;
 const ok = (cond, msg) => { checks++; console.log((cond ? "  ok   " : "  FAIL ") + msg); if (!cond) fails++; };
 const near = (a, b, t) => Math.abs(a - b) <= t;
 const L = 830, P = PD.plate(pc, L);
-const cam = Object.assign({}, SC.DEFAULTS);         // the strut job's bit, depths, tabs, heights
+const cam = Object.assign({ pc }, SC.DEFAULTS);     // the strut job's bit, depths, tabs, heights (+ polygon-clipping for the walls)
 const circle = (cx, cy, r, n = 48) => Array.from({ length: n + 1 }, (_, i) => [cx + r * Math.cos(2 * Math.PI * i / n), -(cy + r * Math.sin(2 * Math.PI * i / n))]);
 const rect = (x, y, w, h) => [[x, -y], [x + w, -y], [x + w, -(y + h)], [x, -(y + h)], [x, -y]];   // svg mm (y down)
 
@@ -47,6 +47,10 @@ ok(errs([{ kind: "pocket", el: 1, closed: true, pts: rect(mid, cy, 2.5, 20) }]).
 ok(errs([], { text: 2 }).some((t) => /not turned into paths/.test(t)), "text objects: error");
 ok(errs([]).some((t) => /Nothing/.test(t)), "nothing to cut: error");
 
+// the X belt: drawn in the template, a warning for shapes behind it
+ok(/X belt in front/.test(PD.template(pc, L, { belt: [13, 23] })) && !/X belt/.test(T), "template: the belt band when given");
+const bw = PD.check(PD.design([{ kind: "engrave", el: 1, closed: false, pts: [[mid - 50, -18], [mid + 50, -18]] }]), P, { bit: cam.bit, belt: [13, 23] });
+ok(bw.some((p) => p.level === "warn" && /behind the X belt/.test(p.text)) && !bw.some((p) => p.level === "error"), "a line behind the belt: a warning, not an error");
 // offsets and pocket lines: never closer than the bit radius to a wall
 const r = cam.bit / 2, ring = D.pockets[0].rings[0];
 const inw = PD.offsetPath(ring, r, true), outw = PD.offsetPath(ring, r, false);
@@ -90,5 +94,34 @@ ok(xy.length && xy.every((p) => PD.inRings(p, [front.outer])), `engraving inside
 const fx = front.xf, want = [-(cy + 15) + fx[0], (mid - 100) + fx[1]];
 ok(xy.some((p) => near(p[0], want[0], 1e-6) && near(p[1], want[1], 1e-6)), "engraving's end at the turned plate's spot (x, y) -> (-y + dx, x + dy)");
 
+// a 1/16" pocket bit (T3): a 2.5 mm pocket fits it; the job goes T2 V-bit, T3 1/16" pockets, T1 the rest, probed 3 times
+const thin = PD.design([{ kind: "pocket", el: 1, closed: true, pts: rect(mid, cy, 2.5, 20) }, { kind: "engrave", el: 2, closed: false, pts: [[mid - 60, -(cy + 15)], [mid - 20, -(cy + 15)]] }]);
+const o16 = Object.assign({}, cam, { angle: 90, pocketBit: 1.5875 });
+ok(!PD.check(thin, P, o16).some((p) => p.level === "error") && /1\/16" clean-up may reach/.test(PD.check(thin, P, { bit: cam.bit }).map((p) => p.text).join()),
+  "2.5 mm pocket: too narrow for 1/8\" (says the 1/16\" clean-up may), fine with 1/16\"");
+const tp16 = PD.toolpaths(thin, o16), J16 = SC.job(pc, L, { design: Object.assign({}, tp16, { angle: 90, vbitD: 6.35 }) }).gcode, l16 = J16.split("\n");
+ok(tp16.t3.length === 1 && !tp16.t1.some((q) => /pockets/.test(q.name)) && tp16.detail.d === 1.5875, "toolpaths: a pocket the 1/8\" can't do at all: all on the T3 clean-up");
+ok(/\(ToolDef 3: SHAPE=flat D=1\.5875/.test(J16) && l16.indexOf("T2") < l16.indexOf("T3") && l16.indexOf("T3") < l16.indexOf("T1") && (J16.match(/^G38\.2 /gm) || []).length === 3,
+  "job: T2, then T3, then T1, Z probed for each");
+ok(/T3 Front plate pocket clean-up/.test(J16) && /F#<t3_feed>/.test(J16) && /M0 \(MSG, Turn Off Router, Change to T3 1\/16in flat\)/.test(J16), "job: the 1/16\" pockets at its own feed, a stop to fit it");
+const pk16 = J16.slice(J16.indexOf("T3 Front plate pocket clean-up")), zs = [...pk16.slice(0, pk16.indexOf("(MSG", 10)).matchAll(/Z(-[\d.]+)/g)].map((m) => +m[1]).filter((z) => z < 0);
+ok(zs.length && Math.min(...zs) >= -1.5 - 1e-9 && zs.some((z) => Math.abs(z + 0.75) < 1e-6), `1/16" passes 0.75 mm deep (deepest ${Math.min(...zs)})`);
+// rest machining: a 20 x 10 pocket - the 1/8" does it all but its 4 inside corners; the 1/16" goes only there, and the
+// corners come out to the 1/16"'s radius
+{
+  const box = PD.design([{ kind: "pocket", el: 1, closed: true, pts: rect(mid, cy, 20, 10) }]), tp = PD.toolpaths(box, o16);
+  const cu = tp.t3[0].moves.filter((m) => m.g === 1 && m.x !== undefined), near = (m) => [[mid, cy], [mid + 20, cy], [mid, cy + 10], [mid + 20, cy + 10]].some(([x, y]) => Math.hypot(m.x - x, m.y - y) < 3.2);
+  ok(tp.t1.some((q) => /pockets/.test(q.name)) && cu.length && cu.every(near), `clean-up: ${cu.length} moves, all within 3.2 mm of a corner`);
+  const sim2 = new StockSimulator({ xmin: mid - 2, xmax: mid + 22, ymin: cy - 2, ymax: cy + 12, zmin: -3, zmax: 0 }, new Map(), { maxCells: 2e5 });
+  const f16 = compileStockTool({ shape: "flat", diameter: 1.5875 });
+  for (const q of PD.pieces(tp.t1.find((x) => /pockets/.test(x.name)).moves)) sim2.sweep(...q, flat);
+  const h2 = (x, y) => { const i = Math.round((x - sim2.stock.xmin) / sim2.dx), j = Math.round((y - sim2.stock.ymin) / sim2.dy); return sim2.heights[j * sim2.vx + i]; };
+  const corner = () => h2(mid + 0.3, cy + 0.3);           // 0.3 mm in from the corner: the 1/8" can't, the 1/16" can
+  const before = corner();
+  for (const q of PD.pieces(tp.t3[0].moves)) sim2.sweep(...q, f16);
+  ok(before > -0.01 && near2(corner(), -1.5) && near2(h2(mid + 10, cy + 5), -1.5), `corner 0.3 mm in: ${before.toFixed(2)} after the 1/8", ${corner().toFixed(2)} after the clean-up`);
+  ok(!PD.toolpaths(PD.design([{ kind: "pocket", el: 1, closed: true, pts: circle(mid, cy, 8) }]), o16).t3.length, "a round pocket: nothing left for the 1/16\"");
+}
+function near2(a, b) { return Math.abs(a - b) < 0.05; }
 console.log(`${checks - fails}/${checks} passed`);
 process.exit(fails ? 1 : 0);

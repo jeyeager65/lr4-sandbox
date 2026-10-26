@@ -3,6 +3,7 @@
 // Plain JS, no THREE: panel.js turns a spool into a material; tests/test_filaments.js.
 // State: { preset (the built-in whose rule places the parts), saved (the name of the user's preset it came from, or null),
 //   spools: [{ mat, color }], parts: { meshName: spoolIndex }, layer, bed, look, plates: { front, bottom } }
+//   (a plate: { mat, color, paint: "#rrggbb" | null } - paint: its face painted, cuts show the material)
 // The built-in presets (and the user's saved ones) are starting points: change a spool or a part and it's "edited".
 (function (root) {
   "use strict";
@@ -69,7 +70,7 @@
   function defaults() {
     return { preset: "classic", saved: null, spools: PRESETS.classic.spools.map(([mat, color]) => ({ mat, color })), parts: {},
       layer: LAYER.def, bed: "pei", look: "auto",
-      plates: { front: { mat: "mdf", color: PLATES.mdf.color }, bottom: { mat: "mdf", color: PLATES.mdf.color } } };
+      plates: { front: { mat: "mdf", color: PLATES.mdf.color, paint: null }, bottom: { mat: "mdf", color: PLATES.mdf.color, paint: null } } };
   }
   // anything stored / linked -> a valid state (unknown bits dropped, the rest defaulted)
   function clean(s) {
@@ -88,7 +89,8 @@
     out.plates = {};
     for (const k of ["front", "bottom"]) {
       const p = s.plates && s.plates[k];
-      out.plates[k] = p && PLATES[p.mat] ? { mat: p.mat, color: HEX.test(p.color) ? p.color.toLowerCase() : PLATES[p.mat].color } : d.plates[k];
+      out.plates[k] = p && PLATES[p.mat] ? { mat: p.mat, color: HEX.test(p.color) ? p.color.toLowerCase() : PLATES[p.mat].color,
+        paint: HEX.test(p.paint || "") ? p.paint.toLowerCase() : null } : d.plates[k];
     }
     return out;
   }
@@ -146,7 +148,7 @@
   const lookOn = (s, lite) => (s.look === "auto" ? !lite : s.look === "on");
 
   // ---- the share link: only what differs from the defaults. spools=PLA_292a2e~PETG_cc1f1a, parts=Core.3~Brace_1.3
-  // (1-based), preset=fiber, layer=0.28, bed=smooth, look=off, plates=mdf_a7865f~acrylic_e8eef0 ----
+  // (1-based), preset=fiber, layer=0.28, bed=smooth, look=off, plates=mdf_a7865f~acrylic_e8eef0 (painted: mdf_a7865f!202020) ----
   function toLink(s) {
     const d = defaults(), q = {}, sp = (x) => `${x.mat}_${x.color.slice(1)}`;
     if (s.preset !== d.preset) q.preset = s.preset;
@@ -157,8 +159,9 @@
     if (s.layer !== d.layer) q.layer = String(s.layer);
     if (s.bed !== d.bed) q.bed = s.bed;
     if (s.look !== d.look) q.look = s.look;
-    const pl = ["front", "bottom"].map((k) => `${s.plates[k].mat}_${s.plates[k].color.slice(1)}`).join("~");
-    if (pl !== ["front", "bottom"].map((k) => `${d.plates[k].mat}_${d.plates[k].color.slice(1)}`).join("~")) q.plates = pl;
+    const plt = (p) => `${p.mat}_${p.color.slice(1)}${p.paint ? "!" + p.paint.slice(1) : ""}`;
+    const pl = ["front", "bottom"].map((k) => plt(s.plates[k])).join("~");
+    if (pl !== ["front", "bottom"].map((k) => plt(d.plates[k])).join("~")) q.plates = pl;
     return q;
   }
   function fromLink(o) {                              // the link's keys -> a state (null if it has none of them)
@@ -171,8 +174,9 @@
     if (o.bed) s.bed = o.bed;
     if (o.look) s.look = o.look;
     if (o.plates) {
-      const [f, b] = o.plates.split("~").map(pair);
-      s.plates = { front: f && { mat: f[0], color: f[1] }, bottom: b && { mat: b[0], color: b[1] } };
+      const one = (t) => { const [m, pt] = t.split("!"), [mat, color] = pair(m); return { mat, color, paint: pt ? "#" + pt : null }; };
+      const [f, b] = o.plates.split("~").map(one);
+      s.plates = { front: f, bottom: b };
     }
     return clean(s);
   }

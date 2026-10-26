@@ -3,8 +3,9 @@
 // corner, top of stock; all bolt holes first, then each outline offset by the bit radius with tabs; 0.25 mm into the
 // spoil board. Output in the style of freecad/fclib/fluidnc_post.py (settings block, touch plate, MSG pauses,
 // (Stock:) / (ToolDef:) comments for the stock simulator). tests/test_strut_cam.js checks it against cam.py's G-code.
-// opts.design (Part 41, plate_design.js toolpaths in the front plate's frame): T2 V-bit engraving first, then M0, the
-// bit change and Z probed again, then T1: holes, the design's pockets and cut-throughs, outlines. None = as cam.py.
+// opts.design (Part 41, plate_design.js toolpaths in the front plate's frame): T2 V-bit engraving first; T3 1/16" pockets
+// if the design asks for that bit; then T1: holes, the design's pockets and cut-throughs, outlines. Each bit change: M0,
+// the bit, Z probed again. None = as cam.py.
 // Needs strut_plate.js (global `StrutPlate`, or require() in node) and polygon-clipping.
 (function (root) {
   "use strict";
@@ -232,8 +233,8 @@
       return { name: op.name, tool, moves: op.moves.map(m => Object.assign({}, m, m.x === undefined ? {} : { x: -m.y + dx, y: m.x + dy },
         m.g >= 2 ? { i: -m.j, j: m.i } : {})) };
     };
-    const eng = D && D.engrave ? [place(D.engrave, 2)] : [];
-    const ops = [...eng, ...lay.plates.map(p => holeOp(p, o)), ...(D ? D.t1.map(op => place(op, 1)) : []), ...lay.plates.map(p => outlineOp(p, o))];
+    const eng = D && D.engrave ? [place(D.engrave, 2)] : [], det = D && D.t3 ? D.t3.map(op => place(op, 3)) : [];
+    const ops = [...eng, ...det, ...lay.plates.map(p => holeOp(p, o)), ...(D ? D.t1.map(op => place(op, 1)) : []), ...lay.plates.map(p => outlineOp(p, o))];
     for (const op of ops) op.tool = op.tool || 1;
     let pos = [0, 0, o.probeClear];
     for (const op of ops) { const r = minutes(op.moves, o, pos); op.minutes = r.min; pos = r.end; }
@@ -241,17 +242,21 @@
     const stock = { xmin: 0, xmax: lay.stock.w, ymin: 0, ymax: lay.stock.l, zmin: -o.t, zmax: 0 };
     const plate = o.plate ? o.plate : null, router = ROUTERS[o.router];
     const mms = v => `${g(v)} mm/min = ${g(+(v / 60).toPrecision(3))} mm/s`;
-    const vName = D ? `${g(D.angle)}deg V-bit` : "";
+    const vName = D ? `${g(D.angle)}deg V-bit` : "", dName = "1/16in flat";
+    const toolName = t => (t === 2 ? vName : t === 3 ? dName : o.bitName);
     const L = [`(${o.title} ${g(strut)} mm)`, "(lr4-sandbox strut plate CAM, fluidnc post style - V1E Jackpot style. Run from the SD card.)",
       "(CNCSIM 1 UNITS=mm)",
       `(Stock: XMIN=${g(stock.xmin)} XMAX=${g(stock.xmax)} YMIN=0 YMAX=${g(stock.ymax)} ZMIN=${g(stock.zmin)} ZMAX=0)`,
       `(ToolDef 1: SHAPE=flat D=${g(o.bit)} FLUTES=${o.flutes} LEN=${g(o.flute_len)} OAL=${g(o.oal)} NAME=${o.bitName})`,
       ...(eng.length ? [`(ToolDef 2: SHAPE=vbit D=${g(D.vbitD)} ANGLE=${g(D.angle)} NAME=${vName})`] : []),
+      ...(det.length ? [`(ToolDef 3: SHAPE=flat D=${g(D.detail.d)} FLUTES=2 NAME=${dName})`] : []),
       "G0 G54 G17 G21 G90 G94", "", "(===== Settings - edit here =====)", "(Feeds, mm/min)",
       `#<t1_feed>=${g(o.feed * 60)} (T1 ${o.bitName} - cutting: ${mms(o.feed * 60)})`,
       `#<t1_plunge>=${g(o.plunge * 60)} (T1 ${o.bitName} - plunging: ${mms(o.plunge * 60)})`,
       ...(eng.length ? [`#<t2_feed>=${g(o.feed * 60)} (T2 ${vName} - cutting: ${mms(o.feed * 60)})`,
         `#<t2_plunge>=${g(o.plunge * 60)} (T2 ${vName} - plunging: ${mms(o.plunge * 60)})`] : []),
+      ...(det.length ? [`#<t3_feed>=${g(D.detail.feed * 60)} (T3 ${dName} - cutting: ${mms(D.detail.feed * 60)})`,
+        `#<t3_plunge>=${g(D.detail.plunge * 60)} (T3 ${dName} - plunging: ${mms(D.detail.plunge * 60)})`] : []),
       "(Heights above the board top, mm)",
       `#<clear_z>=${g(o.clear)} (rapids between regions)`, `#<safe_z>=${g(o.safe)} (feed moves start from here)`];
     if (plate) L.push("(Touch plate)", `#<plate>=${g(plate)} (plate thickness, mm)`,
@@ -270,10 +275,10 @@
       else L.push(`M0 (MSG, Zero Z on the Board Top, then turn On Router at Dial ${g(o.dial)})`);
     };
     const t1Head = () => [`(===== T1: ${o.bitName} - ${router.name} dial ${g(o.dial)} = ~${Math.round(rpm)} RPM${note}, ${fmtMin(t1Min)} =====)`, "T1"];
-    if (eng.length) {
-      L.push("", `(Start: Tool T2 ${vName} in the router, router off,)`, "(jogged to the stock's front-left corner, just above the MDF)", "",
-        `(===== T2: ${vName} - ${router.name} dial ${g(o.dial)}, ${fmtMin(eng[0].minutes)} =====)`,
-        "T2", "G10 L20 P0 X0 Y0 Z0 (here = X0 Y0, temporary Z0)");
+    const tHead = t => [`(===== T${t}: ${toolName(t)} - ${router.name} dial ${g(o.dial)}, ${fmtMin(ops.filter(op => op.tool === t).reduce((s, op) => s + op.minutes, 0))} =====)`, `T${t}`];
+    if (ops[0].tool !== 1) {                         // the design's bits first
+      L.push("", `(Start: Tool T${ops[0].tool} ${toolName(ops[0].tool)} in the router, router off,)`, "(jogged to the stock's front-left corner, just above the MDF)", "",
+        ...tHead(ops[0].tool), "G10 L20 P0 X0 Y0 Z0 (here = X0 Y0, temporary Z0)");
       zeroZ();
     } else {
       L.push("", `(Start: Tool T1 ${o.bitName} in the router, router off,)`, "(jogged to the stock's front-left corner, just above the MDF)", "",
@@ -282,8 +287,8 @@
     }
     let last = { x: null, y: null, z: null, f: null };
     ops.forEach((op, n) => {
-      if (n && op.tool !== ops[n - 1].tool) {         // after the engraving: the 1/8" bit in, Z found again
-        L.push("G0 Z#<clear_z>", `M0 (MSG, Turn Off Router, Change to T1 ${o.bitName})`, "", ...t1Head());
+      if (n && op.tool !== ops[n - 1].tool) {         // a bit change: the next bit in, Z found again
+        L.push("G0 Z#<clear_z>", `M0 (MSG, Turn Off Router, Change to T${op.tool} ${toolName(op.tool)})`, "", ...(op.tool === 1 ? t1Head() : tHead(op.tool)));
         zeroZ();
         last = { x: null, y: null, z: null, f: null };
       }

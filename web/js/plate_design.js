@@ -9,16 +9,20 @@
 (function (root) {
   "use strict";
   const SP = typeof module !== "undefined" && module.exports ? require("./strut_plate.js") : root.StrutPlate;
+  // polygon-clipping: the page's global; node passes it as toolpaths' opts.pc (as strut_plate's functions take it)
 
   const DEFAULTS = {
     engraveDepth: 0.5,   // mm, V-bit
     angle: 90,           // V-bit included angle (60 / 90)
     vbitD: 6.35,         // V-bit diameter (the simulator's tool; engraving never gets near it)
     pocketDepth: 1.5,    // mm, unless the layer's name says ("Pocket 2mm")
+    pocketBit: 3.175,    // 3.175 = the strut job's 1/8" only; 1.5875 = then a 1/16" (T3) cleans up what the 1/8" left
+    detailStep: 0.75, detailFeed: 10, detailPlunge: 2,   // the 1/16": depth per pass (mm), feeds (mm/s)
     stepover: 0.4,       // pockets, of the bit
     edge: 2,             // keep-out: mm from the plate's edge
     hole: 6,             // keep-out: mm round a bolt hole's centre (the button head + a little)
     throughTabs: 2,      // tabs on a cut-through longer than tabMin
+    belt: null,          // [y0, y1]: the X belt's band across the plate, in front of it (the page measures it)
     tabMin: 80,
   };
   const LAYERS = ["Engrave", "Pocket", "Cut through"];
@@ -60,7 +64,9 @@
     const path = (rings) => rings.map((r) => "M" + r.map(([x, y]) => `${f(x)},${f(-y)}`).join("L") + "Z").join("");
     const circ = (c, r, attrs) => `<circle cx="${f(c[0])}" cy="${f(-c[1])}" r="${f(r)}" ${attrs}/>`;
     const layer = (label, body, extra = "") => `  <g inkscape:groupmode="layer" inkscape:label="${label}" id="layer-${label.replace(/\W+/g, "-").toLowerCase()}"${extra}>\n${body}  </g>\n`;
-    const guide = `    <path d="${path(P.rings)}" fill="#e8e1d4" fill-rule="evenodd" stroke="#7a6a55" stroke-width="0.3"/>\n` +
+    const belt = k.belt ? `    <rect x="${f(x0)}" y="${f(-k.belt[1])}" width="${f(x1 - x0)}" height="${f(k.belt[1] - k.belt[0])}" fill="#555" fill-opacity="0.35"/>\n` +
+      `    <text x="${f(x0 + 40)}" y="${f(-(k.belt[0] + k.belt[1]) / 2 + 1.2)}" font-size="3.5" fill="#333">X belt in front: hidden once installed</text>\n` : "";
+    const guide = `    <path d="${path(P.rings)}" fill="#e8e1d4" fill-rule="evenodd" stroke="#7a6a55" stroke-width="0.3"/>\n` + belt +
       P.holes.map((c) => "    " + circ(c, k.hole, 'fill="#d9534f" fill-opacity="0.25" stroke="none"')).join("\n") + "\n" +
       `    <path d="${path(P.rings)}" fill="none" stroke="#d9534f" stroke-opacity="0.35" stroke-width="${f(2 * k.edge)}"/>\n`;
     const ex = (sub, body) => layer(sub, body);
@@ -124,12 +130,20 @@
     };
     D.engrave.forEach((l) => dense(l, false));
     for (const s of [...D.pockets, ...D.through]) s.rings.forEach((r) => dense(r, true));
+    if (k.belt) {                                    // behind the belt: allowed, but you won't see it
+      const hit = (pts) => pts.some((p) => p[1] > k.belt[0] && p[1] < k.belt[1]);
+      const n2 = D.engrave.filter(hit).length + [...D.pockets, ...D.through].filter((s) => s.rings.some(hit)).length;
+      if (n2) out.push({ level: "warn", text: `${n2} shape${n2 > 1 ? "s" : ""} partly behind the X belt (the gray band): cut, but hidden once installed.` });
+    }
     if (bad.hole) out.push({ level: "error", text: "Shapes over the bolt holes / screw heads (the red circles)." });
     if (bad.edge) out.push({ level: "error", text: `Shapes off the plate or within ${k.edge} mm of its edge.` });
     if (D.ignored) out.push({ level: "warn", text: `${D.ignored} shape${D.ignored > 1 ? "s" : ""} on other layers ignored (only Engrave, Pocket and Cut through are cut).` });
-    const narrow = D.pockets.filter((s) => !pocketLines(s.rings, bit / 2, bit * k.stepover).length).length;
-    if (narrow) out.push({ level: "error", text: `${narrow} pocket${narrow > 1 ? "s" : ""} narrower than the ${bit === 3.175 ? '1/8"' : bit + " mm"} bit.` });
-    const small = D.through.filter((s) => !s.rings.some((r) => outerOf(r, s.rings) && offsetPath(r, bit / 2, true))).length;
+    const pb = Math.min(bit, k.pocketBit || bit), bitName = (d) => (Math.abs(d - 3.175) < 1e-3 ? '1/8"' : Math.abs(d - 1.5875) < 1e-3 ? '1/16"' : d + " mm");
+    const narrow = D.pockets.filter((s) => !pocketLines(s.rings, pb / 2, pb * k.stepover).length).length;
+    if (narrow) out.push({ level: "error", text: `${narrow} pocket${narrow > 1 ? "s" : ""} narrower than the ${bitName(pb)} bit` +
+      (pb > 1.6 ? ' (the 1/16" clean-up may reach them).' : ".") });
+    const pcl = o.pc || root.polygonClipping;
+    const small = D.through.filter((s) => !s.rings.some((r) => outerOf(r, s.rings) && (offsetPath(r, bit / 2, true) || (pcl && eroded([r], bit / 2, pcl).length)))).length;
     if (small) out.push({ level: "error", text: `${small} cut-through shape${small > 1 ? "s" : ""} too small or too intricate for the bit.` });
     const islands = D.through.reduce((s, sh) => s + sh.rings.filter((r) => !outerOf(r, sh.rings)).length, 0);
     if (islands) out.push({ level: "warn", text: `${islands} shape${islands > 1 ? "s" : ""} inside cut-throughs (the middle of an O) will fall out with them.` });
@@ -273,39 +287,28 @@
       eng.moves.push({ g: 0, z: k.clear });
       at = l[l.length - 1];
     }
-    // pockets (T1): per pass, the zigzag (pen down while the link between lines stays where the bit fits), then the walls
-    const pk = mv("Front plate pockets");
+    // pockets (T1): each with the 1/8" - per pass, the zigzag (pen down while the link between lines stays where the bit
+    // fits), then the walls. With the 1/16" clean-up (T3): the same with the 1/16", but only where it reaches material the
+    // 1/8" left (rest machining: narrow strokes, inside corners) - full depth there, so it can run before the 1/8".
+    const cleanup = (k.pocketBit || o.bit) < o.bit - 1e-9, r2 = (k.pocketBit || o.bit) / 2, pc = o.pc || root.polygonClipping;
+    const pk = mv("Front plate pockets"), cu = mv("Front plate pocket clean-up");
     for (const s of D.pockets) {
-      const depth = s.depth > 0 ? s.depth : k.pocketDepth, lines = pocketLines(s.rings, r, o.bit * k.stepover);
-      if (!lines.length) continue;
-      const segs = ringSegs(s.rings), fits = (p) => inRings(p, s.rings) && segs.every(([a, b]) => segDist(p, a, b) >= r - 1e-6);
-      const walls = s.rings.map((ring) => { const p = offsetPath(ring, r, outerOf(ring, s.rings)); return p && reverse(p); }).filter(Boolean);
-      for (const z of passes(depth, k.step)) {
-        let pen = null, flip = false, lastY = null;
-        for (const L of lines) {
-          if (L.y !== lastY) { flip = !flip; lastY = L.y; }
-          const a = flip ? [L.x0, L.y] : [L.x1, L.y], b = flip ? [L.x1, L.y] : [L.x0, L.y];
-          const link = pen && [0.25, 0.5, 0.75].every((t) => fits(add(pen, mul(sub(a, pen), t)))) && fits(a) && len(sub(a, pen)) < 3 * o.bit;
-          if (link) pk.moves.push({ g: 1, x: a[0], y: a[1], z, f: "feed" });
-          else {
-            if (pen) pk.moves.push({ g: 0, z: k.safe });
-            pk.moves.push({ g: 0, z: k.clear }, { g: 0, x: a[0], y: a[1] }, { g: 0, z: k.safe }, { g: 1, z, f: "plunge" });
-          }
-          pk.moves.push({ g: 1, x: b[0], y: b[1], z, f: "feed" });
-          pen = b;
-        }
-        for (const w of walls) {
-          pk.moves.push({ g: 0, z: k.clear }, { g: 0, x: w[0].a[0], y: w[0].a[1] }, { g: 0, z: k.safe }, { g: 1, z, f: "plunge" });
-          elMoves(w, z, pk.moves);
-          pen = null;
-        }
-        pk.moves.push({ g: 0, z: k.clear });
-      }
+      const depth = s.depth > 0 ? s.depth : k.pocketDepth, rough = pocketOp(s, r, o.bit * k.stepover, null, pc);
+      pocketMoves(pk.moves, rough, passes(depth, k.step), k);
+      if (!cleanup) continue;
+      const need = restNeed(s.rings, r, rough, r2);
+      if (!need) continue;
+      pocketMoves(cu.moves, pocketOp(s, r2, 2 * r2 * k.stepover, need, pc), passes(depth, k.detailStep), k);
     }
     // cut-throughs (T1): the outer rings' inside profiles to the strut job's depth, tabs on the long ones
-    const th = mv("Front plate cut-throughs"), final = -(o.t + o.through);
+    const th = mv("Front plate cut-throughs"), final = -(o.t + o.through);   // (pc from the pockets above)
     for (const s of D.through) for (const ring of s.rings.filter((q) => outerOf(q, s.rings))) {
-      const p = offsetPath(ring, r, true);
+      const p = offsetPath(ring, r, true) || (() => {   // else: the eroded boundary, as lines (the biggest loop)
+        const w = wallRings([ring], r, pc).sort((a, b) => Math.abs(area(b)) - Math.abs(area(a)))[0];
+        if (!w) return null;
+        const q = area(w) < 0 ? w.slice(0, -1) : w.slice(0, -1).reverse();   // clockwise, as offsetPath's inward
+        return q.map((a, i) => ({ type: "line", a, b: q[(i + 1) % q.length] }));
+      })();
       if (!p) continue;
       let els = reverse(p), k0 = 0;                   // climb, as the outlines; start on the longest straight
       els.forEach((el, i) => { if (el.type === "line" && elLen(el) > elLen(els[k0])) k0 = i; });
@@ -330,7 +333,127 @@
       }
       th.moves.push({ g: 0, z: k.clear });
     }
-    return { engrave: eng.moves.length ? eng : null, t1: [pk, th].filter((q) => q.moves.length) };
+    return { engrave: eng.moves.length ? eng : null, t1: [pk, th].filter((q) => q.moves.length),
+      t3: cu.moves.length ? [cu] : [], detail: cu.moves.length ? { d: 2 * r2, feed: k.detailFeed, plunge: k.detailPlunge } : null };
+  }
+  // a pocket's paths for a bit of radius rad: runs [{ pts, closed }] - the zigzag lines, then the walls (offset rings).
+  // keep(p) (or null = all): only the stretches where the bit does something (sampled every 0.1 mm)
+  function pocketOp(s, rad, step, keep, pc) {
+    const lines = pocketLines(s.rings, rad, step), runs = [], segs = ringSegs(s.rings);
+    const fits = (p) => inRings(p, s.rings) && segs.every(([a, b]) => segDist(p, a, b) >= rad - 1e-6);
+    const split = (pts) => {                          // a polyline -> the runs keep() wants
+      if (!keep) return [pts];
+      const out = [];
+      let cur = null;
+      for (let i = 0; i + 1 < pts.length; i++) {
+        const a = pts[i], b = pts[i + 1], n = Math.max(1, Math.ceil(len(sub(b, a)) / 0.1));
+        for (let j = 0; j <= n; j++) {
+          if (i && !j) continue;
+          const p = add(a, mul(sub(b, a), j / n));
+          if (keep(p)) { if (!cur) out.push(cur = []); cur.push(p); } else cur = null;
+        }
+      }
+      return out.filter((r) => r.length > 1).map((r) => r.filter((p, i) => i === 0 || i === r.length - 1 || (i % 5 === 0)));
+    };
+    let flip = false, lastY = null;
+    for (const L of lines) {
+      if (L.y !== lastY) { flip = !flip; lastY = L.y; }
+      for (const pts of split(flip ? [[L.x0, L.y], [L.x1, L.y]] : [[L.x1, L.y], [L.x0, L.y]])) runs.push({ pts, line: true });
+    }
+    for (const pts of wallRings(s.rings, rad, pc)) for (const p of split(pts)) runs.push({ pts: p });
+    return { runs, fits, rad };
+  }
+  // the walls: the boundary of where the bit's centre may go - the shape (even-odd) less a band of the bit's radius
+  // round every edge (rectangles + 24-gons: within 0.015 mm of round), exactly; loops split where the shape narrows.
+  // Each a closed polyline.
+  function eroded(rings, rad, pc) {
+    // coordinates snapped to 0.0001 mm and the band taken off in batches (polygon-clipping can lose a segment when many
+    // near-coincident edges meet: "Unable to find segment ... in SweepLine tree"); a failed batch is retried smaller
+    const snap = (p) => [Math.round(p[0] * 1e4) / 1e4, Math.round(p[1] * 1e4) / 1e4];
+    const close = (r) => { const q = r.map(snap); return [...q, q[0]]; };
+    let region = pc.xor(...rings.map((r) => [[close(r)]]));
+    const band = [];
+    for (const [a, b] of ringSegs(rings)) {
+      const d = sub(b, a), L = len(d);
+      if (L < 1e-9) continue;
+      const n = mul([-d[1], d[0]], rad / L);
+      band.push([[close([add(a, n), add(b, n), sub(b, n), sub(a, n)])]]);
+      band.push([[close(Array.from({ length: 24 }, (_, i) => [a[0] + rad / Math.cos(Math.PI / 24) * Math.cos(Math.PI * i / 12), a[1] + rad / Math.cos(Math.PI / 24) * Math.sin(Math.PI * i / 12)]))]]);
+    }
+    const take = (from, list) => {
+      try { return pc.difference(from, ...list); }
+      catch (e) {
+        if (list.length === 1) throw e;
+        const h = Math.ceil(list.length / 2);
+        return take(take(from, list.slice(0, h)), list.slice(h));
+      }
+    };
+    for (let i = 0; i < band.length && region.length; i += 50) region = take(region, band.slice(i, i + 50));
+    return region;
+  }
+  const wallRings = (rings, rad, pc) => eroded(rings, rad, pc).flatMap((poly) => poly.map((r) => r.slice()));
+  // runs -> moves, every pass: pen down from one run to the next while the link stays where the bit fits
+  function pocketMoves(mv, op, zs, k) {
+    if (!op.runs.length) return;
+    for (const z of zs) {
+      let pen = null;
+      for (const r of op.runs) {
+        const a = r.els ? r.els[0].a : r.pts[0];
+        const link = pen && r.line && [0.25, 0.5, 0.75].every((t) => op.fits(add(pen, mul(sub(a, pen), t)))) && op.fits(a) && len(sub(a, pen)) < 6 * op.rad;
+        if (link) mv.push({ g: 1, x: a[0], y: a[1], z, f: "feed" });
+        else {
+          if (pen) mv.push({ g: 0, z: k.safe });
+          mv.push({ g: 0, z: k.clear }, { g: 0, x: a[0], y: a[1] }, { g: 0, z: k.safe }, { g: 1, z, f: "plunge" });
+        }
+        if (r.els) elMoves(r.els, z, mv);
+        else for (let i = 1; i < r.pts.length; i++) mv.push({ g: 1, x: r.pts[i][0], y: r.pts[i][1], z, f: "feed" });
+        pen = r.els ? r.els[r.els.length - 1].b : r.pts[r.pts.length - 1];
+      }
+      mv.push({ g: 0, z: k.clear });
+    }
+  }
+  // what the 1/8" leaves in a pocket: a 0.1 mm grid of the shape, less every cell within its radius of its paths; then
+  // grown by the 1/16"'s radius -> need(p): the 1/16" at p would cut some of it. null = nothing left.
+  function restNeed(rings, r1, rough, r2) {
+    const h = 0.1, all = rings.flat(), x0 = Math.min(...all.map((p) => p[0])) - h, y0 = Math.min(...all.map((p) => p[1])) - h;
+    const nx = Math.ceil((Math.max(...all.map((p) => p[0])) + h - x0) / h), ny = Math.ceil((Math.max(...all.map((p) => p[1])) + h - y0) / h);
+    const left = new Uint8Array(nx * ny), segs = ringSegs(rings);
+    for (let j = 0; j < ny; j++) {                    // inside (even-odd, per row)
+      const y = y0 + (j + 0.5) * h, xs = [];
+      for (const [a, b] of segs) if ((a[1] > y) !== (b[1] > y)) xs.push(a[0] + (b[0] - a[0]) * (y - a[1]) / (b[1] - a[1]));
+      xs.sort((p, q) => p - q);
+      for (let n = 0; n + 1 < xs.length; n += 2)
+        for (let i = Math.max(0, Math.ceil((xs[n] - x0) / h - 0.5)); i <= Math.min(nx - 1, Math.floor((xs[n + 1] - x0) / h - 0.5)); i++) left[j * nx + i] = 1;
+    }
+    const cover = (a, b, rr) => {                     // cells within rr of segment ab: no longer left
+      const i0 = Math.max(0, Math.floor((Math.min(a[0], b[0]) - rr - x0) / h)), i1 = Math.min(nx - 1, Math.ceil((Math.max(a[0], b[0]) + rr - x0) / h));
+      const j0 = Math.max(0, Math.floor((Math.min(a[1], b[1]) - rr - y0) / h)), j1 = Math.min(ny - 1, Math.ceil((Math.max(a[1], b[1]) + rr - y0) / h));
+      for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++)
+        if (left[j * nx + i] && segDist([x0 + (i + 0.5) * h, y0 + (j + 0.5) * h], a, b) <= rr) left[j * nx + i] = 0;
+    };
+    for (const run of rough.runs) {
+      const pts = run.pts || [run.els[0].a, ...run.els.flatMap((el) => el.type === "line" ? [el.b] : [arcMid(el), el.b])];
+      for (let i = 0; i + 1 < pts.length; i++) cover(pts[i], pts[i + 1], r1 + 0.05);
+      if (run.els) for (const el of run.els) if (el.type === "arc") {   // an arc's chords cut inside it: sweep it finer
+        const rr = len(sub(el.a, el.c)), sw = arcSweep(el), a0 = Math.atan2(el.a[1] - el.c[1], el.a[0] - el.c[0]), n = Math.max(2, Math.ceil(rr * sw / 0.1));
+        let p = el.a;
+        for (let i = 1; i <= n; i++) { const t = a0 + (el.ccw ? 1 : -1) * sw * i / n, q = [el.c[0] + rr * Math.cos(t), el.c[1] + rr * Math.sin(t)]; cover(p, q, r1 + 0.05); p = q; }
+      }
+    }
+    // specks: a cell left only if a neighbour is too (a lone cell = the grid, not material)
+    const need = new Uint8Array(nx * ny), g = Math.ceil((r2 + h) / h);
+    let any = false;
+    for (let j = 1; j < ny - 1; j++) for (let i = 1; i < nx - 1; i++) {
+      const c = j * nx + i;
+      if (!left[c] || !(left[c - 1] || left[c + 1] || left[c - nx] || left[c + nx])) continue;
+      any = true;
+      for (let dj = -g; dj <= g; dj++) for (let di = -g; di <= g; di++) {
+        const jj = j + dj, ii = i + di;
+        if (jj >= 0 && jj < ny && ii >= 0 && ii < nx && (di * di + dj * dj) * h * h <= (r2 + h) * (r2 + h)) need[jj * nx + ii] = 1;
+      }
+    }
+    if (!any) return null;
+    return (p) => { const i = Math.floor((p[0] - x0) / h), j = Math.floor((p[1] - y0) / h); return i >= 0 && j >= 0 && i < nx && j < ny && !!need[j * nx + i]; };
   }
   function placeTabs(els, n, o) {                    // strut_cam's: n tabs spread round, each on a long enough straight
     const half = o.tabW / 2 + o.tabH + 1, segs = [];

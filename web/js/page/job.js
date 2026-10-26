@@ -2,7 +2,7 @@
 // The page's scripts share one global scope (js/page/*.js, loaded in order by index.html): names declared
 // at the top level here are seen by the later files.
   // ---- version + feedback: the issue link carries the size, data date and the loaded files' checksums ----
-  const VERSION = "0.46.0";
+  const VERSION = "0.46.1";
   function setupAbout() {
     const bits = [`lr4-sandbox ${VERSION}`];
     if (cfg.built) bits.push(`model data built ${cfg.built}`);
@@ -57,7 +57,7 @@
     let note = `G-code: stock ${w.toFixed(0)} × ${l.toFixed(0)} mm (${ins(w)} × ${ins(l)} in), long side along Y, zero at its ` +
       `front-left corner on the top; screw it down outside the plates. ${j.depths.length} passes, ~${Math.round(j.minutes)} min, ` +
       `chip load ${j.chipLoad.toFixed(3)} mm per tooth.`;
-    if (DESIGN.ok) note += ` Front plate design: the V-bit (T2) first, then it stops for the 1/8" bit and zeroes Z again.`;
+    if (DESIGN.ok) note += ` Front plate design: the V-bit (T2) first${DESIGN.tp.t3.length ? ', then the 1/16" (T3)' : ""}; it stops for each bit and zeroes Z again.`;
     try {
       const t = LR4Model.travel(cfg, S);
       if (l > t.y[1] - t.y[0] || w > t.x[1] - t.x[0]) note += " The stock is bigger than this machine's travel: cut the plates on another machine.";
@@ -77,7 +77,7 @@
     camNote();
   });
   $("dl-nc").addEventListener("click", () => {
-    try { const j = camJob(); save(`${baseName()}${DESIGN.ok ? "_T2_vbit_T1_eighth" : "_T1_eighth"}.gcode`, j.gcode); }
+    try { const j = camJob(); save(`${baseName()}${DESIGN.ok ? `_T2_vbit${DESIGN.tp.t3.length ? "_T3_sixteenth" : ""}_T1_eighth` : "_T1_eighth"}.gcode`, j.gcode); }
     catch (e) { dlStatus(`G-code: ${e.message}`); }
   });
 
@@ -95,10 +95,12 @@
     const o = pdOpts();
     $("pd-ed").value = o.engraveDepth; $("pd-pd").value = o.pocketDepth;
     for (const b of $("pd-angle").querySelectorAll("button")) b.setAttribute("aria-pressed", String(+b.dataset.v === +o.angle));
+    for (const b of $("pd-bit").querySelectorAll("button")) b.setAttribute("aria-pressed", String(Math.abs(+b.dataset.v - o.pocketBit) < 1e-3));
   }
-  function pdSave(angle) {
+  function pdSave(angle, pocketBit) {
     const o = pdOpts(), num = (id, k) => { const v = parseFloat($(id).value); return v > 0 ? v : PlateDesign.DEFAULTS[k]; };
-    MS.set("lr4-design", JSON.stringify({ engraveDepth: num("pd-ed", "engraveDepth"), pocketDepth: num("pd-pd", "pocketDepth"), angle: angle || o.angle }));
+    MS.set("lr4-design", JSON.stringify({ engraveDepth: num("pd-ed", "engraveDepth"), pocketDepth: num("pd-pd", "pocketDepth"),
+      angle: angle || o.angle, pocketBit: pocketBit || o.pocketBit }));
     pdFill();
     camNote();
   }
@@ -151,7 +153,8 @@
         else {                                       // sampled along its length; a jump = a new subpath
           const total = el.getTotalLength();
           if (!(total > 0)) return;
-          const step = Math.min(0.25 / scale, total / 8), N = Math.ceil(total / step);
+          const k = Math.sqrt(Math.abs(m.a * m.d - m.b * m.c)) * scale || 1;   // mm per unit of the shape's own (a scaled group)
+          const step = Math.min(0.25 / k, total / 8), N = Math.ceil(total / step);
           let cur = [], last = null;
           for (let i = 0; i <= N; i++) {
             const p = el.getPointAtLength(Math.min(total, i * total / N));
@@ -159,7 +162,12 @@
             cur.push(at(p.x, p.y)); last = p;
           }
           subs.push({ pts: cur });
-          for (const s of subs) s.closed = /^(rect|circle|ellipse)$/.test(tag) || (s.pts.length > 2 && Math.hypot(s.pts[0][0] - s.pts[s.pts.length - 1][0], s.pts[0][1] - s.pts[s.pts.length - 1][1]) < 0.05);
+          // closed: back where it started, within two samples (a subpath after a jump starts up to one sample in)
+          for (const s of subs) {
+            const a = s.pts[0], z = s.pts[s.pts.length - 1];
+            s.closed = /^(rect|circle|ellipse)$/.test(tag) || (s.pts.length > 2 && Math.hypot(a[0] - z[0], a[1] - z[1]) < 2 * step * k + 0.05);
+            if (s.closed && Math.hypot(a[0] - z[0], a[1] - z[1]) > 1e-9) s.pts.push(a.slice());
+          }
         }
         for (const s of subs) {
           const pts = pdSimplify(s.pts, 0.01);
@@ -197,7 +205,7 @@
       if (rec && Math.abs(rec.length - S.strut) <= 0.05) {
         const P = PlateDesign.plate(polygonClipping, S.strut, { nbraces: S.n === S.auto ? 0 : S.n, wing: WING, dogbones: DOGBONE });
         DESIGN.D = Object.assign(PlateDesign.design(rec.items), { text: rec.nText || 0, ignored: rec.ignored || 0 });
-        DESIGN.problems = PlateDesign.check(DESIGN.D, P, Object.assign({ bit: cam.bit }, o));
+        DESIGN.problems = PlateDesign.check(DESIGN.D, P, Object.assign({ bit: cam.bit, belt: beltBand() }, o));
         if (!DESIGN.problems.some((p) => p.level === "error")) {
           try { DESIGN.tp = PlateDesign.toolpaths(DESIGN.D, Object.assign({}, cam, o)); DESIGN.ok = true; }
           catch (e) { DESIGN.problems.push({ level: "error", text: e.message }); }
@@ -225,7 +233,7 @@
   pdFill();
   pdLoad();
   $("pd-template").addEventListener("click", () => save(`LR4_front_plate_${S.strut}mm_template.svg`,
-    PlateDesign.template(polygonClipping, S.strut, { nbraces: S.n === S.auto ? 0 : S.n, wing: WING, dogbones: DOGBONE })));
+    PlateDesign.template(polygonClipping, S.strut, { nbraces: S.n === S.auto ? 0 : S.n, wing: WING, dogbones: DOGBONE, belt: beltBand() })));
   $("pd-file").addEventListener("change", async (e) => {
     const f = e.target.files[0];
     e.target.value = "";
@@ -246,6 +254,7 @@
   });
   for (const id of ["pd-ed", "pd-pd"]) $(id).addEventListener("change", () => pdSave());
   $("pd-angle").addEventListener("click", (e) => { const b = e.target.closest("button[data-v]"); if (b) pdSave(+b.dataset.v); });
+  $("pd-bit").addEventListener("click", (e) => { const b = e.target.closest("button[data-v]"); if (b) pdSave(null, +b.dataset.v); });
 
   // ---- Run G-code (simulator stage 1; js/gcode_play.js over js/lib/cnc-gcode-tools): the strut plate G-code above
   // (Temporary struts) or a file the user picks, parsed from its TEXT and played on the machine, all in mm whatever
