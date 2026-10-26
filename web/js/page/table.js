@@ -1,4 +1,4 @@
-// lr4-sandbox page, part 7 of 12: On the table (stock, bit, touch plate, spoilboard), As built.
+// lr4-sandbox page, part 7 of 13: On the table (stock, bit, touch plate, spoilboard), As built.
 // The page's scripts share one global scope (js/page/*.js, loaded in order by index.html): names declared
 // at the top level here are seen by the later files.
   // ---- On the table (Part 31, user 2026-10-23): the stock, the bit in the router and the touch plate, set up by hand

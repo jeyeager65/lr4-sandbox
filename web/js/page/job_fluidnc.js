@@ -1,4 +1,4 @@
-// lr4-sandbox page, part 8 of 12: Run G-code on FluidNC (+ Preview's buttons), the SD card.
+// lr4-sandbox page, part 8 of 13: Run G-code on FluidNC (+ Preview's buttons), the SD card.
 // The page's scripts share one global scope (js/page/*.js, loaded in order by index.html): names declared
 // at the top level here are seen by the later files.
   // ---- Run G-code on FluidNC (Part 17): the picked file runs from FluidNC's SD card ($SD/Run=/file). The page

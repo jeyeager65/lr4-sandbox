@@ -1,4 +1,4 @@
-// lr4-sandbox page, part 9 of 12: the vacuum hose, the BOM, picking.
+// lr4-sandbox page, part 9 of 13: the vacuum hose, the BOM, picking.
 // The page's scripts share one global scope (js/page/*.js, loaded in order by index.html): names declared
 // at the top level here are seen by the later files.
   // ---- vacuum hose: clamped in the Min-end holder; between the clamp and the core it folds like a drag

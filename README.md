@@ -206,8 +206,9 @@ the files in your `parts/` folder (if you have one) without dropping them.
 `tools/record_demo.js` records an MP4 of the page running a G-code file, with the machine sounds. The video is
 scripted by `(Video ...)` comments in the file itself, in the style of cnc-gcode-tools' `(CNCSIM)` / `(Stock:)` /
 `(ToolDef)` comments: FluidNC and the page ignore them, so one file is both the job and the video. It runs the page
-in headless Chrome and steps its clock one frame at a time, so the video plays at true speed however long each frame
-takes to render (1080p: about 6 minutes for a 2 minute video).
+in headless Chrome, where the page's own director ([`web/js/page/director.js`](web/js/page/director.js), the same one
+that plays help videos live in the page) runs the script on a clock stepped one frame at a time, so the video plays at
+true speed however long each frame takes to render (1080p: about 6 minutes for a 2 minute video).
 
 It needs a clone of this repo, the part files in `parts/` (see above), Node 22+, Chrome and ffmpeg on the PATH:
 
@@ -235,9 +236,11 @@ shots and the FluidTouch pendant's screen in a corner. The comments:
 
 Lines before the first move are the intro and run in order; later ones run when the job reaches their line. `MSG`
 comments show on top as the job reaches them, and M0 pauses show their popup. The full reference is the header of
-[`tools/demo_script.js`](tools/demo_script.js); the recorder's options (`--size`, `--job`, `--real`, `--mode`,
-`--voice`, `--pendant`, `--no-sound` ...) are in the header of [`tools/record_demo.js`](tools/record_demo.js), and
-command-line flags win over the file's settings.
+[`web/js/demo_script.js`](web/js/demo_script.js); the recorder's options (`--size`, `--job`, `--real`, `--mode`,
+`--voice`, `--pendant`, `--no-sound`, `--log` ...) are in the header of [`tools/record_demo.js`](tools/record_demo.js), and
+command-line flags win over the file's settings. `--log events.txt` writes the director's event log (shots, titles,
+captions, Home, jogs, each second's speed); `node tools/video_log_diff.js before.txt after.txt` checks that a change
+left a video as it was.
 
 ## Running the FreeCAD model
 

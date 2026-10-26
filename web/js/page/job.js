@@ -1,8 +1,8 @@
-// lr4-sandbox page, part 6 of 12: version + feedback, strut plate G-code, Run G-code (the job, its stock and moves).
+// lr4-sandbox page, part 6 of 13: version + feedback, strut plate G-code, Run G-code (the job, its stock and moves).
 // The page's scripts share one global scope (js/page/*.js, loaded in order by index.html): names declared
 // at the top level here are seen by the later files.
   // ---- version + feedback: the issue link carries the size, data date and the loaded files' checksums ----
-  const VERSION = "0.46.1";
+  const VERSION = "0.47.0";
   function setupAbout() {
     const bits = [`lr4-sandbox ${VERSION}`];
     if (cfg.built) bits.push(`model data built ${cfg.built}`);

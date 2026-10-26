@@ -1,7 +1,7 @@
-// tools/demo_script.js: (Video ...) comments in a G-code file -> the video's settings, intro and later commands.
+// web/js/demo_script.js (the one copy: the page loads it, tools/demo_script.js re-exports it): (Video ...) comments in a G-code file -> the video's settings, intro and later commands.
 //   node tests/test_demo_script.js   (in npm test)
 "use strict";
-const DS = require("../tools/demo_script.js");
+const DS = require("../web/js/demo_script.js");
 
 let fails = 0, checks = 0;
 const ok = (cond, msg) => { checks++; if (!cond) { fails++; console.log("  FAIL " + msg); } };
@@ -104,6 +104,15 @@ ok(DS.parse("( video  shot : view=CORE time=2 )\nG0 X1").intro[0].kv.view === "C
   const t = DS.parse("(Video AsBuilt: PULLOFFY=4/3.2 PULLOFFZ=auto)\n(Video AsBuilt: PULLOFFY=4)\n(Video Home: VIEW=machine)\n(Video Home: VIEW=page)\nG0 X1\n");
   ok(JSON.stringify(DS.asbuiltOf(t.intro[0]).set) === '{"pull":{"y":[4,3.2]}}' && JSON.stringify(DS.asbuiltOf(DS.parse("(Video AsBuilt: PULLOFFY=auto)\nG0 X1").intro[0]).set) === '{"pull":null}', "PULLOFFY / auto");
   ok(t.warnings.length === 2 && /motor0\/motor1/.test(t.warnings[0]) && /Home VIEW=/.test(t.warnings[1]), `pulloff / Home VIEW warnings: ${JSON.stringify(t.warnings)}`);
+}
+{                                                      // Part 43a: one copy - the page loads it as a script (self.LR4DemoScript)
+  const fs = require("fs"), path = require("path"), vm = require("vm"), self = {};
+  vm.runInNewContext(fs.readFileSync(path.join(__dirname, "../web/js/demo_script.js"), "utf8"), { self, TextEncoder });
+  const P = self.LR4DemoScript;
+  ok(P && typeof P.parse === "function" && P.DEFAULTS.kmax === 5 && P.DEFAULTS.fps === 30, "page copy: self.LR4DemoScript with DEFAULTS");
+  ok(require("../tools/demo_script.js") === DS, "tools/demo_script.js re-exports the page's copy");
+  const k = P.parse("(Video: KIND=ui)\nG0 X1\n");
+  ok(k.settings.kind === "ui" && !k.warnings.length, `KIND=ui: ${JSON.stringify(k.settings)} ${k.warnings.join()}`);
 }
 console.log(fails ? `demo_script: ${fails} of ${checks} failed` : `demo_script: all ${checks} passed`);
 process.exit(fails ? 1 : 0);

@@ -48,7 +48,7 @@ across many FreeCAD builds. See README.md for the layout. FreeCAD 1.1, Python 3,
 - Page tests: `tests/test_page_*.js` drive headless Chrome (several need `parts/`; the FluidNC ones take minutes).
   Screenshots: `node tools/page_shot.js <url> <out.png> [--eval js --shot out2.png]...`.
 - Videos: `python tools/serve.py sandbox --no-open`, then `node tools/record_demo.js <file.gcode> [out.mp4]` in the
-  background (~6 min for 2 min of 1080p). The `(Video ...)` comment spec is the header of `tools/demo_script.js`;
+  background (~6 min for 2 min of 1080p). The `(Video ...)` comment spec is the header of `web/js/demo_script.js` (the director: `web/js/page/director.js`);
   README's table follows it, so update both. Example: `docs/examples/feature_demo.gcode`. Send the video to the
   maintainer rather than analysing it; over 30 MB, send a CRF 30 copy.
 

@@ -1,4 +1,4 @@
-// lr4-sandbox page, part 5 of 12: config.yaml, SD / Flash folders, Web UIs, the Controller (FluidNC), the pendant.
+// lr4-sandbox page, part 5 of 13: config.yaml, SD / Flash folders, Web UIs, the Controller (FluidNC), the pendant.
 // The page's scripts share one global scope (js/page/*.js, loaded in order by index.html): names declared
 // at the top level here are seen by the later files.
   // ---- FluidNC config.yaml: V1E's JP3_LR file (pinned commit, fetched on demand - not shipped) or the user's own,

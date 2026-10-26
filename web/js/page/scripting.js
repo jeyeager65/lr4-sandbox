@@ -1,4 +1,4 @@
-// lr4-sandbox page, part 12 of 12: the handle for scripted videos, machine sounds, the frame loop, load().
+// lr4-sandbox page, part 12 of 13: the handle for scripted videos, machine sounds, the frame loop, load().
 // The page's scripts share one global scope (js/page/*.js, loaded in order by index.html): names declared
 // at the top level here are seen by the later files.
   // ---- for scripts (Part 29: the video sets the machine - tools/record_demo.js): My machine and Show by name / id,

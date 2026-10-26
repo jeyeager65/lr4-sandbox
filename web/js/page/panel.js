@@ -1,4 +1,4 @@
-// lr4-sandbox page, part 2 of 12: the file panel, My machine, Show, print colours.
+// lr4-sandbox page, part 2 of 13: the file panel, My machine, Show, print colours.
 // The page's scripts share one global scope (js/page/*.js, loaded in order by index.html): names declared
 // at the top level here are seen by the later files.
   // ---- the file panel: drop / pick zips, folders or files; what's loaded, missing or a different version ----

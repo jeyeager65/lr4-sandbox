@@ -1,4 +1,4 @@
-// lr4-sandbox page, part 11 of 12: views, panel tabs, SpaceMouse, VR, share link / picture / keyboard.
+// lr4-sandbox page, part 11 of 13: views, panel tabs, SpaceMouse, VR, share link / picture / keyboard.
 // The page's scripts share one global scope (js/page/*.js, loaded in order by index.html): names declared
 // at the top level here are seen by the later files.
   // ---- views ----
