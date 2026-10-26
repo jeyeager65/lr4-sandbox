@@ -36,8 +36,85 @@
   function fjSample() {                              // every 4 ms while a job runs: the tool's spot from the motors
     if (!FJ.job || !CTL.sim || CTL.sim.stopped || !JOB.tl) return;
     const now = ncTime();                            // dt in machine seconds
+    slipTick((now - FJ.job.at) / 1000);              // lost steps (Part 44a) before the spot is read
     FJ.pts.push(Object.assign(fjWork(ctlRaw()), { dt: (now - FJ.job.at) / 1000 }));
     FJ.job.at = now;
+  }
+  // ---- Lost steps (Part 44a, As built > Lost steps; js/lost_steps.js): each sample, the cut's load on every motor
+  // (how deep the bit is in the stock ahead of it, the feed for the rpm, each axis' drag) against what it can push at
+  // that speed. An overloaded motor falls behind its steps (CTL.lost): FluidNC carries on as if it hadn't, so the rest
+  // of the job is shifted, with a thunk per slip. The switches / probe move with it (ctlSwitches), so $H finds the
+  // machine where it really is. Live motors (a video's frozen frame too: the motors run on). ----
+  const SLIP_WIN = 0.05;
+  function slipTick(dt) {
+    const set = AB.set.on && AB.set.slip, ms = CTL.cfg && CTL.cfg.pins.motors;
+    if (!set || !set.on || !ms || !CTL.sim || !JOB.tl) { SLIP.prev = null; return; }
+    const cmd = ["x", "y", "z"].map((a) => { const k = ms.findIndex((q) => q.axis === a); return k < 0 ? 0 : CTL.sim.motorSteps(ms[k].step) / CTL.cfg.steps[a].to; });
+    // speeds over SLIP_WIN s of machine time: FluidNC's steps come in bursts (its own thread), so one 4 ms sample can
+    // see several times the feed (2026-10-26: a sane cut slipped at 10x)
+    if (!SLIP.prev) { SLIP.prev = cmd; SLIP.dt = 0; return; }
+    SLIP.dt += dt > 0 ? dt : 0;
+    if (SLIP.dt < SLIP_WIN) return;
+    const prev = SLIP.prev;
+    dt = SLIP.dt; SLIP.prev = cmd; SLIP.dt = 0;
+    if (!SLIP.st) SLIP.st = LostSteps.create(SLIP.seed);
+    const v = { x: (cmd[0] - prev[0]) / dt, y: (cmd[1] - prev[1]) / dt, z: (cmd[2] - prev[2]) / dt };
+    const j = soundJob(), tl = JOB.tl, sg = j && tl.segs[Math.max(0, j.seg)], def = sg && tl.tools && tl.tools.get(sg.toolNumber);
+    // and no faster than the machine can go: each axis' max rate, a feed move's F (x the feed override); the bursts
+    // still read up to 2x (2026-10-26: Z "up" at 32 mm/s on a 15 mm/s axis)
+    for (const a of ["x", "y", "z"]) { const m = (CTL.cfg.rates[a] || Infinity) / 60; v[a] = Math.min(m, Math.max(-m, v[a])); }
+    const fmax = sg && sg.type !== "rapid" && sg.feedRate > 0 ? sg.feedRate / 60 * (CTL.ov ? CTL.ov[0] / 100 : 1) : Infinity, sp = Math.hypot(v.x, v.y, v.z);
+    if (sp > fmax) for (const a of ["x", "y", "z"]) v[a] *= fmax / sp;
+    const r = (def && def.diameter > 0 ? def.diameter : 3.175) / 2, pose = ctlLive(), p = fjWork(pose), sim = JOB.sim;
+    const heightAt = (x, y) => {                     // the stock's top there (work mm), null off the stock
+      if (!sim || !sim.heights) return null;
+      const i = Math.round((x - sim.stock.xmin) / sim.dx), k = Math.round((y - sim.stock.ymin) / sim.dy);
+      return i >= 0 && i <= sim.nx && k >= 0 && k <= sim.ny ? sim.heights[k * sim.vx + i] : null;
+    };
+    const vh = Math.hypot(v.x, v.y), tx = meta.travel.x;
+    const eng = LostSteps.engage(heightAt, p, vh > 0 ? v.x / vh : 0, vh > 0 ? v.y / vh : 0, r, def && def.fluteLength);
+    const out = LostSteps.step(SLIP.st, { dt, v, set, steps: soundSteps(), rpm: j ? j.rpm : 0, flutes: j ? j.flutes : 2, r, eng,
+      u: (pose[0] - tx[0]) / Math.max(1, tx[1] - tx[0]) });
+    SLIP.load = out;                                 // (tests: the last loads / capacities)
+    if (!out.slips.length) return;
+    const s2 = Imperfect.side2Motor(AB.set);
+    for (const q of out.slips) {
+      const k = q.axis === "x" ? ms.findIndex((m) => m.axis === "x") : ms.findIndex((m) => m.axis === q.axis && m.motor === (q.side ? s2 : 1 - s2));
+      if (k >= 0) CTL.lost[k] += q.mm;
+    }
+    const now = realNow();
+    if (SND.s && now - SLIP.thunk > 35) { SND.s.event("slip"); SLIP.thunk = now; }   // a stall's run of slips = a grinding buzz
+    ctlSwitches();
+    abNoteSoon();
+  }
+  // one slip of mm on that axis now (a video's NOW=, tests): side 0 Min / 1 Max / null = the one nearer the router
+  function slipForce(axis, side, mm) {
+    const ms = CTL.cfg && CTL.cfg.pins.motors;
+    if (!ms || !CTL.sim || !mm) return false;
+    const s2 = Imperfect.side2Motor(AB.set), x = ctlLive()[0], tx = meta.travel.x;
+    const sd = axis === "x" ? 0 : side === 0 || side === 1 ? side : (x - tx[0]) / Math.max(1, tx[1] - tx[0]) > 0.5 ? 1 : 0;
+    const k = axis === "x" ? ms.findIndex((m) => m.axis === "x") : ms.findIndex((m) => m.axis === axis && m.motor === (sd ? s2 : 1 - s2));
+    if (k < 0) return false;
+    CTL.lost[k] += mm;
+    if (!SLIP.st) SLIP.st = LostSteps.create(SLIP.seed);
+    if (SLIP.st.lost[axis]) SLIP.st.lost[axis][sd] += mm;
+    if (SND.s) { SND.s.event("slip"); SLIP.thunk = realNow(); }
+    ctlSwitches();
+    abNoteSoon();
+    return true;
+  }
+  window.LR4Slip = { force: slipForce, seed(n) { SLIP.seed = n | 0; if (SLIP.st) SLIP.st.seed = SLIP.seed; }, lost: () => CTL.lost.slice(),
+    load: () => SLIP.load || null, summary: () => slipSummary(), count: () => (SLIP.st ? SLIP.st.slips : 0) };
+  function slipSummary() {                           // " The motors lost steps: X 1.92 mm, ..." or ""
+    const ms = CTL.cfg && CTL.cfg.pins.motors;
+    if (!ms || !CTL.lost.some((v) => Math.abs(v) > 1e-6)) return "";
+    const s2 = Imperfect.side2Motor(AB.set), parts = [];
+    ms.forEach((m, k) => {
+      if (Math.abs(CTL.lost[k]) < 1e-6) return;
+      const side = m.axis === "x" ? "" : m.motor === s2 ? " (Max side)" : " (Min side)";
+      parts.push(`${m.axis.toUpperCase()}${side} ${Math.abs(CTL.lost[k]).toFixed(2)} mm ${CTL.lost[k] > 0 ? "short in +" : "short in −"}`);
+    });
+    return ` The motors lost steps: ${parts.join(", ")} - FluidNC doesn't know; $H finds where the machine really is.`;
   }
   async function fjRun() {
     if (!(await fjPrepare()) || !FJ.job) return;     // (gone meanwhile: stopped, or a second Run beat it)
@@ -85,6 +162,8 @@
     // at the move it left. Only then: on small arcs a 2 mm band holds P back (a 3 mm circle is all inside it).
     FJ.job = { path, T: MotionCarve.tracker(JOB.tl.segs), P: AB.set.on ? MotionCarve.tracker(JOB.tl.segs, { tol: 2 }) : null, seenSD: false, held: false, k: 0, at: ncTime(), t0: ncTime(), plate: null };
     FJ.pts = []; FJ.lastMsg = "";
+    if (SLIP.st) SLIP.st.dist = 0;                   // the stock's variation from the job's start (Part 44a)
+    SLIP.prev = null;
     clearInterval(FJ.timer);
     FJ.timer = setInterval(fjSample, 4);
     $("job-pop").hidden = true;
@@ -175,7 +254,7 @@
     FJ.job = null;
     jobCloseUp(null);
     $("job-pop").hidden = true;
-    $("job-status").textContent = text;
+    $("job-status").textContent = text + slipSummary();
     fjButtons();
   }
   // for tests/test_page_sdjob.js: the job, its carving, and Preview's carve of the same moves to compare with

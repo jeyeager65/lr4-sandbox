@@ -125,5 +125,14 @@ ok(DS.parse("( video  shot : view=CORE time=2 )\nG0 X1").intro[0].kv.view === "C
   ok(!M.intro.length && !M.at.length && M.warnings.length === 2 && M.warnings.every((w) => /for KIND=ui videos/.test(w)), `machine video: ui lines dropped, warned (${M.warnings.length})`);
   ok(/KIND=film: machine or ui/.test(DS.parse("(Video: KIND=film)\nG0 X1").warnings.join()), "KIND=film warned");
 }
+{ // Part 44a: (Video Slip:) - settings in % drag, a seed, one slip now
+  const s = DS.parse("(Video Slip: ON=on Z=80 SEED=7)\nG0 X1\n(Video Slip: NOW=ymax MM=1.28)\n(Video Slip: NOW=x)\n(Video Slip: X=150)\n(Video Slip: FOO=1)\n");
+  const q = DS.slipOf(s.intro[0]), n = DS.slipOf(s.at[0]);
+  ok(s.intro.length === 1 && s.at.length === 1, `Slip intro + mid-job: ${s.intro.length} / ${s.at.length}`);
+  ok(JSON.stringify(q) === JSON.stringify({ set: { on: true, z: 0.8 }, seed: 7, now: null, mm: 0 }), `slipOf ${JSON.stringify(q)}`);
+  ok(n.now.axis === "y" && n.now.side === 1 && n.mm === 1.28 && n.set === null, `slipOf NOW ${JSON.stringify(n)}`);
+  ok(s.warnings.length === 3 && /MM=/.test(s.warnings[0]) && /0\.\.100/.test(s.warnings[1]) && /FOO/.test(s.warnings[2]), `Slip warnings ${JSON.stringify(s.warnings)}`);
+  ok(DS.slipOf(DS.parse("(Video Slip: NOW=z MM=-0.16)\nG0 X1").intro[0]).now.side === null, "NOW=z: the side nearer the router");
+}
 console.log(fails ? `demo_script: ${fails} of ${checks} failed` : `demo_script: all ${checks} passed`);
 process.exit(fails ? 1 : 0);

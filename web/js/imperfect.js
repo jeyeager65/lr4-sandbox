@@ -18,7 +18,10 @@
   // bottom tilted down toward +X / +Y); exag = the drawing's factor on rack / tilt (0.5 mm is invisible at 1x).
   // Off by default (user 2026-10-23: "at least for now")
   const DEFAULTS = { on: false, motor0: "min", stop: { y: null, z: null }, power: true, rackMax: 2, tiltMax: 1.5,
-    warp: { x: 0.3, y: -0.2, bow: 0.4 }, tram: { x: 0, y: 0 }, exag: 1, pull: null };
+    warp: { x: 0.3, y: -0.2, bow: 0.4 }, tram: { x: 0, y: 0 }, exag: 1, pull: null,
+    slip: { on: false, x: 0.3, y: 0.3, z: 0.5 } };
+  // slip (Part 44a, js/lost_steps.js): lost steps on Real-world, off by default; x / y / z = each axis' drag, 0 (clean,
+  // lubed) .. 1 (dry, gritty)
   // pull = { y: [p0, p1], z: [p0, p1] }: per-motor pulloff_mm in place of the config.yaml's (a video's stand-in for a
   // tuned config; FluidNC boots with them written in, withPulloffs), null = the config's
   // the stop offsets used when the config's pulloffs are equal (V1E's file: 4 / 4), so it homes out by these: a typical
@@ -29,7 +32,7 @@
     const s = JSON.parse(JSON.stringify(DEFAULTS));
     if (saved && typeof saved === "object") {
       for (const k of ["on", "power", "rackMax", "tiltMax", "exag"]) if (saved[k] !== undefined) s[k] = saved[k];
-      for (const k of ["stop", "warp", "tram"]) if (saved[k]) Object.assign(s[k], saved[k]);
+      for (const k of ["stop", "warp", "tram", "slip"]) if (saved[k]) Object.assign(s[k], saved[k]);
       if (saved.pull && typeof saved.pull === "object") s.pull = JSON.parse(JSON.stringify(saved.pull));
       if (saved.motor0 === "max") s.motor0 = "max";
     }
@@ -359,7 +362,8 @@
     ["tm", (s) => s.tiltMax, (s, v) => (s.tiltMax = +v)], ["wx", (s) => s.warp.x, (s, v) => (s.warp.x = +v)],
     ["wy", (s) => s.warp.y, (s, v) => (s.warp.y = +v)], ["wb", (s) => s.warp.bow, (s, v) => (s.warp.bow = +v)],
     ["tx", (s) => s.tram.x, (s, v) => (s.tram.x = +v)], ["ty", (s) => s.tram.y, (s, v) => (s.tram.y = +v)],
-    ["ex", (s) => s.exag, (s, v) => (s.exag = +v || 1)]];
+    ["ex", (s) => s.exag, (s, v) => (s.exag = +v || 1)], ["ls", (s) => (s.slip.on ? 1 : 0), (s, v) => (s.slip.on = v === "1")],
+    ...["x", "y", "z"].map((a) => [`l${a}`, (s) => s.slip[a], (s, v) => (s.slip[a] = Math.min(1, Math.max(0, +v)))])];
   function toLink(set) {
     const d = settings(), q = {}, x = [];
     if (set.on) q.ab = "1";

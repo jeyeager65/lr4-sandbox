@@ -382,7 +382,10 @@
       if (!FJ.job.held) $("job-status").textContent = ev.text;
     }
     if (ev.type === "error" && FJ.job) fjDone(`FluidNC: ${ev.line}${FJ.job.seenSD ? " - the job stopped." : ` (${FJ.job.path})`}`);
-    if (ev.type === "msg" && /^Homed:/.test(ev.text)) $("home-status").textContent = `FluidNC ${ev.text}.`;
+    if (ev.type === "msg" && /^Homed:/.test(ev.text)) {
+      $("home-status").textContent = `FluidNC ${ev.text}.`;
+      if (SLIP.st) LostSteps.homed(SLIP.st, ev.text.slice(6).toLowerCase());   // squared again: no rack from slips (Part 44a)
+    }
     if (ev.type === "alarm") { CTL.homed = false; CTL.axesHomed = null; CTL.alarms = (CTL.alarms || 0) + 1; dro(); }
     if (ev.type === "alarm") { ctlMsg(`FluidNC ${ev.line}: Unlock ($X) to carry on.`); alarmShow(ev.code); }
     if (ev.type === "blank" || (ev.type === "text" && ev.line === ctlLastSent)) return;   // the console's echo
@@ -395,8 +398,8 @@
   }
   function ctlLive() {
     return ["x", "y", "z"].map((a, i) => {
-      const m = CTL.cfg.pins.motors.find((q) => q.axis === a);
-      return CTL.boot[i] + (m ? CTL.sim.motorSteps(m.step) / CTL.cfg.steps[a].to : 0);
+      const k = CTL.cfg.pins.motors.findIndex((q) => q.axis === a), m = CTL.cfg.pins.motors[k];
+      return CTL.boot[i] + (m ? CTL.sim.motorSteps(m.step) / CTL.cfg.steps[a].to - (CTL.lost[k] || 0) : 0);
     });
   }
   function ctlTick() {
@@ -450,19 +453,19 @@
       const off = m.motor === Imperfect.side2Motor(AB.set) && (m.axis === "y" || m.axis === "z") ? st[m.axis] : 0;   // the Max end's motor
       for (const [kind, g] of Object.entries(m.limits)) {
         const below = kind === "neg" || (kind === "all" && !h[m.axis].positive);
-        sim.setSwitch(g, m.step, m.dir, (t[m.axis][below ? 0 : 1] + off - CTL.bootM[k]) * tr.steps[m.axis].to, below);
+        sim.setSwitch(g, m.step, m.dir, (t[m.axis][below ? 0 : 1] + off - CTL.bootM[k] + (CTL.lost[k] || 0)) * tr.steps[m.axis].to, below);
       }
     }
     ctlProbe();
   }
   function ctlProbe() {
-    const sim = CTL.sim, pr = CTL.cfg && CTL.cfg.pins.probe, z = CTL.cfg && CTL.cfg.pins.motors.find((m) => m.axis === "z");
+    const sim = CTL.sim, pr = CTL.cfg && CTL.cfg.pins.probe, kz = CTL.cfg ? CTL.cfg.pins.motors.findIndex((m) => m.axis === "z") : -1, z = kz >= 0 ? CTL.cfg.pins.motors[kz] : null;
     if (!sim || !pr || !z) return;
     if (!CTL.jobPlate && !HAND.plate) { sim.clearSwitch(pr.gpio); return; }
     const tp = touchPlate(), top = tp.stock + tp.plate;   // the plate's top above the table (the job's stock, or under the bit)
     // As built: the tip sits dz off motor0's height along a tilted beam (at the tip's X now)
     AB.probeDz = AB.set.on && AB.geo && CTL.pose ? Imperfect.tipErr(AB.E, AB.geo, CTL.pose[0] - meta.travel.x[0]).dz : 0;
-    sim.setSwitch(pr.gpio, z.step, z.dir, (top - meta.tip_above_table - AB.probeDz - CTL.boot[2]) * CTL.cfg.steps.z.to, true);
+    sim.setSwitch(pr.gpio, z.step, z.dir, (top - meta.tip_above_table - AB.probeDz - CTL.boot[2] + (CTL.lost[kz] || 0)) * CTL.cfg.steps.z.to, true);
   }
   // $H, or with a homing order (a video's HOMING=z,x,y) FluidNC's axis homing commands one after another: $HZ, $HX, $HY
   // axis: one axis only ($HX ...; Run's Home X / Y / Z): the machine counts as homed only once $H (or all three) did it
@@ -557,6 +560,7 @@
     CTL.booting = null;
     Object.assign(CTL, { sim, cfg: tr, yaml, boot: [HOME.pose.x, HOME.pose.y, HOME.pose.z] });
     // each motor where its side is (Part 32: side 2 = side 1 + AB.E: the machine as it is at this power-up)
+    CTL.lost = tr.pins.motors.map(() => 0); SLIP.st = null;   // where the machine is now: nothing lost (Part 44a)
     CTL.bootM = tr.pins.motors.map((m) => CTL.boot["xyz".indexOf(m.axis)] + (AB.set.on && m.motor === Imperfect.side2Motor(AB.set) && (m.axis === "y" || m.axis === "z") ? AB.E[m.axis] : 0));
     window.LR4FluidNC = sim;
     try {                                            // SD card / Flash files added while it booted (it boots with the page)

@@ -28,6 +28,11 @@
 //       the other side) animate over TIME; VIEW=solid|xray|lines (xray: printed + cut parts see-through; lines: edges
 //       only; XRAY=on|off still works); ORBIT turns once round it. Each line runs its own TIME + ORBIT with the job
 //       held; lines in a row run one after the other. Only the set is drawn until ID=off (a Shot moves the camera).
+//   (Video Slip: ON=on X=30 Y=30 Z=80 SEED=7 | NOW=x MM=2)   lost steps (Part 44a; As built > Lost steps, so it needs
+//       (Video AsBuilt: ON=on) too): ON = the motors can slip, X / Y / Z = each axis' drag in % (0 clean + lubed .. 100
+//       dry), SEED = the stock's variation (the same seed + job = the same slips). NOW = one slip right then, MM mm on
+//       that axis (x, y, z = the side nearer the router; ymin, ymax, zmin, zmax = that side), + = short in + (a motor
+//       lost steps on a + move). Intro lines are set before FluidNC boots; later ones when the job gets there
 //   (Video Shot: VIEW=name TIME=s ORBIT=s DIST=mm)   the camera: blends there over TIME (1.5), then turns once round
 //       it over ORBIT; DIST = how far from what it looks at. VIEW: workshop, machine, stock, tool (close on the bit,
 //       follows it), toolfront (the same, straight in from the front: an X tram lean), core (close on the router / core), iso, front, top, side, back, page (mid-job only: the page's own
@@ -79,7 +84,8 @@ const SETTINGS = { size: "wxh", machine: "wxh", fps: "num", volume: "num", pause
   fan: "bool", main: "colour", accent: "colour" };
 const MACHINE_KEYS = ["table", "room", "braces", "struts", "base", "peter", "router", "skirt", "hose", "fan", "main", "accent"];
 const PRESETS = ["all", "no-hardware", "printed", "frame"];   // web/js/show_tree.js PRESETS
-const KINDS = ["shot", "home", "zero", "title", "text", "wait", "speed", "pendant", "show", "inspect", "asbuilt", "point", "click", "step", "design"];
+const KINDS = ["shot", "home", "zero", "title", "text", "wait", "speed", "pendant", "show", "inspect", "asbuilt", "slip", "point", "click", "step", "design"];
+const SLIP_AXES = ["x", "y", "z", "ymin", "ymax", "zmin", "zmax"];
 const UI_ONLY = new Set(["point", "click", "step"]);   // KIND=ui videos (the page on screen) only
 const INTRO_ONLY = new Set(["home", "zero"]);
 const SHOTS = new Set(["workshop", "machine", "stock", "tool", "toolfront", "core", "iso", "front", "top", "side", "back", "page", "pendant", "ymin", "ymax", "gantry", "gantrytop"]);
@@ -200,6 +206,16 @@ function check(c, intro) {
       const bad = keys.filter((k) => !ASBUILT_NUM.includes(k) && !["on", "power", "stopy", "stopz", "pulloffy", "pulloffz"].includes(k));
       return bad.length ? `AsBuilt doesn't know ${bad.map((k) => k.toUpperCase()).join(", ")}` : null;
     }
+    case "slip": {
+      const keys = Object.keys(kv), bad = keys.filter((k) => !["on", "x", "y", "z", "seed", "now", "mm"].includes(k));
+      if (!keys.length) return "Slip wants ON=, X=, Y=, Z=, SEED= or NOW= MM=";
+      if (bad.length) return `Slip doesn't know ${bad.map((k) => k.toUpperCase()).join(", ")}`;
+      for (const k of ["x", "y", "z"]) if (kv[k] !== undefined && !(num(kv[k]) && +kv[k] >= 0 && +kv[k] <= 100)) return `Slip ${k.toUpperCase()}= wants 0..100 (% drag)`;
+      if (kv.seed !== undefined && !Number.isInteger(Number(kv.seed))) return "Slip SEED= wants a whole number";
+      if (kv.now !== undefined && !SLIP_AXES.includes(kv.now.toLowerCase())) return `Slip NOW= one of ${SLIP_AXES.join(", ")}`;
+      if ((kv.now === undefined) !== (kv.mm === undefined) || (kv.mm !== undefined && !num(kv.mm))) return "Slip NOW= goes with MM= (a number)";
+      return null;
+    }
     case "home": {
       const v = kv.view && kv.view.toLowerCase();
       return !v || (SHOTS.has(v) && v !== "page" && v !== "tool" && v !== "toolfront") ? null : `Home VIEW= one of ${[...SHOTS].filter((s) => s !== "page" && s !== "tool" && s !== "toolfront").join(", ")}`;
@@ -253,6 +269,16 @@ function asbuiltOf(c) {
   const E = kv.rack !== undefined || kv.tilt !== undefined ? { y: n("rack"), z: n("tilt") } : undefined;
   return { set, E };
 }
+// a Slip cmd -> { set (LR4AsBuilt.set's slip: only what it sets) | null, seed | undefined, now: { axis, side (0 Min,
+// 1 Max, null = nearer the router) } | null, mm }
+function slipOf(c) {
+  const kv = c.kv, set = {};
+  if (kv.on !== undefined) set.on = !/^(off|no|0)$/i.test(kv.on);
+  for (const a of ["x", "y", "z"]) if (kv[a] !== undefined) set[a] = Number(kv[a]) / 100;
+  const w = (kv.now || "").toLowerCase();
+  return { set: Object.keys(set).length ? set : null, seed: kv.seed !== undefined ? Number(kv.seed) : undefined,
+    now: w ? { axis: w[0], side: /min$/.test(w) ? 0 : /max$/.test(w) ? 1 : null } : null, mm: kv.mm !== undefined ? Number(kv.mm) : 0 };
+}
 const machineOf = (settings) => Object.fromEntries(MACHINE_KEYS.filter((k) => settings[k] !== undefined).map((k) => [k, settings[k]]));
 
 // the intro when a file has none of its own (record_demo's flags: orbit, home)
@@ -268,7 +294,7 @@ const DEFAULTS = { size: [2560, 1440], fps: 30, job: 75, pause: 2, orbit: 10, so
   voice: "machine", pendant: false, mode: "fluidnc", kmax: 5, park: true, hold: 3, detail: "full", scenery: "shop", messages: true,
   messagetime: 4 };
 
-const api = { DEFAULTS, parse, keyvals, videoOf, shotOf, titleText, secsOf, zeroOf, showOf, inspectOf, asbuiltOf, machineOf, roomOf, defaultIntro, hasOwnIntro, mm,
+const api = { DEFAULTS, parse, keyvals, videoOf, shotOf, titleText, secsOf, zeroOf, showOf, inspectOf, asbuiltOf, slipOf, machineOf, roomOf, defaultIntro, hasOwnIntro, mm,
   SHOTS, MACHINE_KEYS };
 if (typeof module !== "undefined" && module.exports) module.exports = api;
 else root.LR4DemoScript = api;

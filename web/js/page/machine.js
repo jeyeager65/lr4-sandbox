@@ -167,7 +167,13 @@
   // the Controller (setupController): the running FluidNC, its config copy, the MPos <-> pose anchor, last status.
   // mode is always "fluidnc" since Part 34 (Basic became Preview: JOB.preview)
   const CTL = { mode: "fluidnc", sim: null, cfg: null, boot: null, mpos: null, state: "", booting: null,
-    pins: 0, pose: null, yaml: "", homed: false, homing: false, rel: {} };
+    pins: 0, pose: null, yaml: "", homed: false, homing: false, rel: {}, lost: [] };
+  // lost: mm each motor (cfg.pins.motors order) is behind the steps FluidNC sent it (Part 44a lost steps: + = short of
+  // where + moves took it); every motor -> pose sum takes it off (ctlLive, abFromMotors) and the switches / probe trip
+  // where the machine really is (so $H puts it right)
+  // SLIP (job_fluidnc.js slipTick): the model's state (LostSteps.create, from boot), the last sample's motor mm, the
+  // seed (a video's SEED=), when the last thunk sounded
+  const SLIP = { st: null, prev: null, seed: 44, thunk: 0 };
   // FluidNC's machine clock (ms): machine time runs k x the real clock (its time scale). realNow is the real clock even
   // while tools/record_demo.js freezes performance.now; ncScale sets FluidNC's scale and keeps the count.
   const realNow = performance.now.bind(performance);

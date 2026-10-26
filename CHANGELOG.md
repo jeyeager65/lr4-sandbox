@@ -3,6 +3,16 @@
 The version is the sandbox page's (`VERSION` in `web/js/page/job.js`, shown in its footer). The footer also shows
 the date the model data was built and the Printables file set it was solved for.
 
+## 0.52.0 - 2026-10-26
+- **Lost steps** (Configure > 4 As built > Real-world > Lost steps, off by default): on a FluidNC Run the motors can
+  slip when the cut asks too much - too deep or too fast for the bit, the router off - or an axis drags (a Drag slider
+  per axis, 0% clean and lubed .. 100% dry). FluidNC never knows, so the rest of the job runs shifted, with a thunk per
+  slip; the job's message and Run's As built note say how far each motor is out, and `$H` finds where the machine
+  really is. Z slips most (dry lead screws, the core's weight, plunges); X has one motor; Y's two share the cut by where
+  the router is, so the nearer one slips first and the gantry stays nearly square. The numbers are illustrative.
+- Video scripts: `(Video Slip: ON=on X=30 Y=30 Z=80 SEED=7)` and `(Video Slip: NOW=x MM=2)` (one slip right then).
+- The As built share link carries the lost steps settings.
+
 ## 0.51.0 - 2026-10-26
 - **Model data rebuilt at every size** (all 25 size builds and the temporary-strut builds): the touch plate + clip,
   the dust shoe screw, the belt end loops, the hex collet nut, the table and the 68 mm hose now come from each size's

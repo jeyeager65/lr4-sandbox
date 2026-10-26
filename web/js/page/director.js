@@ -134,7 +134,7 @@ window.LR4Director = (() => {
     const homeCmd = introAll.find((q) => q.kind === "home" || (q.kind === "click" && /^home(-[xyz])?$/.test(q.kv.id)));   // (a clicked Home too)
     if (o.homing && !D.homingOrder(String(o.homing))) say(`(Video): HOMING=${o.homing}: not an order (e.g. z,x,y)`);
     else if (o.homing) say(`homing order: ${o.homing}`);
-    for (const q of introAll.filter((c) => c.kind === "asbuilt")) { asbuilt(q); }   // the machine as built, before FluidNC boots on it
+    for (const q of introAll.filter((c) => c.kind === "asbuilt" || c.kind === "slip")) { if (q.kind === "slip") slip(q); else asbuilt(q); }   // the machine as built, before FluidNC boots on it
     if (o.home && homeCmd) D.nearHome(Number(homeCmd.kv.offset) || 30);   // FluidNC (re)boots a little way off the switches
     if (!await D.fluidnc()) throw new Error("FluidNC didn't start (is the page cross-origin isolated? serve it with tools/serve.py)");
     say("mode: FluidNC");
@@ -148,6 +148,13 @@ window.LR4Director = (() => {
     RUN.g = { c: c.toArray(), s: s.toArray(), floor: D.floorZ(), fov: camera.fov, aspect: camera.aspect,
       cam: camera.position.toArray(), tgt: controls.target.toArray() };
     return { job, lines: RUN.lines.splice(0) };
+  }
+  function slip(cmd) {                               // (Video Slip:) lost steps (Part 44a)
+    const q = DS.slipOf(cmd);
+    if (q.set) LR4AsBuilt.set({ slip: q.set });
+    if (q.seed !== undefined) LR4Slip.seed(q.seed);
+    if (q.now) LR4Slip.force(q.now.axis, q.now.side, q.mm);
+    say(`slip: ${JSON.stringify(LR4AsBuilt.get().slip)}${q.now ? `, ${q.now.axis} ${q.mm} mm now` : ""}`);
   }
   function asbuilt(cmd) {                            // (Video AsBuilt:) the machine as built (Part 32)
     const q = DS.asbuiltOf(cmd);
@@ -442,7 +449,7 @@ window.LR4Director = (() => {
       } else if (cmd.kind === "text") { await readWait(cam); caption(cmd); }
       else if (cmd.kind === "pendant") pipCmd(cmd);
       else if (cmd.kind === "show") showCmd(cmd);
-      else if (cmd.kind === "asbuilt") { /* set before the intro (prepare) */ }
+      else if (cmd.kind === "asbuilt" || cmd.kind === "slip") { /* set before the intro (prepare) */ }
       else if (cmd.kind === "inspect") cam = await inspectCmd(cmd, cam);
       else if (cmd.kind === "wait") await hold(DS.secsOf(cmd, 1), cam);
       else if (cmd.kind === "point") {
@@ -504,6 +511,7 @@ window.LR4Director = (() => {
         else if (cmd.kind === "pendant") pipCmd(cmd);
         else if (cmd.kind === "show") showCmd(cmd);
         else if (cmd.kind === "asbuilt") asbuilt(cmd);
+        else if (cmd.kind === "slip") slip(cmd);
         else if (cmd.kind === "inspect") {           // the job held while it runs; the view stays on the set until ID=off / a Shot
           const r0 = rate, off = /^off$/i.test(cmd.kv.id || "");
           pace.wait = 1; setRate(1e-9);

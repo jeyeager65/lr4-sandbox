@@ -284,6 +284,7 @@ shots and the FluidTouch pendant's screen in a corner. The comments:
 | `(Video Text: TIME=4 TEXT=...)` | A caption over what comes next. |
 | `(Video Shot: VIEW=tool TIME=1.5 ORBIT=8 DIST=600)` | The camera: `workshop`, `machine`, `stock`, `tool` (follows the bit), `toolfront` (the same, straight in from the front), `core`, `iso`, `front`, `top`, `side`, `back`, `page`, `pendant`, `ymin` / `ymax` (a Y carriage), `gantry`, `gantrytop` (straight down: the rack); it blends there over TIME and turns round it over ORBIT. |
 | `(Video AsBuilt: ON=on RACK=4 STOPY=1.5 TRAM=2 WARPX=0.8 EXAG=10 ...)` | The machine's As built faults for this video (Configure > 4 As built); the full list is in the script reference. |
+| `(Video Slip: ON=on Z=80 SEED=7)` / `(Video Slip: NOW=x MM=2)` | Lost steps (As built > Lost steps; needs AsBuilt `ON=on`): the motors can slip, each axis' drag in %, or one slip right then. |
 | `(Video Show: PRESET=frame HIDE=Dust_Skirt*,Bristles_TPU* SHOW=...)` | What's drawn, by Show's presets and ids (an assembly, `asm.kind`, a part name, `*` patterns). Mid-job too: hide the skirt and bristles to watch the bit. |
 | `(Video Inspect: ID=core EXPLODE=0.7 SECTION=y@0.5 FLIP=on VIEW=xray TIME=2 ORBIT=6)` | The inspect view, animated over TIME; `ID=off` goes back to the machine. |
 | `(Video Home: OFFSET=30)` / `(Video Zero: X=150 Y=120)` | Home at real speed, then jog to work zero (where the stock sits); before the first move. |

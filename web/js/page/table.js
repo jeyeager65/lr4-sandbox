@@ -411,7 +411,7 @@
     const ms = CTL.cfg.pins.motors, E = {};
     for (const a of ["y", "z"]) {
       const s2 = Imperfect.side2Motor(AB.set), k = [1 - s2, s2].map((n) => ms.findIndex((m) => m.axis === a && m.motor === n));   // [Min, Max]
-      E[a] = k.some((i) => i < 0) ? AB.E[a] : k.map((i) => CTL.bootM[i] + CTL.sim.motorSteps(ms[i].step) / CTL.cfg.steps[a].to).reduce((s1, s2) => s2 - s1);
+      E[a] = k.some((i) => i < 0) ? AB.E[a] : k.map((i) => CTL.bootM[i] + CTL.sim.motorSteps(ms[i].step) / CTL.cfg.steps[a].to - (CTL.lost[i] || 0)).reduce((s1, s2) => s2 - s1);
     }
     return E;
   }
@@ -426,7 +426,7 @@
     const lv = (v) => (Math.abs(v) < 0.005 ? "level" : `${f(v)} mm ${v > 0 ? "higher" : "lower"} at the Max end`);
     let t = `Now: the gantry ${rk(E.y)}, the beam ${lv(E.z)}`;
     if (AB.geo) t += `; a cutting-area rectangle's diagonals would differ by ${f(Imperfect.squareness(E, AB.geo, { x0: 0, x1: S.cutX, y0: 0, y1: S.cutY }).diff)} mm`;
-    $("ab-now").textContent = t + `. $H leaves it ${rk(res.y)}, ${lv(res.z)}.`;
+    $("ab-now").textContent = t + `. $H leaves it ${rk(res.y)}, ${lv(res.z)}.` + slipSummary();
     // where each "stops apart" comes from: set here, what the pulloffs make up for, else a typical amount (equal pulloffs)
     const from = { set: "set here", pulloffs: "from your pulloffs", guess: "typical" };
     const why = [st.from.y, st.from.z].includes("guess") ? " Typical = a usual amount; your pulloffs are equal, so $H leaves it that far out." : "";
@@ -444,11 +444,15 @@
     v("ab-wx", s.warp.x); v("ab-wy", s.warp.y); v("ab-wb", s.warp.bow); v("ab-tx", s.tram.x); v("ab-ty", s.tram.y);
     $("ab-ex").value = String(s.exag);
     $("ab-m0").querySelectorAll("button[data-v]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.v === s.motor0)));
+    $("ab-ls").checked = s.slip.on; $("ab-ls-box").hidden = !s.slip.on;
+    for (const a of ["x", "y", "z"]) { $(`ab-l${a}`).value = String(s.slip[a]); abDragOut(a); }
   }
+  const abDragOut = (a) => { $(`ab-l${a}-out`).textContent = `${Math.round(Number($(`ab-l${a}`).value) * 100)}%`; };
   function abRead() {
     const n = (id) => { const x = parseFloat($(id).value); return Number.isFinite(x) ? x : null; }, d = (id) => n(id) ?? 0;
     return { on: $("ab-on").checked, power: $("ab-power").checked, stop: { y: n("ab-sy"), z: n("ab-sz") }, rackMax: d("ab-rm"), tiltMax: d("ab-tm"),
-      warp: { x: d("ab-wx"), y: d("ab-wy"), bow: d("ab-wb") }, tram: { x: d("ab-tx"), y: d("ab-ty") }, exag: Number($("ab-ex").value) || 1, motor0: AB.set.motor0 };
+      warp: { x: d("ab-wx"), y: d("ab-wy"), bow: d("ab-wb") }, tram: { x: d("ab-tx"), y: d("ab-ty") }, exag: Number($("ab-ex").value) || 1, motor0: AB.set.motor0,
+      slip: { on: $("ab-ls").checked, x: Number($("ab-lx").value), y: Number($("ab-ly").value), z: Number($("ab-lz").value) } };
   }
   // a change (the form, LR4AsBuilt.set, a video): merged into the settings and kept; the switches + drawing follow, and
   // the spoilboard its warp (ask = the form: may ask to lay a cut board again)
@@ -476,8 +480,9 @@
     abRedraw();
     abNote();
   }
-  for (const id of ["ab-on", "ab-power", "ab-sy", "ab-sz", "ab-rm", "ab-tm", "ab-wx", "ab-wy", "ab-wb", "ab-tx", "ab-ty", "ab-ex"])
+  for (const id of ["ab-on", "ab-power", "ab-sy", "ab-sz", "ab-rm", "ab-tm", "ab-wx", "ab-wy", "ab-wb", "ab-tx", "ab-ty", "ab-ex", "ab-ls", "ab-lx", "ab-ly", "ab-lz"])
     $(id).addEventListener("change", () => abSet(abRead(), true));
+  for (const a of ["x", "y", "z"]) $(`ab-l${a}`).addEventListener("input", () => abDragOut(a));
   $("ab-cycle").addEventListener("click", abPowerCycle);
   $("ab-mode").addEventListener("click", (e) => {    // Ideal | Real-world = the hidden ab-on checkbox (tests / videos set it)
     const b = e.target.closest("button[data-v]");

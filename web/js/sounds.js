@@ -36,7 +36,7 @@
 //   snd.start()                      on a click (browsers only allow audio after one); false = no Web Audio
 //   snd.setOn(on), snd.setVolume(0..1)
 //   snd.update(pose [x, y, z] mm, dt s, scale, steps { x: { perMm, micro } ... }, { rpm, mrr, flutes })   once a frame
-//   snd.event("switch" | "tap" | "hold")   a one-off click, now (and in the trace); "hold" = only the joke voice
+//   snd.event("switch" | "tap" | "hold" | "slip")   a one-off click, now (and in the trace); "hold" = only the joke voice
 //   snd.setVoice("machine" | "robot")      realistic or the joke mode (Part 23); create({ voice }) too
 //   snd.levels()                     what each voice is set to (tests)
 //   snd.record(on), await snd.wav({ rate }) -> Uint8Array
@@ -58,7 +58,9 @@
   // tap = the bit touching the plate: much quieter (user 2026-10-22; was loudness 0.7, decay 0.035 s)
   // a microswitch (user 2026-10-22: "a tick when pressed and a tock when released" - the lever pushes a tiny button):
   // switch = the press, a high tick; release = a lower, softer tock with a little body
-  const CLICKS = { switch: [4300, 0.012, 2500, 0, 1], release: [1800, 0.010, 900, 600, 0.7], tap: [2600, 0.025, 1200, 170, 0.15] };
+  // slip = a stepper losing steps (Part 44a): a dull, low thunk with a knock in it (the rotor snapping back a pole pair)
+  const CLICKS = { switch: [4300, 0.012, 2500, 0, 1], release: [1800, 0.010, 900, 600, 0.7], tap: [2600, 0.025, 1200, 170, 0.15],
+    slip: [190, 0.045, 350, 75, 1.1] };
   const ROUTER = { up: 0.5, down: 1.5, sag: 0.12, whine: 14, rpmRef: 18000 };   // s, s, fraction at full load, x rotation
   const VAC = { up: 0.9, down: 3.0 };                // s
   const MRR_FULL = 150;                // mm^3/s = full cutting load (1/8" bit slotting ~3 mm deep at 1000 mm/min)
@@ -185,6 +187,7 @@
     release: [["oo", 0, 0.08, 420, 380, 0.6]],                                       // "bop"
     tap: [["ee", 0, 0.2, 440, 440, 0.8], ["oo", 0.42, 0.32, 320, 470, 0.8]],          // "beep... boop?"
     hold: [["mm", 0, 0.35, 150, 140, 0.6], ["mm", 0.35, 0.55, 140, 185, 0.6]],      // "hmmm?" (M0)
+    slip: [["oo", 0, 0.1, 230, 150, 0.8]],                                           // "bonk" (lost steps)
   };
 
   // noise + node helpers shared by both graphs

@@ -237,6 +237,20 @@
             <div class="field"><label for="ab-ty">Tram Y</label>
               <div class="unit-input"><input id="ab-ty" type="number" step="any" title="the bit's bottom tilted down toward +Y, degrees"><span>°</span></div></div>
           </div>
+          <h4>Lost steps <button type="button" class="q" data-help="help-ab-ls" aria-label="About lost steps" title="About lost steps">?</button></h4>
+          <div class="help" id="help-ab-ls" hidden><p>A stepper <b>slips</b> (loses steps, with a thunk) when the cut asks more of
+            it than it has: too deep or too fast for the bit, the router off, a dull bit. FluidNC counts the steps it sent, so it
+            never knows: the rest of the job runs shifted by what the motor lost. <code>$H</code> finds where the machine really is.</p>
+            <p><b>Drag:</b> how hard each axis is to move, 0% = clean and lubed, 100% = dry and gritty. Z slips most: dry lead
+            screws waste most of the motors' push, and a plunge adds to it. X has one motor; Y has two, and the one nearer the
+            router takes more of the cut, so it slips first (the gantry soon pulls the other along: it stays nearly square).</p>
+            <p>The numbers are illustrative (a NEMA17 at V1E's 0.8 A, a typical cutting force for MDF), not measured.</p></div>
+          <label class="check"><input type="checkbox" id="ab-ls"> Motors can lose steps (Run on FluidNC)</label>
+          <div id="ab-ls-box">
+            <div class="slider drag"><label for="ab-lx">Drag X</label><input id="ab-lx" type="range" min="0" max="1" step="0.05"><output id="ab-lx-out" for="ab-lx"></output></div>
+            <div class="slider drag"><label for="ab-ly">Drag Y</label><input id="ab-ly" type="range" min="0" max="1" step="0.05"><output id="ab-ly-out" for="ab-ly"></output></div>
+            <div class="slider drag"><label for="ab-lz">Drag Z</label><input id="ab-lz" type="range" min="0" max="1" step="0.05"><output id="ab-lz-out" for="ab-lz"></output></div>
+          </div>
           <div class="field"><label for="ab-ex">Magnify rack / tilt in the view <button type="button" class="q" data-help="help-ab-ex" aria-label="About magnifying" title="About magnifying">?</button></label>
             <div class="help" id="help-ab-ex" hidden><p>A rack or beam tilt of a few tenths of a mm can't be seen at actual size. This
               draws the gantry and beam that many times further out of square so you can see which way it's off.</p>
@@ -955,6 +969,7 @@
 <script src="js/motion_carve.js"></script>
 <script src="js/hand_setup.js"></script>
 <script src="js/imperfect.js"></script>
+<script src="js/lost_steps.js"></script>
 <script src="js/filaments.js"></script>
 <script src="js/sd_card.js"></script>
 <script src="js/homing.js"></script>
