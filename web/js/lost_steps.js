@@ -50,7 +50,8 @@
   }
   // how deep the bit is in the stock: heightAt(x, y) = the stock's top there (null = no stock). Samples on the half of
   // the bit leading the move (ux, uy = its direction; none = all round) and at the center (a plunge). len = the
-  // flutes' length (deeper than that rubs the shank: counted as cutting). -> { d (mean depth, mm), c (center depth) }
+  // flutes' length (deeper than that rubs the shank: counted as cutting). -> { d (mean depth, mm), c (center depth),
+  // o (outside the bit) }
   function engage(heightAt, p, ux, uy, r, len) {
     const depth = (x, y) => { const h = heightAt(x, y); return h === null || h === undefined ? 0 : Math.min(Math.max(h - p.z, 0), len || Infinity); };
     const moving = Math.hypot(ux, uy) > 1e-6, a0 = moving ? Math.atan2(uy, ux) : 0;
@@ -59,7 +60,11 @@
       const a = moving ? a0 + (i / 6 - 0.5) * Math.PI : (i / 12) * 2 * Math.PI;
       sum += depth(p.x + k * r * Math.cos(a), p.y + k * r * Math.sin(a)); n++;
     }
-    return { d: sum / n, c: depth(p.x, p.y) };
+    // o = how deep the tip is under the stock just outside the bit (its own hole doesn't count: a bit sitting still
+    // reads d = c = 0 in the hole it cut; heat.js wants how buried it is)
+    let o = 0;
+    for (let i = 0; i < 8; i++) { const a = (i / 8) * 2 * Math.PI; o = Math.max(o, depth(p.x + 1.3 * r * Math.cos(a), p.y + 1.3 * r * Math.sin(a))); }
+    return { d: sum / n, c: depth(p.x, p.y), o };
   }
   // a smooth wiggle in [-1, 1] along the travelled distance (seeded value noise)
   function noiseAt(seed, s) {

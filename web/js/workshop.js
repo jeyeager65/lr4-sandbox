@@ -436,14 +436,57 @@
     // a fire extinguisher on the front wall by the entry door (its bench-end side, the knob side), the handle at ~1.1 m
     const fy = Y0 + 0.46 * D - 1.5 * FT - 90 - 300, fxw = X1 - 75;
     if (fy - 100 > Y0 + 0.18 * D + 14 * 25.4 + 90) {     // clear of the first window's trim
-      const red = std({ color: 0xc81e14, roughness: 0.35 }), black = std({ color: 0x1b1c1e, roughness: 0.5 });
-      add(new THREE.CylinderGeometry(70, 70, 400, 24), red, fxw, fy, Z0 + 650 + 200, Math.PI / 2);          // cylinder
-      add(new THREE.SphereGeometry(70, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2), red, fxw, fy, Z0 + 1050, Math.PI / 2);   // dome
-      box(30, 50, 70, fxw, fy, Z0 + 1110, black);                                // valve
-      box(110, 20, 18, fxw - 30, fy, Z0 + 1170, black);                          // handle
-      add(new THREE.CylinderGeometry(9, 9, 260, 8), black, fxw - 75, fy + 40, Z0 + 1000, Math.PI / 2);   // hose
-      box(20, 80, 120, X1 - 10, fy, Z0 + 850, steel);                            // wall bracket
-      box(10, 70, 50, fxw + 2, fy, Z0 + 820, std({ color: 0xf5f5f0 }));          // label
+      // Part 44b (user 2026-10-26: improve it if needed): a 5 lb ABC extinguisher as its own group, so it can lift off
+      // its bracket and fly to a fire (js/page/heat_fx.js). Origin = the body's middle; the hose + horn on the room
+      // side (-X), the levers toward the wall. userData.extinguisher = { obj, home (its pose), hose(u, E, d) (the hose
+      // from stowed (u 0: down the body, clipped) to held out (u 1: its end at E, the horn pointing d; local mm) ->
+      // the horn's tip, local), aim (local up: it leans from there) }
+      const red = std({ color: 0xc81e14, roughness: 0.32, metalness: 0.1 }), black = std({ color: 0x1b1c1e, roughness: 0.5 });
+      const chrome = std({ color: 0xc9ccd0, roughness: 0.25, metalness: 0.9 });
+      const ext = new THREE.Group();
+      ext.name = "extinguisher";
+      ext.position.set(fxw, fy, Z0 + 840);
+      grp.add(ext);
+      const R = 62, H = 380;
+      add(new THREE.CylinderGeometry(R, R, H, 32), red, 0, 0, 0, Math.PI / 2, 0, ext);                          // body
+      add(new THREE.CylinderGeometry(R + 1.5, R + 1.5, 14, 32), black, 0, 0, -H / 2 + 7, Math.PI / 2, 0, ext);   // foot ring
+      add(new THREE.SphereGeometry(R, 32, 12, 0, Math.PI * 2, 0, Math.PI / 2), red, 0, 0, H / 2, Math.PI / 2, 0, ext);   // shoulder
+      add(new THREE.CylinderGeometry(20, 22, 26, 20), chrome, 0, 0, H / 2 + R + 6, Math.PI / 2, 0, ext);       // neck
+      box(44, 38, 34, 0, 0, H / 2 + R + 18, chrome, 0, ext);                                                   // valve body
+      box(140, 24, 9, 40, 0, H / 2 + R + 30, black, 0, ext);                                                   // carry handle
+      const lever = box(130, 22, 8, 36, 0, H / 2 + R + 46, black, 0, ext);                                     // squeeze lever,
+      lever.rotation.set(0, 0.16, 0);                                                                           // open a little
+      add(new THREE.CylinderGeometry(3, 3, 50, 8), chrome, 18, 0, H / 2 + R + 40, 0, 0, ext);                  // pull pin
+      add(new THREE.TorusGeometry(13, 2.5, 8, 20), std({ color: 0xf2c200, roughness: 0.4 }), 18, 34, H / 2 + R + 40, Math.PI / 2, 0, ext);   // its ring
+      add(new THREE.CylinderGeometry(15, 15, 10, 20), chrome, -26, 0, H / 2 + R + 12, 0, Math.PI / 2, ext);    // gauge
+      add(new THREE.CylinderGeometry(12, 12, 1, 20), std({ color: 0xffffff, emissive: 0x222222 }), -31.6, 0, H / 2 + R + 12, 0, Math.PI / 2, ext);
+      add(new THREE.CylinderGeometry(1.2, 1.2, 10, 6), red, -32.4, 0, H / 2 + R + 14, 0.7, Math.PI / 2, ext);   // needle (in the green)
+      // the hose: stowed down the body into its clip; in use it swings out from the body, the horn held toward the fire
+      const V = (x, y, z) => new THREE.Vector3(x, y, z), S = V(-18, 0, H / 2 + R + 14);
+      const STOW = [S, V(-60, -6, H / 2 + R - 10), V(-R - 14, -10, H / 2 - 40), V(-R - 12, -8, 40), V(-R - 8, -4, -H / 2 + 120)];
+      const hoseMesh = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(STOW), 40, 8, 10), black);   // hose
+      ext.add(hoseMesh);
+      const horn = new THREE.Mesh(new THREE.CylinderGeometry(8, 15, 46, 16, 1, true), black);                   // horn (narrow
+      ext.add(horn);                                                                                           // end on the hose)
+      box(10, 30, 16, -R + 2, -4, -H / 2 + 150, black, 0, ext);                                                // hose clip
+      const down = V(0, 0, -1), hornAxis = V(0, -1, 0);
+      const hoseTo = (u, E, d) => {
+        const dd = down.clone().lerp(d || down, u).normalize(), end = STOW[4].clone().lerp(E || STOW[4], u);
+        // held: near straight from the valve out to the end (user 2026-10-26: "it can point straighter"), a slight sag,
+        // lined up with the horn for its last 70 mm
+        const held = [S, S.clone().lerp(end, 0.3).add(V(0, 0, -12)), S.clone().lerp(end, 0.6).add(V(0, 0, -15)), end.clone().addScaledVector(dd, -70), end];
+        const pts = STOW.map((p, i) => p.clone().lerp(held[i], u));
+        hoseMesh.geometry.dispose();
+        hoseMesh.geometry = new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 40, 8, 10);
+        horn.quaternion.setFromUnitVectors(hornAxis, dd);
+        horn.position.copy(end).addScaledVector(dd, 23);
+        return end.clone().addScaledVector(dd, 46);
+      };
+      hoseTo(0);
+      box(20, 80, 120, X1 - 10, fy, Z0 + 790, steel);                                                          // wall bracket
+      box(30, 70, 12, X1 - 30, fy, Z0 + 638, steel);                                                           // its foot
+      grp.userData.extinguisher = { obj: ext, home: { p: ext.position.clone(), q: ext.quaternion.clone() }, hose: hoseTo,
+        nozzle: hoseTo(0), R, aim: V(0, 0, 1) };
     }
 
     // floor and ceiling (face in)

@@ -36,7 +36,7 @@
 //   snd.start()                      on a click (browsers only allow audio after one); false = no Web Audio
 //   snd.setOn(on), snd.setVolume(0..1)
 //   snd.update(pose [x, y, z] mm, dt s, scale, steps { x: { perMm, micro } ... }, { rpm, mrr, flutes })   once a frame
-//   snd.event("switch" | "tap" | "hold" | "slip")   a one-off click, now (and in the trace); "hold" = only the joke voice
+//   snd.event("switch" | "tap" | "hold" | "slip" | "crackle" | "hiss")   a one-off click, now (and in the trace); "hold" = only the joke voice
 //   snd.setVoice("machine" | "robot")      realistic or the joke mode (Part 23); create({ voice }) too
 //   snd.levels()                     what each voice is set to (tests)
 //   snd.record(on), await snd.wav({ rate }) -> Uint8Array
@@ -60,7 +60,9 @@
   // switch = the press, a high tick; release = a lower, softer tock with a little body
   // slip = a stepper losing steps (Part 44a): a dull, low thunk with a knock in it (the rotor snapping back a pole pair)
   const CLICKS = { switch: [4300, 0.012, 2500, 0, 1], release: [1800, 0.010, 900, 600, 0.7], tap: [2600, 0.025, 1200, 170, 0.15],
-    slip: [190, 0.045, 350, 75, 1.1] };
+    slip: [190, 0.045, 350, 75, 1.1], crackle: [3400, 0.004, 2800, 0, 0.45] };
+  // noise bursts (Part 44b): [bandpass Hz, Q, length s, loudness] - hiss = the extinguisher's powder (repeated)
+  const NOISES = { hiss: [3800, 0.6, 0.38, 0.5] };
   const ROUTER = { up: 0.5, down: 1.5, sag: 0.12, whine: 14, rpmRef: 18000 };   // s, s, fraction at full load, x rotation
   const VAC = { up: 0.9, down: 3.0 };                // s
   const MRR_FULL = 150;                // mm^3/s = full cutting load (1/8" bit slotting ~3 mm deep at 1000 mm/min)
@@ -188,6 +190,8 @@
     tap: [["ee", 0, 0.2, 440, 440, 0.8], ["oo", 0.42, 0.32, 320, 470, 0.8]],          // "beep... boop?"
     hold: [["mm", 0, 0.35, 150, 140, 0.6], ["mm", 0.35, 0.55, 140, 185, 0.6]],      // "hmmm?" (M0)
     slip: [["oo", 0, 0.1, 230, 150, 0.8]],                                           // "bonk" (lost steps)
+    crackle: [["ih", 0, 0.03, 900, 700, 0.25]],                                      // "tk"
+    hiss: [["ee", 0, 0.36, 300, 290, 0.35]],                                         // "eeee" (the powder)
   };
 
   // noise + node helpers shared by both graphs
@@ -332,6 +336,14 @@
     return {
       master,
       play(kind, t) {                                // a click at time t (s, context time)
+        const nz = NOISES[kind];
+        if (nz) {                                    // a noise burst: up in 30 ms, held, down at the end
+          const [hz, q, len, loud] = nz, b = ctx.createBufferSource(), f = filt("bandpass", hz, q), g = gain();
+          b.buffer = nb; b.connect(f).connect(g).connect(clickG);
+          b.start(t, (nClick++ * 0.137) % 1.5, len + 0.1);
+          g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(loud, t + 0.03); g.gain.setValueAtTime(loud, t + len - 0.05); g.gain.linearRampToValueAtTime(0, t + len);
+          return;
+        }
         const c = CLICKS[kind];
         if (!c) return;
         const [ping, decay, hp, thud, loud] = c, end = t + Math.max(decay * 4, 0.06);
@@ -431,7 +443,7 @@
         if (ctx && on) G.set(lv, ctx.currentTime);
       },
       event(kind) {
-        if (!CLICKS[kind] && !JOKE_EVENTS[kind]) return;
+        if (!CLICKS[kind] && !JOKE_EVENTS[kind] && !NOISES[kind]) return;
         if (trace) events.push([clock, kind]);
         if (ctx && on) G.play(kind, ctx.currentTime);
       },
@@ -476,7 +488,7 @@
     return api;
   }
 
-  const out = { CLICKS, JOKE_EVENTS, VOWELS, jokeSay, create, voice, velocity, fullStepHz, stepsFromYaml, dialRpm, routerPlan, routerAt, wavBytes, AXES, KOBALT, DEFAULT_RPM };
+  const out = { CLICKS, NOISES, JOKE_EVENTS, VOWELS, jokeSay, create, voice, velocity, fullStepHz, stepsFromYaml, dialRpm, routerPlan, routerAt, wavBytes, AXES, KOBALT, DEFAULT_RPM };
   if (typeof module !== "undefined" && module.exports) module.exports = out;
   else root.LR4Sound = out;
 })(typeof self !== "undefined" ? self : this);

@@ -47,18 +47,22 @@
   // machine where it really is. Live motors (a video's frozen frame too: the motors run on). ----
   const SLIP_WIN = 0.05;
   function slipTick(dt) {
-    const set = AB.set.on && AB.set.slip, ms = CTL.cfg && CTL.cfg.pins.motors;
-    if (!set || !set.on || !ms || !CTL.sim || !JOB.tl) { SLIP.prev = null; return; }
+    const set = AB.set.on && AB.set.slip, ms = CTL.cfg && CTL.cfg.pins.motors, slipOn = !!(set && set.on);
+    if ((!slipOn && !heatSet()) || !ms || !CTL.sim || !JOB.tl) { SLIP.prev = null; return; }
     const cmd = ["x", "y", "z"].map((a) => { const k = ms.findIndex((q) => q.axis === a); return k < 0 ? 0 : CTL.sim.motorSteps(ms[k].step) / CTL.cfg.steps[a].to; });
-    // speeds over SLIP_WIN s of machine time: FluidNC's steps come in bursts (its own thread), so one 4 ms sample can
-    // see several times the feed (2026-10-26: a sane cut slipped at 10x)
-    if (!SLIP.prev) { SLIP.prev = cmd; SLIP.dt = 0; return; }
-    SLIP.dt += dt > 0 ? dt : 0;
-    if (SLIP.dt < SLIP_WIN) return;
-    const prev = SLIP.prev;
-    dt = SLIP.dt; SLIP.prev = cmd; SLIP.dt = 0;
+    // speeds over the last SLIP_WIN s of machine time (a sliding window, stepped every sample): FluidNC's steps come in
+    // bursts (its own thread), so one 4 ms sample can see several times the feed (2026-10-26: a sane cut slipped at
+    // 10x); stepping only once a window let a stalled motor run a few mm ahead before its loss landed (the carve ran on)
+    if (!SLIP.prev) { SLIP.prev = [{ t: 0, cmd }]; SLIP.t = 0; return; }
+    if (!(dt > 0)) return;
+    SLIP.t += dt;
+    const H = SLIP.prev;
+    H.push({ t: SLIP.t, cmd });
+    while (H.length > 2 && SLIP.t - H[1].t >= SLIP_WIN) H.shift();
+    const span = SLIP.t - H[0].t, prev = H[0].cmd;
+    if (span < SLIP_WIN) return;
     if (!SLIP.st) SLIP.st = LostSteps.create(SLIP.seed);
-    const v = { x: (cmd[0] - prev[0]) / dt, y: (cmd[1] - prev[1]) / dt, z: (cmd[2] - prev[2]) / dt };
+    const v = { x: (cmd[0] - prev[0]) / span, y: (cmd[1] - prev[1]) / span, z: (cmd[2] - prev[2]) / span };
     const j = soundJob(), tl = JOB.tl, sg = j && tl.segs[Math.max(0, j.seg)], def = sg && tl.tools && tl.tools.get(sg.toolNumber);
     // and no faster than the machine can go: each axis' max rate, a feed move's F (x the feed override); the bursts
     // still read up to 2x (2026-10-26: Z "up" at 32 mm/s on a 15 mm/s axis)
@@ -73,6 +77,8 @@
     };
     const vh = Math.hypot(v.x, v.y), tx = meta.travel.x;
     const eng = LostSteps.engage(heightAt, p, vh > 0 ? v.x / vh : 0, vh > 0 ? v.y / vh : 0, r, def && def.fluteLength);
+    heatStep({ dt, v, eng, rpm: j ? j.rpm : 0, flutes: j ? j.flutes : 2, r, p, top: heightAt });   // Part 44b: the same sample
+    if (!slipOn) return;
     const out = LostSteps.step(SLIP.st, { dt, v, set, steps: soundSteps(), rpm: j ? j.rpm : 0, flutes: j ? j.flutes : 2, r, eng,
       u: (pose[0] - tx[0]) / Math.max(1, tx[1] - tx[0]) });
     SLIP.load = out;                                 // (tests: the last loads / capacities)
@@ -163,6 +169,7 @@
     FJ.job = { path, T: MotionCarve.tracker(JOB.tl.segs), P: AB.set.on ? MotionCarve.tracker(JOB.tl.segs, { tol: 2 }) : null, seenSD: false, held: false, k: 0, at: ncTime(), t0: ncTime(), plate: null };
     FJ.pts = []; FJ.lastMsg = "";
     if (SLIP.st) SLIP.st.dist = 0;                   // the stock's variation from the job's start (Part 44a)
+    HEAT.st = null; heatSay("");                     // fresh stock: no hot spots, no scorch (Part 44b)
     SLIP.prev = null;
     clearInterval(FJ.timer);
     FJ.timer = setInterval(fjSample, 4);

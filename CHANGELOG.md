@@ -3,6 +3,19 @@
 The version is the sandbox page's (`VERSION` in `web/js/page/job.js`, shown in its footer). The footer also shows
 the date the model data was built and the Printables file set it was solved for.
 
+## 0.53.0 - 2026-10-26
+- **Heat and fire** (Configure > 4 As built > Real-world > Heat, off by default): on a FluidNC Run a bit that rubs
+  instead of cutting - sitting still with the router on, a feed too slow for the rpm (chipload under ~0.025 mm), a
+  held plunge - heats up; the stock under it smokes, gets scorch marks, and Run warns why. With **Fire** on (the help
+  videos) the spot catches and spreads, with a big black plume; right under the router it does terrible things to the
+  machine: the flames spread out under the router, the router and the core's printed parts char and slump (Run lists
+  what's wrecked; **Repair the machine** puts it right). The shop's fire extinguisher lifts off its bracket by the
+  entry door, flies over, is held at waist height in front of the table, swings its hose out and sprays the fire out
+  (crackle and hiss sounds), then flies home. Illustrative numbers: a dwell smokes in about 5 s and would catch in
+  about 15 s.
+- The shop's fire extinguisher is a proper model now (shoulder, valve, pull pin, levers, gauge, hose and horn).
+- Video scripts: `(Video Heat: ON=on FIRE=on AUTO=on)`, `(Video Fire: TIME=4)` (catches at the bit), `(Video Extinguish:)`.
+
 ## 0.52.0 - 2026-10-26
 - **Lost steps** (Configure > 4 As built > Real-world > Lost steps, off by default): on a FluidNC Run the motors can
   slip when the cut asks too much - too deep or too fast for the bit, the router off - or an axis drags (a Drag slider

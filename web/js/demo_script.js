@@ -33,6 +33,10 @@
 //       dry), SEED = the stock's variation (the same seed + job = the same slips). NOW = one slip right then, MM mm on
 //       that axis (x, y, z = the side nearer the router; ymin, ymax, zmin, zmax = that side), + = short in + (a motor
 //       lost steps on a + move). Intro lines are set before FluidNC boots; later ones when the job gets there
+//   (Video Heat: ON=on FIRE=on AUTO=on)   heat (Part 44b; As built > Heat, so it needs (Video AsBuilt: ON=on) too): ON =
+//       smoke, scorch + a warning where the bit rubs, FIRE = a hot spot can catch, AUTO = the extinguisher comes by itself
+//   (Video Fire: TIME=4)              the spot under the bit heats up (smoking) and catches in TIME s (with FIRE=on)
+//   (Video Extinguish:)               the extinguisher flies over now and puts it out (AUTO=off scripts it)
 //   (Video Shot: VIEW=name TIME=s ORBIT=s DIST=mm)   the camera: blends there over TIME (1.5), then turns once round
 //       it over ORBIT; DIST = how far from what it looks at. VIEW: workshop, machine, stock, tool (close on the bit,
 //       follows it), toolfront (the same, straight in from the front: an X tram lean), core (close on the router / core), iso, front, top, side, back, page (mid-job only: the page's own
@@ -84,7 +88,7 @@ const SETTINGS = { size: "wxh", machine: "wxh", fps: "num", volume: "num", pause
   fan: "bool", main: "colour", accent: "colour" };
 const MACHINE_KEYS = ["table", "room", "braces", "struts", "base", "peter", "router", "skirt", "hose", "fan", "main", "accent"];
 const PRESETS = ["all", "no-hardware", "printed", "frame"];   // web/js/show_tree.js PRESETS
-const KINDS = ["shot", "home", "zero", "title", "text", "wait", "speed", "pendant", "show", "inspect", "asbuilt", "slip", "point", "click", "step", "design"];
+const KINDS = ["shot", "home", "zero", "title", "text", "wait", "speed", "pendant", "show", "inspect", "asbuilt", "slip", "heat", "fire", "extinguish", "point", "click", "step", "design"];
 const SLIP_AXES = ["x", "y", "z", "ymin", "ymax", "zmin", "zmax"];
 const UI_ONLY = new Set(["point", "click", "step"]);   // KIND=ui videos (the page on screen) only
 const INTRO_ONLY = new Set(["home", "zero"]);
@@ -216,6 +220,15 @@ function check(c, intro) {
       if ((kv.now === undefined) !== (kv.mm === undefined) || (kv.mm !== undefined && !num(kv.mm))) return "Slip NOW= goes with MM= (a number)";
       return null;
     }
+    case "heat": {
+      const keys = Object.keys(kv), bad = keys.filter((k) => !["on", "fire", "auto"].includes(k));
+      if (!keys.length) return "Heat wants ON=, FIRE= or AUTO=";
+      return bad.length ? `Heat doesn't know ${bad.map((k) => k.toUpperCase()).join(", ")}` : null;
+    }
+    case "fire":
+      return kv.time === undefined || (num(kv.time) && +kv.time > 0) ? null : "Fire TIME= wants seconds";
+    case "extinguish":
+      return null;
     case "home": {
       const v = kv.view && kv.view.toLowerCase();
       return !v || (SHOTS.has(v) && v !== "page" && v !== "tool" && v !== "toolfront") ? null : `Home VIEW= one of ${[...SHOTS].filter((s) => s !== "page" && s !== "tool" && s !== "toolfront").join(", ")}`;
@@ -279,6 +292,12 @@ function slipOf(c) {
   return { set: Object.keys(set).length ? set : null, seed: kv.seed !== undefined ? Number(kv.seed) : undefined,
     now: w ? { axis: w[0], side: /min$/.test(w) ? 0 : /max$/.test(w) ? 1 : null } : null, mm: kv.mm !== undefined ? Number(kv.mm) : 0 };
 }
+// a Heat cmd -> LR4AsBuilt.set's heat (only what it sets)
+function heatOf(c) {
+  const out = {};
+  for (const k of ["on", "fire", "auto"]) if (c.kv[k] !== undefined) out[k] = !/^(off|no|0)$/i.test(c.kv[k]);
+  return out;
+}
 const machineOf = (settings) => Object.fromEntries(MACHINE_KEYS.filter((k) => settings[k] !== undefined).map((k) => [k, settings[k]]));
 
 // the intro when a file has none of its own (record_demo's flags: orbit, home)
@@ -294,7 +313,7 @@ const DEFAULTS = { size: [2560, 1440], fps: 30, job: 75, pause: 2, orbit: 10, so
   voice: "machine", pendant: false, mode: "fluidnc", kmax: 5, park: true, hold: 3, detail: "full", scenery: "shop", messages: true,
   messagetime: 4 };
 
-const api = { DEFAULTS, parse, keyvals, videoOf, shotOf, titleText, secsOf, zeroOf, showOf, inspectOf, asbuiltOf, slipOf, machineOf, roomOf, defaultIntro, hasOwnIntro, mm,
+const api = { DEFAULTS, parse, keyvals, videoOf, shotOf, titleText, secsOf, zeroOf, showOf, inspectOf, asbuiltOf, slipOf, heatOf, machineOf, roomOf, defaultIntro, hasOwnIntro, mm,
   SHOTS, MACHINE_KEYS };
 if (typeof module !== "undefined" && module.exports) module.exports = api;
 else root.LR4DemoScript = api;

@@ -251,6 +251,17 @@
             <div class="slider drag"><label for="ab-ly">Drag Y</label><input id="ab-ly" type="range" min="0" max="1" step="0.05"><output id="ab-ly-out" for="ab-ly"></output></div>
             <div class="slider drag"><label for="ab-lz">Drag Z</label><input id="ab-lz" type="range" min="0" max="1" step="0.05"><output id="ab-lz-out" for="ab-lz"></output></div>
           </div>
+          <h4>Heat <button type="button" class="q" data-help="help-ab-heat" aria-label="About heat and fire" title="About heat and fire">?</button></h4>
+          <div class="help" id="help-ab-heat" hidden><p>A bit makes heat where it <b>rubs</b> instead of cutting: sitting still with
+            the router on, a feed too slow for the rpm (the chipload, feed ÷ (rpm × flutes), under about 0.025 mm), a dull bit.
+            Proper chips carry the heat away. The hot spot smokes, then scorches, and wood can catch fire.</p>
+            <p><b>Heat:</b> smoke, scorch marks and a warning on a FluidNC Run. <b>Fire:</b> it can catch (the help videos use it),
+            and the shop's extinguisher comes over by itself and puts it out. A real fire doesn't wait: never leave a running
+            router, and keep an extinguisher in reach.</p>
+            <p>The numbers are illustrative: a dwell smokes in about 5 s and would catch in about 15 s.</p></div>
+          <label class="check"><input type="checkbox" id="ab-ht"> Heat: smoke, scorch and a warning where the bit rubs</label>
+          <label class="check"><input type="checkbox" id="ab-fi"> Fire: a hot spot can catch</label>
+          <label class="check"><input type="checkbox" id="ab-au"> The extinguisher comes by itself</label>
           <div class="field"><label for="ab-ex">Magnify rack / tilt in the view <button type="button" class="q" data-help="help-ab-ex" aria-label="About magnifying" title="About magnifying">?</button></label>
             <div class="help" id="help-ab-ex" hidden><p>A rack or beam tilt of a few tenths of a mm can't be seen at actual size. This
               draws the gantry and beam that many times further out of square so you can see which way it's off.</p>
@@ -744,6 +755,9 @@
     <p class="foot" id="ctl-src"></p>
     <div id="ab-run" hidden>
       <p class="foot" id="ab-now" role="status"></p>
+      <p class="foot warn" id="heat-note" role="alert" hidden></p>
+      <p class="foot warn" id="heat-dmg" hidden><span id="heat-dmg-t"></span>
+        <button type="button" id="heat-repair" title="Put every part the fire damaged back as it was">Repair the machine</button></p>
       <div class="buttons">
         <button type="button" id="ab-cycle" title="Power down and up: the gantry comes up racked and the beam off level (FluidNC restarts)">Power cycle</button>
         <button type="button" id="ab-sq" title="A rectangle over the cutting area with corner crosses, saved to the SD card: measure its diagonals">Squareness test to the SD card</button>
@@ -970,6 +984,7 @@
 <script src="js/hand_setup.js"></script>
 <script src="js/imperfect.js"></script>
 <script src="js/lost_steps.js"></script>
+<script src="js/heat.js"></script>
 <script src="js/filaments.js"></script>
 <script src="js/sd_card.js"></script>
 <script src="js/homing.js"></script>
@@ -992,6 +1007,7 @@
 <script src="js/page/job.js"></script>
 <script src="js/page/table.js"></script>
 <script src="js/page/job_fluidnc.js"></script>
+<script src="js/page/heat_fx.js"></script>
 <script src="js/page/hose_bom.js"></script>
 <script src="js/page/inspect.js"></script>
 <script src="js/page/ui.js"></script>

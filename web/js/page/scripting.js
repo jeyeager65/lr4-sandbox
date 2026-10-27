@@ -388,6 +388,7 @@
     spinTick(dt);                                     // the bit turning while a FluidNC job has the router on (machine.js;
                                                       // dt capped: a slow frame at 0.5 s turned it exactly half a turn)
     soundTick();
+    heatFxTick(dt);                                   // smoke, scorch, fire, the extinguisher (heat_fx.js, Part 44b)
     if (pendant && pendantOn() && (FT.ft || ++frameN % 8 === 0)) pendantScreen();
     ftPopDraw();
     if (vr.active()) vr.tick(dt);

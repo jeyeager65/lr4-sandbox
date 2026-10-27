@@ -134,5 +134,11 @@ ok(DS.parse("( video  shot : view=CORE time=2 )\nG0 X1").intro[0].kv.view === "C
   ok(s.warnings.length === 3 && /MM=/.test(s.warnings[0]) && /0\.\.100/.test(s.warnings[1]) && /FOO/.test(s.warnings[2]), `Slip warnings ${JSON.stringify(s.warnings)}`);
   ok(DS.slipOf(DS.parse("(Video Slip: NOW=z MM=-0.16)\nG0 X1").intro[0]).now.side === null, "NOW=z: the side nearer the router");
 }
+{ // Part 44b: (Video Heat:) / (Video Fire:) / (Video Extinguish:)
+  const s = DS.parse("(Video Heat: ON=on FIRE=on AUTO=off)\nG0 X1\n(Video Fire: TIME=4)\n(Video Extinguish:)\n(Video Fire: TIME=x)\n(Video Heat: FOO=1)\n");
+  ok(JSON.stringify(DS.heatOf(s.intro[0])) === JSON.stringify({ on: true, fire: true, auto: false }), `heatOf ${JSON.stringify(DS.heatOf(s.intro[0]))}`);
+  ok(s.at.map((c) => c.kind).join() === "fire,extinguish", `Fire / Extinguish mid-job: ${s.at.map((c) => c.kind)}`);
+  ok(s.warnings.length === 2 && /TIME/.test(s.warnings[0]) && /FOO/.test(s.warnings[1]), `Heat warnings ${JSON.stringify(s.warnings)}`);
+}
 console.log(fails ? `demo_script: ${fails} of ${checks} failed` : `demo_script: all ${checks} passed`);
 process.exit(fails ? 1 : 0);

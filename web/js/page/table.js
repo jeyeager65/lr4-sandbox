@@ -446,13 +446,16 @@
     $("ab-m0").querySelectorAll("button[data-v]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.v === s.motor0)));
     $("ab-ls").checked = s.slip.on; $("ab-ls-box").hidden = !s.slip.on;
     for (const a of ["x", "y", "z"]) { $(`ab-l${a}`).value = String(s.slip[a]); abDragOut(a); }
+    $("ab-ht").checked = s.heat.on; $("ab-fi").checked = s.heat.fire; $("ab-au").checked = s.heat.auto;
+    $("ab-fi").disabled = $("ab-au").disabled = !s.heat.on;
   }
   const abDragOut = (a) => { $(`ab-l${a}-out`).textContent = `${Math.round(Number($(`ab-l${a}`).value) * 100)}%`; };
   function abRead() {
     const n = (id) => { const x = parseFloat($(id).value); return Number.isFinite(x) ? x : null; }, d = (id) => n(id) ?? 0;
     return { on: $("ab-on").checked, power: $("ab-power").checked, stop: { y: n("ab-sy"), z: n("ab-sz") }, rackMax: d("ab-rm"), tiltMax: d("ab-tm"),
       warp: { x: d("ab-wx"), y: d("ab-wy"), bow: d("ab-wb") }, tram: { x: d("ab-tx"), y: d("ab-ty") }, exag: Number($("ab-ex").value) || 1, motor0: AB.set.motor0,
-      slip: { on: $("ab-ls").checked, x: Number($("ab-lx").value), y: Number($("ab-ly").value), z: Number($("ab-lz").value) } };
+      slip: { on: $("ab-ls").checked, x: Number($("ab-lx").value), y: Number($("ab-ly").value), z: Number($("ab-lz").value) },
+      heat: { on: $("ab-ht").checked, fire: $("ab-fi").checked, auto: $("ab-au").checked } };
   }
   // a change (the form, LR4AsBuilt.set, a video): merged into the settings and kept; the switches + drawing follow, and
   // the spoilboard its warp (ask = the form: may ask to lay a cut board again)
@@ -480,7 +483,7 @@
     abRedraw();
     abNote();
   }
-  for (const id of ["ab-on", "ab-power", "ab-sy", "ab-sz", "ab-rm", "ab-tm", "ab-wx", "ab-wy", "ab-wb", "ab-tx", "ab-ty", "ab-ex", "ab-ls", "ab-lx", "ab-ly", "ab-lz"])
+  for (const id of ["ab-on", "ab-power", "ab-sy", "ab-sz", "ab-rm", "ab-tm", "ab-wx", "ab-wy", "ab-wb", "ab-tx", "ab-ty", "ab-ex", "ab-ls", "ab-lx", "ab-ly", "ab-lz", "ab-ht", "ab-fi", "ab-au"])
     $(id).addEventListener("change", () => abSet(abRead(), true));
   for (const a of ["x", "y", "z"]) $(`ab-l${a}`).addEventListener("input", () => abDragOut(a));
   $("ab-cycle").addEventListener("click", abPowerCycle);
