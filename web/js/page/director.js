@@ -501,6 +501,10 @@ window.LR4Director = (() => {
     else if (!await call("ncPlay")) throw new Error("FluidNC didn't start the job: " + el("job-status").textContent);
     let held = 0, endHold = 0, s, rate = 0, badge = "", section = -1, realLeft = 0, ramp = -1, k = 0;
     let shot = null, shotF = 0, titleEnd = 0, msgKey = null, msgEnd = 0, inspShot = null, capQ = [];   // inspShot: the shot from before an Inspect
+    // (Video EStop:) pressed (Part 44f): the job is gone - the lines after it run in order (Wait / Text pace them), at
+    // real time, then `after` s more and the end
+    let after = 8, afterF = 0;
+    const gone = () => PWR.estop && !FJ.job;
     const setRate = (r) => {
       ncS = r;
       if (Math.abs(r - rate) > 1e-9) { rate = r; D.rate(r); }
@@ -511,7 +515,7 @@ window.LR4Director = (() => {
     for (;;) {
       s = await frame(shot ? shot.at(Math.min(shotF++, shot.frames - 1)) : null);   // null: the page's camera (its close-ups)
       // the file's (Video ...) lines as playback reaches them
-      for (; k < script.at.length && s.line >= script.at[k].line; k++) {
+      for (; k < script.at.length && (gone() ? pace.wait <= 0 && !capQ.length : s.line >= script.at[k].line); k++) {
         const cmd = script.at[k];
         if (cmd.kind === "shot") {
           const sh = DS.shotOf(cmd);
@@ -528,6 +532,11 @@ window.LR4Director = (() => {
         else if (cmd.kind === "heat") heat(cmd);
         else if (cmd.kind === "fire") say(LR4Heat.fire(DS.secsOf(cmd, 4)) ? `fire in ${DS.secsOf(cmd, 4)} s` : "fire: no job running");
         else if (cmd.kind === "extinguish") say(LR4Heat.extinguish() ? "the extinguisher's coming" : "extinguish: nothing burning");
+        else if (cmd.kind === "estop") {
+          const e = DS.estopOf(cmd);
+          after = e.after;
+          say(e.press ? (LR4Power.press() ? "e-stop pressed: power off" : "e-stop: already pressed") : (LR4Power.release() ? "e-stop released" : "e-stop: not pressed"));
+        }
         else if (cmd.kind === "inspect") {           // the job held while it runs; the view stays on the set until ID=off / a Shot
           const r0 = rate, off = /^off$/i.test(cmd.kv.id || "");
           pace.wait = 1; setRate(1e-9);
@@ -564,7 +573,8 @@ window.LR4Director = (() => {
       // real time at each section's first cut, then ease up to the job's speed; the badge says which
       if (pace.real > 0 && s.cut && s.section !== section) { section = s.section; realLeft = n(pace.real); ramp = -1; }
       let r;
-      if (pace.wait > 0) { pace.wait--; r = 1e-9; }
+      if (gone()) { if (pace.wait > 0) pace.wait--; r = 1; }   // no machine: the fire, the shots at real time
+      else if (pace.wait > 0) { pace.wait--; r = 1e-9; }
       else if (pace.temp) { r = pace.temp.rate; if (--pace.temp.left <= 0) pace.temp = null; }
       else if (realLeft > 0) { r = 1; if (!s.paused && --realLeft === 0) ramp = 0; }
       else if (ramp >= 0) { const q = Math.min(1, ++ramp / n(1.5)); r = Math.exp(Math.log(pace.base) * ease(q)); if (q >= 1) ramp = -1; }
@@ -573,12 +583,13 @@ window.LR4Director = (() => {
       if (s.paused) ncHeld += ncS * dt;
       if (s.paused) { if (++held >= n(Math.max(o.pause, readT(s.popText) + 0.5))) { call("resume"); held = 0; } }   // the popup read
       else held = 0;
-      if (s.t >= s.total && !s.paused && ++endHold > n(1)) break;
+      if (gone()) { if (k >= script.at.length && pace.wait <= 0 && !capQ.length && !titleEnd && ++afterF > n(after)) break; }
+      else if (s.t >= s.total && !s.paused && ++endHold > n(1)) break;
     }
     D.badge(null); call("msg", null);
     say(`FluidNC ran the job in ${((ncM - ncJob0) / 60000).toFixed(1)} min of machine time, ${(ncHeld / 60000).toFixed(1)} of it in M0 holds (the G-code estimate: ${(job.total / 60).toFixed(1)} min)`);
     const endCam = shot ? shot.at(Math.min(shotF, shot.frames - 1)) : null;
-    if (o.park) {                                    // the gantry to the back, Z up, by a jog on FluidNC (~4 s of video)
+    if (o.park && !PWR.estop) {                      // the gantry to the back, Z up, by a jog on FluidNC (~4 s of video)
       const pk = D.ncPark();
       if (pk) {
         say("park");

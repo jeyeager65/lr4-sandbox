@@ -37,6 +37,10 @@
 //       smoke, scorch + a warning where the bit rubs, FIRE = a hot spot can catch, AUTO = the extinguisher comes by itself
 //   (Video Fire: TIME=4)              the spot under the bit heats up (smoking) and catches in TIME s (with FIRE=on)
 //   (Video Extinguish:)               the extinguisher flies over now and puts it out (AUTO=off scripts it)
+//   (Video EStop: DO=press AFTER=8)   the switch panel's e-stop (Part 44f): DO=press cuts the power (FluidNC down mid-job,
+//       the router + vac spin down, the bit cools; a fire burns on), DO=release twists it out (FluidNC restarts). After a
+//       press the job is gone: the lines after it run in order at once (a Wait / Text paces them), the video at real
+//       time, then AFTER s more (8) and the end (no park: no power)
 //   (Video Shot: VIEW=name TIME=s ORBIT=s DIST=mm)   the camera: blends there over TIME (1.5), then turns once round
 //       it over ORBIT; DIST = how far from what it looks at. VIEW: workshop, machine, stock, tool (close on the bit,
 //       follows it), toolfront (the same, straight in from the front: an X tram lean), core (close on the router / core), iso, front, top, side, back, page (mid-job only: the page's own
@@ -88,10 +92,11 @@ const SETTINGS = { size: "wxh", machine: "wxh", fps: "num", volume: "num", pause
   fan: "bool", main: "colour", accent: "colour" };
 const MACHINE_KEYS = ["table", "room", "braces", "struts", "base", "peter", "router", "skirt", "hose", "fan", "main", "accent"];
 const PRESETS = ["all", "no-hardware", "printed", "frame"];   // web/js/show_tree.js PRESETS
-const KINDS = ["shot", "home", "zero", "title", "text", "wait", "speed", "pendant", "show", "inspect", "asbuilt", "slip", "heat", "fire", "extinguish", "point", "click", "step", "design"];
+const KINDS = ["shot", "home", "zero", "title", "text", "wait", "speed", "pendant", "show", "inspect", "asbuilt", "slip", "heat", "fire", "extinguish", "estop", "point", "click", "step", "design"];
 const SLIP_AXES = ["x", "y", "z", "ymin", "ymax", "zmin", "zmax"];
 const UI_ONLY = new Set(["point", "click", "step"]);   // KIND=ui videos (the page on screen) only
 const INTRO_ONLY = new Set(["home", "zero"]);
+const JOB_ONLY = new Set(["estop"]);
 const SHOTS = new Set(["workshop", "machine", "stock", "tool", "toolfront", "core", "iso", "front", "top", "side", "back", "page", "pendant", "ymin", "ymax", "gantry", "gantrytop"]);
 const ASBUILT_NUM = ["rack", "tilt", "exag", "tram", "tramy", "warpx", "warpy", "bow", "rackmax", "tiltmax"];
 const MOTION = /(^|[^A-Z])G0*(0|1|2|3|38\.\d)(?![\d.])/;
@@ -175,6 +180,7 @@ function parse(text) {
 function check(c, intro) {
   const kv = c.kv, k = c.kind;
   if (INTRO_ONLY.has(k) && !intro) return `(Video ${k}:) goes before the first move`;
+  if (JOB_ONLY.has(k) && intro) return `(Video ${k}:) goes after the first move (mid-job)`;
   for (const key of ["time", "orbit", "dist", "offset", "fit", "for", "real"]) if (kv[key] !== undefined && !num(kv[key])) return `${key.toUpperCase()} wants a number`;
   switch (k) {
     case "shot": {
@@ -229,6 +235,12 @@ function check(c, intro) {
       return kv.time === undefined || (num(kv.time) && +kv.time > 0) ? null : "Fire TIME= wants seconds";
     case "extinguish":
       return null;
+    case "estop": {
+      const bad = Object.keys(kv).filter((q) => !["do", "after"].includes(q));
+      if (bad.length) return `EStop doesn't know ${bad.map((q) => q.toUpperCase()).join(", ")}`;
+      if (kv.do !== undefined && !/^(press|release)$/i.test(kv.do)) return "EStop DO= press or release";
+      return kv.after === undefined || (num(kv.after) && +kv.after >= 0) ? null : "EStop AFTER= wants seconds";
+    }
     case "home": {
       const v = kv.view && kv.view.toLowerCase();
       return !v || (SHOTS.has(v) && v !== "page" && v !== "tool" && v !== "toolfront") ? null : `Home VIEW= one of ${[...SHOTS].filter((s) => s !== "page" && s !== "tool" && s !== "toolfront").join(", ")}`;
@@ -298,6 +310,8 @@ function heatOf(c) {
   for (const k of ["on", "fire", "auto"]) if (c.kv[k] !== undefined) out[k] = !/^(off|no|0)$/i.test(c.kv[k]);
   return out;
 }
+// (Video EStop:) -> { press (true: press, false: release), after (s of video after the job is gone) }
+const estopOf = (c) => ({ press: !/^release$/i.test(c.kv.do || "press"), after: c.kv.after !== undefined ? Number(c.kv.after) : 8 });
 const machineOf = (settings) => Object.fromEntries(MACHINE_KEYS.filter((k) => settings[k] !== undefined).map((k) => [k, settings[k]]));
 
 // the intro when a file has none of its own (record_demo's flags: orbit, home)
@@ -313,7 +327,7 @@ const DEFAULTS = { size: [2560, 1440], fps: 30, job: 75, pause: 2, orbit: 10, so
   voice: "machine", pendant: false, mode: "fluidnc", kmax: 5, park: true, hold: 3, detail: "full", scenery: "shop", messages: true,
   messagetime: 4 };
 
-const api = { DEFAULTS, parse, keyvals, videoOf, shotOf, titleText, secsOf, zeroOf, showOf, inspectOf, asbuiltOf, slipOf, heatOf, machineOf, roomOf, defaultIntro, hasOwnIntro, mm,
+const api = { DEFAULTS, parse, keyvals, videoOf, shotOf, titleText, secsOf, zeroOf, showOf, inspectOf, asbuiltOf, slipOf, heatOf, estopOf, machineOf, roomOf, defaultIntro, hasOwnIntro, mm,
   SHOTS, MACHINE_KEYS };
 if (typeof module !== "undefined" && module.exports) module.exports = api;
 else root.LR4DemoScript = api;

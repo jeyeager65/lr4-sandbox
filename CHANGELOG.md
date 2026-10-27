@@ -3,6 +3,14 @@
 The version is the sandbox page's (`VERSION` in `web/js/page/job.js`, shown in its footer). The footer also shows
 the date the model data was built and the Printables file set it was solved for.
 
+## 0.55.0 - 2026-10-27
+- **Switch panel with an emergency stop:** a panel on the table's front edge has the e-stop (red mushroom on a yellow
+  plate), a green power lamp and lighted rockers for the router and the vac. Pressing the e-stop cuts the power:
+  FluidNC stops where it is (not homed after), the router and vac spin down and the bit cools. A fire keeps burning.
+  A quarter twist releases it, and FluidNC restarts. Click the panel in the view, or use Run's E-STOP / Router / Vac
+  buttons. The router's own body switch can be clicked off too. Videos: `(Video EStop: DO=press AFTER=8)`.
+- Heat and fire carry on after a job ends (they used to freeze with its last moment).
+
 ## 0.54.0 - 2026-10-27
 - **Hard spots in the stock:** `(Stock Hard: KNOT=x,y,r[,k] GLUE=Y40[,w[,k]])` in a G-code file marks knots (drawn
   as dark ringed spots) and glue lines; they cut several times harder, so a cut that's fine in clear wood can lose

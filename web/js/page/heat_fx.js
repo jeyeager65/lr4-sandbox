@@ -124,9 +124,20 @@
   }
 
   // ---- once a frame (scripting.js tick) ----
+  // no job running (it ended, or the e-stop cut the power - Part 44f): the heat goes on in real time by itself - the bit
+  // cools, the spots cool or burn and a fire spreads (before, it all froze with the job's last sample)
+  function heatCoast(dt) {
+    const sim = JOB.sim, top = (x, y) => {
+      if (!sim || !sim.heights) return null;
+      const i = Math.round((x - sim.stock.xmin) / sim.dx), k = Math.round((y - sim.stock.ymin) / sim.dy);
+      return i >= 0 && i <= sim.nx && k >= 0 && k <= sim.ny ? sim.heights[k * sim.vx + i] : null;
+    };
+    heatStep({ dt, v: { x: 0, y: 0, z: 0 }, eng: null, rpm: 0, flutes: 2, r: 1.5, p: { x: 0, y: 0, z: 0 }, top });
+  }
   function heatFxTick(dt) {
     const st = HEAT.st;
     if (!st || !JOB.at || HEAT.sim !== JOB.sim) { if (HEAT.points) for (const P of Object.values(HEAT.points)) { P.list.length = 0; heatPointsDraw(P, 0); } return; }
+    if (!FJ.job && dt > 0) heatCoast(dt);
     heatFxInit();
     const rnd = Math.random, V = (x, y, z) => new THREE.Vector3(x, y, z);
     // smoke from hot cells, scorch marks

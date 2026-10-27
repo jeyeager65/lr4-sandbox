@@ -140,5 +140,13 @@ ok(DS.parse("( video  shot : view=CORE time=2 )\nG0 X1").intro[0].kv.view === "C
   ok(s.at.map((c) => c.kind).join() === "fire,extinguish", `Fire / Extinguish mid-job: ${s.at.map((c) => c.kind)}`);
   ok(s.warnings.length === 2 && /TIME/.test(s.warnings[0]) && /FOO/.test(s.warnings[1]), `Heat warnings ${JSON.stringify(s.warnings)}`);
 }
+{ // Part 44f: (Video EStop:) - mid-job only, DO= press / release, AFTER= s
+  const s = DS.parse("(Video EStop:)\nG0 X1\n(Video EStop: AFTER=12)\n(Video EStop: DO=release)\n(Video EStop: DO=kick)\n(Video EStop: AFTER=-1)\n(Video EStop: NOW=1)\n");
+  ok(s.at.map((c) => c.kind).join() === "estop,estop", `EStop mid-job: ${s.at.map((c) => c.kind)}`);
+  ok(s.warnings.length === 4 && /first move/.test(s.warnings[0]) && /DO=/.test(s.warnings[1]) && /AFTER/.test(s.warnings[2]) && /NOW/.test(s.warnings[3]),
+    `EStop warnings ${JSON.stringify(s.warnings)}`);
+  const [a, b] = s.at.map(DS.estopOf);
+  ok(a.press && a.after === 12 && !b.press && b.after === 8, `estopOf ${JSON.stringify([a, b])}`);
+}
 console.log(fails ? `demo_script: ${fails} of ${checks} failed` : `demo_script: all ${checks} passed`);
 process.exit(fails ? 1 : 0);

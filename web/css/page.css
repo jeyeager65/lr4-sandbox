@@ -601,6 +601,18 @@ body.vr-on :is(.meas-main, .panel, .hint, .toolbar, .view-pop, .pick, .insp, .to
 :root.l-off .side-l .colhead > :not(.col-btn), :root.r-off .side-r .colhead > :not(.col-btn) { display: none; }
 .g2 { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
 button.big { padding: 10px 6px; font: 600 15px var(--font-display); letter-spacing: 0.04em; }
+/* the switch panel (Part 44f): E-STOP red, the rockers lit while on with power */
+.pwr-row { display: flex; align-items: center; gap: 6px; margin-top: 6px; }
+.pwr-row .estop { flex: 1 1 auto; padding: 7px 6px; font: 700 13px var(--font-display); letter-spacing: 0.05em;
+  background: #c8241b; color: #fff; border-color: #8f160f; }
+.pwr-row .estop[aria-pressed=true] { background: var(--panel); color: #c8241b; border-color: #c8241b; }
+.pwr-sw { padding: 6px 8px; font-size: 12px; display: inline-flex; align-items: center; gap: 5px; }
+.pwr-sw::before { content: ""; width: 8px; height: 8px; border-radius: 2px; background: var(--muted); opacity: 0.5; }
+.pwr-sw.lit::before { background: #e8402e; opacity: 1; box-shadow: 0 0 5px #e8402e; }
+.pwr-sw[aria-pressed=false] { color: var(--muted); }
+.pwr-note { margin: 4px 0 0; font-size: 12px; color: var(--warn); }
+.estop-mini { color: #c8241b; font-weight: 700; }
+.estop-mini[aria-pressed=true] { background: #c8241b; color: #fff; }
 button.pri { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
 button:disabled { opacity: 0.42; cursor: default; }
 .dro-box { border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px 6px; }

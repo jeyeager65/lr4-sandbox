@@ -334,7 +334,8 @@
     const i = Math.min(FJ.job ? (FJ.job.C || FJ.job.P || FJ.job.T).i : GcodePlay.at(tl, JOB.t).index, tl.segs.length - 1), sg = tl.segs[Math.max(0, i)];
     const def = sg && tl.tools && tl.tools.get(sg.toolNumber);
     // not with the touch plate / clip out (job.js touchOut): the router waits till the clip is off the collet nut
-    return { rpm: touchOut() ? 0 : LR4Sound.routerAt(SND.plan, sg ? sg.srcLine || 0 : 0), seg: i, flutes: (def && def.flutes) || 2 };
+    // nor without power (Part 44f: the e-stop, the router's rocker or its own switch off)
+    return { rpm: touchOut() || !routerPowered() ? 0 : LR4Sound.routerAt(SND.plan, sg ? sg.srcLine || 0 : 0), seg: i, flutes: (def && def.flutes) || 2 };
   }
   function soundRemoved() {                          // mm^3 the stock lost since the last frame (0 after a reset)
     const sim = JOB.sim;
@@ -358,7 +359,7 @@
     }
     SND.seg = j ? j.seg : -1;
     SND.s.update([p.x, p.y, p.z], dt, scale, soundSteps(),
-      { rpm: j ? j.rpm : 0, mrr: dt > 0 ? removed / dt / scale : 0, flutes: j ? j.flutes : 2, hold: !$("job-pop").hidden });
+      { rpm: j ? j.rpm : 0, mrr: dt > 0 ? removed / dt / scale : 0, flutes: j ? j.flutes : 2, hold: !$("job-pop").hidden, vac: vacPowered() });
   }
   function soundToggle() {
     const on = soundEngine().setOn(!SND.s.on());

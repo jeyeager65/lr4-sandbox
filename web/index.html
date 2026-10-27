@@ -706,6 +706,7 @@
   <div class="col-strip" aria-label="Machine (folded)">
     <button type="button" class="hold-btn" data-run="hold" disabled title="Feed hold (!)" aria-label="Hold">❚❚</button>
     <button type="button" data-run="stop" disabled title="Stop the job (soft reset)" aria-label="Stop">■</button>
+    <button type="button" class="estop-mini" data-pwr="estop" aria-pressed="false" aria-label="Emergency stop">⏻</button>
     <button type="button" data-run="home" title="Home all ($H)" aria-label="Home all">⌂</button>
     <button type="button" data-run="zero" title="Zero all here (G10 L20 P1 X0 Y0 Z0)" aria-label="Zero all">⊙</button>
   </div>
@@ -713,6 +714,24 @@
     <div class="g2">
       <button type="button" class="big hold-btn" id="run-hold" data-run="hold" disabled title="Feed hold (!)">❚❚ Hold</button>
       <button type="button" class="big" id="run-stop" data-run="stop" disabled title="Stop the job: soft reset (FluidNC drops it)">■ Stop</button>
+    </div>
+    <div class="pwr-row" aria-label="Switch panel">
+      <button type="button" class="estop" id="pwr-estop" aria-pressed="false">E-STOP</button>
+      <button type="button" class="pwr-sw lit" id="pwr-router" aria-pressed="true" title="The router's rocker on the switch panel: on / off">Router</button>
+      <button type="button" class="pwr-sw lit" id="pwr-vac" aria-pressed="true" title="The vac's rocker on the switch panel: on / off">Vac</button>
+      <button type="button" class="q" data-help="help-pwr" aria-label="About the switch panel" title="About the switch panel">?</button>
+    </div>
+    <p class="pwr-note" id="pwr-note" hidden></p>
+    <div class="help" id="help-pwr" hidden>
+      <p><b>The switch panel</b> is on the table's front edge, at the other end from the pendant. Click its parts in the
+      view, or use these buttons.</p>
+      <p><b>E-STOP</b> (the red mushroom) cuts the power to everything. FluidNC stops where it is and the motors go limp,
+      so it no longer knows where the machine is. The router and the vac spin down, and the bit cools. A fire keeps
+      burning: the e-stop only takes away the power. The green lamp is off while it's pressed.</p>
+      <p><b>Release</b> it with a quarter twist. The power comes back and FluidNC restarts. Home it before the next job.</p>
+      <p><b>Router</b> and <b>Vac</b> are lighted rockers: lit means on, with power. The router turns only when the job
+      turns it on, and the vac runs with it. The router also has its own switch on its body. Click it on the model to
+      turn it off: the router won't start until it's back on.</p>
     </div>
     <div class="dro-box">
       <div class="dro" id="dro" aria-label="Position, mm">
@@ -1010,6 +1029,7 @@
 <script src="js/page/heat_fx.js"></script>
 <script src="js/page/hose_bom.js"></script>
 <script src="js/page/inspect.js"></script>
+<script src="js/page/power.js"></script>
 <script src="js/page/ui.js"></script>
 <script src="js/page/scripting.js"></script>
 <script src="js/page/director.js"></script>

@@ -418,7 +418,7 @@
       },
       voice: () => sayer,
       // o: { rpm (the router's set speed, 0 = off), mrr (mm^3/s the bit is removing, real time), flutes, hold (an M0
-      // popup is up: the joke voice says "hmmm?" as it opens) }
+      // popup is up: the joke voice says "hmmm?" as it opens), vac (false: the vac stays off with the router on) }
       update(p, dt, scale, steps, o = {}) {
         if (!p) return;
         vel = velocity(pose, p, dt, scale, vel);
@@ -429,7 +429,8 @@
           const target = o.rpm || 0;
           rpm = ease(rpm, target, dt, target > rpm ? ROUTER.up : ROUTER.down);
           load = ease(load, rpm > 2000 ? Math.min(1.6, (o.mrr || 0) / MRR_FULL) : 0, dt, 0.12 * Math.sqrt(Math.max(1, scale || 1)));
-          vac = ease(vac, target > 0 ? 1 : 0, dt, target > 0 ? VAC.up : VAC.down);
+          const vt = target > 0 && o.vac !== false;  // o.vac false: its own switch off / no power (Part 44f)
+          vac = ease(vac, vt ? 1 : 0, dt, vt ? VAC.up : VAC.down);
         }
         const eff = rpm * (1 - ROUTER.sag * Math.min(load, 1.5)), hz = eff / 60;
         const plunge = Math.abs(vel[2]) > 0.5 * Math.hypot(vel[0], vel[1]) + 0.2;

@@ -530,6 +530,7 @@
     $("ctl-state").textContent = "";
   }
   async function ctlBoot() {                         // (re)start FluidNC with the config.yaml in use
+    if (PWR.estop) { ctlMsg("E-STOP pressed - no power. Twist the e-stop to release it."); return; }   // (Part 44f)
     const me = CTL.booting = {};
     ctlStop();
     ctlMsg("Starting FluidNC…");
@@ -718,8 +719,8 @@
   function runState() {                              // the pill, Hold / Stop and the overrides, from the state
     const st = CTL.state || (CTL.sim ? "" : CTL.booting ? "Starting" : "Off"), job = FJ.job, pill = $("st-pill");
     const held = !!job && (job.held || /^Hold/.test(st));
-    pill.textContent = `${st || "–"}${CTL.homed && st !== "Alarm" ? " · homed" : ""} ▾`;
-    pill.className = "st-pill" + (st === "Alarm" ? " alarm" : /^(Run|Jog|Home)/.test(st) ? " run" : /^Hold|Door/.test(st) ? " hold" : "");
+    pill.textContent = PWR.estop ? "E-STOP · power off ▾" : `${st || "–"}${CTL.homed && st !== "Alarm" ? " · homed" : ""} ▾`;
+    pill.className = "st-pill" + (st === "Alarm" || PWR.estop ? " alarm" : /^(Run|Jog|Home)/.test(st) ? " run" : /^Hold|Door/.test(st) ? " hold" : "");
     for (const b of document.querySelectorAll("[data-run=hold]")) {
       b.disabled = !job;
       b.textContent = b.id ? (held ? "▶ Resume" : "❚❚ Hold") : held ? "▶" : "❚❚";

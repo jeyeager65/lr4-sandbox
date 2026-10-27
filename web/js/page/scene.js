@@ -1032,6 +1032,89 @@ float lr4G(float x) { float s = 2.0 * fract(x) - 1.0; return floor(x) / 3.0 + (s
     g.fillStyle = "#050607"; g.fillRect(0, 0, canvas.width, canvas.height);
     tex.needsUpdate = true;
   }
+  // ---- the switch panel (Part 44f): one box on the table's front face, at the other end from the pendant - the
+  // e-stop (V1E store's "Emergency Stop Button": a red mushroom on an XB2-style 22 mm bezel, twist to release; it
+  // cuts the mains), a green power lamp, a lighted rocker for the router and one for the vac (both dead with the
+  // e-stop). Sizes are GUESSes (no measured button): head 40 mm, bezel 30 mm, travel 6 mm. Its face is a canvas (the
+  // yellow EMERGENCY STOP disc, labels). power.js presses / lights it; parts at their base.t, the panel facing -Y.
+  const SWP = { w: 180, h: 84, d: 55, estop: -50, lamp: 4, router: 40, vac: 70, travel: 6, inset: 60 };
+  function switchPanelMeshes() {                      // [geometry, material, userData]: local geometry, world base.t
+    const bb = tableBox(true);
+    if (!bb) return [];
+    let cx = bb.max.x - SWP.inset - SWP.w / 2, fy = bb.min.y, top = bb.min.z - 5, mount = null;
+    const bx = (n) => { const m = meshes.find((q) => q.userData.name === n); return m && new THREE.Box3().setFromObject(m); };
+    const st = bx("RailStrip_Min"), ed = bx("RailEdge_Min");
+    if (U.base === "torsion" && st && ed) {           // the pendant's way, mirrored: under the Min rail strip's front end
+      fy = st.min.y; top = st.min.z - 5; cx = st.min.x + SWP.w / 2;
+      mount = [st.min.x, fy, ed.min.z, st.max.x, fy + 60, st.min.z];
+    }
+    const cz = top - SWP.h / 2, y0 = fy - SWP.d, at = (dx, dy = 0) => ({ t: [cx + dx, y0 + dy, cz], s: [1, 1, 1] });
+    const ud = (name, label, base, extra) => Object.assign({ name, label, group: "Electronics", motion: "table", source: "hardware",
+      ownGeo: true, base }, extra);
+    const flat = (c, extra) => new THREE.MeshStandardMaterial(Object.assign({ color: new THREE.Color().setRGB(...c).convertSRGBToLinear(),
+      roughness: 0.55, metalness: 0, side: THREE.DoubleSide }, extra));
+    // turned shapes about Y, [r, h] points: h out of the face (-Y) from it
+    const lathe = (pts) => new THREE.LatheGeometry(pts.map(([r, h]) => new THREE.Vector2(r, h)), 32).scale(1, -1, 1);
+    const cyl = (r, d, y) => new THREE.CylinderGeometry(r, r, d, 32).translate(0, -y - d / 2, 0);
+    const ring = (r0, r1, d) => lathe([[r0, 0], [r1, 0], [r1, d - 1], [r1 - 1, d], [r0, d], [r0, 0]]);
+    const out = [];
+    out.push([new THREE.BoxGeometry(SWP.w, SWP.d, SWP.h).translate(0, SWP.d / 2, 0), flat([0.13, 0.13, 0.14]),
+      ud("SwitchPanel_Box", "Switch panel box (e-stop, power lamp, router + vac rockers; GUESS: 180 x 84 x 55 mm)", at(0), { color: [0.13, 0.13, 0.14] })]);
+    out.push([new THREE.PlaneGeometry(SWP.w, SWP.h).rotateX(Math.PI / 2).translate(0, -0.3, 0), flat([1, 1, 1], { map: switchFace(), roughness: 0.7 }),
+      ud("SwitchPanel_Face", "Switch panel face (EMERGENCY STOP disc, labels)", at(0), { color: [0.13, 0.13, 0.14] })]);
+    // the e-stop: bezel, the stem (shows between the bezel and the head while it's out), the red mushroom head
+    out.push([ring(11, 15, 10), flat([0.05, 0.05, 0.05], { roughness: 0.4 }),
+      ud("SwitchPanel_EStopBezel", "E-stop bezel (22 mm XB2-style, knurled)", at(SWP.estop), { color: [0.05, 0.05, 0.05] })]);
+    out.push([cyl(9, 18, 0), flat([0.55, 0.55, 0.57], { metalness: 0.4, roughness: 0.4 }),
+      ud("SwitchPanel_EStopStem", "E-stop plunger", at(SWP.estop), { color: [0.55, 0.55, 0.57] })]);
+    out.push([lathe([[0, 0], [9, 0], [19, 1], [20, 3], [20, 8], [18, 11], [13, 13.5], [6, 14.6], [0, 14.9]]).translate(0, -10 - SWP.travel, 0),
+      flat([0.78, 0.05, 0.04], { roughness: 0.35 }),
+      ud("SwitchPanel_EStop", "Emergency stop (click: press = mains off; click again: twist to release)", at(SWP.estop), { color: [0.78, 0.05, 0.04], click: "estop" })]);
+    // the power lamp: a 22 mm pilot light, lit while the mains are on
+    out.push([ring(9, 14, 6), flat([0.05, 0.05, 0.05], { roughness: 0.4 }),
+      ud("SwitchPanel_LampBezel", "Power lamp bezel", at(SWP.lamp), { color: [0.05, 0.05, 0.05] })]);
+    out.push([lathe([[0, 0], [9, 0], [9, 5], [7, 7.5], [4, 8.6], [0, 9]]), flat([0.1, 0.25, 0.12], { roughness: 0.25, emissive: 0x000000 }),
+      ud("SwitchPanel_Lamp", "Power lamp (green: lit = power on)", at(SWP.lamp), { color: [0.1, 0.25, 0.12], lens: [0.35, 1, 0.45] })]);
+    // the rockers: a bezel and a red lighted rocker on its pivot (top in = on)
+    for (const [k, label] of [["router", "Router"], ["vac", "Vac"]]) {
+      const K = k[0].toUpperCase() + k.slice(1);
+      out.push([new THREE.BoxGeometry(24, 4, 32).translate(0, -2, 0), flat([0.05, 0.05, 0.05], { roughness: 0.4 }),
+        ud(`SwitchPanel_${K}Bezel`, `${label} rocker bezel`, at(SWP[k]), { color: [0.05, 0.05, 0.05] })]);
+      out.push([new THREE.BoxGeometry(19, 5, 27), flat([0.3, 0.04, 0.03], { roughness: 0.3, emissive: 0x000000 }),
+        ud(`SwitchPanel_${K}`, `${label} switch (lighted rocker; click: on / off - lit = on with power)`, at(SWP[k], -5), { color: [0.3, 0.04, 0.03],
+          lens: [1, 0.2, 0.12], click: k })]);
+    }
+    if (mount) out.push([boxesGeo([mount]), material([0.86, 0.68, 0.44], null, false, "ply"), { name: "SwitchPanel_Mount",
+      label: "Switch panel mount block (5/8 in plywood, under the Min rail strip's front end)", group: "Electronics", motion: "table",
+      source: "made", color: [0.86, 0.68, 0.44], ownGeo: true, grain: "ply" }]);
+    return out;
+  }
+  function switchFace() {                             // the panel's face: 4 px a mm, centre = the panel's centre
+    const k = 4, c = document.createElement("canvas");
+    c.width = SWP.w * k; c.height = SWP.h * k;
+    const g = c.getContext("2d"), X = (x) => (x + SWP.w / 2) * k, Z = (z) => (SWP.h / 2 - z) * k;
+    g.fillStyle = "#232325"; g.fillRect(0, 0, c.width, c.height);
+    g.fillStyle = "#f5c400"; g.beginPath(); g.arc(X(SWP.estop), Z(0), 32 * k, 0, 2 * Math.PI); g.fill();   // the yellow disc
+    g.fillStyle = "#111"; g.font = `bold ${5 * k}px sans-serif`; g.textAlign = "center"; g.textBaseline = "middle";
+    const arc = (text, r, a0, dir) => {               // text round the disc (dir 1: over the top, -1: under)
+      const step = 0.205 * dir, n = text.length;
+      [...text].forEach((ch, i) => {
+        const a = a0 + (i - (n - 1) / 2) * step;
+        g.save(); g.translate(X(SWP.estop) + dir * r * k * Math.sin(a), Z(0) - dir * r * k * Math.cos(a)); g.rotate(a);   // left to right either way
+        g.fillText(ch, 0, 0); g.restore();
+      });
+    };
+    arc("EMERGENCY", 26.5, 0, 1);
+    arc("STOP", 26.5, 0, -1);
+    g.fillStyle = "#e8e8e8"; g.font = `bold ${4.2 * k}px sans-serif`;
+    for (const [x, t] of [[SWP.lamp, "POWER"], [SWP.router, "ROUTER"], [SWP.vac, "VAC"]]) g.fillText(t, X(x), Z(-27));
+    g.font = `${3.6 * k}px sans-serif`;
+    for (const x of [SWP.router, SWP.vac]) { g.fillText("I", X(x), Z(21)); g.fillText("O", X(x), Z(-20.5)); }
+    const tex = new THREE.CanvasTexture(c);
+    tex.encoding = THREE.sRGBEncoding;
+    tex.anisotropy = 4;
+    return tex;
+  }
   loadPendant();
   function rebuild() {
     clearMachine();
@@ -1078,6 +1161,7 @@ float lr4G(float x) { float s = 2.0 * fract(x) - 1.0; return floor(x) / 3.0 + (s
     for (const [geo, ud] of tableMeshes()) addMesh(geo, material(ud.color, null, false, ud.grain), ud);
     for (const [geo, ud] of legMeshes()) addMesh(geo, material(ud.color, null, false, ud.grain), ud);
     for (const [geo, mat, ud] of pendantMeshes()) addMesh(geo, mat, ud);
+    for (const [geo, mat, ud] of switchPanelMeshes()) addMesh(geo, mat, ud);
     meta = { cut_in: [S.cutX / IN, S.cutY / IN], travel: LR4Model.travel(cfg, S), tip_above_table: cfg.tip_above_table,
       hose: LR4Model.hose(cfg, S, inst), table_mm: [S.TW, S.TL], bom: cfg.bom_ref, peter_style: cfg.peter_style, parts: meshes,
       triangles: tris };
@@ -1088,6 +1172,7 @@ float lr4G(float x) { float s = 2.0 * fract(x) - 1.0; return floor(x) / 3.0 + (s
     updateSliders();
     renderBom();
     updateShop();
+    if (typeof powerLook === "function") powerLook();   // the switch panel as the power is (power.js, Part 44f)
   }
 
   // ---- workshop scenery (js/workshop.js) round the table, sized by the building size (blank = auto); the note

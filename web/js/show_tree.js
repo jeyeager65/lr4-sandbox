@@ -18,7 +18,7 @@
     Hose: "hose", Electronics: "electronics", Pendant: "pendant" };
   const MOTION_ASM = { table: "table", gantry: "beam", beam: "beam", core: "core", hose: "hose" };   // a bolt nothing else places
   const ROUTER = /^(Router_|Tool_Mount_|Dust_Shoe|Dust_Skirt|Bristles_TPU)/;
-  const ELEC = /(^|_)(Stepper|Endstop)|^PSU|^Jackpot3_(Fan|Board)|^TouchPlate_Wire|^Pendant_screen/;
+  const ELEC = /(^|_)(Stepper|Endstop)|^PSU|^Jackpot3_(Fan|Board)|^TouchPlate_Wire|^Pendant_screen|^SwitchPanel_(?!Mount)/;
   const FRAME = ["table", "yz-min", "yz-max", "beam"];
   // how a part comes off in the exploded view when that isn't along its screws (user 2026-10-22): the X motor lifts out
   // of the core, the Y / Z motors slide out to their own side (Min -X, Max +X)

@@ -168,6 +168,11 @@
   // mode is always "fluidnc" since Part 34 (Basic became Preview: JOB.preview)
   const CTL = { mode: "fluidnc", sim: null, cfg: null, boot: null, mpos: null, state: "", booting: null,
     pins: 0, pose: null, yaml: "", homed: false, homing: false, rel: {}, lost: [] };
+  // the switch panel (Part 44f, power.js): the e-stop (pressed = the mains off), the router + vac rockers and the
+  // router's own body switch (on by default, in series with its rocker); not kept (a new page: all on, e-stop out)
+  const PWR = { estop: false, router: true, vac: true, body: true };
+  const routerPowered = () => !PWR.estop && PWR.router && PWR.body;
+  const vacPowered = () => !PWR.estop && PWR.vac;
   // lost: mm each motor (cfg.pins.motors order) is behind the steps FluidNC sent it (Part 44a lost steps: + = short of
   // where + moves took it); every motor -> pose sum takes it off (ctlLive, abFromMotors) and the switches / probe trip
   // where the machine really is (so $H puts it right)
