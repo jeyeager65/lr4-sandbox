@@ -30,6 +30,20 @@ console.log(`  dwell: smoke ${tSmoke} s, then scorch +${tScorch} s, would-ignite
 ok(tSmoke > 3 && tSmoke < 9, `dwell smokes in 3-9 s (${tSmoke})`);
 ok(tScorch !== null && tIgn !== null && tSmoke + tScorch + tIgn < 25, `then scorches + would catch within 25 s`);
 ok(H.burning(d).length === 0, "Fire off: no fire");
+// the sample length doesn't matter: a dwell stepped at 2 ms catches when one at 50 ms does (2026-10-27: a new cell
+// under the bit was dropped as "cool" each short step - recordings never caught)
+{
+  const tIg = (dt) => { const s = H.create(); for (let t = 0; t < 40; t += dt) if (H.step(s, base({ dt })).events.includes("would-ignite")) return t; return null; };
+  const a = tIg(0.05), b = tIg(0.002);
+  ok(a !== null && b !== null && Math.abs(a - b) < 0.5, `would-ignite at 50 ms steps ${a && a.toFixed(2)} s, at 2 ms ${b && b.toFixed(2)} s`);
+}
+// the shank jammed in the wood (Part 44c: past the flutes, X stuck): it rubs - catches far sooner than a dwell
+{
+  const j = H.create(), jam = { eng: { d: 3, c: 3, s: 1.3 } };
+  const jS = until(j, jam, (o) => o.events.includes("smoke")), jI = jS + until(j, jam, (o) => o.events.includes("would-ignite"));
+  console.log(`  jammed shank: smoke ${jS} s, would-ignite ${jI.toFixed(1)} s`);
+  ok(jS < tSmoke / 2 && jI < 12, `a jammed shank smokes in half a dwell's time, would catch within 12 s (${jS}, ${jI.toFixed(1)})`);
+}
 // Fire on: it catches, the fire grows; the extinguisher puts it out and cools the spot + the bit
 const f = H.create(), tF = until(f, { fire: true }, (o) => o.events.includes("ignite"));
 ok(tF !== null && tF < 25 && H.burning(f).length === 1, `Fire on: catches (${tF} s)`);

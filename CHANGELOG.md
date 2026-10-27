@@ -3,6 +3,19 @@
 The version is the sandbox page's (`VERSION` in `web/js/page/job.js`, shown in its footer). The footer also shows
 the date the model data was built and the Printables file set it was solved for.
 
+## 0.54.0 - 2026-10-27
+- **Hard spots in the stock:** `(Stock Hard: KNOT=x,y,r[,k] GLUE=Y40[,w[,k]])` in a G-code file marks knots (drawn
+  as dark ringed spots) and glue lines; they cut several times harder, so a cut that's fine in clear wood can lose
+  steps there.
+- **Too deep for the bit:** deeper than the flutes, a sideways move shoves the smooth shank instead of cutting - X / Y
+  jam and stay stuck until Z lifts. A jammed bit spins in one spot: it rubs, smokes within seconds and (Fire on) catches.
+- **run_amps** from your config.yaml sets how hard each motor pushes before it skips (0.8 A = V1E's); over 1.0 A Run
+  notes that the motors run hot. Illustrative numbers.
+- Fixes: a G4 dwell happens at the end of the move before it; the stock is carved every motor sample (lost steps no
+  longer depend on the frame rate); after lost steps the job's progress follows where FluidNC thinks it is (video lines
+  no longer bunch up); a spot under the bit always takes its heat (recordings caught fire late or never); printed parts
+  melt less near a fire; video stock shots look at the stock after homing.
+
 ## 0.53.0 - 2026-10-26
 - **Heat and fire** (Configure > 4 As built > Real-world > Heat, off by default): on a FluidNC Run a bit that rubs
   instead of cutting - sitting still with the router on, a feed too slow for the rpm (chipload under ~0.025 mm), a

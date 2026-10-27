@@ -93,7 +93,7 @@
     });
   }
   const ease = (from, to, dt, tc) => from + (to - from) * (1 - Math.exp(-dt / tc));
-  // steps per mm + microsteps + run_mode per axis from a config.yaml's text (axes: x: motor0: tmc_2209 ...)
+  // steps per mm + microsteps + run_mode + run_amps per axis from a config.yaml's text (axes: x: motor0: tmc_2209 ...)
   function stepsFromYaml(text) {
     const out = {}, lines = String(text || "").split(/\r?\n/);
     let axis = null, ind = -1;
@@ -102,14 +102,16 @@
       if (m && AXES.includes(m[2])) { axis = m[2]; ind = m[1].length; out[axis] = out[axis] || {}; continue; }
       if (axis && l.trim() && l.search(/\S/) <= ind) axis = null;
       if (!axis) continue;
-      const per = /^\s*steps_per_mm:\s*([\d.]+)/.exec(l), mic = /^\s*microsteps:\s*(\d+)/.exec(l), rm = /^\s*run_mode:\s*(\w+)/.exec(l);
+      const per = /^\s*steps_per_mm:\s*([\d.]+)/.exec(l), mic = /^\s*microsteps:\s*(\d+)/.exec(l), rm = /^\s*run_mode:\s*(\w+)/.exec(l), am = /^\s*run_amps:\s*([\d.]+)/.exec(l);
       if (per && out[axis].perMm === undefined) out[axis].perMm = Number(per[1]);
       if (mic && out[axis].micro === undefined) out[axis].micro = Number(mic[1]);
       if (rm && out[axis].mode === undefined) out[axis].mode = rm[1];
+      if (am && out[axis].amps === undefined) out[axis].amps = Number(am[1]);
     }
     for (const a of AXES) {
       const o = out[a] || {};
-      out[a] = { perMm: o.perMm || (a === "z" ? 200 : 50), micro: o.micro || 8, mode: /^spread/i.test(o.mode || "") ? "SpreadCycle" : "StealthChop" };
+      out[a] = { perMm: o.perMm || (a === "z" ? 200 : 50), micro: o.micro || 8, mode: /^spread/i.test(o.mode || "") ? "SpreadCycle" : "StealthChop",
+        amps: o.amps > 0 ? o.amps : 0.8 };   // V1E's 0.8 A when the config doesn't say
     }
     return out;
   }

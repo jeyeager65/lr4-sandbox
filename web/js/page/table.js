@@ -426,7 +426,7 @@
     const lv = (v) => (Math.abs(v) < 0.005 ? "level" : `${f(v)} mm ${v > 0 ? "higher" : "lower"} at the Max end`);
     let t = `Now: the gantry ${rk(E.y)}, the beam ${lv(E.z)}`;
     if (AB.geo) t += `; a cutting-area rectangle's diagonals would differ by ${f(Imperfect.squareness(E, AB.geo, { x0: 0, x1: S.cutX, y0: 0, y1: S.cutY }).diff)} mm`;
-    $("ab-now").textContent = t + `. $H leaves it ${rk(res.y)}, ${lv(res.z)}.` + slipSummary();
+    $("ab-now").textContent = t + `. $H leaves it ${rk(res.y)}, ${lv(res.z)}.` + slipSummary() + slipAmpsNote();
     // where each "stops apart" comes from: set here, what the pulloffs make up for, else a typical amount (equal pulloffs)
     const from = { set: "set here", pulloffs: "from your pulloffs", guess: "typical" };
     const why = [st.from.y, st.from.z].includes("guess") ? " Typical = a usual amount; your pulloffs are equal, so $H leaves it that far out." : "";

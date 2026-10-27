@@ -18,6 +18,7 @@ const GP = vm.runInContext("self = this; GcodePlay", ctx), StockSimulator = vm.r
 
 let fails = 0, checks = 0;
 const ok = (cond, msg) => { checks++; if (!cond) { fails++; console.log("FAIL " + msg); } };
+const near = (a, b, tol = 1e-6) => Math.abs(a - b) <= tol;
 
 (async () => {
   for (const [strut, opts] of [[600, {}], [830, {}], [1200, { tabs: 0 }], [830, { step: 3.5, tabs: 6, plate: 0 }]]) {
@@ -152,6 +153,21 @@ const ok = (cond, msg) => { checks++; if (!cond) { fails++; console.log("FAIL " 
     let seen = null;
     const c = await GP.load("(CNCSIM UNITS=INCH)\n(Stock: XMIN=0 XMAX=2 YMIN=0 YMAX=3 ZMIN=-0.5 ZMAX=0)\nG20\nG0 Z0.2\n", null, (st) => { seen = st; return s0; });
     ok(c.segs[0].start.x === 3 && seen && Math.abs(seen.zmin + 12.7) < 1e-9 && Math.abs(seen.xmax - 50.8) < 1e-9, `start fn: stock ${JSON.stringify(seen)}`);
+  }
+  // G4 dwells (Part 44c): listed with the move after them; comments / other P words don't count
+  {
+    const d = await GP.load("G21 G90\nG0 Z5\nG1 Z-3 F300\n(Video Text: G4 P9)\nG4 P20\nG4P1.5 ; again\nG0 Z40\nG4 P2\nM30\n");
+    ok(JSON.stringify(d.dwells) === JSON.stringify([{ index: 2, lineNum: 5, secs: 20 }, { index: 2, lineNum: 6, secs: 1.5 },
+      { index: 3, lineNum: 8, secs: 2 }]) && d.segs[2].srcLine === 7, `dwells: ${JSON.stringify(d.dwells)}`);
+  }
+  // (Stock Hard:) (Part 44c): knots / glue lines in the file's units; none = null
+  {
+    const h = await GP.load("(Stock Hard: KNOT=60,50,8 KNOT=10, 20, 5, 2.5 GLUE=Y40 GLUE=x7,2,3)\n(Stock Hard: bad KNOT=1,2)\nG21\nG0 Z5\n");
+    ok(JSON.stringify(h.hard) === JSON.stringify({ knots: [{ x: 60, y: 50, r: 8 }, { x: 10, y: 20, r: 5, k: 2.5 }],
+      glue: [{ axis: "x", at: 40 }, { axis: "y", at: 7, w: 2, k: 3 }] }), `hard: ${JSON.stringify(h.hard)}`);
+    const hi = await GP.load("(Stock: XMIN=0 XMAX=4 YMIN=0 YMAX=4 ZMIN=-0.5 ZMAX=0)\n(Stock Hard: KNOT=1,2,0.5 GLUE=Y3)\nG20\nG0 Z0.2\n");
+    ok(hi.hard && near(hi.hard.knots[0].x, 25.4) && near(hi.hard.knots[0].r, 12.7) && near(hi.hard.glue[0].at, 76.2) && (await GP.load("G0 Z1\n")).hard === null,
+      `hard in inches: ${JSON.stringify(hi.hard)}`);
   }
 
   console.log(`${checks - fails}/${checks} checks passed`);

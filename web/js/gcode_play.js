@@ -106,7 +106,32 @@
       plates.push({ index: i, x: s.start.x, y: s.start.y, z: s.probe.surface, thick: s.probe.plate, tool: s.toolNumber,
         t0: before ? before.time : timeOf(i), t1: after ? after.time : timeOf(i + 2) });
     });
-    return { segs, t, total, events, stock, tools, plates, anim, lines: text.split("\n").length - extra, metaInch,
+    // G4 dwells (P = seconds, FluidNC): the parser skips them, so the clock has no time for them; listed so FluidNC
+    // jobs can tell a dwell from the move after it. index: the move after the G4
+    const dwells = [];
+    source.forEach((l, n) => {
+      const m = /^[^;(]*\bG0*4(?![\d.])[^;(]*?P\s*([\d.]+)/i.exec(l);
+      if (!m) return;
+      let i = segs.findIndex((s) => (s.srcLine || 0) > n + 1);
+      dwells.push({ index: i < 0 ? segs.length : i, lineNum: n + 1, secs: +m[1] });
+    });
+    // the stock's hard spots (Part 44c; LostSteps.hardAt): (Stock Hard: KNOT=x,y,r[,k] GLUE=Y40[,w[,k]]), any number of
+    // each, on any number of lines; in the file's units (the (Stock:) line's)
+    const hard = { knots: [], glue: [] }, u = metaInch ? IN : 1;
+    for (const l of source) {
+      const c = /^\s*\(\s*Stock\s+Hard\s*:([^)]*)\)/i.exec(l);
+      if (!c) continue;
+      for (const m of c[1].matchAll(/\b(KNOT|GLUE)\s*=\s*([XY]?)([-\d.,\s]+)/gi)) {
+        const v = m[3].split(",").map((q) => q.trim()).filter((q) => q !== "").map(Number);
+        if (v.some((q) => !Number.isFinite(q))) continue;
+        if (/knot/i.test(m[1]) && v.length >= 3) hard.knots.push(Object.assign({ x: v[0] * u, y: v[1] * u, r: v[2] * u }, v.length > 3 ? { k: v[3] } : {}));
+        else if (/glue/i.test(m[1]) && m[2] && v.length >= 1) {
+          // GLUE=Y40: the line at Y 40, running along X
+          hard.glue.push(Object.assign({ axis: /y/i.test(m[2]) ? "x" : "y", at: v[0] * u }, v.length > 1 ? { w: v[1] * u } : {}, v.length > 2 ? { k: v[2] } : {}));
+        }
+      }
+    }
+    return { segs, t, total, events, stock, tools, plates, anim, dwells, hard: hard.knots.length || hard.glue.length ? hard : null, lines: text.split("\n").length - extra, metaInch,
       units: !inches ? "mm" : inches === segs.length ? "in" : "mixed" };
   }
 

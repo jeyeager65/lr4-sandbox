@@ -25,6 +25,7 @@ axes:
       tmc_2209:
         microsteps: 8
         run_mode: SpreadCycle
+        run_amps: 1.200
     motor1:
       tmc_2209:
         microsteps: 16
@@ -41,7 +42,8 @@ ok(st.x.perMm === 50 && st.x.micro === 8 && st.x.mode === "StealthChop", "x: " +
 ok(st.y.perMm === 50 && st.y.micro === 8 && st.y.mode === "SpreadCycle", "y (first motor's): " + JSON.stringify(st.y));
 ok(st.z.perMm === 200 && st.z.micro === 8 && st.z.mode === "StealthChop", "z (no run_mode = StealthChop): " + JSON.stringify(st.z));
 const none = S.stepsFromYaml("");
-ok(none.x.perMm === 50 && none.z.perMm === 200 && none.x.micro === 8, "no config: V1E's numbers");
+ok(none.x.perMm === 50 && none.z.perMm === 200 && none.x.micro === 8 && none.x.amps === 0.8, "no config: V1E's numbers");
+ok(st.y.amps === 1.2 && st.x.amps === 0.8, `run_amps: y 1.2 (first motor's), x not set = 0.8 (${st.y.amps}, ${st.x.amps})`);
 
 // full steps and the voice: X at 50 mm/s = 312.5 full steps/s -> 78.1 Hz; a 5 mm/s Z plunge -> 31.25 Hz; a creep is silent
 ok(near(S.fullStepHz(50, 50, 8), 312.5), "full-step rate");

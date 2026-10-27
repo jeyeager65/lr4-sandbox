@@ -104,7 +104,7 @@ const VIDEO = HEAD.concat(["G0 X120 Y50", "G1 Z-3 F300", "G4 P6", "G0 Z5", "M5",
     ok(a.boxes, "Fire / auto enabled with Heat on");
     ok(!/Smoke/.test(a.cut.note) && a.cut.scorched === 0, `proper cut: no smoke, no scorch (bit ${a.cut.bit && a.cut.bit.toFixed(0)} °C)`);
     ok(a.heatOnly.seen.smoke && a.heatOnly.scorched > 0 && a.heatOnly.seen.would && !a.heatOnly.seen.burning,
-      `Heat only: smoke, scorch (${a.heatOnly.scorched} cells), the warning, no fire - ${a.heatOnly.note}`);
+      `Heat only: smoke, scorch (${a.heatOnly.scorched} cells), the warning, no fire - ${a.heatOnly.note} ${JSON.stringify(a.heatOnly.seen)}`);
     ok(a.heatOnly.seen.particles, "smoke particles drawn");
     ok(a.fire.seen.burning && a.fire.seen.out && a.fire.seen.spray && a.fire.seen.back && a.fire.seen.away, `Fire: caught, the extinguisher flew (${Object.keys(a.fire.seen).join(", ")})`);
     ok(a.fire.burning === 0 && a.fire.seen.outNote && a.fire.scorched > 0, `put out ("Out." said), the scorch stays (${a.fire.scorched} cells)`);

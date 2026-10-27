@@ -46,7 +46,7 @@ const S_HELPERS = `
   askBox.auto = () => true;
   true`;
 // a slot along +X at Y 50 of a 200 x 100 x 12 mm stock: depth, feed
-const SLOT = (depth, feed) => ["(LR4 slip test)", "(Stock: XMIN=0 XMAX=200 YMIN=0 YMAX=100 ZMIN=-12 ZMAX=0)",
+const SLOT = (depth, feed, hard) => ["(LR4 slip test)", "(Stock: XMIN=0 XMAX=200 YMIN=0 YMAX=100 ZMIN=-12 ZMAX=0)", ...(hard ? [hard] : []),
   "(ToolDef 1: SHAPE=flat D=3.175 FLUTES=2 LEN=12.7 NAME=1/8in flat)", "G21 G90 G54", "T1", "M3 S18000", "G0 Z5", "G0 X20 Y50",
   `G1 Z${-depth} F300`, `G1 X150 F${feed}`, "G0 Z5", "M5", "M30", ""].join("\n");
 
@@ -83,6 +83,13 @@ const SLOT = (depth, feed) => ["(LR4 slip test)", "(Stock: XMIN=0 XMAX=200 YMIN=
       const e0 = LR4AsBuilt.E().y;
       LR4Slip.force("y", 1, 1.28); LR4Ctl.sync(); await T.sleep(300);
       out.rack = LR4AsBuilt.E().y - e0;
+      // Part 44c: the same pushy cut in clear wood, then through a knot
+      out.home2 = await A.home();
+      const n0 = LR4Slip.count();
+      out.clear = await A.play(${JSON.stringify(SLOT(3, 2500))}, "clear.gcode");
+      out.clearN = LR4Slip.count() - n0;
+      out.knot = await A.play(${JSON.stringify(SLOT(3, 2500, "(Stock Hard: KNOT=100,50,12)"))}, "knot.gcode");
+      out.knotN = LR4Slip.count() - n0 - out.clearN;
       return out;
     })()`);
     const lostX = (l) => (l && l.length ? l[0] : NaN);   // V1E's config: motor 0 = X
@@ -90,10 +97,12 @@ const SLOT = (depth, feed) => ["(LR4 slip test)", "(Stock: XMIN=0 XMAX=200 YMIN=
     ok(/^Done\./.test(a.gentle) && a.gentleN === 0 && a.gentleLost.every((v) => v === 0), `sane cut: no slips (${a.gentleN}) - ${a.gentle}`);
     ok(/^Done\./.test(a.hard) && a.hardN > 0 && lostX(a.hardLost) > 0.5, `9 mm at 2500 slips X: ${a.hardN} slips, lost ${JSON.stringify(a.hardLost)}`);
     ok(/lost steps: X/.test(a.hard), `the job says so: ${a.hard}`);
-    ok(a.end !== null && near(a.end, 150 - lostX(a.hardLost) + 3.175 / 2, 1), `the slot ends short: x ${a.end} (FluidNC 150 + the bit radius, lost ${lostX(a.hardLost).toFixed(2)})`);
+    ok(a.end !== null && near(a.end, 150 - lostX(a.hardLost) + 3.175 / 2, 2), `the slot ends short: x ${a.end} (FluidNC 150 + the bit radius, lost ${lostX(a.hardLost).toFixed(2)})`);   // 2 mm: a runaway (~107 mm) ends its last slips past the carve by up to ~1.9 mm (timing)
     ok(/lost steps/.test(a.note), `Run's note: ${a.note}`);
     ok(a.home0 && a.home1 && a.home0.every((v, i) => near(v, a.home1[i], 0.1)), `$H finds it: ${JSON.stringify(a.home0)} / ${JSON.stringify(a.home1)}`);
     ok(near(Math.abs(a.rack), 1.28, 0.01), `NOW= slip on Y racks it 1.28 mm: ${a.rack}`);
+    ok(/^Done\./.test(a.clear) && a.clearN === 0, `3 mm at 2500 in clear wood: no slips (${a.clearN}) - ${a.clear}`);
+    ok(/^Done\./.test(a.knot) && a.knotN > 0, `the same through a knot slips: ${a.knotN} - ${a.knot}`);
   } catch (e) {
     ok(false, "threw: " + (e && e.stack || e));
   } finally {

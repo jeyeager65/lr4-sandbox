@@ -25,6 +25,14 @@ ok(LS.settings().on === false, "off by default");
 ok(near(LS.capacity("x", 0, steps.x, 0), 0.3 * 2 * Math.PI / 0.032, 1e-6), `X capacity ${LS.capacity("x", 0, steps.x, 0)}`);
 ok(near(LS.capacity("x", LS.C.F_KNEE, steps.x, 0), LS.capacity("x", 0, steps.x, 0) / 2, 1e-9), "torque halves at the knee");
 ok(LS.capacity("z", 0, steps.z, 1) < 0.3 * LS.capacity("z", 0, steps.z, 0), "dry Z screws: under 30% of lubed");
+// run_amps (config.yaml): the push goes with the current, up to A_SAT; no amps = A_REF
+{
+  const c = (amps) => LS.capacity("x", 0, Object.assign({}, steps.x, { amps }), 0), c0 = LS.capacity("x", 0, steps.x, 0);
+  ok(near(c(LS.C.A_REF), c0) && near(c(1.2), c0 * 1.5) && near(c(3), c(LS.C.A_SAT)), `run_amps: 0.8 = default, 1.2 = 1.5x, saturates (${c(1.2).toFixed(1)} N)`);
+  const hot = { v: { x: 2500 / 60, y: 0, z: 0 }, eng: { d: 6, c: 6 } };
+  ok(run(hot).all.length > 0 && run(Object.assign({}, hot, { steps: Object.assign({}, steps, { x: Object.assign({}, steps.x, { amps: 1.4 }) }) })).all.length === 0,
+    "6 mm at 2500 slips at 0.8 A, not at 1.4 A");
+}
 
 // engage: a full slot 3 mm deep -> d 3 ahead, c 3; the bit above the stock -> 0
 const flat = (top) => () => top;
@@ -43,6 +51,42 @@ ok(deep.all.length > 0 && deep.all.every((q) => q.axis === "x" && q.mm > 0), `to
 ok(near(deep.st.lost.x[0], deep.all.length * 4 / 6.25), `whole quanta (4 full steps = 0.64 mm): ${deep.st.lost.x[0]}`);
 ok(run(along(2500, 6, "y")).all.length === 0, "the same along Y: two motors carry it");
 ok(run(along(-2500, 6)).st.lost.x[0] < 0, "a - move slips short in -");
+
+// hard spots (Part 44c): a knot / glue line cuts harder; a pushy cut that's fine in clear wood slips in a knot
+const hard = { knots: [{ x: 50, y: 50, r: 10 }], glue: [{ axis: "x", at: 80 }] };
+ok(LS.hardAt(hard, 50, 50) === LS.C.KNOT_K && LS.hardAt(hard, 50, 61) === 1 && near(LS.hardAt(hard, 50, 58.75), (1 + LS.C.KNOT_K) / 2) && LS.hardAt(null, 50, 50) === 1,
+  `hardAt knot: center KNOT_K, outside 1, fades in its outer quarter (${LS.hardAt(hard, 50, 58.75)})`);
+ok(LS.hardAt(hard, 0, 80.4) === 4 && LS.hardAt(hard, 0, 80.6) === 1 && LS.hardAt({ glue: [{ axis: "y", at: 5, w: 2, k: 2 }] }, 5.9, 0) === 2, "hardAt glue: 1 mm wide, either way");
+{
+  const e1 = LS.engage(flat(0), { x: 0, y: 0, z: -3 }, 1, 0, 1.5875, 12.7), e3 = LS.engage(flat(0), { x: 50, y: 50, z: -3 }, 1, 0, 1.5875, 12.7, hard);
+  const eo = LS.engage(flat(-5), { x: 50, y: 50, z: -3 }, 1, 0, 1.5875, 12.7, hard);
+  ok(e1.k === 1 && near(e3.k, LS.C.KNOT_K) && eo.k === 1 && near(e3.d, e1.d), `engage k: plain 1, in the knot KNOT_K, above the stock 1 (${e1.k}, ${e3.k}, ${eo.k})`);
+}
+const pushy = along(2000, 3);
+ok(run(pushy).all.length === 0 && run(Object.assign({}, pushy, { eng: { d: 3, c: 3, k: LS.C.KNOT_K } })).all.length > 0,
+  "2000 mm/min 3 deep: no slips in clear wood, slips in a knot");
+ok(run(Object.assign({}, along(1000, 3), { eng: { d: 3, c: 3, k: LS.C.KNOT_K } })).all.length === 0, "1000 mm/min 3 deep: a knot doesn't stall it");
+
+// the shank: deeper than the flutes, a sideways move shoves it - stuck even slow; a plunge that deep is fine
+{
+  const es = LS.engage(flat(10), { x: 0, y: 0, z: -4 }, 1, 0, 1.5875, 12.7);
+  ok(near(es.d, 12.7) && near(es.s, 1.3), `engage: 14 deep with 12.7 flutes -> d 12.7, s 1.3 (${es.d}, ${es.s})`);
+  ok(LS.engage(flat(10), { x: 0, y: 0, z: -4 }, 0, 0, 1.5875, 12.7).s === 0 && LS.engage(flat(10), { x: 0, y: 0, z: 0 }, 1, 0, 1.5875, 12.7).s === 0,
+    "engage: s 0 when not moving sideways / within the flutes");
+  const slow = { v: { x: 300 / 60, y: 0, z: 0 }, eng: { d: 0.2, c: 0.2, s: 1 } }, stuck = run(slow);
+  ok(near(stuck.st.lost.x[0], 5, 0.65), `1 mm of shank at 300 mm/min: X stuck (lost ${stuck.st.lost.x[0].toFixed(2)} of 5 mm)`);
+  ok(run({ v: { x: 0, y: 0, z: -1 }, eng: { d: 0, c: 0.5, s: 0 } }).all.length === 0, "plunging that deep: Z fine");
+  // jammed: still stuck once it reads its own hole (s 0), until Z lifts; a move back frees it too
+  const j1 = run({ v: { x: 5, y: 0, z: 0 }, eng: { d: 0, c: 0, s: 0 } }, 1, 0.004, stuck.st);
+  ok(stuck.st.jam && near(j1.st.lost.x[0], 10, 0.65), `jammed: the next 5 mm lost too though s reads 0 (lost ${j1.st.lost.x[0].toFixed(2)})`);
+  const back = run({ v: { x: -5, y: 0, z: 0 }, eng: { d: 0, c: 0, s: 0 } }, 0.1, 0.004, LS.create());
+  const st2 = LS.create(); st2.jam = { x: 1, y: 0 };
+  ok(back.all.length === 0 && (run({ v: { x: -5, y: 0, z: 0 }, eng: {} }, 0.1, 0.004, st2), st2.jam === null), "a move back frees it");
+  const st3 = LS.create(); st3.jam = { x: 1, y: 0 }; run({ v: { x: 0, y: 0, z: 5 }, eng: {} }, 0.1, 0.004, st3);
+  ok(st3.jam === null && run({ v: { x: 5, y: 0, z: 0 }, eng: { d: 0, c: 0, s: 0 } }, 1, 0.004, st3).all.length === 0, "Z lifting frees it");
+  const st4 = LS.create(); st4.jam = { x: 1, y: 0 }; LS.homed(st4);
+  ok(st4.jam === null, "$H frees it");
+}
 
 // router off in the stock: the bit drags, X stalls (loses most of the move)
 const off = run(Object.assign(along(1000, 3), { rpm: 0 }));

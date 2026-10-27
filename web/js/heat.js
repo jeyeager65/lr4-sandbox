@@ -16,6 +16,8 @@
     TAU_CONTACT: 0.7,   // s: the stock under the bit taking the bit's heat
     TAU_CELL: 6,        // s: a spot cooling once the bit has gone
     H_GOOD: 0.025,      // mm / tooth: thinner chips than this rub
+    Q_SHANK: 120,       // °C/s more per mm of shank buried in the wood (Part 44c: past the flutes, the spinning shank
+                        // rubs the wood it's jammed against - friction, it burns fast; capped at 2 mm; illustrative)
     SMOKE: 180, SCORCH: 260, IGNITE: 380,   // °C (wood chars ~250-300, MDF / pine ignite ~300-400)
     BURN: 450,          // °C a burning spot holds until it's put out
     CELL: 3,            // mm
@@ -50,7 +52,8 @@
     st.t += dt;
     const eng = o.eng || { d: 0, c: 0 }, deep = Math.max(eng.d, eng.c, eng.o || 0), contact = deep > 0, rb = rubbing(o);
     const depthK = contact ? 0.5 + 0.5 * Math.min(1, deep / 3) : 0;
-    const q = contact ? C.Q_RUB * Math.max(0, o.rpm || 0) / C.RPM_REF * rb.rub * depthK : 0;
+    const spin = Math.max(0, o.rpm || 0) / C.RPM_REF;
+    const q = contact ? C.Q_RUB * spin * rb.rub * depthK + C.Q_SHANK * spin * Math.min(2, eng.s || 0) : 0;
     const chips = contact && o.rpm > 0 ? (1 - rb.rub) / C.TAU_CHIPS : 0;
     st.bit += (q - (st.bit - C.T_AIR) * (1 / C.TAU_BIT + chips)) * dt;
     // the cells under the bit's tip take its heat (while it's in the stock)
@@ -62,7 +65,7 @@
         if (Math.hypot(x - o.p.x, y - o.p.y) > r + C.CELL / 2 || (o.top && o.top(x, y) === null)) continue;
         let c = st.cells.get(key(i, j));
         if (!c) { c = { i, j, x, y, T: C.T_AIR, scorch: 0, z: o.p.z }; st.cells.set(key(i, j), c); }
-        c.z = o.p.z;
+        c.z = o.p.z; c.at = st.t;                    // touched now: kept (below)
         if (st.bit > c.T) c.T += (st.bit - c.T) * Math.min(1, dt / C.TAU_CONTACT);
       }
     }
@@ -85,7 +88,9 @@
       if (fire && Math.hypot(fire.x - c.x, fire.y - c.y) <= Math.max(C.CELL * 1.5, fire.r)) c.T = Math.max(c.T, C.BURN);
       else c.T -= (c.T - C.T_AIR) * Math.min(1, dt / C.TAU_CELL);
       if (c.T > C.SCORCH) c.scorch = Math.min(1, c.scorch + (c.T - C.SCORCH) / 150 * dt);
-      if (c.T < C.T_AIR + 2 && c.scorch === 0) { st.cells.delete(k); continue; }
+      // gone once cool - not one the bit touches now: a new cell warms only (bit - T) x dt / TAU_CONTACT a sample, under
+      // the 2 degrees with short samples (2026-10-27: a recording's slow machine time never kept one - no fire)
+      if (c.T < C.T_AIR + 2 && c.scorch === 0 && c.at !== st.t) { st.cells.delete(k); continue; }
       if (!hot || c.T > hot.T) hot = c;
     }
     for (const f of st.fires) {                      // burning: it spreads over the stock (new cells in its radius)

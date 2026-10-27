@@ -2,7 +2,7 @@
 // The page's scripts share one global scope (js/page/*.js, loaded in order by index.html): names declared
 // at the top level here are seen by the later files.
   // ---- version + feedback: the issue link carries the size, data date and the loaded files' checksums ----
-  const VERSION = "0.53.0";
+  const VERSION = "0.54.0";
   function setupAbout() {
     const bits = [`lr4-sandbox ${VERSION}`];
     if (cfg.built) bits.push(`model data built ${cfg.built}`);
@@ -285,11 +285,19 @@
     catch (e) { /* V1E's */ }
     return GcodePlay.V1E;
   }
-  function jobStockMaterial(top, bottom, through, skirt, rgb) {   // cnc-gcode-tools' stock shader (theme colours as there; rgb: MDF)
+  // hard: the job's hard spots (GcodePlay's (Stock Hard:), work mm) and off = [x, y] work -> world: knots as darker
+  // ringed grain right through the stock, glue lines as darker lines (Part 44c)
+  const HARD_N = 8;
+  function jobStockMaterial(top, bottom, through, skirt, rgb, hard, off) {   // cnc-gcode-tools' stock shader (theme colours as there; rgb: MDF)
     const dark = matchMedia("(prefers-color-scheme: dark)").matches;
+    const knots = [...Array(HARD_N)].map(() => new THREE.Vector4()), glue = [...Array(HARD_N)].map(() => new THREE.Vector4());
+    const hk = hard ? hard.knots.slice(0, HARD_N) : [], hg = hard ? hard.glue.slice(0, HARD_N) : [], o = off || [0, 0];
+    hk.forEach((q, i) => knots[i].set(q.x + o[0], q.y + o[1], q.r, 0));
+    hg.forEach((g, i) => glue[i].set(g.axis === "x" ? 0 : 1, g.at + (g.axis === "x" ? o[1] : o[0]), Math.max(0.8, g.w ?? LostSteps.C.GLUE_W), 0));
     const m = new THREE.ShaderMaterial({
       side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1,
-      uniforms: { uLight: { value: new THREE.Vector3(0, 0, 1) }, uView: { value: new THREE.Vector3(0, 0, 1) },
+      uniforms: { uKnot: { value: knots }, uNKnot: { value: hk.length }, uGlue: { value: glue }, uNGlue: { value: hg.length },
+        uLight: { value: new THREE.Vector3(0, 0, 1) }, uView: { value: new THREE.Vector3(0, 0, 1) },
         uStockColor: { value: new THREE.Vector3(...(rgb || (dark ? [0.80, 0.68, 0.50] : [0.87, 0.75, 0.56]))) },
         uCutColor: { value: new THREE.Vector3(...(rgb ? rgb.map((v) => v * 0.85) : dark ? [0.70, 0.55, 0.38] : [0.76, 0.60, 0.42])) },
         uTop: { value: top }, uBottom: { value: bottom }, uThroughZ: { value: through + (top - bottom) * 1e-5 },
@@ -309,12 +317,23 @@
       fragmentShader: `varying vec3 vPos; varying vec3 vNormal; varying float vThrough; varying float vFresh;
         uniform vec3 uLight; uniform vec3 uView; uniform vec3 uStockColor; uniform vec3 uCutColor;
         uniform float uTop; uniform float uBottom; uniform float uSkirt;
+        uniform vec4 uKnot[${HARD_N}]; uniform int uNKnot; uniform vec4 uGlue[${HARD_N}]; uniform int uNGlue;
         void main() {
           if (vThrough > 0.999) discard;
           vec3 n = normalize(vNormal);
           if (dot(n, uView) < 0.0) n = -n;
           float depth = clamp((uTop - vFresh - vPos.z) / max(uTop - uBottom, 1e-6), 0.0, 1.0);
           vec3 base = depth < 1e-4 || uSkirt > 0.5 ? uStockColor : mix(uCutColor, uCutColor * 0.55, depth);
+          for (int i = 0; i < ${HARD_N}; i++) {
+            if (i >= uNKnot) break;
+            float d = distance(vPos.xy, uKnot[i].xy), r = uKnot[i].z;
+            base = mix(base, base * vec3(0.52, 0.38, 0.26) * (0.82 + 0.18 * sin(d * 2.6)), 1.0 - smoothstep(0.75 * r, r, d));
+          }
+          for (int i = 0; i < ${HARD_N}; i++) {
+            if (i >= uNGlue) break;
+            float c = uGlue[i].x < 0.5 ? vPos.y : vPos.x, h = 0.5 * uGlue[i].z;
+            base = mix(base, base * vec3(0.62, 0.50, 0.32), 1.0 - smoothstep(h, h + 0.3, abs(c - uGlue[i].y)));
+          }
           float diffuse = max(dot(n, uLight), 0.0);
           float sky = 0.5 + 0.5 * n.z;
           gl_FragColor = vec4(base * (0.22 + 0.18 * sky + 0.62 * diffuse), 1.0);
@@ -330,7 +349,7 @@
     };
   }
   // rest(x, y) (sim frame, optional): how far the stock's bottom is below flat there (Part 32: it follows the spoilboard)
-  function jobStockMesh(sim, at, rgb, rest) {        // the heightmap as one grid (top) + its four side walls
+  function jobStockMesh(sim, at, rgb, rest, hard) {  // the heightmap as one grid (top) + its four side walls; hard: jobStockMaterial
     const { nx, ny, vx, vy, dx, dy, stock: s } = sim;
     const pos = new Float32Array(vx * vy * 3), sag = new Float32Array(vx * vy);
     for (let j = 0, k = 0; j < vy; j++) for (let i = 0; i < vx; i++, k++) {
@@ -351,7 +370,7 @@
     // shaded as cnc-gcode-tools shades its stock (StockMeshRenderer): cut surfaces in their own colour, darker with
     // depth, lit from beside the camera; cut-through triangles dropped so the table shows; pushed back (polygon offset)
     // so the moves on its surface stay visible
-    const top = new THREE.Mesh(geo, jobStockMaterial(at[2] + s.zmax, at[2] + s.zmin, sim.bottom + at[2], false, rgb));
+    const top = new THREE.Mesh(geo, jobStockMaterial(at[2] + s.zmax, at[2] + s.zmin, sim.bottom + at[2], false, rgb, hard, at));
     const x0 = at[0] + s.xmin, x1 = at[0] + s.xmax, y0 = at[1] + s.ymin, y1 = at[1] + s.ymax, z0 = at[2] + s.zmin, z1 = at[2] + s.zmax;
     const w = [], rz = (x, y) => (rest ? rest(x - at[0], y - at[1]) : 0);   // the walls follow it too, in pieces
     for (const [a, b, c, d] of [[x0, y0, x1, y0], [x1, y0, x1, y1], [x1, y1, x0, y1], [x0, y1, x0, y0]]) {
@@ -374,7 +393,7 @@
     wg.setAttribute("aRest", new THREE.BufferAttribute(new Float32Array(w.length / 3), 1));
     wg.setAttribute("aFresh", new THREE.BufferAttribute(new Float32Array(w.length / 3), 1));
     wg.computeVertexNormals();
-    top.add(new THREE.Mesh(wg, jobStockMaterial(z1, z0, -Infinity, true, rgb)));
+    top.add(new THREE.Mesh(wg, jobStockMaterial(z1, z0, -Infinity, true, rgb, hard, at)));
     top.userData.z = at[2];
     top.userData.box = new THREE.Box3(new THREE.Vector3(x0, y0, z0), new THREE.Vector3(x1, y1, z1));   // picked / snapped as this (hose_bom.js tableBlocks)
     top.onBeforeRender = camLight([top.material]);
@@ -930,7 +949,7 @@
       const rest = stockRest({ x: [tl.stock.xmin + z0[0], tl.stock.xmax + z0[0]], y: [tl.stock.ymin + z0[1], tl.stock.ymax + z0[1]] });
       Imperfect.follow(JOB.sim, rest);
       JOB.sim.setSegments(tl.segs);
-      JOB.stock = jobStockMesh(JOB.sim, at, undefined, rest && ((x, y) => rest.at(x + z0[0], y + z0[1])));
+      JOB.stock = jobStockMesh(JOB.sim, at, undefined, rest && ((x, y) => rest.at(x + z0[0], y + z0[1])), tl.hard);
       JOB.group.add(JOB.stock);
       jobUpdateMesh(true);
     }

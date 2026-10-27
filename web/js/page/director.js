@@ -181,7 +181,15 @@ window.LR4Director = (() => {
       ncM += ncS * dt;
       uiPlace();
       const st = await clock.frame(cam || null, dt, [ncM, ncS * dt, o.kmax]);
-      if (RUN.frames % o.fps === 0) ev(`sec rate=${+ncS.toPrecision(3)} line=${st.line} t=${st.t.toFixed(1)} badge=${evBadge}`);
+      if (RUN.frames % o.fps === 0) {
+        ev(`sec rate=${+ncS.toPrecision(3)} line=${st.line} t=${st.t.toFixed(1)} badge=${evBadge}`);
+        const ab = LR4AsBuilt.get();                 // Part 44: the slips / heat each second (only videos that turn them on)
+        if (ab.on && ((ab.slip && ab.slip.on) || (ab.heat && ab.heat.on))) {
+          const hs = LR4Heat.state(), spot = hs ? Math.max(20, ...[...hs.cells.values()].map((c) => c.T)) : 20;
+          ev(`state slips=${LR4Slip.count()} lostX=${LR4Slip.lost()[0].toFixed(2)} bit=${(LR4Heat.bit() || 20).toFixed(0)}°C spot=${spot.toFixed(0)}°C ` +
+            `cells=${hs ? hs.cells.size : 0} burning=${LR4Heat.burning()}`);
+        }
+      }
       if (o.trace && RUN.frames < 600) RUN.lines.push("nc " + RUN.frames + " " + JSON.stringify(D.ncTrace()));
       last = st;
       if (captionEnd && RUN.frames + 1 >= captionEnd) { captionEnd = 0; call("caption", null); }
@@ -483,7 +491,8 @@ window.LR4Director = (() => {
       say("homing (FluidNC must, before a job)");
       call("home", true);
       for (let i = 0; i < n(120) && D.homing(); i++) await frame(cam);
-      await D.layout();
+      const lay = await D.layout();                  // the stock moved with the homed spot: later stock shots look there
+      stockView = viewOf(lay.stock, lay.at);
     }
     say(`job (at ${(RUN.frames / o.fps).toFixed(1)} s, ${pace.base}x)`);
     const ncJob0 = ncM;

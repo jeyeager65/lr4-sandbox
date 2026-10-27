@@ -37,8 +37,34 @@
     if (!FJ.job || !CTL.sim || CTL.sim.stopped || !JOB.tl) return;
     const now = ncTime();                            // dt in machine seconds
     slipTick((now - FJ.job.at) / 1000);              // lost steps (Part 44a) before the spot is read
-    FJ.pts.push(Object.assign(fjWork(ctlRaw()), { dt: (now - FJ.job.at) / 1000 }));
+    const raw = ctlRaw(), dts = (now - FJ.job.at) / 1000;
+    FJ.pts.push(Object.assign(fjWork(raw), { dt: dts }));
     FJ.job.at = now;
+    if (FJ.job.C) {                                  // where FluidNC thinks it is (the lost steps put back): the job's
+      const ms = CTL.cfg.pins.motors;                // progress (line, events, router) - the real bit can be far off
+      const cmd = raw.map((v, i) => { const k = ms.findIndex((m) => m.axis === "xyz"[i]); return v + (k >= 0 ? CTL.lost[k] || 0 : 0); });
+      const rate = Math.max(...["x", "y", "z"].map((a) => CTL.cfg.rates[a] || 0)) / 60;
+      FJ.job.C.feed(fjWork(cmd), rate * dts * 1.5 + 1);
+    }
+    fjCarve();
+  }
+  // carve each sample as it comes (the mesh still once a frame): the next sample's slip / heat reads the stock cut up
+  // to here - carved once a frame, the cut lagged the bit by a frame, so a busy PC read the slot walls as wood and
+  // loads (slips) changed with the frame rate (2026-10-27: the same 9 mm cut lost 0 or 114 mm)
+  function fjCarve() {
+    const J = FJ.job, tl = JOB.tl;
+    const rate = Math.max(...["x", "y", "z"].map((a) => CTL.cfg.rates[a] || 0)) / 60;   // mm/s of machine time (fjSample's dt)
+    const pts = FJ.pts.splice(0);
+    for (const q of pts) {
+      const acts = J.T.feed(q, rate * q.dt * 1.5 + 1);
+      if (J.P) {                                     // As built: the motors are off the path by its errors, so the
+        J.P.feed(q, rate * q.dt * 1.5 + 1);          // exact tracker carves straight lines from sample to sample, with
+        for (const a of acts) if (a.line && J.P.i > a.seg) a.seg = J.P.i;   // the bit of the move the job is on (the 2 mm
+      }                                              // tracker) - not the last move it matched (2026-10-26: T1's V-bit
+                                                     // carved the 1in surfacing passes as thin lines)
+      if (JOB.sim && acts.length) MotionCarve.carve(JOB.sim, tl.segs, acts);
+      if (JOB.spoil && acts.length && MotionCarve.carve(JOB.spoil, tl.segs, acts)) J.spoilCut = true;
+    }
   }
   // ---- Lost steps (Part 44a, As built > Lost steps; js/lost_steps.js): each sample, the cut's load on every motor
   // (how deep the bit is in the stock ahead of it, the feed for the rpm, each axis' drag) against what it can push at
@@ -76,11 +102,14 @@
       return i >= 0 && i <= sim.nx && k >= 0 && k <= sim.ny ? sim.heights[k * sim.vx + i] : null;
     };
     const vh = Math.hypot(v.x, v.y), tx = meta.travel.x;
-    const eng = LostSteps.engage(heightAt, p, vh > 0 ? v.x / vh : 0, vh > 0 ? v.y / vh : 0, r, def && def.fluteLength);
-    heatStep({ dt, v, eng, rpm: j ? j.rpm : 0, flutes: j ? j.flutes : 2, r, p, top: heightAt });   // Part 44b: the same sample
+    const eng = LostSteps.engage(heightAt, p, vh > 0 ? v.x / vh : 0, vh > 0 ? v.y / vh : 0, r, def && def.fluteLength, tl.hard);
+    const out = slipOn ? LostSteps.step(SLIP.st, { dt, v, set, steps: soundSteps(), rpm: j ? j.rpm : 0, flutes: j ? j.flutes : 2, r, eng,
+      u: (pose[0] - tx[0]) / Math.max(1, tx[1] - tx[0]) }) : null;
+    // Part 44b: the same sample, at the bit's real speed: jammed (the shank buried, Part 44c) it spins in one spot -
+    // rubbing, it heats, smokes, can catch (user 2026-10-27), whatever FluidNC thinks the feed is
+    const vReal = slipOn && SLIP.st.jam ? { x: 0, y: 0, z: v.z } : v;
+    heatStep({ dt, v: vReal, eng, rpm: j ? j.rpm : 0, flutes: j ? j.flutes : 2, r, p, top: heightAt });
     if (!slipOn) return;
-    const out = LostSteps.step(SLIP.st, { dt, v, set, steps: soundSteps(), rpm: j ? j.rpm : 0, flutes: j ? j.flutes : 2, r, eng,
-      u: (pose[0] - tx[0]) / Math.max(1, tx[1] - tx[0]) });
     SLIP.load = out;                                 // (tests: the last loads / capacities)
     if (!out.slips.length) return;
     const s2 = Imperfect.side2Motor(AB.set);
@@ -111,6 +140,12 @@
   }
   window.LR4Slip = { force: slipForce, seed(n) { SLIP.seed = n | 0; if (SLIP.st) SLIP.st.seed = SLIP.seed; }, lost: () => CTL.lost.slice(),
     load: () => SLIP.load || null, summary: () => slipSummary(), count: () => (SLIP.st ? SLIP.st.slips : 0) };
+  function slipAmpsNote() {                          // Lost steps on + a config.yaml run_amps over A_HOT: say what it costs
+    if (!(AB.set.on && AB.set.slip && AB.set.slip.on)) return "";
+    const st = soundSteps(), hot = ["x", "y", "z"].filter((a) => st[a].amps > LostSteps.C.A_HOT);
+    return hot.length ? ` run_amps ${hot.map((a) => `${a.toUpperCase()} ${st[a].amps} A`).join(", ")}: the motors push harder before ` +
+      `they skip, but run hot - raise it with care.` : "";
+  }
   function slipSummary() {                           // " The motors lost steps: X 1.92 mm, ..." or ""
     const ms = CTL.cfg && CTL.cfg.pins.motors;
     if (!ms || !CTL.lost.some((v) => Math.abs(v) > 1e-6)) return "";
@@ -166,7 +201,8 @@
     // machine runs a little off the G-code's own path there (a probe on a warped board sets Z where the page's ideal one
     // wouldn't, a gantry left racked), where T has left the path (it carves the motors' own lines then) and would stay
     // at the move it left. Only then: on small arcs a 2 mm band holds P back (a 3 mm circle is all inside it).
-    FJ.job = { path, T: MotionCarve.tracker(JOB.tl.segs), P: AB.set.on ? MotionCarve.tracker(JOB.tl.segs, { tol: 2 }) : null, seenSD: false, held: false, k: 0, at: ncTime(), t0: ncTime(), plate: null };
+    FJ.job = { path, T: MotionCarve.tracker(JOB.tl.segs), P: AB.set.on ? MotionCarve.tracker(JOB.tl.segs, { tol: 2 }) : null,
+      C: AB.set.on ? MotionCarve.tracker(JOB.tl.segs, { tol: 2 }) : null, seenSD: false, held: false, k: 0, at: ncTime(), t0: ncTime(), plate: null };
     FJ.pts = []; FJ.lastMsg = "";
     if (SLIP.st) SLIP.st.dist = 0;                   // the stock's variation from the job's start (Part 44a)
     HEAT.st = null; heatSay("");                     // fresh stock: no hot spots, no scorch (Part 44b)
@@ -191,26 +227,14 @@
   }
   function fjTick() {                                // once a frame: carve what the motors did since the last frame
     const J = FJ.job, tl = JOB.tl;
-    fjSample();
-    const rate = Math.max(...["x", "y", "z"].map((a) => CTL.cfg.rates[a] || 0)) / 60;   // mm/s of machine time (fjSample's dt)
-    const pts = FJ.pts.splice(0);
-    for (const q of pts) {
-      const acts = J.T.feed(q, rate * q.dt * 1.5 + 1);
-      if (J.P) {                                     // As built: the motors are off the path by its errors, so the
-        J.P.feed(q, rate * q.dt * 1.5 + 1);          // exact tracker carves straight lines from sample to sample, with
-        for (const a of acts) if (a.line && J.P.i > a.seg) a.seg = J.P.i;   // the bit of the move the job is on (the 2 mm
-      }                                              // tracker) - not the last move it matched (2026-10-26: T1's V-bit
-                                                     // carved the 1in surfacing passes as thin lines)
-      if (JOB.sim && acts.length) MotionCarve.carve(JOB.sim, tl.segs, acts);
-      if (JOB.spoil && acts.length && MotionCarve.carve(JOB.spoil, tl.segs, acts)) J.spoilCut = true;
-    }
+    fjSample();                                      // (carves what's left: fjCarve)
     jobUpdateMesh(false);
     if (J.spoilCut) { J.spoilCut = false; meshUpdate(SPOIL.sim, SPOIL.mesh, false); spoilSaveSoon(); }
     JOB.done.geometry.setDrawRange(0, 2 * J.T.carved);
     JOB.partial.geometry.setDrawRange(0, 0);
     const w = J.T.last;
     if (w) { $("wx").textContent = w.x.toFixed(3); $("wy").textContent = w.y.toFixed(3); $("wz").textContent = w.z.toFixed(3); }
-    for (; J.k < tl.events.length && tl.events[J.k].index <= (J.P || J.T).i; J.k++) {
+    for (; J.k < tl.events.length && tl.events[J.k].index <= (J.C || J.P || J.T).i; J.k++) {
       const e = tl.events[J.k];                      // a tool change (M6): hold it there for the bit - also when the
       if (e.kind === "tool") {                       // hold beat this tick there (slow frames): fjHold's own tick then
         J.toolStop = e;                              // still finds it, so the popup asks for the bit, not "Paused (M0)"
@@ -228,7 +252,7 @@
   }
   function fjHold() {                                // FluidNC is holding (M0, or ! from here): the popup
     fjTick();                                        // the motion up to now first: the status can beat the frame
-    const J = FJ.job, tl = JOB.tl, segs = tl.segs, c = (J.P || J.T).i;
+    const J = FJ.job, tl = JOB.tl, segs = tl.segs, c = (J.C || J.P || J.T).i;
     const noCut = (a, b) => { for (let i = a; i < b; i++) if (segs[i].type === "cut") return false; return true; };
     const attach = tl.plates.find((q) => q.index >= c && noCut(c, q.index));
     const remove = !attach && J.plate && noCut(J.plate.index + 1, c + 1);

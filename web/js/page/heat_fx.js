@@ -176,7 +176,8 @@
   // flames, more above them: hot air rises); it chars (its color toward black, rougher) and the printed / TPU parts
   // slump toward the fire (PLA softens ~60 °C, the TPU skirt + bristles first), smoking while they cook. It stays that
   // way when the fire's out: Repair puts it right (LR4Heat.repair, the Run note's button). Illustrative, like the rest. ----
-  const DMG = { CHAR: 10, MELT0: 1.2, MELT: 4, SAG: 70, MELT_R: 220, PULL: 0.22, REACH: 260, EVERY: 0.25, BIG: 400 };   // MELT_R: mm round the fire that slumps   // exposure units, mm
+  const DMG = { CHAR: 10, MELT0: 1.2, MELT: 6, SAG: 25, MELT_R: 150, PULL: 0.22, REACH: 260, EVERY: 0.25, BIG: 400 };   // MELT_R: mm round the fire that slumps   // exposure units, mm
+  // (user 2026-10-27: "melting the plastic a bit too much" - SAG 70 -> 25 mm, MELT_R 220 -> 150, MELT 4 -> 6)
   HEAT.dmg = new Map();                                // mesh -> { h (exposure), char, melt, orig { color, rough }, geo (own copy), base }
   const dmgBox = new THREE.Box3(), dmgSphere = new THREE.Sphere();
   function heatCeiling(at) {                          // the lowest underside right over a fire's spot (world z) within 250 mm

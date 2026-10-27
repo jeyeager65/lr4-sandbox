@@ -150,7 +150,7 @@
       const tl = JOB.tl, nc = !JOB.preview, t = nc ? this.ncT() : JOB.t;
       const p = tl ? GcodePlay.at(tl, t) : null, i = tl ? Math.min(p.index, tl.segs.length - 1) : -1, sg = tl && tl.segs[i];
       return { t, total: tl ? tl.total : 0, playing: nc ? !!FJ.job && !FJ.job.held : JOB.playing, paused: !$("job-pop").hidden,
-        closeUp: !!JOB.camSaved || !!camTween, cut: !!sg && sg.type === "cut", line: sg ? sg.srcLine || 0 : 0,
+        closeUp: !!JOB.camSaved || !!camTween, cut: !!sg && sg.type === "cut", line: nc ? this.ncLine() : sg ? sg.srcLine || 0 : 0,
         tip: p && JOB.at ? [JOB.at[0] + p.x, JOB.at[1] + p.y, JOB.at[2] + p.z] : null,
         cam: [camera.position.toArray(), controls.target.toArray()],
         msg: (() => {                                // the latest MSG / PRINT line played
@@ -244,6 +244,21 @@
       const T = J.P || J.T, i = Math.min(T.i, tl.segs.length - 1), a = i > 0 ? tl.t[i - 1] : 0;   // P: As built's
       return T.carved >= tl.segs.length ? tl.total : a + Math.min(1, T.f) * (tl.t[i] - a);
     },
+    // the source line FluidNC's motors are on: the tracker's move; at its end the next move's (as the clock's index
+    // has it: lines after an M0 show while it holds), but the G4's line before a dwell, so (Video ...) lines after
+    // the G4 wait for the dwell (the clock has no time for it)
+    ncLine() {
+      const tl = JOB.tl, J = FJ.job;
+      if (!tl || !tl.segs.length) return 0;
+      const n = tl.segs.length, last = tl.segs[n - 1].srcLine || 0;
+      if (!J) return this._ncRan ? last : 0;
+      const T = J.C || J.P || J.T;                   // C: FluidNC's own place (lost steps don't stall the lines)
+      if (T.carved >= n) return last;
+      const i = Math.min(T.i, n - 1), sg = tl.segs[i], line = sg.srcLine || 0;
+      const L = Math.hypot(sg.end.x - sg.start.x, sg.end.y - sg.start.y, sg.end.z - sg.start.z);
+      const dw = (1 - T.f) * L < 0.05 && (tl.dwells || []).find((d) => d.index === i + 1);
+      return dw ? Math.max(line, dw.lineNum) : (1 - T.f) * L < 0.05 && i + 1 < n ? tl.segs[i + 1].srcLine || line : line;
+    },
     ncSend(line) {                                   // sent; its reply (ncReply: null, true or the error code) comes as frames run
       this._ncR = null;                              // (FluidNC all but stops between frames, so don't wait for it here)
       CTL.sim.command(line, 600000).then((r) => { this._ncR = r.ok ? true : r.code; }, () => { this._ncR = "no reply"; });
@@ -316,7 +331,7 @@
     if (!active) return null;
     const text = JOB.src && JOB.src.text;
     if (text !== SND.planSrc) { SND.planSrc = text; SND.plan = LR4Sound.routerPlan(text); }
-    const i = Math.min(FJ.job ? (FJ.job.P || FJ.job.T).i : GcodePlay.at(tl, JOB.t).index, tl.segs.length - 1), sg = tl.segs[Math.max(0, i)];
+    const i = Math.min(FJ.job ? (FJ.job.C || FJ.job.P || FJ.job.T).i : GcodePlay.at(tl, JOB.t).index, tl.segs.length - 1), sg = tl.segs[Math.max(0, i)];
     const def = sg && tl.tools && tl.tools.get(sg.toolNumber);
     // not with the touch plate / clip out (job.js touchOut): the router waits till the clip is off the collet nut
     return { rpm: touchOut() ? 0 : LR4Sound.routerAt(SND.plan, sg ? sg.srcLine || 0 : 0), seg: i, flutes: (def && def.flutes) || 2 };
