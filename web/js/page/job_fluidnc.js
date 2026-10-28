@@ -82,7 +82,8 @@
     if (!SLIP.prev) { SLIP.prev = [{ t: 0, cmd }]; SLIP.t = 0; return; }
     if (!(dt > 0)) return;
     SLIP.t += dt;
-    const H = SLIP.prev;
+    const H = SLIP.prev, last = H[H.length - 1].cmd;
+    const dd = { x: cmd[0] - last[0], y: cmd[1] - last[1], z: cmd[2] - last[2] };   // this sample's commanded mm
     H.push({ t: SLIP.t, cmd });
     while (H.length > 2 && SLIP.t - H[1].t >= SLIP_WIN) H.shift();
     const span = SLIP.t - H[0].t, prev = H[0].cmd;
@@ -93,8 +94,30 @@
     // and no faster than the machine can go: each axis' max rate, a feed move's F (x the feed override); the bursts
     // still read up to 2x (2026-10-26: Z "up" at 32 mm/s on a 15 mm/s axis)
     for (const a of ["x", "y", "z"]) { const m = (CTL.cfg.rates[a] || Infinity) / 60; v[a] = Math.min(m, Math.max(-m, v[a])); }
-    const fmax = sg && sg.type !== "rapid" && sg.feedRate > 0 ? sg.feedRate / 60 * (CTL.ov ? CTL.ov[0] / 100 : 1) : Infinity, sp = Math.hypot(v.x, v.y, v.z);
+    // (a rapid: as fast as its slowest axis lets it along its line, x the rapid override)
+    const rapidF = () => {
+      const d = sg.end && sg.start ? ["x", "y", "z"].map((a) => Math.abs(sg.end[a] - sg.start[a])) : [0, 0, 0], L = Math.hypot(...d);
+      if (!(L > 0)) return Infinity;
+      const f = Math.min(...["x", "y", "z"].map((a, i) => (d[i] > 0 ? (CTL.cfg.rates[a] || Infinity) / 60 * L / d[i] : Infinity)));
+      return f * (CTL.ov ? CTL.ov[1] / 100 : 1);
+    };
+    const fmax = !sg ? Infinity : sg.type === "rapid" ? rapidF() : sg.feedRate > 0 ? sg.feedRate / 60 * (CTL.ov ? CTL.ov[0] / 100 : 1) : Infinity, sp = Math.hypot(v.x, v.y, v.z);
     if (sp > fmax) for (const a of ["x", "y", "z"]) v[a] *= fmax / sp;
+    // ... and AT the move's F while it cruises: the steps over ncTime read slow when the wasm sim lags the real clock
+    // (a busy PC, two pages, 10x), so the same cut slipped or not by CPU load (2026-10-27: 30-39 vs 91 mm). Under a
+    // fifth of F = speeding up / slowing down: the measured speed. (SLIP.rate: measured / F while cruising, tests)
+    // Only along the move (the tracker can still be on the cut while Z lifts: once that pushed Z to the cut's F, 3x its
+    // max) and never past an axis' max rate
+    else if (fmax < Infinity && sp > 0.2 * fmax && sg.start && sg.end) {
+      const L = Math.hypot(sg.end.x - sg.start.x, sg.end.y - sg.start.y, sg.end.z - sg.start.z);
+      const along = L > 0 ? ["x", "y", "z"].reduce((s, a) => s + v[a] * (sg.end[a] - sg.start[a]), 0) / (L * sp) : 0;
+      if (along > 0.95) {
+        const R = SLIP.rate || (SLIP.rate = { n: 0, sum: 0, min: Infinity, max: 0 }), q = sp / fmax;
+        R.n++; R.sum += q; R.min = Math.min(R.min, q); R.max = Math.max(R.max, q);
+        const k = Math.min(fmax / sp, ...["x", "y", "z"].map((a) => (Math.abs(v[a]) > 1e-9 ? (CTL.cfg.rates[a] || Infinity) / 60 / Math.abs(v[a]) : Infinity)));
+        for (const a of ["x", "y", "z"]) v[a] *= k;
+      }
+    }
     const r = (def && def.diameter > 0 ? def.diameter : 3.175) / 2, pose = ctlLive(), p = fjWork(pose), sim = JOB.sim;
     const heightAt = (x, y) => {                     // the stock's top there (work mm), null off the stock
       if (!sim || !sim.heights) return null;
@@ -103,7 +126,7 @@
     };
     const vh = Math.hypot(v.x, v.y), tx = meta.travel.x;
     const eng = LostSteps.engage(heightAt, p, vh > 0 ? v.x / vh : 0, vh > 0 ? v.y / vh : 0, r, def && def.fluteLength, tl.hard);
-    const out = slipOn ? LostSteps.step(SLIP.st, { dt, v, set, steps: soundSteps(), rpm: j ? j.rpm : 0, flutes: j ? j.flutes : 2, r, eng,
+    const out = slipOn ? LostSteps.step(SLIP.st, { dt, dd, v, set, steps: soundSteps(), rpm: j ? j.rpm : 0, flutes: j ? j.flutes : 2, r, eng,
       u: (pose[0] - tx[0]) / Math.max(1, tx[1] - tx[0]) }) : null;
     // Part 44b: the same sample, at the bit's real speed: jammed (the shank buried, Part 44c) it spins in one spot -
     // rubbing, it heats, smokes, can catch (user 2026-10-27), whatever FluidNC thinks the feed is
@@ -112,6 +135,7 @@
     if (!slipOn) return;
     SLIP.load = out;                                 // (tests: the last loads / capacities)
     if (!out.slips.length) return;
+    if (window.SLIP_DBG) window.SLIP_DBG.push({ v, dd, dt, seg: j && j.seg, type: sg && sg.type, fmax, load: out.load, cap: out.cap, eng, slips: out.slips.length });
     const s2 = Imperfect.side2Motor(AB.set);
     for (const q of out.slips) {
       const k = q.axis === "x" ? ms.findIndex((m) => m.axis === "x") : ms.findIndex((m) => m.axis === q.axis && m.motor === (q.side ? s2 : 1 - s2));
@@ -139,7 +163,8 @@
     return true;
   }
   window.LR4Slip = { force: slipForce, seed(n) { SLIP.seed = n | 0; if (SLIP.st) SLIP.st.seed = SLIP.seed; }, lost: () => CTL.lost.slice(),
-    load: () => SLIP.load || null, summary: () => slipSummary(), count: () => (SLIP.st ? SLIP.st.slips : 0) };
+    load: () => SLIP.load || null, summary: () => slipSummary(), count: () => (SLIP.st ? SLIP.st.slips : 0),
+    rate: () => (SLIP.rate ? Object.assign({ mean: SLIP.rate.sum / SLIP.rate.n }, SLIP.rate) : null) };
   function slipAmpsNote() {                          // Lost steps on + a config.yaml run_amps over A_HOT: say what it costs
     if (!(AB.set.on && AB.set.slip && AB.set.slip.on)) return "";
     const st = soundSteps(), hot = ["x", "y", "z"].filter((a) => st[a].amps > LostSteps.C.A_HOT);

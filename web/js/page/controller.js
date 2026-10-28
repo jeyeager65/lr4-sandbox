@@ -395,6 +395,17 @@
     if (ev.type === "msg" && /^Homed:/.test(ev.text)) {
       $("home-status").textContent = `FluidNC ${ev.text}.`;
       if (SLIP.st) LostSteps.homed(SLIP.st, ev.text.slice(6).toLowerCase());   // squared again: no rack from slips (Part 44a)
+      // FluidNC's position is the switches' now: the steps lost before are part of where each motor started (the pose
+      // stays), so FluidNC's place (pose + lost: the job's progress tracker) is the real one again - else a $H mid-file
+      // left the tracker that far off and the rest of the job's (Video ...) lines never came (2026-10-28, safety.gcode)
+      const axes = ev.text.slice(6).toLowerCase(), ms = CTL.cfg && CTL.cfg.pins.motors;
+      if (ms && CTL.boot && CTL.bootM) ms.forEach((m, k) => {
+        if (!axes.includes(m.axis) || !CTL.lost[k]) return;
+        const i = "xyz".indexOf(m.axis);
+        if (ms.findIndex((q) => q.axis === m.axis) === k) CTL.boot[i] -= CTL.lost[k];
+        CTL.bootM[k] -= CTL.lost[k];
+        CTL.lost[k] = 0;
+      });
     }
     if (ev.type === "alarm") { CTL.homed = false; CTL.axesHomed = null; CTL.alarms = (CTL.alarms || 0) + 1; dro(); }
     if (ev.type === "alarm") { ctlMsg(`FluidNC ${ev.line}: Unlock ($X) to carry on.`); alarmShow(ev.code); }

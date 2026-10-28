@@ -77,7 +77,7 @@ const SLOT = (depth, feed, hard) => ["(LR4 slip test)", "(Stock: XMIN=0 XMAX=200
       out.gentle = await A.play(${JSON.stringify(SLOT(3, 1000))}, "gentle.gcode");
       out.gentleLost = LR4Slip.lost(); out.gentleN = LR4Slip.count();
       out.hard = await A.play(${JSON.stringify(SLOT(9, 2500))}, "hard.gcode");
-      out.hardLost = LR4Slip.lost(); out.hardN = LR4Slip.count(); out.load = LR4Slip.load();
+      out.hardLost = LR4Slip.lost(); out.hardN = LR4Slip.count(); out.load = LR4Slip.load(); out.rate = LR4Slip.rate();
       out.end = A.slotEnd(50, 6); out.note = LR4AsBuilt.note();
       out.home1 = await A.home();
       const e0 = LR4AsBuilt.E().y;
@@ -93,6 +93,7 @@ const SLOT = (depth, feed, hard) => ["(LR4 slip test)", "(Stock: XMIN=0 XMAX=200
       return out;
     })()`);
     const lostX = (l) => (l && l.length ? l[0] : NaN);   // V1E's config: motor 0 = X
+    console.log("  info rate (measured / F cruising): " + JSON.stringify(a.rate) + " lost " + JSON.stringify(a.hardLost));
     ok(a.form && a.lx === "30%", `the form shows it: ${a.form} ${a.lx}`);
     ok(/^Done\./.test(a.gentle) && a.gentleN === 0 && a.gentleLost.every((v) => v === 0), `sane cut: no slips (${a.gentleN}) - ${a.gentle}`);
     ok(/^Done\./.test(a.hard) && a.hardN > 0 && lostX(a.hardLost) > 0.5, `9 mm at 2500 slips X: ${a.hardN} slips, lost ${JSON.stringify(a.hardLost)}`);

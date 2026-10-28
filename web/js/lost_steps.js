@@ -132,8 +132,10 @@
   // load: stalled), in whole slips (QUANTUM full steps). Moves st.lost (mm, + = behind in +). -> { slips: [{ axis,
   // side, mm }], load, cap }. A motor only slips while its axis drives (holding torque is far more than running).
   function step(st, o) {
-    const dt = o.dt || 0, out = { slips: [] };
-    st.dist += Math.hypot(o.v.x, o.v.y, o.v.z) * dt;
+    // o.dd = the commanded mm per axis this moment (the page: the steps sent), else v x dt - by distance, an outcome
+    // doesn't hang on how the moment's time was measured
+    const dt = o.dt || 0, out = { slips: [] }, dd = o.dd || { x: o.v.x * dt, y: o.v.y * dt, z: o.v.z * dt };
+    st.dist += Math.hypot(dd.x, dd.y, dd.z);
     const lc = loads(st, Object.assign({ noise: noiseAt(st.seed, st.dist / C.NOISE_MM) }, o));
     out.load = lc.load; out.cap = lc.cap;
     if (!o.set.on) return out;
@@ -151,7 +153,7 @@
         const rho = jam && a !== "z" ? Infinity : lc.load[a][i] / Math.max(1e-9, lc.cap[a][i]);
         if (rho > 1 && a !== "z" && eng.s > 0 && !st.jam) st.jam = { x: o.v.x / vh, y: o.v.y / vh };
         if (rho <= 1) { st.cont[a][i] = 0; continue; }
-        st.cont[a][i] += Math.abs(va) * dt * Math.min(1, (rho - 1) * 3 + 0.25);
+        st.cont[a][i] += Math.abs(dd[a]) * Math.min(1, (rho - 1) * 3 + 0.25);
         while (st.cont[a][i] >= q) {
           st.cont[a][i] -= q;
           const mm = Math.sign(va) * q;
