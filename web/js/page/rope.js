@@ -228,6 +228,17 @@
       if (dm.lengthSq() > 0) for (let i = 0; i < RN.n; i++) { ROPE.p[i].add(dm); ROPE.q[i].add(dm); }
     }
     ROPE.at = ac.clone();
+    // put away and settled (1.5 s): the shape rides the core rigidly, no physics (user 2026-10-28: "shouldn't bounce
+    // around at all when put away" - the colliders' refresh and the slack still nudged them)
+    ROPE.still = stored ? (ROPE.still || 0) + dt : 0;
+    if (!stored) ROPE.frozen = null;
+    if (stored && ROPE.still > 1.5) {
+      if (!ROPE.frozen) ROPE.frozen = ROPE.p.map((p) => p.clone().sub(ac));
+      ROPE.frozen.forEach((r, i) => { ROPE.p[i].copy(ac).add(r); ROPE.q[i].copy(ROPE.p[i]); });
+      ROPE.rel = ROPE.frozen.map((r) => r.clone()); ROPE.vmax = 0; ROPE.vnode = -1;
+      ropeMesh();
+      return;
+    }
     const pay = (L, need, max) => {                   // grow when it's near taut, shrink only when it's clearly slack
       const lo = need * 1.1 + 3, hi = need * 1.45 + 10;
       return L < lo ? Math.min(max, L + Math.min(400 * dt, lo - L)) : L > hi ? L - Math.min(60 * dt, L - hi) : L;
@@ -248,7 +259,9 @@
     for (let s = 0; s < steps; s++) {
       for (let i = 0; i < RN.n; i++) {
         if (pin(i)) continue;
-        const p = ROPE.p[i], v = p.clone().sub(ROPE.q[i]).multiplyScalar(held ? 0.95 : 0.99);   // drag: held = overdamped
+        // held: no momentum at all, each step just settles toward its rest shape (user 2026-10-28: "they dont need to
+        // bounce at all" while probing; 0.95 drag still swung when Z moved); flung: real swing
+        const p = ROPE.p[i], v = p.clone().sub(ROPE.q[i]).multiplyScalar(held ? 0 : 0.99);
         ROPE.q[i].copy(p); p.add(v); p.z -= g;
       }
       const fix = (i, v) => { ROPE.p[i].copy(v); ROPE.q[i].copy(v); };

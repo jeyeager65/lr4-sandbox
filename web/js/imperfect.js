@@ -105,17 +105,21 @@
   }
 
   // the tip's error at table x (mm): side 2's lead / height shared out along the beam, and the small X shift as the
-  // gantry turns (the bit geo.ty in front of the carriages' line) and the beam tilts (the tip geo.tz below its middle)
+  // gantry turns (the bit geo.ty in front of the carriages' line) and the beam tilts (the tip geo.tz below its middle).
+  // The rack pivots on the Y carriages (xA, span); the tilt on the two Z leadscrews (zA, zspan: E.z = the Max screw's
+  // height over the Min one's - what the Z pulloffs set; 2026-10-27, was the carriages' span, ~5 % off)
+  const zSpan = (geo) => (geo && geo.zspan > 0 ? geo.zspan : geo ? geo.span : 0);
   function tipErr(E, geo, x) {
     const ok = geo && geo.span > 0, f = ok ? (x - geo.xA) / geo.span : 0;
-    const dx = ok ? (-E.y * (geo.ty || 0) + E.z * (geo.tz || 0)) / geo.span : 0;
-    return { dx, dy: E.y * f, dz: E.z * f };
+    const zs = zSpan(geo), fz = ok ? (x - (geo.zspan > 0 ? geo.zA : geo.xA)) / zs : 0;
+    const dx = ok ? -E.y * (geo.ty || 0) / geo.span + E.z * (geo.tz || 0) / zs : 0;
+    return { dx, dy: E.y * f, dz: E.z * fz };
   }
   // the bit's bottom tilt (mm per mm, rising toward +X / +Y): the tram (down toward +X / +Y) + the beam's tilt (the
   // router hangs off it: side 2 higher tips its +X edge up)
   function slopes(set, E, geo) {
     const t = (d) => Math.tan((d || 0) * Math.PI / 180);
-    return { sx: -t(set.tram.x) + (geo && geo.span > 0 ? E.z / geo.span : 0), sy: -t(set.tram.y) };
+    return { sx: -t(set.tram.x) + (geo && geo.span > 0 ? E.z / zSpan(geo) : 0), sy: -t(set.tram.y) };
   }
 
   // a fresh spoilboard's warp at table (x, y), over box { x: [from, to], y: [from, to] } (the cutting area): 0 at the

@@ -324,7 +324,12 @@ body.rec .stage { position: fixed; inset: 0; }
   font: 700 clamp(28px, 5.2vh, 96px) var(--font-display), system-ui, sans-serif; letter-spacing: 0.02em;
   color: #fff; background: rgb(0 0 0 / 0.55);
 }
-.rec-badge[hidden], .rec-caption[hidden], .rec-title[hidden], .rec-msg[hidden], .rec-pip[hidden] { display: none; }
+.rec-badge[hidden], .rec-caption[hidden], .rec-title[hidden], .rec-msg[hidden], .rec-pip[hidden], .rec-term[hidden] { display: none; }
+.rec-term {                           /* the controller log's last lines in the demo video (Video Term) */
+  position: absolute; left: 2.2%; top: 13%; max-width: 52%; white-space: pre-wrap;   /* under the speed badge */ overflow-wrap: anywhere;
+  padding: 0.5em 0.8em; border-radius: 8px; font: 500 clamp(13px, 2.1vh, 38px) / 1.35 ui-monospace, Consolas, monospace;
+  color: #d8f5c8; background: rgb(8 10 12 / 0.78); pointer-events: none;
+}
 .rec-pip {                            /* the pendant's screen in a corner of the demo video (LR4Demo.pip) */
   position: absolute; width: var(--pip-w, 26%); padding: 0.45%; border-radius: 10px; background: #0b0c0e;
   box-shadow: 0 6px 30px rgb(0 0 0 / 0.45); pointer-events: none;

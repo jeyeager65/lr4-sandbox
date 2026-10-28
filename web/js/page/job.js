@@ -2,7 +2,7 @@
 // The page's scripts share one global scope (js/page/*.js, loaded in order by index.html): names declared
 // at the top level here are seen by the later files.
   // ---- version + feedback: the issue link carries the size, data date and the loaded files' checksums ----
-  const VERSION = "0.56.0";
+  const VERSION = "0.57.0";
   function setupAbout() {
     const bits = [`lr4-sandbox ${VERSION}`];
     if (cfg.built) bits.push(`model data built ${cfg.built}`);
@@ -554,7 +554,10 @@
       return was;
     }
     const f = touchFrame(plate.geometry), at = pl.world ? [0, 0, 0] : JOB.at;
-    const dir = new THREE.Vector3(1, -1, 0).normalize(), up = new THREE.Vector3(0, 0, 1), side = up.clone().cross(dir);
+    // the strip's handle to the front and toward the middle: front-left in the right half of X travel, clear of the
+    // Max end's plates (user 2026-10-28, z_level's right probe)
+    const tv = meta.travel, right = !pl.world && pl.x > (tv.x[1] - tv.x[0]) / 2;
+    const dir = new THREE.Vector3(right ? -1 : 1, -1, 0).normalize(), up = new THREE.Vector3(0, 0, 1), side = up.clone().cross(dir);
     // either face can go up: the one that needs less turning from the stored pose once the strip has tipped over
     // (user 2026-10-24: it flipped right over to show the face you see in the holder)
     const turnTo = (s) => new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(dir, side.clone().multiplyScalar(s),

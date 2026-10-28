@@ -344,7 +344,7 @@
   const TOUCH_PLATE = { stock: StrutCam.DEFAULTS.t, plate: StrutCam.DEFAULTS.plate };
   function touchPlate() {
     const tl = JOB.tl, st = tl && tl.stock, pl = tl && tl.plates[0];
-    TOUCH_PLATE.stock = st ? st.zmax - st.zmin : StrutCam.DEFAULTS.t;
+    TOUCH_PLATE.stock = st ? st.zmax - st.zmin : tl ? 0 : StrutCam.DEFAULTS.t;   // a job with no stock: on the spoilboard
     TOUCH_PLATE.plate = pl && pl.thick > 0 ? pl.thick : StrutCam.DEFAULTS.plate;
     if (HAND.plate && !CTL.jobPlate) TOUCH_PLATE.stock = HAND.plate.z;   // the button's plate: on what's under the bit
     return TOUCH_PLATE;
@@ -356,6 +356,16 @@
     log.appendChild(d);
     while (log.childElementCount > 500) log.firstChild.remove();
     log.scrollTop = log.scrollHeight;
+    if (REC_TERM.n) recTerm();
+  }
+  // a video's terminal (LR4Demo.term): the log's last [MSG:...] lines; it stands in for the MSG box
+  const REC_TERM = { n: 0 };
+  function recTerm() {
+    const b = $("rec-term"), lines = REC_TERM.n ? [...$("ctl-log").children].map((d) => d.textContent)
+      .filter((t) => /^\[MSG:/.test(t)).slice(-REC_TERM.n) : [];
+    b.hidden = !lines.length;
+    b.textContent = lines.join("\n");
+    if (REC_TERM.n) $("rec-msg").hidden = true;
   }
   const ctlMsg = (t) => { $("ctl-msg").textContent = t; };
   let ctlLastSent = "";
@@ -421,6 +431,15 @@
       if (!JOB.preview) move(q);
     }
     if (AB.set.on && AB.geo && Math.abs(Imperfect.tipErr(AB.E, AB.geo, q[0] - t.x[0]).dz - AB.probeDz) > 0.002) ctlProbe();   // the tip's height along a tilted beam
+    if (AB.set.on && (CTL.jobPlate || HAND.plate)) {  // As built: each probe trips a little differently (plate, wire,
+      const tp = touchPlate(), gap = q[2] + meta.tip_above_table - tp.stock - tp.plate;   // switch) - a new scatter
+      if (gap > 2 && !CTL.probeFresh) {             // once the tip is clear of the plate, for the next touch
+        const r = Math.random;
+        CTL.probeNoise = (r() + r() + r() - 1.5) * 0.02;   // within +-0.015 mm, sd ~0.006
+        CTL.probeFresh = true;
+        ctlProbe();
+      } else if (gap < 0.5) CTL.probeFresh = false;
+    }
     const warn = past.length ? `Past the hard stop (${past.join(", ")}): the real machine would hit it there. ` +
       "This config.yaml's soft_limits are off, so FluidNC doesn't stop it." : "";
     if (warn ? $("ctl-msg").textContent !== warn : /^Past the hard stop/.test($("ctl-msg").textContent)) ctlMsg(warn);
@@ -465,7 +484,8 @@
     const tp = touchPlate(), top = tp.stock + tp.plate;   // the plate's top above the table (the job's stock, or under the bit)
     // As built: the tip sits dz off motor0's height along a tilted beam (at the tip's X now)
     AB.probeDz = AB.set.on && AB.geo && CTL.pose ? Imperfect.tipErr(AB.E, AB.geo, CTL.pose[0] - meta.travel.x[0]).dz : 0;
-    sim.setSwitch(pr.gpio, z.step, z.dir, (top - meta.tip_above_table - AB.probeDz - CTL.boot[2] + (CTL.lost[kz] || 0)) * CTL.cfg.steps.z.to, true);
+    const noise = AB.set.on ? CTL.probeNoise || 0 : 0;   // As built: this touch's scatter (set as the tip lifts clear)
+    sim.setSwitch(pr.gpio, z.step, z.dir, (top + noise - meta.tip_above_table - AB.probeDz - CTL.boot[2] + (CTL.lost[kz] || 0)) * CTL.cfg.steps.z.to, true);
   }
   // $H, or with a homing order (a video's HOMING=z,x,y) FluidNC's axis homing commands one after another: $HZ, $HX, $HY
   // axis: one axis only ($HX ...; Run's Home X / Y / Z): the machine counts as homed only once $H (or all three) did it

@@ -158,6 +158,8 @@ window.LR4Director = (() => {
     LR4Clip.leave(!/^off$/i.test(cmd.kv.leave || "on"));
     say(`clip: ${JSON.stringify(LR4Clip.state())}`);
   }
+  // (Video Term: LINES=n) the controller log's last n lines in a corner (default 5; 0 = off), in place of the MSG box
+  const term = (cmd) => call("term", cmd.kv.lines === undefined ? 5 : +cmd.kv.lines);
   function slip(cmd) {                               // (Video Slip:) lost steps (Part 44a)
     const q = DS.slipOf(cmd);
     if (q.set) LR4AsBuilt.set({ slip: q.set });
@@ -185,6 +187,7 @@ window.LR4Director = (() => {
     const frame = async (cam) => {
       ncM += ncS * dt;
       uiPlace();
+      if (cam) camTween = null;                      // a shot has the camera: the page's probe close-up would zoom in again
       const st = await clock.frame(cam || null, dt, [ncM, ncS * dt, o.kmax]);
       if (RUN.frames % o.fps === 0) {
         ev(`sec rate=${+ncS.toPrecision(3)} line=${st.line} t=${st.t.toFixed(1)} badge=${evBadge}`);
@@ -468,6 +471,7 @@ window.LR4Director = (() => {
       } else if (cmd.kind === "text") { await readWait(cam); caption(cmd); }
       else if (cmd.kind === "pendant") pipCmd(cmd);
       else if (cmd.kind === "show") showCmd(cmd);
+      else if (cmd.kind === "term") term(cmd);
       else if (["asbuilt", "slip", "heat", "clip"].includes(cmd.kind)) { /* set before the intro (prepare) */ }
       else if (cmd.kind === "inspect") cam = await inspectCmd(cmd, cam);
       else if (cmd.kind === "wait") await hold(DS.secsOf(cmd, 1), cam);
@@ -538,6 +542,7 @@ window.LR4Director = (() => {
         else if (cmd.kind === "slip") slip(cmd);
         else if (cmd.kind === "heat") heat(cmd);
         else if (cmd.kind === "clip") clip(cmd);
+        else if (cmd.kind === "term") term(cmd);
         else if (cmd.kind === "fire") say(LR4Heat.fire(DS.secsOf(cmd, 4)) ? `fire in ${DS.secsOf(cmd, 4)} s` : "fire: no job running");
         else if (cmd.kind === "extinguish") say(LR4Heat.extinguish() ? "the extinguisher's coming" : "extinguish: nothing burning");
         else if (cmd.kind === "estop") {
@@ -608,6 +613,7 @@ window.LR4Director = (() => {
       }
     }
     await hold(o.hold, endCam);
+    call("term", 0);                                 // the terminal stays up through the end hold (its last line: done)
     uiDone();
   }
 

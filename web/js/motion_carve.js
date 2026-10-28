@@ -24,7 +24,9 @@
   // last sample (mm; the page: max rate x time scale x elapsed); omitted = no limit.
   function tracker(segs, opts = {}) {
     const tol = opts.tol ?? 0.1, maxSegs = opts.maxSegs ?? 20000;
-    const T = { i: 0, f: 0, on: false, last: null, carved: 0 };   // cursor: move i carved up to f; carved = moves done
+    // cursor: move i carved up to f; carved = moves done; stop: no move from this index on yet (the page: the next M0 -
+    // a real Z homing goes up and down past the switch, which looked like the $HZ after the M0)
+    const T = { i: 0, f: 0, on: false, last: null, carved: 0, stop: Infinity };
     T.feed = (p, reach = Infinity) => {
       const out = [];
       const prev = T.last;
@@ -32,10 +34,10 @@
       if (!segs.length) { if (prev) out.push({ line: [prev, T.last], seg: -1 }); return out; }
       // the first move from the cursor on that p lies on (within reach along the path)
       let hit = null, run = 0;
-      for (let j = T.i; j < segs.length && j < T.i + maxSegs; j++) {
+      for (let j = T.i; j < segs.length && j < T.i + maxSegs && j < T.stop; j++) {
         const q = project(segs[j], p);
         if (q.d <= tol && (j > T.i || q.u >= T.f - 1e-6)) { hit = { j, u: q.u }; break; }
-        run += len(segs[j]) * (j === T.i ? 1 - T.f : 1);
+        if (segs[j].type !== "probe") run += len(segs[j]) * (j === T.i ? 1 - T.f : 1);   // a probe stops short at contact
         if (run > reach + tol) break;
       }
       if (hit && T.on) {                               // along the path: the moves in between are done

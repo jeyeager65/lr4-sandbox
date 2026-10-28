@@ -164,7 +164,8 @@
     rate(x) { JOB.rate = SND.rec = x || null; },     // playback speed without touching the menu (null = the menu's); FluidNC: the sound's
     badge(text) { const b = $("rec-badge"); b.hidden = !text; b.textContent = text || ""; },
     caption(text) { const b = $("rec-caption"); b.hidden = !text; b.textContent = text || ""; },
-    msg(text) { const b = $("rec-msg"); b.hidden = !text; b.textContent = text || ""; },
+    msg(text) { const b = $("rec-msg"); b.hidden = !text || REC_TERM.n > 0; b.textContent = text || ""; },
+    term(n) { REC_TERM.n = Math.max(0, n | 0); recTerm(); },   // (Video Term: LINES=n) the controller log's last n lines
     homingOrder(str) {                               // a video's HOMING=z,x,y: Home sends $HZ, $HX, $HY
       HOME.order = str ? Homing.order(str) : null;
       return HOME.order;
@@ -257,6 +258,9 @@
       const i = Math.min(T.i, n - 1), sg = tl.segs[i], line = sg.srcLine || 0;
       const L = Math.hypot(sg.end.x - sg.start.x, sg.end.y - sg.start.y, sg.end.z - sg.start.z);
       const dw = (1 - T.f) * L < 0.05 && (tl.dwells || []).find((d) => d.index === i + 1);
+      // the tracker already on the move after a G4 but not moving yet (an M0 before the G4 holding): still the G4's line
+      const dw0 = T.f * L < 0.05 && (tl.dwells || []).find((d) => d.index === i);
+      if (dw0) return dw0.lineNum;
       return dw ? Math.max(line, dw.lineNum) : (1 - T.f) * L < 0.05 && i + 1 < n ? tl.segs[i + 1].srcLine || line : line;
     },
     ncSend(line) {                                   // sent; its reply (ncReply: null, true or the error code) comes as frames run

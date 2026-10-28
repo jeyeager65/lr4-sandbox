@@ -64,6 +64,13 @@
     AB.piv = { x: b.min.x, y: (b.min.y + b.max.y) / 2, z: beam.isEmpty() ? b.max.z : (beam.min.z + beam.max.z) / 2, span };
     const rb = meshes.find((m) => m.userData.name === "Router_Bit"), tip = rb && bitTip(rb, rb.userData.base || { t: [0, 0, 0], s: [1, 1, 1] });
     AB.geo = { xA: b.min.x - fr[0], span, ty: tip ? tip.y - AB.piv.y : 0, tz: tip ? AB.piv.z - tip.z : 0 };
+    const lead = ["Z_Leadscrew_Min", "Z_Leadscrew_Max"].map((n) => meshes.find((m) => m.userData.name === n));   // the beam's tilt
+    if (lead.every(Boolean)) {                       // pivots on these (imperfect.js tipErr)
+      const cx = lead.map((m) => { const g = m.geometry, base = m.userData.base || { t: [0, 0, 0], s: [1, 1, 1] };
+        if (!g.boundingBox) g.computeBoundingBox();
+        return (g.boundingBox.min.x + g.boundingBox.max.x) / 2 * base.s[0] + base.t[0]; });
+      AB.geo.zA = cx[0] - fr[0]; AB.geo.zspan = cx[1] - cx[0]; AB.piv.zspan = AB.geo.zspan;
+    }
   }
   // the model bit's tip (its axis at the bottom: a plain cylinder's box centre / min Z), world mm - as drawn now, or at
   // pose 0 with base = its userData.base
@@ -90,7 +97,7 @@
   }
   function abPose(dy, dz) {
     const P = AB.piv, on = AB.set.on && P && !AB.square, ex = AB.set.exag || 1;   // square: tableFrame measuring
-    const rack = on ? Math.atan2(AB.E.y * ex, P.span) : 0, tilt = on ? Math.atan2(AB.E.z * ex, P.span) : 0;
+    const rack = on ? Math.atan2(AB.E.y * ex, P.span) : 0, tilt = on ? Math.atan2(AB.E.z * ex, P.zspan || P.span) : 0;
     const tr = AB.set.on && !AB.square && AB.set.tram ? AB.set.tram : null, tex = Math.min(TRAM_EX, ex);
     const tx = tr ? (+tr.x || 0) * tex * Math.PI / 180 : 0, ty = tr ? (+tr.y || 0) * tex * Math.PI / 180 : 0;
     abExag(rack || tilt ? ex : 1, tx || ty ? tex : 1);
@@ -218,11 +225,23 @@
   const jobSpot = () => (CTL.homed && (CTL.runFrom || CTL.homePose)) || null;
   // work zero's offset from the cutting area's corner (mm; LR4Demo.zero, videos only): poses = work + corner + this
   const jobZ0 = () => JOB.zero || [0, 0];
+  // G54 in machine mm: the cutting area's front-left corner (+ a video's work zero) on the stock top, as fjPrepare sets it
+  function jobWorkZero(stock) {
+    const tv = meta.travel, hp = CTL.homePose, hs = Homing.settings(CTL.yaml), z0 = jobZ0();
+    return [hs.x.mpos + tv.x[0] + z0[0] - hp.x, hs.y.mpos + tv.y[0] + z0[1] - hp.y,
+      hs.z.mpos - meta.tip_above_table - (stock ? stock.zmin : 0) - hp.z];
+  }
   function jobStartAt() {
     const h = jobSpot();
     if (!h) return undefined;
     const tv = meta.travel, z0 = JOB.zero;   // JOB.zero: LR4Demo.zero (videos: jogged there first)
-    return (stock) => ({ x: z0 ? 0 : h.x - tv.x[0], y: z0 ? 0 : h.y - tv.y[0], z: h.z + meta.tip_above_table + (stock ? stock.zmin : 0) });
+    return (stock) => {
+      const s = { x: z0 ? 0 : h.x - tv.x[0], y: z0 ? 0 : h.y - tv.y[0], z: h.z + meta.tip_above_table + (stock ? stock.zmin : 0) };
+      if (!CTL.homePose) return s;
+      const hs = Homing.settings(CTL.yaml), wz = jobWorkZero(stock);   // + G53 and $H mid-file (gcode_play)
+      return Object.assign(s, { mach: { x: -wz[0], y: -wz[1], z: -wz[2] },
+        home: { x: hs.x.mpos - wz[0], y: hs.y.mpos - wz[1], z: hs.z.mpos - wz[2] } });
+    };
   }
   document.getElementById("home").addEventListener("click", () => ctlHome());
 

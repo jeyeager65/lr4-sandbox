@@ -203,6 +203,7 @@
     // at the move it left. Only then: on small arcs a 2 mm band holds P back (a 3 mm circle is all inside it).
     FJ.job = { path, T: MotionCarve.tracker(JOB.tl.segs), P: AB.set.on ? MotionCarve.tracker(JOB.tl.segs, { tol: 2 }) : null,
       C: AB.set.on ? MotionCarve.tracker(JOB.tl.segs, { tol: 2 }) : null, seenSD: false, held: false, k: 0, at: ncTime(), t0: ncTime(), plate: null };
+    fjGate(0);
     FJ.pts = []; FJ.lastMsg = "";
     if (SLIP.st) SLIP.st.dist = 0;                   // the stock's variation from the job's start (Part 44a)
     HEAT.st = null; heatSay("");                     // fresh stock: no hot spots, no scorch (Part 44b)
@@ -214,9 +215,7 @@
     fjButtons();
     // G54 = the cutting area's front-left corner on the stock top, where Preview puts work zero too (as you'd jog there
     // and zero); a file that zeroes itself (the strut job's G10 L20) moves it, in both
-    const tv = meta.travel, hp = CTL.homePose, hs = Homing.settings(CTL.yaml), st = JOB.tl.stock;
-    const z0 = jobZ0();                              // + a video's work zero (LR4Demo.zero)
-    const wz = [hs.x.mpos + tv.x[0] + z0[0] - hp.x, hs.y.mpos + tv.y[0] + z0[1] - hp.y, hs.z.mpos - meta.tip_above_table - (st ? st.zmin : 0) - hp.z];
+    const wz = jobWorkZero(JOB.tl.stock);            // + a video's work zero (LR4Demo.zero)
     await sim.command(`G10 L2 P1 X${wz[0].toFixed(3)} Y${wz[1].toFixed(3)} Z${wz[2].toFixed(3)}`).catch(() => {});
     return true;
   }
@@ -250,11 +249,21 @@
     jobCloseUp(pl);
     if (!pl && CTL.pose) move(CTL.pose);             // the plate back on the core (move() places it)
   }
+  // the trackers can't pass the next M0 (a pause event's index: its first move after) before FluidNC holds there
+  function fjGate(from) {
+    const J = FJ.job, e = JOB.tl.events.find((q) => q.kind === "pause" && q.index > from);
+    J.gate = e ? e.index : Infinity;
+    for (const T of [J.T, J.P, J.C]) if (T) T.stop = J.gate;
+  }
   function fjHold() {                                // FluidNC is holding (M0, or ! from here): the popup
     fjTick();                                        // the motion up to now first: the status can beat the frame
     const J = FJ.job, tl = JOB.tl, segs = tl.segs, c = (J.C || J.P || J.T).i;
     const noCut = (a, b) => { for (let i = a; i < b; i++) if (segs[i].type === "cut") return false; return true; };
-    const attach = tl.plates.find((q) => q.index >= c && noCut(c, q.index));
+    if (J.gate < Infinity && noCut(c + 1, J.gate)) fjGate(J.gate);   // at the M0 (a ! mid-cut leaves the gate)
+    // attach: the next probe's plate, if the bit is over its spot (a hold before moving there - "detach, moving
+    // right" in docs/examples/z_level.gcode - puts the plate and clip away instead)
+    const here = fjWork(ctlRaw());
+    const attach = tl.plates.find((q) => q.index >= c && noCut(c, q.index) && Math.hypot(q.x - here.x, q.y - here.y) < 1);
     const remove = !attach && J.plate && noCut(J.plate.index + 1, c + 1);
     if (attach) fjPlate(attach); else if (remove) fjPlate(null);
     const tool = J.toolStop;

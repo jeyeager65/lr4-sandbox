@@ -27,11 +27,35 @@
   // everything into mm - the scene, the stock and the clock
   const IN = 25.4;
   let Parser = null;
-  // start: where the machine is when the file starts (work mm; the page's homed spot), else 0, 0, 0
+  // start: where the machine is when the file starts (work mm; the page's homed spot), else 0, 0, 0.
+  // start.mach: machine zero in work mm (the page's G54), so G53 lines go where FluidNC sends them;
+  // start.home: the homed spot in work mm, so $H / $HZ mid-file move there (Z first, as FluidNC's cycles)
   function parser(start) {
     if (!Parser) Parser = class extends GCodeParser {
-      reset() { super.reset(); if (this.start) this.position = Object.assign({}, this.start); }
+      reset() { super.reset(); if (this.start) this.position = { x: this.start.x, y: this.start.y, z: this.start.z }; }
       addSegment(s) { s.inch = this.units === "inches"; super.addSegment(s); }
+      extractTarget(words) {
+        const m = this.lineMachineCoords && this.start && this.start.mach, k = this.units === "inches" ? IN : 1;
+        return super.extractTarget(m ? words.map(([l, v]) => (/^[XYZ]$/.test(l) ? [l, v + m[l.toLowerCase()] / k] : [l, v])) : words);
+      }
+      parseLine(line, n) {
+        const h = /^\$H([XYZ]*)(?:\s|$)/i.exec(line), hm = this.start && this.start.home;
+        if (!h || !hm) return super.parseLine(line, n);
+        const ax = (h[1] || "XYZ").toLowerCase(), k = this.units === "inches" ? IN : 1;
+        // Z: up to the switch, then the pulloff back down (so a $HZ from the homed spot is still a move: the tracker
+        // would otherwise end the job at the move before it and skip the (Video ...) lines after it)
+        const steps = [];
+        if (ax.includes("z")) steps.push({ z: hm.z + 4 }, { z: hm.z });   // GUESS: 4 mm, the config's usual pulloff
+        if (/[xy]/.test(ax)) steps.push({ x: ax.includes("x") ? hm.x : undefined, y: ax.includes("y") ? hm.y : undefined });
+        for (const st of steps) {
+          const end = Object.assign({}, this.position);
+          for (const a of ["x", "y", "z"]) if (st[a] !== undefined) end[a] = st[a] / k;
+          if (["x", "y", "z"].every((a) => end[a] === this.position[a])) continue;
+          this.addSegment({ type: "rapid", start: Object.assign({}, this.position), end, feedRate: this.feedRate,
+            tool: this.currentTool, toolNumber: this.currentToolNumber(), toolChangeType: null, lineNum: n });
+          this.position = end;
+        }
+      }
     };
     const p = new Parser();
     p.start = start || null;
@@ -96,8 +120,11 @@
     // after it ("remove"), only counting pauses with no cutting between them and the probe; without those, the
     // probe + its retract
     const plates = [];
+    // (no (Stock:): the plate goes on what's under the bit - the spoilboard, the page's work Z 0 without a stock -
+    // a probe-only file like docs/examples/z_level.gcode, 2026-10-27; was no plate: FluidNC's probe found nothing)
     segs.forEach((s, i) => {
-      if (s.type !== "probe" || !s.probe) return;
+      if (s.type !== "probe" || (!s.probe && p.simMeta.stock)) return;
+      if (!s.probe) s.probe = { surface: 0, plate: 0 };
       let c0 = i - 1, c1 = i + 1;
       while (c0 >= 0 && segs[c0].type !== "cut") c0--;
       while (c1 < segs.length && segs[c1].type !== "cut") c1++;

@@ -3,6 +3,21 @@
 The version is the sandbox page's (`VERSION` in `web/js/page/job.js`, shown in its footer). The footer also shows
 the date the model data was built and the Printables file set it was solved for.
 
+## 0.57.0 - 2026-10-28
+- **Z leveling script:** `docs/examples/z_level.gcode` probes the spoilboard at both ends of the beam (3 times each,
+  averaged), works out the Z pulloffs that level the beam, saves them to the config and re-homes Z. Its settings at
+  the top are for this machine (893 mm between the Z leadscrew centers).
+- **G53 and mid-file homing in G-code files:** the page now follows `G53` (machine coordinates) moves and `$H` /
+  `$HZ` lines inside a file, so jobs like the leveling script play to the end.
+- **As built's Z tilt pivots on the Z leadscrews:** the beam tilts about the leadscrews, which are 893 mm apart.
+- **Probe readings scatter a little** with As built on (up to about ±0.015 mm), as a real touch plate does. This is
+  why the script probes several times and averages.
+- **The touch plate wires don't bounce** while the clip is held. They move into place and stop. They still swing
+  when the clip is flung off.
+- On the right half of the table the touch plate lies angled left, away from the edge.
+- Videos: `(Video Term: LINES=n)` shows the last n MSG lines from the controller's terminal. While a video's shot
+  has the camera, the page's own probe close-up stays off (it zoomed in a second time at each pause).
+
 ## 0.56.0 - 2026-10-27
 - **Touch plate wires:** the plate's (red) and the clip's (black) wires are drawn, coming out of the small hole in the
   core's front and hanging, stiff, to the spade and the crimp. They follow the plate and the clip when probing.
