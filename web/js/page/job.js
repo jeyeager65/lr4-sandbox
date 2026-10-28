@@ -2,7 +2,7 @@
 // The page's scripts share one global scope (js/page/*.js, loaded in order by index.html): names declared
 // at the top level here are seen by the later files.
   // ---- version + feedback: the issue link carries the size, data date and the loaded files' checksums ----
-  const VERSION = "0.55.0";
+  const VERSION = "0.56.0";
   function setupAbout() {
     const bits = [`lr4-sandbox ${VERSION}`];
     if (cfg.built) bits.push(`model data built ${cfg.built}`);
@@ -494,7 +494,7 @@
   // First of all the shoe's bottom (skirt + bristles; it snaps on: user) is pulled down off its snaps and slid out,
   // then it's off; it goes back last.
   const CLIP_RE = /^TouchPlate_(Clip_|Magnet$)/, SKIRT_RE = /^(Dust_Skirt|Bristles_TPU)/, TOUCH_SECS = 0.9;
-  const TOUCH_ANIM = { out: false, skirt: 0, clip: 0, plate: 0, target: null, onNut: null };
+  const TOUCH_ANIM = { out: false, skirt: 0, clip: 0, plate: 0, target: null, onNut: null, leave: false };   // leave: (Video Clip: LEAVE=on), rope.js
   function touchSkirtPlace() {                       // the skirt + bristles at TOUCH_ANIM.skirt: down 10, then out 160 (-Y)
     const k = TOUCH_ANIM.skirt;
     if (k <= 0 || k >= 1) return;
@@ -548,6 +548,7 @@
     const parts = meshes.filter((m) => TOUCH_PARTS.includes(m.userData.name)), plate = parts.find((m) => m.userData.name === "TouchPlate");
     if (probing !== !!(pl && plate)) { probing = !!(pl && plate); applyVisibility(); }   // skirt off while probing
     const A = TOUCH_ANIM, was = A.out;
+    if (pl && ROPE.flung) ropeReset(true);           // a new probe: the flung clip back on its bolt first
     if (!pl || !plate) {                             // back on the core: the tick brings them home, move() takes over
       A.out = false;
       return was;
@@ -576,8 +577,9 @@
   // the job carried on while the plate, clip and shoe bottom were still on their way back): touchSettled() resolves
   // once it's still (30 s at most, so nothing hangs)
   // the plate or its clip anywhere but home (or on its way): the router stays off - no turning bit, no router sound
-  const touchOut = () => { const A = TOUCH_ANIM; return A.out || A.plate > 0 || A.clip > 0; };
-  const touchBusy = () => { const A = TOUCH_ANIM; return A.out ? A.plate < 1 : A.plate > 0 || A.clip > 0 || A.skirt > 0; };
+  // (a clip left on the nut on purpose - Part 44d's video - doesn't count: the router starts and flings it, rope.js)
+  const touchOut = () => { const A = TOUCH_ANIM; return A.out || A.plate > 0 || (A.clip > 0 && !A.leave); };
+  const touchBusy = () => { const A = TOUCH_ANIM; return A.out ? A.plate < 1 : A.plate > 0 || (A.clip > 0 && !A.leave) || A.skirt > 0; };
   function touchSettled() {
     const t0 = realNow();
     return new Promise((res) => { (function wait() { if (!touchBusy() || realNow() - t0 > 30000) res(); else setTimeout(wait, 50); })(); });
@@ -677,7 +679,7 @@
   }
   function touchClipPlace() {                        // the clip + magnet at TOUCH_ANIM.clip (0 = on its bolt: move()'s)
     const A = TOUCH_ANIM;
-    if (A.clip <= 0) return;
+    if (A.clip <= 0 || ROPE.flung) return;           // flung: rope.js has it
     const N = touchNut();
     if (!N) return;
     if (!N.route) {                                  // a little off the bolt head (along the rod), out along +X past the
@@ -709,8 +711,8 @@
       if (A.clip >= 1) A.plate = Math.min(1, A.plate + step);
     } else {
       A.plate = Math.max(0, A.plate - step);
-      if (A.plate <= 0) A.clip = Math.max(0, A.clip - step);
-      if (A.clip <= 0) A.skirt = Math.max(0, A.skirt - step);
+      if (A.plate <= 0 && !A.leave) A.clip = Math.max(0, A.clip - step);   // left on the nut: stays (rope.js)
+      if (A.clip <= 0 || A.leave) A.skirt = Math.max(0, A.skirt - step);
     }
     if (A.skirt !== s0) {
       if ((s0 >= 1) !== (A.skirt >= 1)) applyVisibility();   // off once out, back on as it starts home

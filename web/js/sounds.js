@@ -36,7 +36,7 @@
 //   snd.start()                      on a click (browsers only allow audio after one); false = no Web Audio
 //   snd.setOn(on), snd.setVolume(0..1)
 //   snd.update(pose [x, y, z] mm, dt s, scale, steps { x: { perMm, micro } ... }, { rpm, mrr, flutes })   once a frame
-//   snd.event("switch" | "tap" | "hold" | "slip" | "crackle" | "hiss")   a one-off click, now (and in the trace); "hold" = only the joke voice
+//   snd.event("switch" | "tap" | "hold" | "slip" | "crackle" | "hiss" | "clank" | "clink")   a one-off click, now (and in the trace); "hold" = only the joke voice
 //   snd.setVoice("machine" | "robot")      realistic or the joke mode (Part 23); create({ voice }) too
 //   snd.levels()                     what each voice is set to (tests)
 //   snd.record(on), await snd.wav({ rate }) -> Uint8Array
@@ -60,7 +60,8 @@
   // switch = the press, a high tick; release = a lower, softer tock with a little body
   // slip = a stepper losing steps (Part 44a): a dull, low thunk with a knock in it (the rotor snapping back a pole pair)
   const CLICKS = { switch: [4300, 0.012, 2500, 0, 1], release: [1800, 0.010, 900, 600, 0.7], tap: [2600, 0.025, 1200, 170, 0.15],
-    slip: [190, 0.045, 350, 75, 1.1], crackle: [3400, 0.004, 2800, 0, 0.45] };
+    slip: [190, 0.045, 350, 75, 1.1], crackle: [3400, 0.004, 2800, 0, 0.45],
+    clank: [1650, 0.07, 1400, 240, 0.9], clink: [3100, 0.03, 2200, 0, 0.35] };   // the probe clip flung / hitting things (Part 44d)
   // noise bursts (Part 44b): [bandpass Hz, Q, length s, loudness] - hiss = the extinguisher's powder (repeated)
   const NOISES = { hiss: [3800, 0.6, 0.38, 0.5] };
   const ROUTER = { up: 0.5, down: 1.5, sag: 0.12, whine: 14, rpmRef: 18000 };   // s, s, fraction at full load, x rotation

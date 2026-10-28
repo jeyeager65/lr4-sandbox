@@ -3,6 +3,13 @@
 The version is the sandbox page's (`VERSION` in `web/js/page/job.js`, shown in its footer). The footer also shows
 the date the model data was built and the Printables file set it was solved for.
 
+## 0.56.0 - 2026-10-27
+- **Touch plate wires:** the plate's (red) and the clip's (black) wires are drawn, coming out of the small hole in the
+  core's front and hanging, stiff, to the spade and the crimp. They follow the plate and the clip when probing.
+- **The clip flung off the collet nut** (for the safety video): `(Video Clip: LEAVE=on)` leaves the clip on the nut
+  after a probe; once the router spins it flies off, hangs by its wire and clanks on what it hits. The job carries
+  on. The next probe puts it back on its bolt.
+
 ## 0.55.0 - 2026-10-27
 - **Switch panel with an emergency stop:** a panel on the table's front edge has the e-stop (red mushroom on a yellow
   plate), a green power lamp and lighted rockers for the router and the vac. Pressing the e-stop cuts the power:

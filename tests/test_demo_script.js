@@ -148,5 +148,10 @@ ok(DS.parse("( video  shot : view=CORE time=2 )\nG0 X1").intro[0].kv.view === "C
   const [a, b] = s.at.map(DS.estopOf);
   ok(a.press && a.after === 12 && !b.press && b.after === 8, `estopOf ${JSON.stringify([a, b])}`);
 }
+{ // Part 44d: (Video Clip: LEAVE=on|off) - before the job or mid-job
+  const s = DS.parse("(Video Clip: LEAVE=on)\nG0 X1\n(Video Clip: LEAVE=off)\n(Video Clip: LEAVE=maybe)\n(Video Clip: NOW=1)\n");
+  ok(s.intro.map((c) => c.kind).join() === "clip" && s.at.map((c) => c.kind).join() === "clip", `Clip: ${s.intro.map((c) => c.kind)} / ${s.at.map((c) => c.kind)}`);
+  ok(s.warnings.length === 2 && /LEAVE=/.test(s.warnings[0]) && /NOW/.test(s.warnings[1]), `Clip warnings ${JSON.stringify(s.warnings)}`);
+}
 console.log(fails ? `demo_script: ${fails} of ${checks} failed` : `demo_script: all ${checks} passed`);
 process.exit(fails ? 1 : 0);

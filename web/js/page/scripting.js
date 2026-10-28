@@ -403,6 +403,7 @@
     ctlTick();
     spinTick(dt);                                     // the bit turning while a FluidNC job has the router on (machine.js;
                                                       // dt capped: a slow frame at 0.5 s turned it exactly half a turn)
+    ropeTick(dt);                                     // the clip's wire; the clip flung off the nut (rope.js, Part 44d)
     soundTick();
     heatFxTick(dt);                                   // smoke, scorch, fire, the extinguisher (heat_fx.js, Part 44b)
     if (pendant && pendantOn() && (FT.ft || ++frameN % 8 === 0)) pendantScreen();

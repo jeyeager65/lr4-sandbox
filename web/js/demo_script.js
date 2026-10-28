@@ -92,7 +92,7 @@ const SETTINGS = { size: "wxh", machine: "wxh", fps: "num", volume: "num", pause
   fan: "bool", main: "colour", accent: "colour" };
 const MACHINE_KEYS = ["table", "room", "braces", "struts", "base", "peter", "router", "skirt", "hose", "fan", "main", "accent"];
 const PRESETS = ["all", "no-hardware", "printed", "frame"];   // web/js/show_tree.js PRESETS
-const KINDS = ["shot", "home", "zero", "title", "text", "wait", "speed", "pendant", "show", "inspect", "asbuilt", "slip", "heat", "fire", "extinguish", "estop", "point", "click", "step", "design"];
+const KINDS = ["shot", "home", "zero", "title", "text", "wait", "speed", "pendant", "show", "inspect", "asbuilt", "slip", "heat", "fire", "extinguish", "estop", "clip", "point", "click", "step", "design"];
 const SLIP_AXES = ["x", "y", "z", "ymin", "ymax", "zmin", "zmax"];
 const UI_ONLY = new Set(["point", "click", "step"]);   // KIND=ui videos (the page on screen) only
 const INTRO_ONLY = new Set(["home", "zero"]);
@@ -235,6 +235,11 @@ function check(c, intro) {
       return kv.time === undefined || (num(kv.time) && +kv.time > 0) ? null : "Fire TIME= wants seconds";
     case "extinguish":
       return null;
+    case "clip": {
+      const bad = Object.keys(kv).filter((q) => q !== "leave");
+      if (bad.length) return `Clip doesn't know ${bad.map((q) => q.toUpperCase()).join(", ")}`;
+      return kv.leave === undefined || /^(on|off)$/i.test(kv.leave) ? null : "Clip LEAVE= on or off";
+    }
     case "estop": {
       const bad = Object.keys(kv).filter((q) => !["do", "after"].includes(q));
       if (bad.length) return `EStop doesn't know ${bad.map((q) => q.toUpperCase()).join(", ")}`;

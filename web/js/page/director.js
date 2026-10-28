@@ -134,7 +134,8 @@ window.LR4Director = (() => {
     const homeCmd = introAll.find((q) => q.kind === "home" || (q.kind === "click" && /^home(-[xyz])?$/.test(q.kv.id)));   // (a clicked Home too)
     if (o.homing && !D.homingOrder(String(o.homing))) say(`(Video): HOMING=${o.homing}: not an order (e.g. z,x,y)`);
     else if (o.homing) say(`homing order: ${o.homing}`);
-    for (const q of introAll.filter((c) => ["asbuilt", "slip", "heat"].includes(c.kind))) { if (q.kind === "slip") slip(q); else if (q.kind === "heat") heat(q); else asbuilt(q); }   // the machine as built, before FluidNC boots on it
+    LR4Clip.leave(false);                            // the probe clip on its bolt (a flung one from before goes home)
+    for (const q of introAll.filter((c) => ["asbuilt", "slip", "heat", "clip"].includes(c.kind))) { if (q.kind === "slip") slip(q); else if (q.kind === "heat") heat(q); else if (q.kind === "clip") clip(q); else asbuilt(q); }   // the machine as built, before FluidNC boots on it
     if (o.home && homeCmd) D.nearHome(Number(homeCmd.kv.offset) || 30);   // FluidNC (re)boots a little way off the switches
     if (!await D.fluidnc()) throw new Error("FluidNC didn't start (is the page cross-origin isolated? serve it with tools/serve.py)");
     say("mode: FluidNC");
@@ -152,6 +153,10 @@ window.LR4Director = (() => {
   function heat(cmd) {                               // (Video Heat:) heat + fire (Part 44b)
     LR4AsBuilt.set({ heat: DS.heatOf(cmd) });
     say(`heat: ${JSON.stringify(LR4AsBuilt.get().heat)}`);
+  }
+  function clip(cmd) {                               // (Video Clip: LEAVE=on) the probe clip left on the nut (Part 44d)
+    LR4Clip.leave(!/^off$/i.test(cmd.kv.leave || "on"));
+    say(`clip: ${JSON.stringify(LR4Clip.state())}`);
   }
   function slip(cmd) {                               // (Video Slip:) lost steps (Part 44a)
     const q = DS.slipOf(cmd);
@@ -189,6 +194,8 @@ window.LR4Director = (() => {
           ev(`state slips=${LR4Slip.count()} lostX=${LR4Slip.lost()[0].toFixed(2)} bit=${(LR4Heat.bit() || 20).toFixed(0)}°C spot=${spot.toFixed(0)}°C ` +
             `cells=${hs ? hs.cells.size : 0} burning=${LR4Heat.burning()}`);
         }
+        const cs = LR4Clip.state();                  // Part 44d: the probe clip left on the nut / flung
+        if (cs.leave || cs.flung) ev(`clip ${JSON.stringify(cs)}`);
       }
       if (o.trace && RUN.frames < 600) RUN.lines.push("nc " + RUN.frames + " " + JSON.stringify(D.ncTrace()));
       last = st;
@@ -461,7 +468,7 @@ window.LR4Director = (() => {
       } else if (cmd.kind === "text") { await readWait(cam); caption(cmd); }
       else if (cmd.kind === "pendant") pipCmd(cmd);
       else if (cmd.kind === "show") showCmd(cmd);
-      else if (["asbuilt", "slip", "heat"].includes(cmd.kind)) { /* set before the intro (prepare) */ }
+      else if (["asbuilt", "slip", "heat", "clip"].includes(cmd.kind)) { /* set before the intro (prepare) */ }
       else if (cmd.kind === "inspect") cam = await inspectCmd(cmd, cam);
       else if (cmd.kind === "wait") await hold(DS.secsOf(cmd, 1), cam);
       else if (cmd.kind === "point") {
@@ -530,6 +537,7 @@ window.LR4Director = (() => {
         else if (cmd.kind === "asbuilt") asbuilt(cmd);
         else if (cmd.kind === "slip") slip(cmd);
         else if (cmd.kind === "heat") heat(cmd);
+        else if (cmd.kind === "clip") clip(cmd);
         else if (cmd.kind === "fire") say(LR4Heat.fire(DS.secsOf(cmd, 4)) ? `fire in ${DS.secsOf(cmd, 4)} s` : "fire: no job running");
         else if (cmd.kind === "extinguish") say(LR4Heat.extinguish() ? "the extinguisher's coming" : "extinguish: nothing burning");
         else if (cmd.kind === "estop") {
