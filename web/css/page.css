@@ -616,6 +616,18 @@ button.big { padding: 10px 6px; font: 600 15px var(--font-display); letter-spaci
 .pwr-sw.lit::before { background: #e8402e; opacity: 1; box-shadow: 0 0 5px #e8402e; }
 .pwr-sw[aria-pressed=false] { color: var(--muted); }
 .pwr-note { margin: 4px 0 0; font-size: 12px; color: var(--warn); }
+/* the router + its speed dial (Part 45a, router.js) */
+.rt-row { display: flex; align-items: center; gap: 6px; margin-top: 6px; font-size: 12px; }
+.rt-row select { flex: 1 1 auto; min-width: 0; }
+.rt-row input[type=range] { flex: 1 1 auto; min-width: 60px; }
+.rt-row label b { display: inline-block; min-width: 2.2em; }
+.rt-rpm { color: var(--muted); white-space: nowrap; }
+.rt-readout { position: absolute; left: 50%; bottom: 52px; transform: translateX(-50%); pointer-events: none; opacity: 0;
+  transition: opacity 0.4s; background: var(--panel); border: 1px solid var(--line, var(--muted)); border-radius: 10px;
+  padding: 10px 20px; text-align: center; box-shadow: 0 4px 18px rgba(0, 0, 0, 0.25); z-index: 5; }
+.rt-readout.on { opacity: 0.94; transition: opacity 0.1s; }
+.rt-readout b { display: block; font: 700 34px var(--font-display); }
+.rt-readout span { font-size: 15px; color: var(--muted); }
 .estop-mini { color: #c8241b; font-weight: 700; }
 .estop-mini[aria-pressed=true] { background: #c8241b; color: #fff; }
 button.pri { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }

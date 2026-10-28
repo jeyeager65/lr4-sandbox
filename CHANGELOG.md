@@ -3,6 +3,18 @@
 The version is the sandbox page's (`VERSION` in `web/js/page/job.js`, shown in its footer). The footer also shows
 the date the model data was built and the Printables file set it was solved for.
 
+## 0.59.0 - 2026-10-28
+- **Pick your router, set its speed dial** (Run, under the switch panel). Kobalt, Makita RT0701C, Carbide Compact
+  Router and DeWalt DWP611 are set by hand: the dial sets the speed and the G-code's S does nothing. The sound, chip
+  load, heat and the bit's spin all follow the dial. The terminal tells you when a file asks for a different dial.
+  The Sienci AutoSpin T1 takes its speed from S, like a spindle (up to 31,250 RPM). Each machine keeps its own
+  router and dial. The model is still drawn as the Kobalt for every router.
+- **The dial on the router turns:** the wheel at the switch end has its numbers 1-6. Drag it (up or right is
+  faster), click it for the next number, or scroll over it for half steps. A big readout shows the speed while it
+  turns.
+- **The bit spins faster** (about 2 turns a second at dial 3, from 1.5 to 2.5 by the speed). It spins up and down
+  over a second or so, and a faint blur round the bit and the collet nut shows it turning.
+
 ## 0.57.0 - 2026-10-28
 - **Z leveling script:** `docs/examples/z_level.gcode` probes the spoilboard at both ends of the beam (3 times each,
   averaged), works out the Z pulloffs that level the beam, saves them to the config and re-homes Z. Its settings at

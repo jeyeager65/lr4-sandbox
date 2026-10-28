@@ -1173,6 +1173,7 @@ float lr4G(float x) { float s = 2.0 * fract(x) - 1.0; return floor(x) / 3.0 + (s
     renderBom();
     updateShop();
     if (typeof powerLook === "function") powerLook();   // the switch panel as the power is (power.js, Part 44f)
+    if (typeof rtLook === "function") rtLook();       // the router's speed dial, numbered and turned (router.js, Part 45a)
   }
 
   // ---- workshop scenery (js/workshop.js) round the table, sized by the building size (blank = auto); the note

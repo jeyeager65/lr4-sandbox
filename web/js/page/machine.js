@@ -26,7 +26,7 @@
   function spinApply() {
     const nut = meshes.find((m) => m.userData.name === "Router_Nut"), rb = meshes.find((m) => m.userData.name === "Router_Bit");
     if (!rb) return;
-    const a = JOB.spinning && JOB.spin ? JOB.spin : 0, tip = bitTip(rb);
+    const a = (JOB.spinning || JOB.rps > 0) && JOB.spin ? JOB.spin : 0, tip = bitTip(rb);   // spinning down: still turning
     const R = new THREE.Quaternion().setFromAxisAngle(ZUP.clone().applyQuaternion(rb.quaternion), a);
     if (nut && nut.userData.rest) {
       nut.position.copy(nut.userData.rest.p).sub(tip).applyQuaternion(R).add(tip);
@@ -35,14 +35,65 @@
     const q = R.clone().multiply(rb.quaternion);
     if (jobBit && JOB.bits) for (const b of JOB.bits.values()) if (b.visible) { b.position.copy(tip); b.quaternion.copy(q); }
     if (HAND.bitMesh) { HAND.bitMesh.position.copy(tip); HAND.bitMesh.quaternion.copy(q); }
+    spinGhost(rb, tip);
+  }
+  // Part 45a: the turn on screen (LR4Routers.spinRps: 1.5-2.5 rev/s by the router's speed, not the real rpm), spun up
+  // / down like the sound (0.5 / 1.5 s), clockwise from above. JOB.rps = the turn now.
+  function spinAdvance(dt, on, rpm) {
+    const to = on ? LR4Routers.spinRps(rpm) : 0, v = JOB.rps || 0, tc = to > v ? 0.5 / 3 : 1.5 / 3;
+    JOB.rps = Math.abs(to - v) < 0.01 ? to : v + (to - v) * (1 - Math.exp(-dt / tc));
+    if (JOB.rps > 0) JOB.spin = ((JOB.spin || 0) - dt * 2 * Math.PI * JOB.rps) % (2 * Math.PI);
+  }
+  // the blur of a fast-turning bit (user 2026-10-27: that sells 18k rpm, not raw turns): a faint disc round the bit's
+  // cutting part and one round the collet nut's corners, fading in with the spin-up. Not in meshes (no picking, no
+  // printed look); placed by spinApply on the router's (leaned) axis.
+  const GHOST = { bit: null, nut: null };
+  function spinGhost(rb, tip) {
+    const f = Math.min(1, (JOB.rps || 0) / 2);
+    if (!GHOST.bit) {
+      const mk = (c, r, h) => {
+        const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r, h, 40, 1, true),
+          new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide }));
+        m.renderOrder = 2; m.visible = false; scene.add(m);
+        return m;
+      };
+      GHOST.bit = mk(0xb8bcc4, 1, 1);                // unit size: scaled to the bit in use
+      GHOST.nut = mk(0x2a2a2a, 1, 1);
+    }
+    const axis = ZUP.clone().applyQuaternion(rb.quaternion), qa = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), axis);
+    const bit = (jobBit && JOB.bits && [...JOB.bits.values()].find((b) => b.visible)) || HAND.bitMesh || rb;
+    const g = bit.geometry, show = f > 0.05 && bit.visible;
+    if (!g.boundingBox) g.computeBoundingBox();
+    const bb = g.boundingBox, s = bit === rb ? (rb.userData.base || { s: [1, 1, 1] }).s : [1, 1, 1];
+    const r = Math.max(bb.max.x - bb.min.x, bb.max.y - bb.min.y) / 2 * s[0], h = Math.min(25, (bb.max.z - bb.min.z) * s[2]);
+    GHOST.bit.visible = show && r > 0.2;
+    if (GHOST.bit.visible) {
+      GHOST.bit.scale.set(r * 1.02, h, r * 1.02);
+      GHOST.bit.quaternion.copy(qa);
+      GHOST.bit.position.copy(tip).addScaledVector(axis, h / 2);
+      GHOST.bit.material.opacity = 0.32 * f;
+    }
+    const nut = meshes.find((m) => m.userData.name === "Router_Nut");
+    GHOST.nut.visible = show && !!(nut && nut.visible && nut.userData.rest);
+    if (GHOST.nut.visible) {
+      if (!nut.userData.ghost) {                     // the nut's size + centre along the axis from its rest box
+        const nb = nut.geometry.boundingBox || (nut.geometry.computeBoundingBox(), nut.geometry.boundingBox), ns = (nut.userData.base || { s: [1, 1, 1] }).s;
+        nut.userData.ghost = { r: Math.max(nb.max.x - nb.min.x, nb.max.y - nb.min.y) / 2 * ns[0], h: (nb.max.z - nb.min.z) * ns[2] };
+      }
+      const ng = nut.userData.ghost, c = new THREE.Box3().setFromObject(nut).getCenter(new THREE.Vector3());
+      GHOST.nut.scale.set(ng.r * 1.04, ng.h * 0.98, ng.r * 1.04);
+      GHOST.nut.quaternion.copy(qa);
+      GHOST.nut.position.copy(c);
+      GHOST.nut.material.opacity = 0.35 * f;
+    }
   }
   function spinTick(dt) {                            // FluidNC jobs (Preview: jobTick turns it and places its bit)
     if (JOB.preview || !meta) return;
-    const j = FJ.job ? soundJob() : null, was = JOB.spinning;
+    const j = FJ.job ? soundJob() : null, was = JOB.spinning || JOB.rps > 0;
     // the router on (the file's own router plan, as the sound has it), not while the touch plate or its clip is out:
     // the router mustn't start with the clip still on the collet nut (user 2026-10-26)
     JOB.spinning = !!(j && j.rpm > 0) && !touchOut();
-    if (JOB.spinning) JOB.spin = ((JOB.spin || 0) - dt * 2 * Math.PI) % (2 * Math.PI);   // clockwise from above, 1 turn/s
+    spinAdvance(dt, JOB.spinning, j ? j.rpm : 0);
     if (JOB.spinning || was) spinApply();
   }
   // Part 32: the Y carriages (the gantry's ends at pose 0, from the meshes' own boxes): the table frame's geo for the
@@ -178,6 +229,8 @@
   // the switch panel (Part 44f, power.js): the e-stop (pressed = the mains off), the router + vac rockers and the
   // router's own body switch (on by default, in series with its rocker); not kept (a new page: all on, e-stop out)
   const PWR = { estop: false, router: true, vac: true, body: true };
+  // the router + its speed dial (Part 45a, router.js; LR4Routers.settings), kept per machine (lr4-router)
+  const RT = { set: LR4Routers.settings(null) };
   const routerPowered = () => !PWR.estop && PWR.router && PWR.body;
   const vacPowered = () => !PWR.estop && PWR.vac;
   // lost: mm each motor (cfg.pins.motors order) is behind the steps FluidNC sent it (Part 44a lost steps: + = short of

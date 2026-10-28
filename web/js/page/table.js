@@ -682,7 +682,8 @@
     JOB.last = now;                                                                       // a slow GPU (tick's dt is capped)
     if (!JOB.tl) return;
     if (JOB.playing) {
-      JOB.spin = ((JOB.spin || 0) - dt * 2 * Math.PI) % (2 * Math.PI);   // clockwise from above, 1 turn/s, as cnc-gcode-tools
+      const sj = soundJob();                         // the turn by the router's speed (machine.js spinAdvance, Part 45a)
+      spinAdvance(dt, JOB.spinning, sj ? sj.rpm : 0);
       const r = GcodePlay.step(JOB.tl, JOB.t, dt, JOB.rate || +$("job-speed").value, JOB.k);   // rate: LR4Demo.rate (videos)
       JOB.k = r.k;
       jobSeek(r.t);

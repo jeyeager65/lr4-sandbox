@@ -338,8 +338,11 @@
     const i = Math.min(FJ.job ? (FJ.job.C || FJ.job.P || FJ.job.T).i : GcodePlay.at(tl, JOB.t).index, tl.segs.length - 1), sg = tl.segs[Math.max(0, i)];
     const def = sg && tl.tools && tl.tools.get(sg.toolNumber);
     // not with the touch plate / clip out (job.js touchOut): the router waits till the clip is off the collet nut
-    // nor without power (Part 44f: the e-stop, the router's rocker or its own switch off)
-    return { rpm: touchOut() || !routerPowered() ? 0 : LR4Sound.routerAt(SND.plan, sg ? sg.srcLine || 0 : 0), seg: i, flutes: (def && def.flutes) || 2 };
+    // nor without power (Part 44f: the e-stop, the router's rocker or its own switch off). Part 45a: the speed is the
+    // router's (router.js RT: a manual router's dial, a G-code router's S); a note once per router-on line
+    const line = sg ? sg.srcLine || 0 : 0, planned = LR4Sound.routerAt(SND.plan, line);
+    if (planned > 0) rtNote(SND.plan, line);
+    return { rpm: touchOut() || !routerPowered() ? 0 : LR4Routers.rpm(RT.set, planned), seg: i, flutes: (def && def.flutes) || 2 };
   }
   function soundRemoved() {                          // mm^3 the stock lost since the last frame (0 after a reset)
     const sim = JOB.sim;

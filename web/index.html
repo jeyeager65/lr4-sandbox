@@ -723,6 +723,32 @@
       <button type="button" class="q" data-help="help-pwr" aria-label="About the switch panel" title="About the switch panel">?</button>
     </div>
     <p class="pwr-note" id="pwr-note" hidden></p>
+    <div class="rt-row" aria-label="Router speed">
+      <select id="rt-router" aria-label="Router" title="Your router: where its speed comes from, and its dial's speeds"></select>
+      <button type="button" class="q" data-help="help-rt" aria-label="About the router's speed" title="About the router's speed">?</button>
+    </div>
+    <div class="rt-row">
+      <label for="rt-dial">Dial <b id="rt-dial-v"></b></label>
+      <input id="rt-dial" type="range" min="1" max="6" step="0.1" title="The router's speed dial (or drag the wheel on the router in the view)">
+      <span class="rt-rpm" id="rt-rpm"></span>
+    </div>
+    <p class="pwr-note" id="rt-note" hidden></p>
+    <div class="help" id="help-rt" hidden>
+      <p><b>Router</b> picks your router. It sets where the speed comes from and what each dial number means. The
+      model is still drawn as the Kobalt for every router.</p>
+      <ul>
+        <li><b>Kobalt, Makita RT0701C, Carbide Compact Router, DeWalt DWP611</b>: you set the speed by hand on the
+        router's dial. The G-code's S does nothing. The sound, the chip load, heat and the bit's spin all follow the
+        dial. If the file asks for another dial ("Turn On Router at Dial 3"), the terminal says so when the job gets
+        there.</li>
+        <li><b>Sienci AutoSpin T1</b>: the controller sets the speed, like a spindle. The G-code's S is the speed
+        in RPM, up to 31,250. Below 10,000 RPM it isn't accurate. Its own dial does nothing while the controller drives
+        it.</li>
+      </ul>
+      <p><b>Dial</b>: 1 is slowest, 6 is fastest. You can also turn the wheel at the switch end of the router in the
+      view: drag it (up or right is faster), click it for the next number, or scroll over it for half steps. Each
+      machine keeps its own router and dial.</p>
+    </div>
     <div class="help" id="help-pwr" hidden>
       <p><b>The switch panel</b> is on the table's front edge, at the other end from the pendant. Click its parts in the
       view, or use these buttons.</p>
@@ -994,6 +1020,7 @@
 <script src="js/table_model.js"></script>
 <script src="js/strut_plate.js"></script>
 <script src="js/strut_cam.js"></script>
+<script src="js/routers.js"></script>
 <script src="js/plate_design.js"></script>
 <script src="js/lib/cnc-gcode-tools/gcode-expander.js"></script>
 <script src="js/lib/cnc-gcode-tools/stock-sim.js"></script>
@@ -1032,6 +1059,7 @@
 <script src="js/page/hose_bom.js"></script>
 <script src="js/page/inspect.js"></script>
 <script src="js/page/power.js"></script>
+<script src="js/page/router.js"></script>
 <script src="js/page/ui.js"></script>
 <script src="js/page/scripting.js"></script>
 <script src="js/page/director.js"></script>

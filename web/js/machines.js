@@ -13,7 +13,7 @@
 // IndexedDB (SdCard / HandSetup, in the page).
 (function (root) {
   "use strict";
-  const MACHINE_KEY = /^(lr4-(asbuilt|cam|config-size|design|filaments|fil-presets|hand|jobdef:.*|lighting|opts|pendant|room|scenery|table-top|sd-sel)|detail|peter-style|peter-style-files|print-main|print-accent)$/;
+  const MACHINE_KEY = /^(lr4-(asbuilt|cam|config-size|design|filaments|fil-presets|hand|jobdef:.*|lighting|opts|pendant|room|router|scenery|table-top|sd-sel)|detail|peter-style|peter-style-files|print-main|print-accent)$/;
   const LIST = "lr4-machines", ACTIVE = "lr4-machine", SHARED = "shared", HELP = "help", FIRST = "My LR4";
   const DBS = ["lr4-sandbox-sd", "lr4-sandbox-flash", "lr4-sandbox-design"];   // design: the front plate's SVG (Part 41)
   const isMachineKey = (k) => MACHINE_KEY.test(k);

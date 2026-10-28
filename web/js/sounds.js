@@ -141,7 +141,10 @@
       else if (m5) ev.push({ line: n + 1, rpm: 0 });
       else if (s && ev.length && ev[ev.length - 1].rpm > 0 && /\bS/.test(code) && !/\bM/.test(code)) ev.push({ line: n + 1, rpm: Number(s[1]) });
       const on = /turn\s+on\s+(?:the\s+)?router(?:[^)]*?dial\s*([\d.]+))?/i.exec(cm), off = /turn\s+off\s+(?:the\s+)?router/i.test(cm);
-      if (on) ev.push({ line: n + 1, rpm: on[1] ? dialRpm(Number(on[1]), own) : own.length ? own[0][1] : DEFAULT_RPM });
+      const last = ev[ev.length - 1];
+      if (on && last && last.line === n + 1 && last.rpm > 0) { if (on[1]) last.dial = Number(on[1]); }   // "M3 S.. (Turn On ... Dial N)": its S
+      else if (on) ev.push(Object.assign({ line: n + 1, rpm: on[1] ? dialRpm(Number(on[1]), own) : own.length ? own[0][1] : DEFAULT_RPM },
+        on[1] ? { dial: Number(on[1]) } : {}));      // dial: what the file asks for (Part 45a: a manual router runs at its own)
       else if (off) ev.push({ line: n + 1, rpm: 0 });
     }
     return { events: ev, said: ev.length > 0 };
