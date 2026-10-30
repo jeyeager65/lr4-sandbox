@@ -10,7 +10,16 @@ the date the model data was built and the Printables file set it was solved for.
   a lock has flats too). **Collets**: each in its own nut (nut and collet swap together), or one nut for all.
 - **ER11 collet modeled:** the nose, the groove the nut's ring snaps into, the 8 deg taper and 8 slits cut in turn
   from each end (the slit count and width are GUESSES). A collet is bored for its own shank.
-- The Carbide has a shaft lock and the Kobalt has shaft flats (both GUESSES).
+- **Kobalt and Carbide measured** (from the nut's bottom): the shaft, its wrench flats, the hub, the housing's rim
+  and its open vent end (spokes, the openings behind them), and the shaft lock: a boss (sleeve) round the button, the
+  button's size and travel, and its pin through a hole in the shaft square to the flats. The bit change turns the
+  shaft until the hole lines up, then the wrench takes the nut's flats nearest the front. The Carbide's lock sits
+  below its hub on an arm up to the spokes; its hub, spokes and arm are the gray casting. Both shafts are black.
+- The collet nut is a hollow hex with beveled corners; the collet shows through its end. The round nut is gone.
+- Build your router: the shaft lock gets a boss Ø, where the boss starts, an arm, the button's Ø, its pin and how far
+  it stands out; the motor housing gets a vent (depth, wall, spokes, spoke width, spokes in from the rim).
+- A router sits in its mount with the collet nut's bottom level with the core's bottom unless its preset or your
+  edit sets a height (the other routers' guessed heights are gone).
 - Fixed: the page wouldn't load ("Cannot read properties of undefined (reading 'source')") when this browser had an
   edit kept from 0.60.0 for a built-in router. The edit is dropped now and the router keeps its own preset.
 

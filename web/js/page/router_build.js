@@ -14,7 +14,9 @@
     ["model.shaft.d", "Exposed shaft Ø", "mm", ""], ["model.shaft.exposed", "Exposed shaft length", "mm", ""],
     ["model.bearing_cap.d", "Bearing cap Ø", "mm", ""], ["model.bearing_cap.l", "Bearing cap length", "mm", ""],
     ["model.housing.d", "Motor housing Ø", "mm", "r"], ["model.housing.l", "Motor housing length", "mm", "r"],
-    ["model.housing.ch", "Motor housing chamfer", "mm", "r"],
+    ["model.housing.ch", "Motor housing chamfer", "mm", "r"], ["model.housing.vent.depth", "Vent depth (0 = closed end)", "mm", "r"],
+    ["model.housing.vent.wall", "Vent wall", "mm", "r"], ["model.housing.vent.spokes", "Vent spokes", "", "r"], ["model.housing.vent.w", "Spoke width", "mm", "r"],
+    ["model.housing.vent.inset", "Spokes in from the rim", "mm", "r"],
     ["model.housing.d", "Can Ø", "mm", "s"], ["model.housing.l", "Can length", "mm", "s"],
     ["model.collar.d", "Collar Ø", "mm", "r"], ["model.collar.l", "Collar length", "mm", "r"], ["model.overall", "Overall height", "mm", "r"]];
   const BITEND = [["model.collet_nut.below", "Nut face below the shaft end", "mm"], ["model.collet.l", "Collet length", "mm"],
@@ -26,7 +28,7 @@
   // every part's color + finish (model.looks; the page: router.js rtMaterial); r / s: routers / spindles only
   const LOOKS = [["motor_cap", "Motor cap", ""], ["housing", "Motor housing", "r"], ["housing", "Can", "s"], ["collar", "Collar", "r"],
     ["transition", "Transition", "r"], ["bearing_cap", "Bearing cap", ""], ["shaft", "Shaft", ""], ["collet_nut", "Collet nut", ""],
-    ["collet", "Collet", ""], ["dial", "Dial", "r"], ["switch", "Switch rocker", "r"], ["shaft_lock", "Shaft lock", "r"],
+    ["collet", "Collet", ""], ["dial", "Dial", "r"], ["switch", "Switch rocker", "r"], ["shaft_lock", "Shaft lock button", "r"], ["lock_boss", "Shaft lock boss", "r"],
     ["strain_relief", "Strain relief", ""], ["cord", "Cord", ""], ["trim", "Trim (bezels, grille)", ""]];
   const FINISHES = [["metal", "Metal"], ["plastic", "Plastic"], ["rubber", "Rubber"]];
   function rbField(box, id, label, type, unit) {
@@ -57,16 +59,12 @@
     rbField("rb-trans", "rb-t-l", "Transition length", "num", "mm").dataset.k = "model.transition.l";
     rbField("rb-trans", "rb-t-d", "Top Ø", "num", "mm").dataset.k = "model.transition.d";
     rbField("rb-trans-e", "rb-t-e", "Fillet size", "num", "mm").dataset.k = "model.transition.e";
-    for (const [k, l, u] of [["z", "Lock height", "mm"], ["a", "Lock angle", "°"], ["d", "Lock Ø", "mm"], ["r", "Lock reach", "mm"], ["travel", "Press depth", "mm"]])
+    for (const [k, l, u] of [["z", "Lock height", "mm"], ["a", "Lock angle", "°"], ["d", "Boss Ø (0 = none)", "mm"], ["in", "Boss starts at", "mm"], ["arm", "Arm width (0 = none)", "mm"], ["r", "Lock reach", "mm"], ["button", "Button Ø", "mm"], ["pin", "Pin Ø (0 = none)", "mm"], ["out", "Button stands out", "mm"], ["travel", "Press depth", "mm"]])
       rbField("rb-lock", `rb-lock-${k}`, l, "num", u).dataset.k = `model.shaft_lock.${k}`;
-    const nut = document.createElement("div");
-    nut.className = "variant"; nut.id = "rb-nutkind";
-    nut.innerHTML = '<span>Collet nut</span><button type="button" data-v="hex" aria-pressed="true">Hex</button><button type="button" data-v="round" aria-pressed="false">Round</button>';
-    tr.after(nut);
     const cool = document.createElement("div");
     cool.className = "variant rb-spin"; cool.id = "rb-cooling";
     cool.innerHTML = '<span>Cooling</span><button type="button" data-v="air" aria-pressed="true">Air (fan)</button><button type="button" data-v="water" aria-pressed="false">Water</button>';
-    nut.after(cool);
+    tr.after(cool);
     // the bit end (user 2026-10-29: for the bit change): collet, nut, thread, the shaft's wrench flats
     rbField("rb-bitend", "rb-csizes", "Collet sizes", "text", "mm").dataset.list = "model.collet.sizes";
     $("rb-csizes").title = "Every shank the collets take, in mm, comma apart (1/8\" = 3.175, 1/4\" = 6.35); a bit change swaps the collet when the shank changes";
@@ -139,7 +137,6 @@
     const mnote = $("rb-mountnote"), msrc = cfg && cfg.files && alt && cfg.files.sources[alt.file.split("/")[0]];
     mnote.textContent = alt && !userFiles.has(alt.file) ? `The ${msrc ? msrc.title : p.mount} files aren't added yet (Parts): drawn as the Kobalt set for now.` : "";
     mnote.hidden = !mnote.textContent;   // (Part 45c: scene.js mountAlt)
-    for (const btn of $("rb-nutkind").querySelectorAll("button")) btn.setAttribute("aria-pressed", String(btn.dataset.v === m.collet_nut.shape));
     const shown = Object.assign({}, p, { model: Object.assign({}, m, { overall: LR4RouterBody.overall(m), housing: Object.assign({ ch: 0 }, m.housing),
       bearing_cap: m.bearing_cap || { d: 0, l: 0 }, collar: m.collar || { d: 0, l: 0 } }) });
     for (const el of document.querySelectorAll("#st-rt input[data-k]")) {
@@ -312,7 +309,7 @@
   $("rb-lock-on").addEventListener("change", (e) => rbEdit((p) => {
     const m = p.model;
     if (!e.target.checked) { delete m.shaft_lock; return; }
-    m.shaft_lock = { z: +(m.collet_nut.h + m.shaft.exposed + (m.bearing_cap ? m.bearing_cap.l : 0) + 10).toFixed(1), a: -50, d: 14, r: +(m.housing.d / 2 + 3).toFixed(1), travel: 3 };
+    m.shaft_lock = { z: +(m.collet_nut.h + m.shaft.exposed + (m.bearing_cap ? m.bearing_cap.l : 0) + 10).toFixed(1), a: -50, d: 14, r: +(m.housing.d / 2 + 3).toFixed(1), travel: 3, button: 10, out: 4 };
   }, true));
   $("rb-flats-on").addEventListener("change", (e) => rbEdit((p) => {
     const S = p.model.shaft;
@@ -320,7 +317,6 @@
     S.flats = { af: +(S.d * 0.8).toFixed(1), z: +(p.model.collet_nut.h + 0.2).toFixed(1), l: Math.max(1, Math.min(3, S.exposed - 0.4)) };
   }, true));
   $("rb-cooling").addEventListener("click", (e) => { const v = e.target.dataset && e.target.dataset.v; if (v) rbEdit((p) => { p.model.cooling = v; }, true); });
-  $("rb-nutkind").addEventListener("click", (e) => { const v = e.target.dataset && e.target.dataset.v; if (v) rbEdit((p) => { p.model.collet_nut.shape = v; }, true); });
   $("rb-dialplace").addEventListener("click", (e) => { const v = e.target.dataset && e.target.dataset.v; if (v) rbEdit((p) => { p.model.dial.place = v; }, true); });
   $("st-rt").addEventListener("input", (e) => {
     const el = e.target, k = el.dataset.k;

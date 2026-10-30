@@ -69,7 +69,7 @@ ok(near(fo, o, 0.05), `RT_MOUNTS.kobalt puts the router where the build's was ($
 const cm = M("carbide"), C = B.build(cm), [hlo, hhi] = bbox(C.parts.motor_cap);
 ok(Math.abs(hhi[1] - hlo[1] - 75) < 0.5, `Carbide motor cap 75 wide (${(hhi[1] - hlo[1]).toFixed(1)})`);
 const hz = bbox(C.parts.housing);
-ok(Math.abs(hz[0][2] - 24) < 0.01 && Math.abs(hz[1][2] - 109) < 0.01 && Math.abs(hz[1][0] - 32.4) < 0.01, "Carbide housing 64.8 x 85, 24 up from the nut's bottom");
+ok(Math.abs(hz[0][2] - 37) < 0.01 && Math.abs(hz[1][2] - 109) < 0.01 && Math.abs(hz[1][0] - 32.4) < 0.01, "Carbide housing 64.8 x 72, 37 up from the nut's bottom");
 ok(B.overall(cm) === 200, `Carbide overall 200 (${B.overall(cm)})`);
 
 // the motor cap: sized by its preset, sitting on the turned stack, its parts on it
@@ -86,7 +86,7 @@ for (const id of Object.keys(R.ROUTERS)) {
     ok(out.z.lock && out.z.lock.travel === m.shaft_lock.travel, `${id}: shaft lock + its press (${m.shaft_lock.travel} mm)`);
   }
 }
-const g = B.expand({ collet_nut: { af: 20, h: 10, shape: "hex", below: 1 }, shaft: { d: 12, exposed: 0 }, housing: { d: 60, l: 90 },
+const g = B.expand({ collet_nut: { af: 20, h: 10, below: 1 }, shaft: { d: 12, exposed: 0 }, housing: { d: 60, l: 90 },
   motor_cap: { L: 80, W: 70, H: 60, top_r: 5, front_r: 20, back_r: 8, bot_r: 3 }, dial: { place: "end", d: 20, t: 6 } });
 ok(g.cap.z[0] === 100 && g.cap.z[1] === 160 && g.cap.r[0] === 8 && g.cap.r[1] === 20 && g.cap.top_r === 5 && g.cap.bot_r === 3,
   `motor cap: on the stack, back / front corner fillets, top / underneath ${JSON.stringify(g.cap)}`);

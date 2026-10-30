@@ -73,7 +73,7 @@
   const LOOKS = { shaft: { c: STEEL, f: "metal" }, collet: { c: [0.78, 0.66, 0.42], f: "metal" }, collet_nut: { c: STEEL, f: "metal" },
     bearing_cap: { c: SILVER, f: "metal" }, housing: { c: SILVER, f: "metal" }, collar: { c: SILVER, f: "metal" },
     transition: { c: SILVER, f: "metal" }, motor_cap: { c: [0.30, 0.30, 0.32], f: "plastic" }, dial: { c: DARK, f: "plastic" },
-    switch: { c: [0.17, 0.17, 0.18], f: "plastic" }, shaft_lock: { c: [0.12, 0.12, 0.13], f: "plastic" },
+    switch: { c: [0.17, 0.17, 0.18], f: "plastic" }, shaft_lock: { c: [0.12, 0.12, 0.13], f: "plastic" }, lock_boss: { c: SILVER, f: "metal" },
     strain_relief: { c: DARK, f: "rubber" }, cord: { c: DARK, f: "rubber" }, trim: { c: DARK, f: "plastic" } };
   const LOOK_PARTS = Object.keys(LOOKS);
   function looks(m) {                                // the preset's looks, every part filled in
@@ -82,6 +82,7 @@
       const L = obj(m.looks && m.looks[k]), c = L && Array.isArray(L.c) && L.c.length === 3 && L.c.every((v) => Number.isFinite(+v)) ? L.c.map((v) => clamp(+v, 0, 1)) : null;
       out[k] = { c: c || LOOKS[k].c.slice(), f: L && FINISHES.includes(L.f) ? L.f : LOOKS[k].f };
     }
+    if (!obj(m.looks && m.looks.lock_boss)) out.lock_boss = { c: out.housing.c.slice(), f: out.housing.f };   // the boss: as the housing, unless set
     return out;
   }
   const section = (v, d, lo, hi) => { const s = obj(v); return s ? { d: num(s.d, lo, hi, d.d), l: num(s.l, 0, 500, d.l) } : null; };
@@ -102,7 +103,7 @@
     const m = { label: String(b.label || q.name).slice(0, 120) }, B = base.model;
     // the bit end: collet nut, collet, shaft (missing ones: the Kobalt's)
     const n = obj(b.collet_nut) || B.collet_nut;
-    m.collet_nut = { type: String(n.type || "").slice(0, 20), af: num(n.af, 5, 60, 22), h: num(n.h, 3, 40, 14), shape: n.shape === "round" ? "round" : "hex", below: num(n.below, 0, 20, 1.5) };
+    m.collet_nut = { type: String(n.type || "").slice(0, 20), af: num(n.af, 5, 60, 22), h: num(n.h, 3, 40, 14), below: num(n.below, 0, 20, 1.5) };
     m.collet_nut.below = Math.min(m.collet_nut.below, m.collet_nut.h - 1);
     const c = obj(b.collet) || B.collet, sizes = (Array.isArray(c.sizes) ? c.sizes : B.collet.sizes).map((v) => num(v, 1, 20, 6.35)).filter((v, i, a) => a.indexOf(v) === i).sort((x, y) => x - y);
     m.collet = { type: String(c.type || "").slice(0, 20), sizes: sizes.length ? sizes : [6.35], l: num(c.l, 5, 60, 18), d: num(c.d, 4, 40, 11.5), taper: num(c.taper, 0, 30, 8) };
@@ -123,6 +124,9 @@
       if (!m.housing) m.housing = { d: 65, l: 95 };
       const ch = num(obj(b.housing) && b.housing.ch, 0, 20, 0);
       if (ch) m.housing.ch = ch;
+      const V = obj(b.housing) && obj(b.housing.vent);   // the open end the fan blows out of: a tube wall, spokes from the hub
+      if (V && num(V.depth, 0, 60, 0) > 0) m.housing.vent = { depth: num(V.depth, 0, 60, 10), wall: num(V.wall, 0.8, 10, 2.5),
+        spokes: Math.round(num(V.spokes, 0, 24, 12)), w: num(V.w, 1, 20, 3), inset: num(V.inset, 0, 50, 0.5) };
       const Tr = obj(b.transition);                  // the transition up to the motor cap
       if (Tr) {
         const t = { l: num(Tr.l, 0, 200, 0), shape: Tr.shape === "cap" ? "cap" : "round", edge: ["fillet", "chamfer"].includes(Tr.edge) ? Tr.edge : "none" };
@@ -141,7 +145,13 @@
       m.dial = { place: D.place === "top" ? "top" : "end", d: num(D.d, 8, 80, 24), t: num(D.t, 2, 30, 6) };
       if (Array.isArray(D.ring) && D.ring.length === 2 && D.ring.every((v) => /^#[0-9a-f]{6}$/i.test(v))) m.dial.ring = D.ring.slice();
       const L = obj(b.shaft_lock);
-      if (L) m.shaft_lock = { z: num(L.z, 0, 300, 25), a: num(L.a, -360, 360, -50), d: num(L.d, 4, 40, 16), r: num(L.r, 5, 80, 30), travel: num(L.travel, 0.5, 10, 3) };
+      if (L) {                                       // d: the boss's Ø (0 = none: the button straight out of the turned part); in: where it starts out from the axis;
+        // arm: a bracket that wide from the boss up to the housing (0 = none); pin: the Ø of the button's pin into the shaft's hole (0 = none);
+        // button: its Ø; out: how far it stands out
+        const tr = num(L.travel, 0.5, 10, 3), d = L.d === 0 ? 0 : num(L.d, 4, 40, 16), r = num(L.r, 5, 80, 30);
+        m.shaft_lock = { z: num(L.z, 0, 300, 25), a: num(L.a, -360, 360, -50), d, in: num(L.in, 0, r - 1, 0), arm: num(L.arm, 0, 60, 0), pin: num(L.pin, 0, 12, 0), r, travel: tr,
+          button: num(L.button, 2, 30, d ? +(d * 0.7).toFixed(1) : 10), out: num(L.out, 0.5, 20, tr + 1) };
+      }
       const SR = obj(b.strain_relief);
       if (SR) {
         m.strain_relief = { l: num(SR.l, 5, 150, 40), d: num(SR.d, 4, 40, 12), bend: num(SR.bend, -90, 90, 45) };

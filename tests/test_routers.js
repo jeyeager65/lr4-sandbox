@@ -86,7 +86,7 @@ ok(g3.W === 65 && g3.L === 65, `a cap narrower than the housing -> the housing's
 const DM = require("../web/js/router_dims.js");
 const dm = (id, c = 36.5) => Object.fromEntries(DM.dims(R.ROUTERS[id], c).map((d) => [d.id, d]));
 const mk = dm("makita");
-ok(mk["cap-L"].v === 78 && mk["cap-L"].k === "model.motor_cap.L" && mk["cap-L"].f === 2 && mk.overall.v === 205 && mk.overall.k === "model.overall" && mk.clamp.v === 29.5,
+ok(mk["cap-L"].v === 78 && mk["cap-L"].k === "model.motor_cap.L" && mk["cap-L"].f === 2 && mk.overall.v === 205 && mk.overall.k === "model.overall" && mk.clamp.v === 36.5,
   "dims: the Makita's motor cap length (centered: drag x2), overall, nut below the clamp");
 ok(Object.values(mk).every((d) => d.views.length && Number.isFinite(d.v) && [d.a, d.b, d.off].every((p) => p.length === 3 && p.every(Number.isFinite))), "dims: all placed, in a view");
 ok(mk["len-shaft"].k === "model.shaft.exposed" && mk["len-collet_nut"].k === "model.collet_nut.h" && mk["dia-collet_nut"].k === "model.collet_nut.af", "dims: the exposed shaft + the collet nut");

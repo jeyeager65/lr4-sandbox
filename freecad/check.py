@@ -50,7 +50,7 @@ PAIRS = [
     ("Core", "X_Rail_Upper"), ("Core", "X_Rail_Lower"), ("Core", "StrutPlate_Front"),
     ("Core", "StrutPlate_Bottom"), ("Core", "Tool_Mount_T_Kobalt"), ("Core", "Tool_Mount_B_Kobalt"),
     ("Core", "Dust_Shoe_Kobalt"), ("Core", "Router_Housing"), ("Core", "X_Stepper"),
-    *[(r, o) for r in ("Router_Housing", "Router_Collar", "Router_BearingCap", "Router_ShaftLock")
+    *[(r, o) for r in ("Router_Housing", "Router_Collar", "Router_BearingCap", "Router_ShaftLock", "Router_LockBoss")
       for o in ("Tool_Mount_T_Kobalt", "Tool_Mount_B_Kobalt", "Dust_Shoe_Kobalt", "Dust_Skirt_Kobalt", "X_Stepper", "Core")],
     ("Router_ColletNut", "Dust_Shoe_Kobalt"), ("Router_Bit", "Dust_Shoe_Kobalt"), ("Router_ColletNut", "Dust_Skirt_Kobalt"),
     *[(r, o) for r in ("Router_MotorCap", "Router_Trim", "Router_Dial", "Router_Switch", "Router_StrainRelief", "Router_Cord")

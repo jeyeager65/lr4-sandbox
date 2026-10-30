@@ -46,7 +46,7 @@
   const RT_MESH = { collet_nut: ["Router_ColletNut", "Collet nut"], collet: ["Router_Collet", "Collet"], thread: ["Router_Thread", "Shaft thread"],
     shaft: ["Router_Shaft", "Shaft"], bearing_cap: ["Router_BearingCap", "Bearing cap"], housing: ["Router_Housing", "Motor housing"],
     collar: ["Router_Collar", "Collar"], transition: ["Router_Transition", "Transition"], motor_cap: ["Router_MotorCap", "Motor cap"],
-    dial: ["Router_Dial", "Speed dial"], switch: ["Router_Switch", "Switch"], shaft_lock: ["Router_ShaftLock", "Shaft lock"],
+    dial: ["Router_Dial", "Speed dial"], switch: ["Router_Switch", "Switch"], shaft_lock: ["Router_ShaftLock", "Shaft lock"], lock_boss: ["Router_LockBoss", "Shaft lock boss"],
     strain_relief: ["Router_StrainRelief", "Strain relief"], cord: ["Router_Cord", "Cord"], trim: ["Router_Trim", "Trim"] };
   const RT_OWN = /^Router_(?!Cord_Run$)/;                          // the page's router meshes (+ the bit)
   // the model bit (a 1/8" 2-flute end mill 20 mm out of the nut, as the size build's): GUESS until the bit settings say
@@ -58,15 +58,17 @@
     if (RT.clampOf === cfg && RT.clampM === M) return RT.clamps;
     const B = rtRec(M.B), T = rtRec(M.T);
     RT.clampOf = cfg; RT.clampM = M;
-    RT.clamps = B && T && B.lo_ref ? { def: M.clamp, lo: [0, B.hi_ref[2] - B.lo_ref[2]], hi: [T.lo_ref[2] - B.lo_ref[2], T.hi_ref[2] - B.lo_ref[2]] } : null;
+    RT.clamps = B && T && B.lo_ref ? { def: rtClampDef(M, B), lo: [0, B.hi_ref[2] - B.lo_ref[2]], hi: [T.lo_ref[2] - B.lo_ref[2], T.hi_ref[2] - B.lo_ref[2]] } : null;
     return RT.clamps;
   }
+  // the default nut-below-the-clamp: the nut's bottom level with the core's bottom (else the build's)
+  function rtClampDef(M, B) { const C = rtRec("Core"); return C && C.lo_ref ? +(B.lo_ref[2] - C.lo_ref[2]).toFixed(2) : M.clamp; }
   // the router frame (ref build coords): on the clamp axis, z = the nut's bottom (the router's height in the mount:
   // model.clamp = mm from the nut's bottom up to the lower clamp's bottom, kept with the router)
   function rtFrame(r) {
     const M = rtMountOf(r), B = rtRec(M.B);
     if (!B || !B.lo_ref) return null;
-    const clamp = r.model.clamp ?? M.clamp;
+    const clamp = r.model.clamp ?? rtClampDef(M, B);
     return { o: [B.lo_ref[0] + M.axis[0], B.lo_ref[1] + M.axis[1], B.lo_ref[2] - clamp], a: 0, mount: M.B };
   }
   function rtBody() {                                // the current router's built model + frame (kept until either changes)

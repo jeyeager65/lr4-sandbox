@@ -89,7 +89,7 @@ const ok = (cond, msg) => { checks++; console.log((cond ? "  ok   " : "  FAIL ")
       bm.geometry.computeBoundingBox();
       const bb = bm.geometry.boundingBox;
       out.spin = { ring: !!(dm && dm.userData.ring), dialTris: dm && dm.geometry.index ? dm.geometry.index.count : 0, body: PWR.body,
-        d: +(bb.max.x - bb.min.x).toFixed(1), canShown: !$$("rb-st9").closest(".field").hidden, gripHidden: $$("rb-st6").closest(".field").hidden };
+        d: +(bb.max.x - bb.min.x).toFixed(1), canShown: ![...document.querySelectorAll(".rb-spin [data-k='model.housing.d']")].some((e) => e.closest(".field").hidden), gripHidden: [...document.querySelectorAll(".rb-router [data-k='model.housing.d']")].every((e) => e.closest(".field").hidden) };
       LR4Router.set({ router: "makita" }); await T.sleep(100);
       document.querySelector('#rb-kind button[data-v="spindle"]').click(); await T.sleep(100);
       out.toSpin = [LR4Routers.ROUTERS.makita.model.kind, LR4Routers.ROUTERS.makita.source];
@@ -244,7 +244,7 @@ const ok = (cond, msg) => { checks++; console.log((cond ? "  ok   " : "  FAIL ")
     ok(b.after === "kobalt" && b.gone, "Delete: gone, back to the Kobalt");
     ok(b.L2 === 78 && b.edits.length === 0, `Reset: the Makita back to 78 (${b.L2}), no edits left (${b.edits})`);
     ok(b.head && b.head.L === 105 && b.head.W === 80 && b.headShown && !b.back, `Kobalt: the motor cap ${b.head && b.head.L} x ${b.head && b.head.W} (its lock back after Reset)`);
-    ok(b.kLock && b.kLock.r === 29.5 && b.kLock.z === 25 && b.kLock.travel === 3 && b.lockOn, `the Kobalt: its shaft lock ${JSON.stringify(b.kLock)}`);
+    ok(b.kLock && b.kLock.r === 28 && b.kLock.z === 24 && b.kLock.travel === 1.5 && b.lockOn, `the Kobalt: its shaft lock ${JSON.stringify(b.kLock)}`);
     ok(b.tr.l === "38" && b.tr.dShown && b.tr.after.join() === "cap,fillet,5,2,true,true", `the Carbide's transition (38): shaped to the cap, a 5 fillet, housing chamfer 2 (${JSON.stringify(b.tr)})`);
     ok(b.tr.look[0] === "rubber" && b.tr.look[1] === 0.88 && b.tr.look[2] === 0 && b.tr.look[3], `a look per part: a rubber housing, a blue collar (${JSON.stringify(b.tr.look)})`);
     const s = b.spin;
@@ -253,8 +253,8 @@ const ok = (cond, msg) => { checks++; console.log((cond ? "  ok   " : "  FAIL ")
     ok(b.toSpin[0] === "spindle" && b.toSpin[1] === "gcode" && b.toRouter === 78, `Router -> Spindle (${b.toSpin}) -> Router (motor cap ${b.toRouter})`);
     ok(b.shoe0.every(Boolean) && !b.shoe1[0] && !b.shoe1[1] && b.shoe1[2] && b.optHose && b.shoe2,
       `mount None: shoe + hose hidden, the tool mount stays, the hose option off (${JSON.stringify([b.shoe0, b.shoe1, b.optHose, b.shoe2])})`);
-    ok(b.clampDef === "29.5" && b.dTip === 4.5 && b.dNut === 4.5 && b.note0 && b.dBack === 0,
-      `nut below the clamp 29.5 (the Makita's GUESS) -> 25: router + bit 4.5 higher, both clamps on the housing (${b.dNut}, ${b.dTip}), Reset back (${b.dBack})`);
+    ok(b.clampDef === "36.5" && b.dTip === 11.5 && b.dNut === 11.5 && b.note0 && b.dBack === 0,
+      `nut below the clamp 36.5 (the default: level with the core's bottom) -> 25: router + bit 11.5 higher, both clamps on the housing (${b.dNut}, ${b.dTip}), Reset back (${b.dBack})`);
     ok(/upper clamp is off the motor housing|clamps are off the motor housing/.test(b.note1 || ""), `clamp off the housing noted: ${b.note1}`);
     ok(b.tabs.join() === "head,help-rb-head,colors,help-rb-colors", `tabs: one section shown, the ? follows (${b.tabs})`);
     const c = b.cu;
@@ -267,7 +267,7 @@ const ok = (cond, msg) => { checks++; console.log((cond ? "  ok   " : "  FAIL ")
     ok(x.box && x.L2[0] === 90 && x.L2[1] === "90", `click the cap length, type 90 + Enter: the router ${x.L2}`);
     ok(x.H[1] > x.H[0] + 5, `drag the cap height's handle up 40 px: ${x.H[0]} -> ${x.H[1]}`);
     ok(x.v3d[0] === 35 && x.v3d[1] && x.top[0] === 8 && x.top[1] && !x.top[2], `3D: the usual lens + orbit (${x.v3d}); Top: length + its own width line (${x.top})`);
-    ok(x.lockSide.every(Boolean) && x.lockTop[0] === "29.5" && /°$/.test(x.lockTop[1] || "") && /^Ø/.test(x.lockTop[2] || ""), `the lock + dial on the model: side ${x.lockSide}, top ${x.lockTop}`);
+    ok(x.lockSide.every(Boolean) && x.lockTop[0] === "28" && /°$/.test(x.lockTop[1] || "") && /^Ø/.test(x.lockTop[2] || ""), `the lock + dial on the model: side ${x.lockSide}, top ${x.lockTop}`);
     ok(x.dial === 30, `dial Ø typed on the model: ${x.dial}`);
     ok(Math.abs(Math.abs(x.ang[1] - x.ang[0]) - 30) <= 1, `the lock's tip turned 30° on screen: ${x.ang[0]} -> ${x.ang[1]}`);
     ok(x.pick[0] === "housing" && x.pick[1] && x.pick[2] === "Length,Ø,Chamfer" && x.pick[3] <= 4 && x.pick[4], `click the motor housing: picked + lit, its card (${x.pick})`);

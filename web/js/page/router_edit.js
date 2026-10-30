@@ -246,7 +246,7 @@
   // off the router (or ✕) lets it go. hose_bom.js's click calls rxClick first. ----
   const rxCard = document.getElementById("rbx-card");
   // a region's options: the builder's own button groups, mirrored in the card
-  const RX_OPTS = { collet_nut: [["rb-nutkind", "Collet nut"]], dial: [["rb-dialplace", "Dial"]], housing: [["rb-cooling", "Cooling"]] };
+  const RX_OPTS = { dial: [["rb-dialplace", "Dial"]], housing: [["rb-cooling", "Cooling"]] };
   function rxRegion() { return RX.sel && LR4RouterDims.regions(rxRouter()).find((g) => g.id === RX.sel); }
   function rxClick(hit) {                             // true: the close-up took the click
     if (typeof rbViewing !== "function" || !rbViewing()) return false;

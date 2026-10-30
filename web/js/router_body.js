@@ -49,18 +49,6 @@
   const zcyl = (d, z0, z1, n) => turned([[0, z0], [d / 2, z0], [d / 2, z1], [0, z1]], [0, 0, 0], [0, 0, 1], n);
 
   // ---- the motor cap: a box with its own corner radius per end, top edges rounded, bottom edges rounded ----
-  function sdPoly(pts, x, y) {                       // convex CCW polygon (the hex nut)
-    let out = -Infinity, dq = Infinity, inside = true;
-    for (let i = 0; i < pts.length; i++) {
-      const a = pts[i], b = pts[(i + 1) % pts.length], ex = b[0] - a[0], ey = b[1] - a[1], el = Math.hypot(ex, ey);
-      const s = ((x - a[0]) * ey - (y - a[1]) * ex) / el;   // + outside
-      out = Math.max(out, s);
-      if (s > 0) inside = false;
-      const t = Math.min(Math.max(((x - a[0]) * ex + (y - a[1]) * ey) / (el * el), 0), 1);
-      dq = Math.min(dq, Math.hypot(x - a[0] - ex * t, y - a[1] - ey * t));
-    }
-    return inside ? out : dq;
-  }
   function planSd(s) {
     if (s.plan) return s.plan;
     const rn = s.r ? s.r[0] : 0, rp = s.r ? s.r[1] : 0, bx = s.L / 2, by = s.W / 2;
@@ -106,11 +94,21 @@
     }));
     return sweep(rings);
   }
-  function hexNut(af, h, z0, bore) {                 // a hex, chamfered both ends, centred on the axis
-    const rc = af / 2 / Math.cos(Math.PI / 6), pts = Array.from({ length: 6 }, (_, i) => [rc * Math.cos(Math.PI / 3 * i), rc * Math.sin(Math.PI / 3 * i)]);
-    const m = slab({ plan: (x, y) => sdPoly(pts, x, y), L: 2 * rc, W: af, z: [z0, z0 + h], chamfer: Math.min(1.2, h / 4) });
-    if (bore > 0) append(m, turned([[0, z0 - 0.02], [bore / 2, z0 - 0.02], [bore / 2, z0 + 0.6], [0, z0 + 0.6]], [0, 0, 0], [0, 0, 1], 32));   // the dark hole the collet shows in
-    return m;
+  // the collet nut, hollow: a hex (corners at 0 deg, flats facing +-y; a 45 deg bevel both ends) outside; the
+  // opening in its face shows the collet's nose + bore (the collet a little in), a lip over the nose, the cavity
+  // the collet sits in, open at the top for the shaft's thread
+  function colletNut(m) {
+    const nut = m.collet_nut, C = m.collet || { d: 11.5, l: 18, sizes: [6.35] }, h = nut.h, rf = nut.af / 2;
+    const nose = Math.min(2.5, C.l / 6), lip = Math.min(1.0, h / 6);
+    const ro = Math.max(C.d / 2 - nose * 0.58 + 0.4, Math.max(...(C.sizes || [6.35])) / 2 + 0.6);   // the opening: the collet's face shows
+    const Th = m.shaft && m.shaft.thread, rin = Math.max(C.d / 2 + 0.3, Th ? Th.d / 2 : 0, ro + 0.5);
+    const hexAt = (f) => (t) => f / Math.cos((((t % (Math.PI / 3)) + Math.PI / 3) % (Math.PI / 3)) - Math.PI / 6);
+    const ch = Math.min(1.2, h / 4), hexR = hexAt(rf), edge = hexAt(rf - ch);   // a flat 45 deg bevel on every face (crisp: the page creases over 35 deg)
+    const ring = (rr, z) => Array.from({ length: N }, (_, i) => { const t = 2 * Math.PI * i / N, r = typeof rr === "function" ? rr(t) : rr; return [r * Math.cos(t), r * Math.sin(t), z]; });
+    const rings = [ring(ro, 0), ring(edge, 0), ring(hexR, ch), ring(hexR, h - ch), ring(edge, h), ring(rin, h),
+      ring(rin, lip + (rin - ro)), ring(ro, lip)];
+    rings.push(rings[0]);                            // round to the opening again: closed
+    return sweep(rings);
   }
   function box(c, size) {                            // axis-aligned, centred on c
     const [hx, hy, hz] = size.map((v) => v / 2), m = mesh();
@@ -233,15 +231,34 @@
   // the turned part above the shaft: bearing cap, the motor housing (its collet end chamfered ch at 45 deg), the collar,
   // the transition { l, d, shape: "round" (a cone to its top d) | "cap" (lofted from round to the motor cap's plan),
   // edge: "none" | "fillet" | "chamfer", e } - its edge where it meets the cap
+  // the vent end (housing.vent): spokes (the hub's look) from the hub out to the wall, `inset` in from the rim
+  // back to the dark inside (trim) `depth` in; the hub = the bearing cap carried on up inside (else a ring round the shaft)
+  function vent(P, m, V, ri, z, zv) {
+    const B = ok(m.bearing_cap) ? m.bearing_cap : null, rh = B ? B.d / 2 : (m.shaft ? m.shaft.d / 2 : 6) + 4, t = Math.max(zv - 0.4 - z - (V.inset || 0), 0.5);
+    append(P.trim, turned([[0, zv - 0.3], [ri + 0.1, zv - 0.3], [ri + 0.1, zv - 0.1], [0, zv - 0.1]], [0, 0, 0], [0, 0, 1]));
+    append(B ? P.bearing_cap : P.housing, turned([[0, z], [rh, z], [rh, zv - 0.2], [0, zv - 0.2]], [0, 0, 0], [0, 0, 1]));
+    for (let i = 0; i < V.spokes; i++) {             // each a bar, its long side radial
+      const a = 2 * Math.PI * (i + 0.5) / V.spokes, u = [Math.cos(a), Math.sin(a), 0], v = [-u[1], u[0], 0], b = box([0, 0, 0], [ri - rh + 1, V.w, t]);
+      const cx = (rh + ri) / 2 - 0.2, cz = zv - 0.4 - t / 2;
+      for (let j = 0; j < b.pos.length; j += 3) { const x = b.pos[j], y = b.pos[j + 1]; b.pos[j] = u[0] * (x + cx) + v[0] * y; b.pos[j + 1] = u[1] * (x + cx) + v[1] * y; b.pos[j + 2] += cz; }
+      append(B ? P.bearing_cap : P.housing, b);   // one casting with the hub
+    }
+  }
   function stack(m, P) {
     let z = m.collet_nut.h + (m.shaft ? m.shaft.exposed || 0 : 0), r = 0;
     for (const k of SECTIONS) {
       const s = m[k];
       if (!ok(s)) continue;
       const c = k === "housing" ? Math.min(s.ch || 0, s.l / 2, Math.max(s.d / 2 - 0.5, 0)) : 0;
+      const V = k === "housing" && s.vent ? s.vent : null, R = s.d / 2;
       const prof = [[0, z]];
-      if (c > 0) prof.push([s.d / 2 - c, z], [s.d / 2, z + c]); else prof.push([s.d / 2, z]);
-      prof.push([s.d / 2, z + s.l], [0, z + s.l]);
+      if (V) {                                       // open: the tube's wall down to the rim, recessed depth to the spokes
+        const ri = Math.max(R - Math.max(V.wall, c + 0.4), 1), zv = z + Math.min(V.depth, s.l - 1);
+        prof[0] = [0, zv]; prof.push([ri, zv], [ri, z]);
+        vent(P, m, V, ri, z, zv);
+      }
+      if (c > 0) prof.push([R - c, z], [R, z + c]); else prof.push([R, z]);
+      prof.push([R, z + s.l], [0, z + s.l]);
       append(P[k], turned(prof, [0, 0, 0], [0, 0, 1]));
       z += s.l; r = s.d / 2;
     }
@@ -283,11 +300,10 @@
     return sweep(rings);
   }
   const PARTS = ["shaft", "thread", "collet", "collet_nut", "bearing_cap", "housing", "collar", "transition", "motor_cap",
-    "dial", "switch", "switch_off", "shaft_lock", "strain_relief", "cord", "trim"];
+    "dial", "switch", "switch_off", "shaft_lock", "lock_boss", "strain_relief", "cord", "trim"];
   function build(m) {
     const P = Object.fromEntries(PARTS.map((k) => [k, mesh()])), nut = m.collet_nut;
-    append(P.collet_nut, nut.shape === "round" ? turned([[0, 0], [nut.af / 2 - 1, 0], [nut.af / 2, 1], [nut.af / 2, nut.h], [0, nut.h]], [0, 0, 0], [0, 0, 1])
-      : hexNut(nut.af, nut.h, 0, Math.max(...((m.collet && m.collet.sizes) || [6.35])) + 1.5));
+    append(P.collet_nut, colletNut(m));
     const sp = shaftParts(m);
     append(P.shaft, sp.shaft); append(P.thread, sp.thread); append(P.collet, colletPart(m));
     const Z = { nutTop: nut.h, shaftEnd: sp.shaftEnd, flats: m.shaft && m.shaft.flats || null, lock: null };
@@ -295,11 +311,20 @@
     m = expand(m);
     const top = stack(m, P);
     append(P.motor_cap, slab(m.cap));
-    if (m.shaft_lock) {                              // a peg out of the housing, pressed in `travel` (tool_change.js)
-      const L = m.shaft_lock, a = L.a * Math.PI / 180, dir = [Math.cos(a), Math.sin(a), 0], hr = ok(m.housing) ? m.housing.d / 2 : L.r - 4;
-      const r0 = Math.max(Math.min(hr - (L.travel || 3) - 1, L.r - 2), 0);
-      append(P.shaft_lock, cyl([dir[0] * r0, dir[1] * r0, L.z], dir, L.d, L.r - r0, 48));
-      Z.lock = { dir, z: L.z, travel: L.travel || 3 };
+    if (m.shaft_lock) {                              // a boss from `in` out to r, the button on its end: pressed in `travel` (tool_change.js);
+      // arm: a bracket from the boss up to the housing's bottom (the spokes' face on a vented one), e.g. the Carbide's U
+      const L = m.shaft_lock, a = L.a * Math.PI / 180, dir = [Math.cos(a), Math.sin(a), 0], tr = L.travel || 3, rb = L.r - tr, r0 = L.in || 0;
+      if (L.d > 0) append(P.lock_boss, cyl([dir[0] * r0, dir[1] * r0, L.z], dir, L.d, L.r - r0, 48));
+      const zh = nut.h + (m.shaft ? m.shaft.exposed || 0 : 0) + (ok(m.bearing_cap) ? m.bearing_cap.l : 0) + (m.housing.vent ? m.housing.vent.inset || 0 : 0);
+      if (L.arm > 0 && zh > L.z) {
+        const b = box([0, 0, 0], [L.r - r0, L.arm, zh - L.z]), v = [-dir[1], dir[0], 0], cx = (L.r + r0) / 2, cz = (zh + L.z) / 2;
+        for (let j = 0; j < b.pos.length; j += 3) { const x = b.pos[j], y = b.pos[j + 1]; b.pos[j] = dir[0] * (x + cx) + v[0] * y; b.pos[j + 1] = dir[1] * (x + cx) + v[1] * y; b.pos[j + 2] += cz; }
+        append(P.lock_boss, b);
+      }
+      append(P.shaft_lock, cyl([dir[0] * rb, dir[1] * rb, L.z], dir, L.button || L.d * 0.7, tr + (L.out || tr + 1), 48));
+      const sr = (m.shaft ? m.shaft.d : 12) / 2 + 0.3;   // its pin, in to just clear of the shaft: pressed, it goes travel into the shaft's hole
+      if (L.pin > 0 && rb > sr) append(P.shaft_lock, cyl([dir[0] * sr, dir[1] * sr, L.z], dir, L.pin, rb - sr + 0.5, 24));
+      Z.lock = { dir, z: L.z, travel: tr };
     }
     const D = m.dial, ax = D.axis === "y" ? [0, 1, 0] : [0, 0, 1];
     append(P.dial, cyl(add(D.at, mul(ax, -D.t / 2)), ax, D.d, D.t, 72));

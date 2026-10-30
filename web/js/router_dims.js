@@ -154,7 +154,7 @@
     if (!m || !m.collet_nut) return null;
     if (!part) return /^(Tool_Mount_|Dust_Shoe)/.test(name || "") && r.mount !== "none" ? "mount" : null;
     const spin = m.kind === "spindle";
-    if (part === "shaft_lock") return "shaft_lock";
+    if (part === "shaft_lock" || part === "lock_boss") return "shaft_lock";
     if (part === "dial") return "dial";
     if (part === "collet_nut" || part === "collet" || part === "thread") return "collet_nut";
     if (/^(motor_cap|switch|switch_off|strain_relief|cord|trim)$/.test(part)) return spin ? "housing" : "motor_cap";

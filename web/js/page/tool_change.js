@@ -69,7 +69,7 @@
     const hold = two ? "A wrench on the shaft's flats holds it" : L ? "Press and hold the shaft lock" : "Hold the shaft";
     if (S.cam) add(0.9, "Bit change: the router is off", (u) => tcCam(S, tcEase(u)));
     if (S.shoe.length) add(0.8, "The lower dust shoe off (the upper one stays on)", (u) => { S.shoeDz = 140 * tcEase(u); S.shoeOn = u < 0.98; });
-    if (Math.abs(S.shaftA1) > 0.02) add(0.5, two ? "Turn the shaft till its flats face the front" : "Turn the shaft till the nut's flats face the front",
+    if (Math.abs(S.shaftA1) > 0.02) add(0.5, two ? "Turn the shaft till its flats face the front" : L ? "Turn the shaft till the lock's hole lines up" : "Turn the shaft till the nut's flats face the front",
       (u) => { S.shaftA = S.shaftA1 * tcEase(u); });
     add(0.5, hold, (u) => { if (L) S.press = tcEase(u); if (two) S.hw = { slide: 1 - tcEase(u), a: 0, show: true }; });
     add(0.6, `${hold}, a ${nut.af} mm wrench on the collet nut`, (u) => { S.nw = { slide: 1 - tcEase(u), a: 0, show: true }; });
@@ -212,6 +212,11 @@
     if (S.useLock && lock) {
       S.lock = lock; S.rest.lock = { p: lock.position.clone() }; S.travel = m.shaft_lock.travel;
       S.lockDir = new THREE.Vector3(...lock.userData.lockDir).applyQuaternion(rb.quaternion);
+      // its pin goes through the shaft's hole, square to the flats (the router's x at rest; user 2026-10-30): the shaft
+      // turned till the hole lines up with the lock, the wrench on the nut's flats nearest the front
+      const ph = Math.atan2(ax.dot(xr.clone().cross(S.lockDir)), xr.dot(S.lockDir)), w = th + TC_SWING / 2, p3 = Math.PI / 3;
+      S.shaftA1 = ph - Math.PI * Math.round(ph / Math.PI);
+      S.wrenchA = S.shaftA1 + p3 * Math.round((w - S.shaftA1) / p3);
     }
     // the bits: the one in now (a copy of it rides out), the new one (from its form, as table.js handBit draws it)
     S.bq = rb.quaternion.clone();

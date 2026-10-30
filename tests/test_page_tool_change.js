@@ -78,7 +78,10 @@ const JOBTXT = ["(LR4 tool change test)", STOCK, "(ToolDef 1: SHAPE=flat D=3.175
       ok(r.maxDz > E + 10 && r.maxDz < E + 13, `${id}: the nut comes off the thread and down (${r.maxDz.toFixed(1)} mm)`);
       ok(r.minA < -2 * Math.PI * (E / 0.75) * 0.95, `${id}: it turns ~${(E / 0.75).toFixed(1)} times to come off (${(-r.minA / 2 / Math.PI).toFixed(1)})`);
       ok(hold === "lock" ? r.press > 0.99 && !r.two : r.two && r.press === 0, `${id}: ${hold === "lock" ? "the shaft lock pressed, 1 wrench" : "2 wrenches, the lock not pressed"} (${r.press}, ${r.two})`);
-      ok(r.fMin > 0.85 && r.fMax > 0.99, `${id}: the wrench's handle out the front, 30 deg either side (cos ${r.fMin}..${r.fMax})`);
+      // 2 wrenches: the shaft turned so the swing is 30 deg either side of the front; the lock: the shaft stops where its
+      // hole lines up, the wrench on the nut's flats nearest the front - the swing within 60 deg of it, through it
+      const fLo = hold === "lock" ? 0.49 : 0.85;
+      ok(r.fMin > fLo && r.fMax > 0.99, `${id}: the wrench's handle out the front, ${hold === "lock" ? 60 : 30} deg either side at most (cos ${r.fMin}..${r.fMax})`);
       ok(r.wrench && r.wrenchesHidden, `${id}: the wrench on the nut, put away after`);
       ok(r.swap === true && r.caps.some((c) => nuts === "each" ? /aside in its nut/.test(c) : /collet out/.test(c)) && r.each === (nuts === "each") && r.caps.some((c) => /new bit in/.test(c)),
         `${id}: 1/8" -> 1/4": the collet swapped, ${nuts === "each" ? "in its own nut" : "out of the one nut"} (${r.caps.length} captions)`);
