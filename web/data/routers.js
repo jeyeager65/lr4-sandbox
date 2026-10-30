@@ -16,8 +16,8 @@
 //   strain_relief { at, l, d: at the cap, bend: deg toward +y }; cord { d, out: the stub drawn past the relief };
 //   looks { part: { c: sRGB 0..1, f: metal | plastic | rubber } } for every part (js/routers.js LOOK_PARTS).
 //   A spindle: { kind: "spindle", collet_nut, collet, shaft, bearing_cap, housing (the can), cooling: air | water }.
-// The Kobalt's motor cap sits 5 mm forward of the axis (GUESS: centred, the measured 80 mm width reaches 3 mm into
-// the core and its upper bearing bolts' heads - the real head is narrower at the back; measure where it sits).
+// The Kobalt's motor cap: centred on the axis, top + under fillets 14 (GUESS: clears the hose); its measured 80 mm width reaches ~3 mm into the core's top and its
+// upper bearing bolts' heads (the real head is narrower at the back; 5 mm forward instead cut the hose 5.3 mm).
 // clamp (nut below the lower clamp, mm): the Kobalt's is the build's 36.5; the others GUESS - both clamps on the
 // housing, the upper one 3 mm under its top (V1E doesn't say how high each router sits).
 // GUESS = not measured: the shaft flats, thread length, collet sizes / types except the Kobalt + Carbide (user:
@@ -43,7 +43,7 @@
         "bearing_cap": {"d": 30.4, "l": 11.0},
         "housing": {"d": 65.8, "l": 100.0},
         "collar": {"d": 66.6, "l": 22.0},
-        "motor_cap": {"L": 105, "W": 80, "H": 60, "top_r": 8, "front_r": 14, "back_r": 14, "bot_r": 4, "at": [0, -5]},
+        "motor_cap": {"L": 105, "W": 80, "H": 60, "top_r": 14, "front_r": 14, "back_r": 14, "bot_r": 14},
         "dial": {"place": "end", "d": 22.0, "t": 8.0, "ring": ["#202022", "#0b0b0c"]},
         "shaft_lock": {"z": 25.0, "a": -51.5, "d": 16.8, "r": 29.5, "travel": 3.0},
         "strain_relief": {"at": [-52.5, 0, 185], "l": 45.0, "d": 13.0, "bend": 45.0},
