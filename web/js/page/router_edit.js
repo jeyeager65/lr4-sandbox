@@ -2,8 +2,8 @@
 // model to adjust it. All these number fields isn't working well"). In the router's Close-up (router_build.js): the
 // router's dimensions (LR4RouterDims) drawn on it, CAD style; click a number to type it, drag a ● handle to pull that
 // end. Flat views (Side / Front / Top: a narrow lens, no orbiting) so they read like a drawing, or 3D. Every change
-// goes through the builder's own input (its data-k / data-l), so the builder's rules - the head on the grip, overall
-// = the stack + the head - hold here too. The page's scripts share one global scope (RT, rbViewing: router*.js). ----
+// goes through the builder's own input (its data-k), so the builder's rules - the motor cap on the turned part, overall
+// = the stack + the cap - hold here too. The page's scripts share one global scope (RT, rbViewing: router*.js). ----
   const RX = { view: "side", drag: null, edit: null, fov: null, hover: null, sel: null, ghost: null, ghostKey: "", lit: [], slide: null };
   const RX_VIEWS = [["side", "Side"], ["front", "Front"], ["top", "Top"], ["3d", "3D"]];
   const RX_LENS = 8;                                  // the flat views' field of view (deg): near enough to a drawing
@@ -13,7 +13,8 @@
   rxBox.innerHTML = '<svg class="rbx-svg" aria-hidden="true"></svg><div class="rbx-views" id="rbx-views" role="group" aria-label="View">' +
     RX_VIEWS.map(([v, l]) => `<button type="button" data-v="${v}" aria-pressed="false">${l}</button>`).join("") +
     '</div><div class="rbx-undo"><button type="button" data-undo="rb-undo" disabled title="Undo (Ctrl+Z)">↶</button>' +
-    '<button type="button" data-undo="rb-redo" disabled title="Redo (Ctrl+Shift+Z)">↷</button></div><p class="rbx-tip" id="rbx-tip">Click a part to edit it · click a number to type it · drag a ● to pull that end</p>' +
+    '<button type="button" data-undo="rb-redo" disabled title="Redo (Ctrl+Shift+Z)">↷</button>' +
+    '<button type="button" id="rbx-tc" title="Watch a bit change on this router: the bit set in Run > On the table goes in">Change bit</button></div><p class="rbx-tip" id="rbx-tip">Click a part to edit it · click a number to type it · drag a ● to pull that end</p>' +
     '<div class="rbx-card" id="rbx-card" hidden></div>';
   rxStage.insertBefore(rxBox, document.getElementById("insp"));   // under Inspect's panels
   const rxSvg = rxBox.querySelector("svg");
@@ -29,7 +30,7 @@
     const c = Math.cos(f.a), s = Math.sin(f.a);
     return new THREE.Vector3(f.o[0] + p[0] * c - p[1] * s, f.o[1] + p[0] * s + p[1] * c, f.o[2] + p[2]);
   }
-  const rxMesh = () => meshes.find((m) => m.userData.name === "Router_Kobalt");   // the router's body (it rides the machine's pose)
+  const rxMesh = () => meshes.find((m) => m.userData.name === "Router_Housing");   // the router's housing (it rides the machine's pose)
   function rxWorld(p) {                               // body frame -> the scene
     const w = rxRef(p), m = rxMesh();
     if (w && m) { m.updateMatrixWorld(); w.applyMatrix4(m.matrixWorld); }
@@ -69,7 +70,7 @@
         const arrow = (P, s) => `<path class="arr" d="M${P[0]} ${P[1]} L${P[0] + s * ax + px} ${P[1] + s * ay + py} L${P[0] + s * ax - px} ${P[1] + s * ay - py}Z"/>`;
         svg += `<g class="${cls}">${ext(A, A2)}${ext(B, B2)}<line x1="${A2[0]}" y1="${A2[1]}" x2="${B2[0]}" y2="${B2[1]}"/>${n > 18 ? arrow(A2, 1) + arrow(B2, -1) : ""}</g>`;
         at = [(A2[0] + B2[0]) / 2, (A2[1] + B2[1]) / 2];
-        if (d.f && (d.k || d.l)) labels.push({ d, at: B2, handle: true });
+        if (d.f && d.k) labels.push({ d, at: B2, handle: true });
       }
       labels.push({ d, at });
     }
@@ -88,7 +89,7 @@
         rxBox.appendChild(el);
       }
       el.dataset.id = d.id;
-      const ro = !d.k && !d.l;
+      const ro = !d.k;
       if (!handle && !(RX.edit && RX.edit.el === el)) el.textContent = rxFmt(d);
       el.title = ro ? `${d.label} (set by the parts below it)` : handle ? `Drag: ${d.label}` : `${d.label}: click to type`;
       el.disabled = ro;
@@ -106,9 +107,7 @@
   }
 
   // a change: into the builder's input, as if typed there (its handler saves, rebuilds, keeps the rules)
-  function rxInput(d) {
-    return d.k ? document.querySelector(`#st-rt input[data-k="${d.k}"]`) : document.querySelector(`#rb-lathe input[data-l="${d.l}"]`);
-  }
+  const rxInput = (d) => d.k && document.querySelector(`#st-rt input[data-k="${d.k}"]`);
   function rxSet(d, v) {
     const el = rxInput(d);
     if (!el || !Number.isFinite(v)) return;
@@ -120,7 +119,7 @@
 
   function rxType(el) {                               // a number clicked: a box on the spot
     const d = rxFind(el.dataset.id);
-    if (!d || (!d.k && !d.l)) return;
+    if (!d || !d.k) return;
     const box = document.createElement("input");
     box.type = "number"; box.step = "any"; box.className = "rbx-in"; box.value = d.v;
     box.setAttribute("aria-label", d.label + (d.kind === "ang" ? " (degrees)" : " (mm)"));
@@ -143,6 +142,14 @@
     box.addEventListener("blur", () => end(true));
     box.addEventListener("click", (e) => e.stopPropagation());
   }
+  rxBox.querySelector("#rbx-tc").addEventListener("click", async (e) => {   // a bit change on this router (tool_change.js)
+    const btn = e.currentTarget, b = bitForm($("hs-bit"));
+    if (typeof tcPlay !== "function" || btn.disabled) return;
+    btn.disabled = true;
+    await tcPlay({ bit: b });
+    btn.disabled = false;
+    if (b) handBit(b);                                // what went in is in the router now
+  });
   rxBox.addEventListener("click", (e) => {
     const el = e.target.closest(".rbx-n");
     if (el && !RX.edit) rxType(el);
@@ -233,22 +240,22 @@
   }
 
   // ---- a part picked (user 2026-10-29: "click and highlight each part and edit the values / sliders for the selected
-  // part"): a click on the router in the close-up picks a region (LR4RouterDims.regions / pick: a turned section by the
-  // height you click, the head, dial, spindle lock, mount); it's lit (a see-through shell, or the mount's own glow),
+  // part"): a click on the router in the close-up picks a region (LR4RouterDims.regions / pick: the mesh's part, a
+  // turned section by the height you click, the motor cap, dial, shaft lock, mount); it's lit (a see-through shell, or the mount's own glow),
   // only its numbers are drawn, and a card shows a slider + a number for each of its sizes (and its options). A click
   // off the router (or ✕) lets it go. hose_bom.js's click calls rxClick first. ----
   const rxCard = document.getElementById("rbx-card");
   // a region's options: the builder's own button groups, mirrored in the card
-  const RX_OPTS = { nut: [["rb-nutkind", "Nut"]], dial: [["rb-dialplace", "Dial"]], can: [["rb-cooling", "Cooling"]] };
+  const RX_OPTS = { collet_nut: [["rb-nutkind", "Collet nut"]], dial: [["rb-dialplace", "Dial"]], housing: [["rb-cooling", "Cooling"]] };
   function rxRegion() { return RX.sel && LR4RouterDims.regions(rxRouter()).find((g) => g.id === RX.sel); }
   function rxClick(hit) {                             // true: the close-up took the click
     if (typeof rbViewing !== "function" || !rbViewing()) return false;
-    const f = RT.body && RT.body.f, P = hit && hit.point, name = hit && hit.object && hit.object.userData.name;
+    const f = RT.body && RT.body.f, P = hit && hit.point, ud = hit && hit.object && hit.object.userData;
     let id = null;
-    if (f && P && name) {
+    if (f && P && ud) {
       const m = rxMesh(), L = m ? m.worldToLocal(P.clone()) : P;   // back into the router's own frame
       const c = Math.cos(f.a), s = Math.sin(f.a), dx = L.x - f.o[0], dy = L.y - f.o[1];
-      id = LR4RouterDims.pick(rxRouter(), name, [dx * c + dy * s, -dx * s + dy * c, L.z - f.o[2]]);
+      id = LR4RouterDims.pick(rxRouter(), ud.rtPart || null, [dx * c + dy * s, -dx * s + dy * c, L.z - f.o[2]], ud.name);
     }
     rxPick(id);
     return !!id;
@@ -261,11 +268,12 @@
   }
   function rxGhost() {                                // the picked part lit
     const g = !rxBox.hidden && rxRegion(), f = RT.body && RT.body.f, sh = g && g.shape;
-    // the head / dial / nut: a copy of their own mesh a little bigger (it hugs the real shape); the rest: a shell
-    const own = g && sh && { head: "Router_Head", dial: "Router_Dial", nut: "Router_Nut" }[g.id];
+    // a part with a mesh of its own: a copy of it a little bigger (it hugs the real shape); the rest: a shell
+    const own = g && sh && { motor_cap: "Router_MotorCap", dial: "Router_Dial", collet_nut: "Router_ColletNut", shaft_lock: "Router_ShaftLock",
+      transition: "Router_Transition", collar: "Router_Collar", bearing_cap: "Router_BearingCap" }[g.id];
     const om = own && meshes.find((m) => m.userData.name === own && m.visible);
     const host = om || rxMesh(), key = sh && f && host ? JSON.stringify([sh, f.o, f.a, om ? om.geometry.uuid : ""]) : "";
-    const litRe = g && !sh ? (g.id === "mount" ? /^Tool_Mount_/ : /^Router_Head$/) : null;
+    const litRe = g && !sh && g.id === "mount" ? /^Tool_Mount_/ : null;
     for (const m of RX.lit) if (m !== selected) m.material.emissive.setHex(0x000000);
     RX.lit = litRe ? meshes.filter((m) => m.visible && litRe.test(m.userData.name || "")) : [];
     for (const m of RX.lit) { m.material.emissive.set(css("--accent") || "#c8241b"); m.material.emissiveIntensity = 0.35; }
@@ -314,7 +322,7 @@
   function rxCardDims() {
     const C = rtClamps(), seen = new Set();
     return LR4RouterDims.dims(rxRouter(), C ? C.def : null).filter((d) => {
-      const k = d.k || d.l;
+      const k = d.k;
       if (d.g !== RX.sel || !k || seen.has(k)) return false;
       seen.add(k);
       return true;
@@ -338,7 +346,7 @@
     rxCard.append(h);
     for (const d of rxCardDims()) {
       const [lo, hi, st] = rxRange(d), row = document.createElement("label"), u = d.kind === "ang" ? "°" : "mm";
-      row.className = "rbx-row"; row.dataset.k = d.k || d.l;
+      row.className = "rbx-row"; row.dataset.k = d.k;
       row.innerHTML = `<span></span><input type="range" min="${lo}" max="${hi}" step="${st}"><input type="number" step="any"><em>${u}</em>`;
       const short = d.label.toLowerCase().startsWith(g.label.toLowerCase() + " ") ? d.label.slice(g.label.length + 1) : d.label;
       row.querySelector("span").textContent = short.charAt(0).toUpperCase() + short.slice(1);
@@ -366,18 +374,11 @@
       o.append(sel);
       rxCard.append(o);
     }
-    if (g.id === "head" && !g.shape) {                // a photo-modelled head: only as a simple one
-      const b = document.createElement("button");
-      b.type = "button"; b.className = "rbx-simple"; b.textContent = "Use a simple head";
-      b.title = "This router's head is modelled from photos: swap it for a rounded box the same size to shape it here";
-      b.addEventListener("click", () => { $("rb-simple").click(); rxPick("head"); });
-      rxCard.append(b);
-    }
   }
   function rxCardSync() {                             // the card's values from the router (not the one being moved)
     if (rxCard.hidden) return;
-    if (!rxRegion()) return rxPick(null);             // the part's gone (a row removed, the lock off, now a spindle)
-    const cur = new Map(rxCardDims().map((d) => [d.k || d.l, d]));
+    if (!rxRegion()) return rxPick(null);             // the part's gone (the lock off, now a spindle)
+    const cur = new Map(rxCardDims().map((d) => [d.k, d]));
     for (const row of rxCard.querySelectorAll(".rbx-row[data-k]")) {
       const d = cur.get(row.dataset.k);
       if (!d) continue;
@@ -391,7 +392,7 @@
   rxCard.addEventListener("input", (e) => {
     const row = e.target.closest(".rbx-row[data-k]");
     if (!row || (e.target.type === "number" && e.target.value === "")) return;
-    const d = rxCardDims().find((q) => (q.k || q.l) === row.dataset.k);
+    const d = rxCardDims().find((q) => q.k === row.dataset.k);
     if (!d) return;
     const v = Number(e.target.value);
     for (const el of row.querySelectorAll("input")) if (el !== e.target) el.value = v;   // the slider + the number together

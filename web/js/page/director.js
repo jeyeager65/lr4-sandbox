@@ -135,7 +135,7 @@ window.LR4Director = (() => {
     if (o.homing && !D.homingOrder(String(o.homing))) say(`(Video): HOMING=${o.homing}: not an order (e.g. z,x,y)`);
     else if (o.homing) say(`homing order: ${o.homing}`);
     LR4Clip.leave(false);                            // the probe clip on its bolt (a flung one from before goes home)
-    for (const q of introAll.filter((c) => ["asbuilt", "slip", "heat", "clip"].includes(c.kind))) { if (q.kind === "slip") slip(q); else if (q.kind === "heat") heat(q); else if (q.kind === "clip") clip(q); else asbuilt(q); }   // the machine as built, before FluidNC boots on it
+    for (const q of introAll.filter((c) => ["asbuilt", "slip", "heat", "clip", "router"].includes(c.kind))) { if (q.kind === "slip") slip(q); else if (q.kind === "heat") heat(q); else if (q.kind === "clip") clip(q); else if (q.kind === "router") router(q); else asbuilt(q); }   // the machine as built, before FluidNC boots on it
     if (o.home && homeCmd) D.nearHome(Number(homeCmd.kv.offset) || 30);   // FluidNC (re)boots a little way off the switches
     if (!await D.fluidnc()) throw new Error("FluidNC didn't start (is the page cross-origin isolated? serve it with tools/serve.py)");
     say("mode: FluidNC");
@@ -153,6 +153,12 @@ window.LR4Director = (() => {
   function heat(cmd) {                               // (Video Heat:) heat + fire (Part 44b)
     LR4AsBuilt.set({ heat: DS.heatOf(cmd) });
     say(`heat: ${JSON.stringify(LR4AsBuilt.get().heat)}`);
+  }
+  function router(cmd) {                             // (Video Router: ID=carbide DIAL=3) the router + its dial (Part 45b)
+    const o = {};
+    if (cmd.kv.id) o.router = String(cmd.kv.id).toLowerCase();
+    if (cmd.kv.dial !== undefined) o.dial = +cmd.kv.dial;
+    say(`router: ${JSON.stringify(LR4Router.set(o))}`);
   }
   function clip(cmd) {                               // (Video Clip: LEAVE=on) the probe clip left on the nut (Part 44d)
     LR4Clip.leave(!/^off$/i.test(cmd.kv.leave || "on"));
@@ -542,6 +548,7 @@ window.LR4Director = (() => {
         else if (cmd.kind === "slip") slip(cmd);
         else if (cmd.kind === "heat") heat(cmd);
         else if (cmd.kind === "clip") clip(cmd);
+        else if (cmd.kind === "router") router(cmd);
         else if (cmd.kind === "term") term(cmd);
         else if (cmd.kind === "fire") say(LR4Heat.fire(DS.secsOf(cmd, 4)) ? `fire in ${DS.secsOf(cmd, 4)} s` : "fire: no job running");
         else if (cmd.kind === "extinguish") say(LR4Heat.extinguish() ? "the extinguisher's coming" : "extinguish: nothing burning");
@@ -619,6 +626,7 @@ window.LR4Director = (() => {
 
   return {
     waitLoaded, prepare, direct, recordClock, liveClock, videoKind,
+    directing: () => !!(RUN && RUN.logOn),           // a video has the camera (tool_change.js leaves it alone)
     // the page's player (js/page/help.js): the whole video on `clock` (liveClock); started() once it is set up
     async play(text, name, o, clock, started) {
       await prepare(text, name, o);

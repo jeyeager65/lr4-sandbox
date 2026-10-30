@@ -1,10 +1,11 @@
-// router_body.js (Part 45b): every preset builds closed, outward-facing pieces; the Kobalt preset lands on the
-// FreeCAD model's boxes (hw.kobalt_k7tr03 as built: lr4_config.json's Router_* lo_ref / hi_ref, less the router's
-// frame); the Carbide's measured sizes (overall 200, grip 64.8 x 85, head 75 wide); the dial / cord frames.
+// router_body.js (Part 45b): every preset builds closed, outward-facing parts; the Kobalt's collet nut lands on the
+// FreeCAD model's (lr4_config.json's Router_Nut lo_ref / hi_ref, less the router's frame) and its cord tip on the size
+// build's cord route; the Carbide's measured sizes (overall 200, housing 64.8 x 85, cap 75 wide); the motor cap on the
+// turned part; the bit end (thread inside the nut, the collet under the shaft's end, the flats).
 //   node tests/test_router_body.js
 "use strict";
 const B = require("../web/js/router_body.js");
-const DATA = require("../web/data/routers.js");
+const R = require("../web/js/routers.js");
 const cfg = require("../web/data/lr4_config.json");
 
 let fails = 0, checks = 0;
@@ -24,56 +25,71 @@ const volume = (m) => {                              // signed: > 0 when the fac
 };
 const near = (a, b, tol) => a.every((v, k) => Math.abs(v - b[k]) <= tol);
 const f = (a) => a.map((v) => +v.toFixed(1)).join(",");
+const M = (id) => R.ROUTERS[id].model;               // cleaned: every look + default filled in
 
-for (const [id, r] of Object.entries(DATA.routers)) {
-  const out = B.build(r.body);
-  for (const k of r.body.kind === "spindle" ? ["body", "head", "nut", "cap", "cord"] : ["body", "head", "nut", "dial", "switch", "cord"]) {
-    const m = out.parts[k];
-    ok(m.pos.length > 0 && m.pos.every(Number.isFinite), `${id} ${k}: built, finite`);
-    ok(volume(m) > 0, `${id} ${k}: faces out (volume ${volume(m).toFixed(0)})`);
+for (const id of Object.keys(R.ROUTERS)) {
+  const m = M(id), out = B.build(m), spin = m.kind === "spindle";
+  const parts = ["collet_nut", "collet", "shaft", "thread", "housing", "motor_cap", "strain_relief", "cord"].concat(spin ? ["trim"] : ["dial", "switch", "switch_off"]);
+  for (const k of parts) {
+    const p = out.parts[k];
+    ok(p.pos.length > 0 && p.pos.every(Number.isFinite), `${id} ${k}: built, finite`);
+    ok(volume(p) > 0, `${id} ${k}: faces out (volume ${volume(p).toFixed(0)})`);
   }
-  ok(Math.abs(bbox(out.parts.head)[1][2] - r.body.overall) < 0.6, `${id}: head top = overall ${r.body.overall}`);   // (Kobalt: its dial housing 0.5 over)
+  ok(Object.keys(out.parts).every((k) => B.PARTS.includes(k)) && Object.keys(m.looks).every((k) => R.LOOK_PARTS.includes(k)), `${id}: parts + looks named`);
+  ok(Math.abs(bbox(out.parts.motor_cap)[1][2] - B.overall(m)) < 0.6, `${id}: top = overall ${B.overall(m)}`);
+  const th = bbox(out.parts.thread), nut = m.collet_nut;
+  ok(th[0][2] >= nut.below - 0.01 && th[1][2] <= nut.h + 0.01 && th[1][0] <= m.shaft.thread.d / 2 + 0.01, `${id}: the thread inside the nut (${f(th[0])} .. ${f(th[1])})`);
+  const co = bbox(out.parts.collet);
+  ok(co[0][2] > 0 && Math.abs(co[1][0] - m.collet.d / 2) < 0.05, `${id}: the collet from the nut's face up, ${m.collet.d} across its nut end`);
+  if (m.shaft.flats) {
+    const sh = out.parts.shaft, F = m.shaft.flats;
+    let ymax = 0;
+    for (let i = 0; i < sh.pos.length; i += 3) if (sh.pos[i + 2] > F.z + 0.1 && sh.pos[i + 2] < F.z + F.l - 0.1) ymax = Math.max(ymax, Math.abs(sh.pos[i + 1]));
+    ok(Math.abs(ymax - F.af / 2) < 0.01, `${id}: the shaft's flats ${F.af} across (${(2 * ymax).toFixed(2)})`);
+  }
 }
 
-// the Kobalt preset vs the FreeCAD model (ref build), in the router's frame: the bit's centre, the nut's bottom
+// the Kobalt vs the FreeCAD model (ref build), in the router's frame: the bit's centre, the nut's bottom
 const rec = (n) => cfg.parts.find((p) => p.key === n);
-const bit = rec("Router_Bit"), nut = rec("Router_Nut");
-const o = [(bit.lo_ref[0] + bit.hi_ref[0]) / 2, (bit.lo_ref[1] + bit.hi_ref[1]) / 2, nut.lo_ref[2]];
-const K = B.build(DATA.routers.kobalt.body);
-for (const [k, n, tol] of [["nut", "Router_Nut", 0.6]]) {   // (the rest reshaped from the user's photos 2026-10-28)
-  const [lo, hi] = bbox(K.parts[k]), R = rec(n);
-  const want = [R.lo_ref.map((v, i) => v - o[i]), R.hi_ref.map((v, i) => v - o[i])];
-  ok(near(lo, want[0], tol) && near(hi, want[1], tol), `Kobalt ${k} on FreeCAD's ${n}: ${f(lo)} .. ${f(hi)} vs ${f(want[0])} .. ${f(want[1])}`);
-}
+// (Part 45b step 4: FreeCAD's router is this preset now - router_export.js - so its boxes aren't checked against it;
+// the page data's Router_Nut until the next size refresh, Router_ColletNut after)
+const bit = rec("Router_Bit"), nutR = rec("Router_ColletNut") || rec("Router_Nut");
+const o = [(bit.lo_ref[0] + bit.hi_ref[0]) / 2, (bit.lo_ref[1] + bit.hi_ref[1]) / 2, nutR.lo_ref[2]];
+const K = B.build(M("kobalt"));
 ok(near(K.cord.dir, [-Math.SQRT1_2, Math.SQRT1_2, 0], 1e-6), "Kobalt cord leaves bent 45 deg toward +y");
-const tipW = cfg.hose.cord.tip, BUILD_TIP = [-108.1, 27.4, 196.0];   // js/page/router.js RT_BUILD_TIP (the cord route's reference)
+// js/page/router.js RT_BUILD_TIP = the page data's cord tip (the size builds' router; after the next refresh: the
+// default preset's, tools/router_export.js cord.tip - update RT_BUILD_TIP then, this check says so)
+const tipW = cfg.hose.cord.tip, BUILD_TIP = [-108.1, 27.4, 196.0];
 ok(near(BUILD_TIP.map((v, i) => v + o[i]), tipW, 1.0), `RT_BUILD_TIP = lr4's cord_tip (${f(BUILD_TIP.map((v, i) => v + o[i]))} vs ${f(tipW)})`);
-ok(Math.abs(K.cord.tip[2] - 185) < 0.01, "Kobalt cord leaves on the seam (z 185)");
+// the page's mount frame (router.js RT_MOUNTS.kobalt) = the build's bit axis + nut bottom
+const mb = rec("Tool_Mount_B_Kobalt"), fo = [mb.lo_ref[0] + 49.4, mb.lo_ref[1] + 44.35, mb.lo_ref[2] - 36.5];
+ok(near(fo, o, 0.05), `RT_MOUNTS.kobalt puts the router where the build's was (${f(fo)} vs ${f(o)})`);
 
 // the Carbide: measured sizes
-const C = B.build(DATA.routers.carbide.body), cb = DATA.routers.carbide.body;
-const [hlo, hhi] = bbox(C.parts.head);
-ok(Math.abs(hhi[1] - hlo[1] - 75) < 0.5, `Carbide head 75 wide (${(hhi[1] - hlo[1]).toFixed(1)})`);
-const grip = cb.nut[1] + cb.spindle[1] + cb.nose[1];
-ok(grip === 24 && cb.grip[0] === 64.8 && cb.grip[1] === 85, "Carbide grip 64.8 x 85, 24 up from the nut's bottom");
-const capLo = bbox(C.parts.cap)[0][2];
-ok(capLo > 150, `Carbide switch bezel on the head (lowest z ${capLo.toFixed(1)})`);
+const cm = M("carbide"), C = B.build(cm), [hlo, hhi] = bbox(C.parts.motor_cap);
+ok(Math.abs(hhi[1] - hlo[1] - 75) < 0.5, `Carbide motor cap 75 wide (${(hhi[1] - hlo[1]).toFixed(1)})`);
+const hz = bbox(C.parts.housing);
+ok(Math.abs(hz[0][2] - 24) < 0.01 && Math.abs(hz[1][2] - 109) < 0.01 && Math.abs(hz[1][0] - 32.4) < 0.01, "Carbide housing 64.8 x 85, 24 up from the nut's bottom");
+ok(B.overall(cm) === 200, `Carbide overall 200 (${B.overall(cm)})`);
 
-// the generic head: sized by its preset, sitting on the turned stack, its parts on it
-for (const [id, r] of Object.entries(DATA.routers)) {
-  const h = r.body.head;
-  if (!h || r.body.slabs) continue;
-  const out = B.build(r.body), [lo, hi] = bbox(out.parts.head), x = B.expand(r.body), at = h.at || [0, 0];
-  ok(Math.abs(hi[0] - lo[0] - h.L) < 0.5 && Math.abs(hi[1] - lo[1] - h.W) < 0.5, `${id}: generic head ${f([hi[0] - lo[0], hi[1] - lo[1]])} = L x W ${h.L} x ${h.W}`);
-  ok(Math.abs(hi[2] - lo[2] - h.H) < 0.5, `${id}: generic head ${(hi[2] - lo[2]).toFixed(1)} tall = H ${h.H}`);
-  ok(Math.abs(lo[2] - B.stackTop(r.body)) < 0.5, `${id}: head sits on the grip (bottom ${lo[2].toFixed(1)}, stack top ${B.stackTop(r.body)})`);
-  ok(x.cord.at[0] <= at[0] - h.L / 2 + 0.01, `${id}: cord leaves the -x end`);
-  if (!r.body.switch) ok(Math.abs(x.switch.at[0] - (at[0] + h.L / 2 + 0.75)) < 0.01 && out.rocker, `${id}: switch + rocker on the +x end`);
+// the motor cap: sized by its preset, sitting on the turned stack, its parts on it
+for (const id of Object.keys(R.ROUTERS)) {
+  const m = M(id), h = m.motor_cap;
+  if (m.kind === "spindle") continue;
+  const out = B.build(m), [lo, hi] = bbox(out.parts.motor_cap), x = B.expand(m), at = h.at || [0, 0];
+  ok(Math.abs(hi[0] - lo[0] - h.L) < 0.5 && Math.abs(hi[1] - lo[1] - h.W) < 0.5, `${id}: motor cap ${f([hi[0] - lo[0], hi[1] - lo[1]])} = L x W ${h.L} x ${h.W}`);
+  ok(Math.abs(hi[2] - lo[2] - h.H) < 0.5, `${id}: motor cap ${(hi[2] - lo[2]).toFixed(1)} tall = H ${h.H}`);
+  ok(Math.abs(lo[2] - B.stackTop(m)) < 0.5, `${id}: cap sits on the turned part (bottom ${lo[2].toFixed(1)}, stack top ${B.stackTop(m)})`);
+  ok(x.strain_relief.at[0] <= at[0] - h.L / 2 + 0.01, `${id}: cord leaves the -x end`);
+  ok(Math.abs(x.switch.at[0] - (at[0] + h.L / 2 + 0.75)) < 0.01 && out.rocker, `${id}: switch + rocker on the +x end`);
+  if (m.shaft_lock) {
+    ok(out.z.lock && out.z.lock.travel === m.shaft_lock.travel, `${id}: shaft lock + its press (${m.shaft_lock.travel} mm)`);
+  }
 }
-const g = B.expand({ nut: [20, 10, "hex"], grip: [60, 90], overall: 160, head: { L: 80, W: 70, H: 60, top_r: 5, front_r: 20, back_r: 8, bot_r: 3 } });
-const gs = g.slabs[0];
-ok(gs.z[0] === 100 && gs.z[1] === 160 && gs.r[0] === 8 && gs.r[1] === 20 && gs.top_r === 5 && gs.bot_r === 3,
-  `generic head: H down from overall, back / front corner fillets, top / underneath ${JSON.stringify(gs)}`);
+const g = B.expand({ collet_nut: { af: 20, h: 10, shape: "hex", below: 1 }, shaft: { d: 12, exposed: 0 }, housing: { d: 60, l: 90 },
+  motor_cap: { L: 80, W: 70, H: 60, top_r: 5, front_r: 20, back_r: 8, bot_r: 3 }, dial: { place: "end", d: 20, t: 6 } });
+ok(g.cap.z[0] === 100 && g.cap.z[1] === 160 && g.cap.r[0] === 8 && g.cap.r[1] === 20 && g.cap.top_r === 5 && g.cap.bot_r === 3,
+  `motor cap: on the stack, back / front corner fillets, top / underneath ${JSON.stringify(g.cap)}`);
 
 console.log(fails ? `${fails} of ${checks} failed` : `${checks}/${checks} checks passed`);
 process.exit(fails ? 1 : 0);

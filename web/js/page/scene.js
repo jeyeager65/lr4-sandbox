@@ -526,8 +526,15 @@
   // the bristles' strip: Standard (22 mm, what the build bends) or Extra long (32 mm: src.long, its own file) - the
   // Options step's Bristles; the long one only once its file is loaded (else the standard)
   const bristleSrc = (s) => (s.kind === "bent" && s.long && bristleLen === "long" && userFiles.has(s.long.file) ? Object.assign({}, s, s.long) : s);
+  // the other V1E mounts (Part 45c, 2026-10-30): a Kobalt mount part (tool mounts, shoe, skirt) drawn from the router's
+  // mount's file (src.alt: the Makita 701 / T1 or DeWalt 611 set, in the Kobalt files' frame: the same A) once that
+  // file is loaded, else the Kobalt's. MOUNT_NAME: the label's "Kobalt" for that set
+  const MOUNT_NAME = { makita: "Makita 701", dewalt: "DeWalt 611" };
+  const mountNow = () => { const r = typeof LR4Routers !== "undefined" && typeof RT !== "undefined" && LR4Routers.ROUTERS[RT.set.router]; return r ? r.mount : "kobalt"; };
+  const mountAlt = (s) => { const a = s && s.alt && s.alt[mountNow()]; return a && userFiles.has(a.file) ? a : null; };
   function srcGeometry(rec) {
-    const s = bristleSrc(rec.src), ck = rec.key + (s.kind === "peter" ? "|" + peterStyle : "") + (s !== rec.src ? "|long" : "");
+    const s0 = bristleSrc(rec.src), alt = mountAlt(s0), s = alt ? Object.assign({}, s0, alt) : s0;
+    const ck = rec.key + (s.kind === "peter" ? "|" + peterStyle : "") + (s0 !== rec.src ? "|long" : "") + (alt ? "|" + alt.file : "");
     if (srcCache.has(ck)) return srcCache.get(ck);
     let geo = null;
     if (s.kind === "stl" || s.kind === "bent") {
@@ -1130,7 +1137,8 @@ float lr4G(float x) { float s = 2.0 * fract(x) - 1.0; return floor(x) / 3.0 + (s
       // Part 33: the table is drawn from table_model.js (tableMeshes); the size builds' own table parts are left out
       // (TableMDF before the 2026-10-26 refresh, TableBase / Spoilboard / RailStrip_* after)
       if (o.name === "TableMDF" || TABLE_PART.test(o.name)) continue;
-      const g = (typeof rtBodyGeo === "function" && rtBodyGeo(o)) || recGeometry(o.rec);   // the router: from its preset (router.js)
+      if (/^Router_/.test(o.name)) continue;          // the router + its bit: the page's own (router.js rtMeshes, Part 45b)
+      const g = recGeometry(o.rec);
       if (!g) {
         const sg = standInGeo(o.rec);
         if (sg) {
@@ -1144,11 +1152,11 @@ float lr4G(float x) { float s = 2.0 * fract(x) - 1.0; return floor(x) / 3.0 + (s
       }
       const { geo, fin, hasUV, tris: n } = g;
       const ud = Object.assign({}, o.rec.meta, { name: o.name, base: { t: o.t, s: o.s } }, g.ud);
+      if (mountAlt(o.rec.src)) ud.label = ud.label.replace("Kobalt", MOUNT_NAME[mountNow()]);   // the router's mount set (Part 45c)
       if (DUST_PARTS.test(o.name)) ud.group = "Shoe";   // own toggle, so the bit shows with the hose on (user 2026-10-20)
       if (o.rec.src) delete ud.variant;              // Peter Plates from files: the style picks the geometry
       if (o.name !== o.rec.meta.name) { ud.label = pretty(o.name); ud.ref = o.rec.meta.name; }
       const mat = ud.source === "printed" && !fin ? printedMaterial(ud.color, printFrame(o.rec.src)) : material(ud.color, fin, hasUV);
-      if (geo.attributes.rm && typeof rtLookMat === "function") rtLookMat(mat);   // the router's turned part: a look per section
       if (o.rec.src && o.rec.src.kind === "peter" && mat.userData.print) bedOutside(mat, geo, o.name);
       if (ud.clip) { ud.clip = Object.assign({}, ud.clip, { p: o.clipP }); mat.clippingPlanes = [new THREE.Plane()]; }
       addMesh(geo, mat, ud);
@@ -1167,6 +1175,7 @@ float lr4G(float x) { float s = 2.0 * fract(x) - 1.0; return floor(x) / 3.0 + (s
     for (const [geo, ud] of legMeshes()) addMesh(geo, material(ud.color, null, false, ud.grain), ud);
     for (const [geo, mat, ud] of pendantMeshes()) addMesh(geo, mat, ud);
     for (const [geo, mat, ud] of switchPanelMeshes()) addMesh(geo, mat, ud);
+    if (typeof rtMeshes === "function") for (const [geo, mat, ud] of rtMeshes(inst)) addMesh(geo, mat, ud);
     meta = { cut_in: [S.cutX / IN, S.cutY / IN], travel: LR4Model.travel(cfg, S), tip_above_table: cfg.tip_above_table,
       hose: LR4Model.hose(cfg, S, inst), table_mm: [S.TW, S.TL], bom: cfg.bom_ref, peter_style: cfg.peter_style, parts: meshes,
       triangles: tris };

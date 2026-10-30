@@ -2,7 +2,7 @@
 // The page's scripts share one global scope (js/page/*.js, loaded in order by index.html): names declared
 // at the top level here are seen by the later files.
   // ---- version + feedback: the issue link carries the size, data date and the loaded files' checksums ----
-  const VERSION = "0.60.0";
+  const VERSION = "0.61.0";
   function setupAbout() {
     const bits = [`lr4-sandbox ${VERSION}`];
     if (cfg.built) bits.push(`model data built ${cfg.built}`);
@@ -525,11 +525,11 @@
     let x = -Infinity, z = Infinity, zNut = Infinity;   // and the shoe's bottom (skirt off)
     for (const m of meshes) {
       const n = m.userData.name;
-      if (!/^(Dust_Shoe|Tool_Mount_|Router_Kobalt|Router_Nut|Router_Bit)/.test(n) || !m.visible) continue;
+      if (!/^(Dust_Shoe|Tool_Mount_|Router_Housing|Router_MotorCap|Router_ColletNut|Router_Bit)/.test(n) || !m.visible) continue;
       const b = new THREE.Box3().setFromObject(m), mo = touchMotion();
       x = Math.max(x, b.max.x - mo.x);
       if (/^Dust_Shoe/.test(n)) z = Math.min(z, b.min.z - mo.z);
-      if (n === "Router_Nut") zNut = b.min.z - mo.z;
+      if (n === "Router_ColletNut") zNut = b.min.z - mo.z;
     }
     // no shoe drawn (Options, or hidden - the help videos hide it): under the collet nut instead (it was Infinity: the
     // clip's route went off to infinity, 2026-10-26)
@@ -538,7 +538,7 @@
   function touchFront() {                            // (world y, parked) just in front of the bottom mount, shoe, router
     let y = Infinity;
     for (const m of meshes) {
-      if (!/^(Dust_Shoe|Tool_Mount_B|Router_Kobalt|Router_Nut|Router_Bit)/.test(m.userData.name) || !m.visible) continue;
+      if (!/^(Dust_Shoe|Tool_Mount_B|Router_Housing|Router_MotorCap|Router_ColletNut|Router_Bit)/.test(m.userData.name) || !m.visible) continue;
       y = Math.min(y, new THREE.Box3().setFromObject(m).min.y - touchMotion().y);
     }
     return y - 10;
@@ -632,7 +632,7 @@
     }
   }
   function touchNut() {                             // the magnet's spot on the collet nut (world, parked), once per build
-    const nut = meshes.find((m) => m.userData.name === "Router_Nut"), mag = meshes.find((m) => m.userData.name === "TouchPlate_Magnet");
+    const nut = meshes.find((m) => m.userData.name === "Router_ColletNut"), mag = meshes.find((m) => m.userData.name === "TouchPlate_Magnet");
     if (!nut || !mag) return null;
     if (TOUCH_ANIM.onNut && TOUCH_ANIM.onNut.nut === nut && TOUCH_ANIM.onNut.mag === mag) return TOUCH_ANIM.onNut;
     const wb = (m) => { m.geometry.computeBoundingBox(); return m.geometry.boundingBox.clone().translate(new THREE.Vector3(...(m.userData.base || { t: [0, 0, 0] }).t)); };
@@ -740,7 +740,6 @@
   // the bit as cnc-gcode-tools draws it (StockMeshRenderer.buildToolMesh + fluted: lathe profile, helical flute
   // gullies), run unchanged against a stand-in gl that keeps the arrays, and shaded like it too: its tool shader
   // (light from the camera, sky term, highlight), the cutting part in the tool's colour (its palette), shank grey
-  const COLLET = 25.4 / 4;                            // mm: the biggest shank the router's collet takes (1/4")
   const TOOL_RGB = ["#00ccff", "#00ff88", "#ff4dff", "#ffff00", "#ff8800", "#8888ff", "#ff0088", "#00ffff"];   // controller.js
   function jobToolMaterial(rgb) {
     const m = new THREE.ShaderMaterial({
@@ -764,7 +763,7 @@
   function jobBitMesh(def, colour) {
     let tool = compileStockTool(def);
     if (!tool) return null;
-    const big = tool.radius * 2 > COLLET + 0.01;
+    const big = tool.radius * 2 > colletMax() + 0.01;
     // flutes as the bits are made (user 2026-10-26): V-bits / chamfers 2 straight ones unless said; over 1/2" straight too
     if ((def.shape === "vbit" || def.shape === "chamfer") && !tool.flutes) tool = Object.assign({}, tool, { flutes: 2 });
     if (tool.radius * 2 > 12.7 + 0.01) tool = Object.assign({}, tool, { straightFlutes: true });
@@ -782,7 +781,7 @@
     let pos = mb.position.data, nor = mb.normal.data;
     if (big) {                                       // its shank swapped for a 1/4" one: the head's top, then the shank
       const n = mb.cutterCount * 3, fluteTop = tool.fluteLength, top = Math.max(tool.overallLength || 0, fluteTop + 25);
-      const S = COLLET / 2, r = tool.radius, p = Array.from(pos.subarray(0, n)), q = Array.from(nor.subarray(0, n));
+      const S = colletMax() / 2, r = tool.radius, p = Array.from(pos.subarray(0, n)), q = Array.from(nor.subarray(0, n));
       const outline = [[r, fluteTop], [S, fluteTop], [S, top], [0, top]], sides = 32;
       for (let k = 0; k + 1 < outline.length; k++) {   // lathe, as stock-sim's buildToolMesh
         const [r0, z0] = outline[k], [r1, z1] = outline[k + 1], l = Math.hypot(z1 - z0, r1 - r0), nr = (z1 - z0) / l, nz = -(r1 - r0) / l;
@@ -807,7 +806,7 @@
   // Handed for the router's clockwise turn seen from above (user 2026-10-26: they were backwards): each blade's
   // cutting face leads clockwise, its gullet just ahead of it - the angles below run clockwise (y mirrored, SY = -1).
   function surfacingBitGeo(tool, def) {
-    const R = tool.radius, S = COLLET / 2, N = Math.min(4, Math.max(2, tool.flutes || 2));
+    const R = tool.radius, S = colletMax() / 2, N = Math.min(4, Math.max(2, tool.flutes || 2));
     const head = tool.fluteLength || Math.min(22, Math.max(8, R * 0.9)), neck = Math.min(10, Math.max(5, R * 0.45)), a0 = Math.PI / 4;   // a0: the blades turned to face a front view
     const top = Math.max(tool.overallLength || 0, head + neck + 25), body = R * 0.84, lift = 0.4;   // the body clears the cut
     const parts = [[], []];                          // non-indexed geometries per group

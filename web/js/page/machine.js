@@ -24,18 +24,20 @@
   // and the hand-installed bit on that axis, tip at its tip. move() places the nut and calls this; spinTick turns it
   // every frame a job has the router on (FluidNC: a dwell or a hold doesn't move the machine, the bit still turns)
   function spinApply() {
-    const nut = meshes.find((m) => m.userData.name === "Router_Nut"), rb = meshes.find((m) => m.userData.name === "Router_Bit");
+    const rb = meshes.find((m) => m.userData.name === "Router_Bit");
     if (!rb) return;
     const a = (JOB.spinning || JOB.rps > 0) && JOB.spin ? JOB.spin : 0, tip = bitTip(rb);   // spinning down: still turning
     const R = new THREE.Quaternion().setFromAxisAngle(ZUP.clone().applyQuaternion(rb.quaternion), a);
-    if (nut && nut.userData.rest) {
-      nut.position.copy(nut.userData.rest.p).sub(tip).applyQuaternion(R).add(tip);
-      nut.quaternion.copy(R).multiply(nut.userData.rest.q);
+    for (const m of meshes) {                        // the collet nut, collet + shaft (router.js RT_SPIN)
+      if (!m.userData.rest || !RT_SPIN.test(m.userData.name || "")) continue;
+      m.position.copy(m.userData.rest.p).sub(tip).applyQuaternion(R).add(tip);
+      m.quaternion.copy(R).multiply(m.userData.rest.q);
     }
     const q = R.clone().multiply(rb.quaternion);
     if (jobBit && JOB.bits) for (const b of JOB.bits.values()) if (b.visible) { b.position.copy(tip); b.quaternion.copy(q); }
     if (HAND.bitMesh) { HAND.bitMesh.position.copy(tip); HAND.bitMesh.quaternion.copy(q); }
     spinGhost(rb, tip);
+    if (typeof tcPlace === "function") tcPlace();     // a bit change under way: its parts where it has them (tool_change.js)
   }
   // Part 45a: the turn on screen (LR4Routers.spinRps: 1.5-2.5 rev/s by the router's speed, not the real rpm), spun up
   // / down like the sound (0.5 / 1.5 s), clockwise from above. JOB.rps = the turn now.
@@ -73,7 +75,7 @@
       GHOST.bit.position.copy(tip).addScaledVector(axis, h / 2);
       GHOST.bit.material.opacity = 0.32 * f;
     }
-    const nut = meshes.find((m) => m.userData.name === "Router_Nut");
+    const nut = meshes.find((m) => m.userData.name === "Router_ColletNut");
     GHOST.nut.visible = show && !!(nut && nut.visible && nut.userData.rest);
     if (GHOST.nut.visible) {
       if (!nut.userData.ghost) {                     // the nut's size + centre along the axis from its rest box
@@ -197,7 +199,7 @@
       m.scale.set(b.s[0], b.s[1], b.s[2]);
       m.position.set(b.t[0] + (k === "core" ? dx : 0), b.t[1] + (k === "table" ? 0 : dy), b.t[2] + (k === "core" || k === "beam" ? dz : 0));
       if (m.userData.ex) m.position.add(new THREE.Vector3(...m.userData.ex));   // inspect's exploded view
-      if (m.userData.name === "Router_Nut") m.quaternion.identity();
+      if (RT_SPIN.test(m.userData.name || "")) m.quaternion.identity();
       const c = m.userData.clip;
       if (c) {                          // straight belt run (exported at full reach): cut where it meets the moving
         const [px, py, pz] = c.p;       // idler / pulley - Y runs: the gantry (dy); X runs: the core (dx + beam)
@@ -206,11 +208,9 @@
       }
     }
     abPose(dy, dz);
-    const nut = meshes.find((m) => m.userData.name === "Router_Nut");   // its pose unturned: spinApply turns it from here
-    if (nut) nut.userData.rest = { p: nut.position.clone(), q: nut.quaternion.clone() };
+    for (const m of meshes) if (RT_SPIN.test(m.userData.name || "")) m.userData.rest = { p: m.position.clone(), q: m.quaternion.clone() };   // their pose unturned: spinApply turns them from here
     spinApply();                                      // the file's own bit rides on the router (homing, jogs, the video's
                                                       // moves), the hand-installed one too; + the router's lean, turning
-    if (typeof rtPocketClip === "function") rtPocketClip();   // the router's pocket cut rides with it (router.js)
     if (hoseMesh) updateHose(dx, dy, dz);
     if (CAPS.list.length) placeSection();             // inspect's section cut follows the set
     HOME.pose = { x: dx, y: dy, z: dz };
@@ -232,6 +232,9 @@
   const PWR = { estop: false, router: true, vac: true, body: true };
   // the router + its speed dial (Part 45a, router.js; LR4Routers.settings), kept per machine (lr4-router)
   const RT = { set: LR4Routers.settings(null) };
+  const RT_SPIN = /^Router_(ColletNut|Collet|Thread|Shaft)$/;     // turn with the bit (spinApply); router.js makes them
+  // the biggest shank the router's collets take (Part 45b: model.collet.sizes; was a fixed 1/4")
+  const colletMax = () => { const r = LR4Routers.ROUTERS[RT.set.router]; return r ? Math.max(...r.model.collet.sizes) : 25.4 / 4; };
   const routerPowered = () => !PWR.estop && PWR.router && PWR.body;
   const vacPowered = () => !PWR.estop && PWR.vac;
   // lost: mm each motor (cfg.pins.motors order) is behind the steps FluidNC sent it (Part 44a lost steps: + = short of

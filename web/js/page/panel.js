@@ -20,6 +20,7 @@
       for (const r of p.src.kind === "peter" ? [p.src.open, p.src.closed] : [p.src])
         (needed.get(r.file) || needed.set(r.file, []).get(r.file)).push(p.meta.name);
       if (p.src.long) optional.add(p.src.long.file);  // the extra-long bristles: used when picked, never "missing"
+      for (const a of Object.values(p.src.alt || {})) optional.add(a.file);   // the other mounts' files (Part 45c): the same
     }
     progress("Loading your part files…", null, "kept in this browser");
     try {

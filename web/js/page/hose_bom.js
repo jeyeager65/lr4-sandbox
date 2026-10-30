@@ -230,6 +230,15 @@
     const body = document.getElementById("bom-body"), sum = document.getElementById("bom-sum");
     if (bristleLen === "long")                        // the Options step's extra-long bristles: that file to print
       secs = secs.map((sec) => Object.assign({}, sec, { rows: (sec.rows || []).map((r) => (r[1] === "TPU_Bristles_22mm" ? [r[0], "TPU_Bristles_32mm_Extra_Long", ...r.slice(2)] : r)) }));
+    {                                                  // the router in use (Part 45b) + its mount's printed set (45c: Makita / DeWalt)
+      const rt = typeof RT !== "undefined" && LR4Routers.ROUTERS[RT.set.router], mt = rt && rt.mount;
+      const MS_ = { makita: ["Makita", "Makita 701 / T1 tool mount (Printables 1033926)"], dewalt: ["DeWalt", "DeWalt 611 tool mount (Printables 1034374)"] }[mt];
+      if (rt) secs = secs.map((sec) => Object.assign({}, sec, { rows: (sec.rows || []).map((r) => {
+        if (/trim router$/.test(r[1] || "")) return [r[0], rt.name, ...r.slice(2)];
+        if (MS_ && /_Kobalt$/.test(r[1] || "") && /^Kobalt tool mount/.test(r[3] || "")) return [r[0], r[1].replace(/Kobalt$/, MS_[0]), r[2], MS_[1], ...r.slice(4)];
+        return r;
+      }) }));
+    }
     const open = new Set([...body.querySelectorAll("details")].filter((d) => d.open).map((d) => d.dataset.title));
     body.textContent = "";
     if (!secs.length) { sum.textContent = "Not in this export."; return; }

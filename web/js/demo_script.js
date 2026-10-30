@@ -37,6 +37,8 @@
 //       smoke, scorch + a warning where the bit rubs, FIRE = a hot spot can catch, AUTO = the extinguisher comes by itself
 //   (Video Fire: TIME=4)              the spot under the bit heats up (smoking) and catches in TIME s (with FIRE=on)
 //   (Video Extinguish:)               the extinguisher flies over now and puts it out (AUTO=off scripts it)
+//   (Video Router: ID=carbide DIAL=3)   the machine's router (web/data/routers.js ids) and its dial (Part 45b): before the
+//       job (at the top) or mid-job; a tool change (M6) in the job plays the bit change on it (tool_change.js)
 //   (Video EStop: DO=press AFTER=8)   the switch panel's e-stop (Part 44f): DO=press cuts the power (FluidNC down mid-job,
 //       the router + vac spin down, the bit cools; a fire burns on), DO=release twists it out (FluidNC restarts). After a
 //       press the job is gone: the lines after it run in order at once (a Wait / Text paces them), the video at real
@@ -92,7 +94,7 @@ const SETTINGS = { size: "wxh", machine: "wxh", fps: "num", volume: "num", pause
   fan: "bool", main: "colour", accent: "colour" };
 const MACHINE_KEYS = ["table", "room", "braces", "struts", "base", "peter", "router", "skirt", "hose", "fan", "main", "accent"];
 const PRESETS = ["all", "no-hardware", "printed", "frame"];   // web/js/show_tree.js PRESETS
-const KINDS = ["shot", "home", "zero", "title", "text", "wait", "speed", "pendant", "show", "inspect", "asbuilt", "slip", "heat", "fire", "extinguish", "estop", "clip", "term", "point", "click", "step", "design"];
+const KINDS = ["shot", "home", "zero", "title", "text", "wait", "speed", "pendant", "show", "inspect", "asbuilt", "slip", "heat", "fire", "extinguish", "estop", "clip", "term", "point", "click", "step", "design", "router"];
 const SLIP_AXES = ["x", "y", "z", "ymin", "ymax", "zmin", "zmax"];
 const UI_ONLY = new Set(["point", "click", "step"]);   // KIND=ui videos (the page on screen) only
 const INTRO_ONLY = new Set(["home", "zero"]);
@@ -235,6 +237,12 @@ function check(c, intro) {
       return kv.time === undefined || (num(kv.time) && +kv.time > 0) ? null : "Fire TIME= wants seconds";
     case "extinguish":
       return null;
+    case "router": {
+      const bad = Object.keys(kv).filter((q) => !["id", "dial"].includes(q));
+      if (bad.length) return `Router doesn't know ${bad.map((q) => q.toUpperCase()).join(", ")}`;
+      if (!kv.id && kv.dial === undefined) return "Router wants ID= or DIAL=";
+      return kv.dial === undefined || (num(kv.dial) && +kv.dial >= 1 && +kv.dial <= 6) ? null : "Router DIAL= 1 to 6";
+    }
     case "clip": {
       const bad = Object.keys(kv).filter((q) => q !== "leave");
       if (bad.length) return `Clip doesn't know ${bad.map((q) => q.toUpperCase()).join(", ")}`;

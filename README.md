@@ -33,6 +33,7 @@ download them yourself (free), and the page or the FreeCAD scripts place your co
 | [Kobalt tool mount + dust shoe](https://www.printables.com/model/1034828) (V1 Engineering) | `kobalt/` |
 | [Jackpot3 box](https://www.printables.com/model/1434650) (V1 Engineering) | `jackpot3/` |
 | [Peter Plates](https://www.printables.com/model/1044487) (V1 Engineering) | `peter/` |
+| Optional, for a router on those mounts: [Makita 701 / AutoSpin T1 tool mount + dust shoe](https://www.printables.com/model/1033926), [DeWalt 611 tool mount + dust shoe](https://www.printables.com/model/1034374) (V1 Engineering) | `makita/`, `dewalt/` (the page only) |
 
 On each Printables page, use **Download** to get all of the model's files as one zip. Nothing else is needed: the
 page and the scripts bring their own hardware models (steppers, bearings, rails, bolts, router, hose).
@@ -140,10 +141,11 @@ Run has a Machine column on the left, the Job column on the right and the consol
 - **Touch plate under the bit** puts the plate on the stock so G38.2 stops on it.
 - **On the table > Bit** (and a job's bit change) takes any bit the cut simulation knows: flat end mill, ball end,
   bullnose (corner radius), V-bit, chamfer (angle + tip flat) or tapered ball (angle + ball diameter), with its flute
-  count, up to 1-1/2" across. A bit wider than 1/4" is drawn on a 1/4" shank (the router's collet takes no more), as
+  count, up to 1-1/2" across. A bit wider than the router's biggest collet (1/4" on most) is drawn on that shank, as
   a 2-flute bit unless the file says otherwise; over 1/2" it's drawn as a surfacing bit. **My bits** keeps your bits
   in this browser, starting with the V1E store's bits and a 3/4" surfacing bit. A job's tool change pops up its
-  bit: **Install bit and resume**.
+  bit: **Install bit and resume** first shows the change on the router (shaft lock or a second wrench, the collet nut
+  off, the bit and - when the shank changes - the collet swapped, the nut back on); **Show the bit change** turns it off.
 - **On the table > Stock** puts a board on the spoilboard by hand. **Spoilboard:** every cut into it stays (per
   machine, in this browser); **Surfacing job to the SD card** writes a zigzag that flattens it; **New spoilboard**
   lays a fresh one.

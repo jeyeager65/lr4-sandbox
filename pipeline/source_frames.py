@@ -178,6 +178,18 @@ for nm in [u for u in unmatched if u.startswith("Bristles_TPU")]:
         out[nm]["long"] = dict(file=lr["file"], sha256=lr["sha256"], height=[0, round(sg["strip_spine_x"] + 5.0, 5), 1])
     unmatched.remove(nm)
 
+# the other V1E mounts (Part 45c, 2026-10-30): the Makita 701 / T1 and DeWalt 611 tool mounts, dust shoe + skirt share
+# the Kobalt files' frame (the same core face and heights: their bounding boxes), so each Kobalt part takes the
+# other mount's file with the same A - the page picks by the router's mount (scene.js mountSrc); the bristles are
+# the same file in all three sets
+MOUNT_ALT = {f"{k}_Kobalt": {m: f"{m}/{k}_{M}.stl" for m, M in (("makita", "Makita"), ("dewalt", "DeWalt"))}
+             for k in ("Tool_Mount_B", "Tool_Mount_T", "Dust_Shoe", "Dust_Skirt")}
+for nm, alts in MOUNT_ALT.items():
+    if nm in out:
+        got = {m: {k: file_rec(f)[k] for k in ("file", "sha256")} for m, f in alts.items() if os.path.exists(os.path.join(PARTS, f))}
+        if got:
+            out[nm]["alt"] = got
+
 dst = os.path.join(SIZES_DIR, "source_frames_temp.json" if TEMP else "source_frames.json")
 json.dump(out, open(dst, "w"), indent=1)
 print(f"SOURCES {len(out)} parts from files; not from a file: {', '.join(unmatched)}")

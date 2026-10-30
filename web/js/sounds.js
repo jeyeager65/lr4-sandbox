@@ -68,7 +68,7 @@
   const VAC = { up: 0.9, down: 3.0 };                // s
   const MRR_FULL = 150;                // mm^3/s = full cutting load (1/8" bit slotting ~3 mm deep at 1000 mm/min)
   // the user's router: Kobalt trim router dial -> RPM (web/data/routers.js); half steps interpolate
-  const KOBALT = (typeof module !== "undefined" && module.exports ? require("../data/routers.js") : root.LR4RouterData).routers.kobalt.dial;
+  const KOBALT = (typeof module !== "undefined" && module.exports ? require("../data/routers.js") : root.LR4RouterData).routers.kobalt.speeds;
   const DEFAULT_RPM = 18000;           // a job that never says (no M3, no "Turn On Router"): dial 3
 
   // ---- pure helpers (tests/test_sounds.js) ----

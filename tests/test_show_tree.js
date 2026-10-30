@@ -10,7 +10,9 @@ let fails = 0, checks = 0;
 const ok = (cond, msg) => { checks++; if (!cond) { fails++; console.log("FAIL " + msg); } };
 
 const cfg = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "web", "data", "lr4_config.json"), "utf8"));
-const parts = cfg.parts.map((r) => Object.assign({}, r.meta));
+const parts = cfg.parts.filter((r) => !/^Router_/.test(r.key)).map((r) => Object.assign({}, r.meta));   // the router: the page's own (router.js)
+for (const n of ["Router_Housing", "Router_MotorCap", "Router_ColletNut", "Router_Dial", "Router_Switch", "Router_Bit"])
+  parts.push({ name: n, label: n.slice(7), group: "Core", source: "hardware", motion: "core" });
 for (const p of parts) if (/^(Dust_Skirt|Bristles_TPU)/.test(p.name)) p.group = "Shoe";   // as the page does
 parts.push({ name: "Vacuum_Hose", label: "Vacuum hose", group: "Hose", source: "hardware", motion: "hose" },
   { name: "Cable_Sleeve", label: "Cable sleeve", group: "Hose", source: "hardware", motion: "hose" },
@@ -32,7 +34,7 @@ ok(tree.asms.map((a) => a.id).join() === "table,yz-min,yz-max,beam,core,router,t
 // moves
 ok(where("Belt_Y_Min_Front").join() === "table.hardware", "Y belt with the table: " + where("Belt_Y_Min_Front"));
 ok(where("Belt_X_Min").join() === "beam.hardware", "X belt with the beam");
-ok(where("Router_Kobalt").join() === "router.hardware", "router out of Core");
+ok(where("Router_Housing").join() === "router.hardware", "router out of Core");
 ok(where("Tool_Mount_T_Kobalt").join() === "router.printed", "tool mount with the router");
 ok(where("Dust_Skirt_Kobalt").join() === "router.printed", "skirt with the router");
 ok(where("X_Stepper").join() === "core.electronics", "X stepper: core electronics");
@@ -65,7 +67,7 @@ ok(T.presetOf(tree, offOf("printed")) === "printed" && T.presetOf(tree, new Set(
 const ins = T.inspectSet(tree, "Core");
 ok(["Bearing_Core__M8", "Bearing_Core_Lower_1", "X_Idler_2", "Core__M3_to_X_Stepper", "Tool_Mount_T_Kobalt__M5_to_Core",
   "Endstop_X__M2_5_to_Core"].every((x) => ins.has(x)), "Core: bolts + bearings + idlers");
-ok(!ins.has("X_Stepper") && !ins.has("Router_Kobalt") && !ins.has("Tool_Mount_T_Kobalt"), "Core: not the parts on the far side");
+ok(!ins.has("X_Stepper") && !ins.has("Router_Housing") && !ins.has("Tool_Mount_T_Kobalt"), "Core: not the parts on the far side");
 ok(T.inspectSet(tree, "core").size === T.members(tree, "core").length, "an assembly = its members");
 const xz = T.inspectSet(tree, "XZ_Plate_Min");
 ok(xz.has("XZ_Plate_Min__M5_to_Brace_1") && xz.has("MGN12H_Min_177") && !xz.has("Brace_1"), "XZ plate: its bolts + rail blocks, not the brace");
@@ -100,15 +102,15 @@ ok(yl.find((q) => q.title === "Hardware").rows.some((r) => r[1] === "MGN12 Rail 
 // a component's meshes stay together (the stepper isn't taken apart); numbered copies are not one component
 {
   const set = new Set(["Plate", "Y_Stepper_Min", "Y_Stepper_Min_Shaft", "Y_Stepper_Min_Lead_Red", "Y_Clip", "Y_Clip_2",
-    "Router_Kobalt", "Router_Cap", "Bolt"]);
+    "Router_Housing", "Router_MotorCap", "Bolt"]);
   const c = (x) => [x, 1, 0];
   const info = { bolts: { Bolt: { axis: [0, 0, 1], chain: ["Y_Stepper_Min_Shaft", "Plate"] } }, size: { Plate: 100 },
     centre: { Plate: [0, 0, 0], Y_Stepper_Min: c(1), Y_Stepper_Min_Shaft: c(2), Y_Stepper_Min_Lead_Red: c(3), Y_Clip: c(4),
-      Y_Clip_2: c(5), Router_Kobalt: [0, 0, 9], Router_Cap: [9, 9, 9], Bolt: c(0) } };
+      Y_Clip_2: c(5), Router_Housing: [0, 0, 9], Router_MotorCap: [9, 9, 9], Bolt: c(0) } };
   const e = T.explode(set, info);
   ok(e.Y_Stepper_Min.join() === "-1,0,0" && e.Y_Stepper_Min_Shaft.join() === "-1,0,0" && e.Y_Stepper_Min_Lead_Red.join() === "-1,0,0",
     "stepper pieces move with the stepper (its bolt chain names the shaft; it slides out -X): " + JSON.stringify(e));
-  ok(e.Router_Cap.join() === e.Router_Kobalt.join() && e.Y_Clip_2.join() !== e.Y_Clip.join(), "router pieces together, numbered copies apart");
+  ok(e.Router_MotorCap.join() === e.Router_Housing.join() && e.Y_Clip_2.join() !== e.Y_Clip.join(), "router pieces together, numbered copies apart");
 }
 // an axle bolt's bearings come off sideways (square to the axle, away from the host), the bolt two steps out
 {

@@ -60,19 +60,19 @@ parser.add_argument("--show-editor", action="store_true")
 
 # ---- routers: speed is set by hand on the router's dial; the messages say which setting ----
 # Pick one with --router=<key> (Job > Post Processor Arguments). Tables are (dial, RPM);
-# half steps on the dial are interpolated. Add your own router here.
+# half steps on the dial are interpolated (speeds = the dial table). Add your own router here.
 ROUTERS = {
     "kobalt": dict(name="Kobalt trim router",
-                   dial=[(1, 10000), (2, 14000), (3, 18000), (4, 22000), (5, 26000), (6, 35000)],
+                   speeds=[(1, 10000), (2, 14000), (3, 18000), (4, 22000), (5, 26000), (6, 35000)],
                    source="manual table"),
     "makita": dict(name="Makita RT0701C",
-                   dial=[(1, 10000), (2, 12000), (3, 17000), (4, 22000), (5, 27000), (6, 30000)],
+                   speeds=[(1, 10000), (2, 12000), (3, 17000), (4, 22000), (5, 27000), (6, 30000)],
                    source="Makita RT0701C instruction manual, speed adjusting dial table"),
     "carbide": dict(name="Carbide Compact Router",
-                    dial=[(1, 11000), (2, 13500), (3, 18250), (4, 24500), (5, 29250), (6, 31000)],
+                    speeds=[(1, 11000), (2, 13500), (3, 18250), (4, 24500), (5, 29250), (6, 31000)],
                     source="Carbide 3D table (approximate)"),
     "dewalt": dict(name="DeWalt DWP611",
-                   dial=[(1, 16000), (2, 18200), (3, 20400), (4, 22600), (5, 24800), (6, 27000)],
+                   speeds=[(1, 16000), (2, 18200), (3, 20400), (4, 22600), (5, 24800), (6, 27000)],
                    source="even spread over DeWalt's 16000-27000 RPM spec - unverified"),
 }
 DEFAULT_ROUTER = "makita"     # the most common LowRider/MPCNC router
@@ -80,7 +80,7 @@ SPINUP_S = 3                  # s: dwell after the router relay switches on (--s
 
 
 def _table(router):
-    return ROUTERS[router or DEFAULT_ROUTER]["dial"]
+    return ROUTERS[router or DEFAULT_ROUTER]["speeds"]
 
 
 def router_dial(rpm, router=None):

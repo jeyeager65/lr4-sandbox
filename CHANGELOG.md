@@ -3,6 +3,27 @@
 The version is the sandbox page's (`VERSION` in `web/js/page/job.js`, shown in its footer). The footer also shows
 the date the model data was built and the Printables file set it was solved for.
 
+## 0.61.0 - 2026-10-30
+- **Router parts by their real names:** collet nut, exposed shaft, bearing cap, motor housing, collar, transition,
+  motor cap, shaft lock, strain relief. Build your router's tabs and the close-up use them too. A router file from
+  0.60.0 (.router.json) or an edit kept from then doesn't load: make it again.
+- **The router is the page's own:** every router is drawn from its preset on the mount (no longer reshaping the
+  model's Kobalt), with its own bit. Each part has its own color and finish (Colors tab: every part).
+- **Bit end** (a new tab): the collets the router takes (the Kobalt and the Carbide: ER11, 1/8" + 1/4"), the
+  collet nut's thread, and wrench flats on the shaft for a router with no shaft lock. The shaft lock now has a
+  press depth.
+- **Bit changes, animated:** at a job's tool change, Install bit and resume first shows the change on the router: the
+  dust shoe off, the shaft held (its lock pressed, or a second wrench on the shaft's flats), the collet nut broken
+  loose with a wrench and spun off by hand down its thread, the old bit out, the collet swapped when the shank
+  changes, the new bit in, the nut back on and tightened, the shoe back on. Captions say each step. **Show the bit
+  change** in the popup turns it off. The router's close-up has a **Change bit** button too (it puts in the bit set in
+  Run > On the table).
+- **The Makita 701 / AutoSpin T1 and DeWalt 611 mounts:** a router on those mounts draws V1E's own tool mounts, dust
+  shoe and skirt for it (the Carbide Compact Router and a 65 mm spindle use the Makita set). Add the set's zip from
+  Printables under Parts; until then it's drawn as the Kobalt set, and the Router step says so. The BOM names the
+  router and its mount's files.
+- **Video scripts:** `(Video Router: ID=carbide DIAL=3)` picks the router (and its dial) for a video.
+
 ## 0.60.0 - 2026-10-29
 - **Build your router** (My LR4 > 5 Router): every router is a preset you can copy and edit, spindles too. A
   close-up editor draws the sizes on the model: click or drag one to change it, pick a part, switch Side / Front /

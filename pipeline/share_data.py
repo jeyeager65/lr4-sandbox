@@ -100,7 +100,8 @@ def src_of(name, frames):
     if f is None:
         return None
     keep = ("file", "sha256", "A", "depth", "piece", "path", "along", "height", "across", "z0", "start", "scale", "reverse",
-            "long")                                   # long: the bristles' extra-long strip {file, sha256, height}
+            "long", "alt")                            # long: the bristles' extra-long strip {file, sha256, height}; alt: the
+                                                      # other mounts' files {makita | dewalt: {file, sha256}} (same A)
     if f["kind"] == "peter":
         return dict(kind="peter", **{s: {k: f[s][k] for k in keep if k in f[s]} for s in ("open", "closed")})
     return dict(kind=f["kind"], **{k: f[k] for k in keep if k in f})

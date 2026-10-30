@@ -28,7 +28,7 @@ const RUN = (k) => `(async () => {
   document.getElementById("job-play").click();
   await T.until(() => LR4Job.running(), 10000);
   out.started = LR4Job.running();
-  const nut = meshes.find((m) => m.userData.name === "Router_Nut"), qs = new Set();
+  const nut = meshes.find((m) => m.userData.name === "Router_ColletNut"), qs = new Set();
   out.spinOn = 0;
   while (LR4Job.running()) {
     await T.sleep(100);

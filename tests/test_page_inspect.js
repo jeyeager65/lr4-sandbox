@@ -83,7 +83,7 @@ const steps = [
    const m0 = wc(g('TouchPlate_Magnet')), p0 = wc(g('TouchPlate')), s0 = wc(g('Dust_Skirt_Kobalt'));
    handPlate(true); const order = [];
    for (let i = 0; i < 40; i++) { touchAnimTick(0.1); order.push(TOUCH_ANIM.skirt >= 1 ? (TOUCH_ANIM.clip >= 1 ? 'p' : 'c') : 's'); }
-   const n = wc(g('Router_Nut')), m = wc(g('TouchPlate_Magnet'));
+   const n = wc(g('Router_ColletNut')), m = wc(g('TouchPlate_Magnet'));
    const out = { state: [TOUCH_ANIM.skirt, TOUCH_ANIM.clip, TOUCH_ANIM.plate], skirt: g('Dust_Skirt_Kobalt').visible,
      onNut: Math.hypot(m.x - n.x, m.y - n.y), dz: Math.abs(m.z - n.z), plate: wc(g('TouchPlate')).distanceTo(p0),
      order: [...new Set(order)].join('') };

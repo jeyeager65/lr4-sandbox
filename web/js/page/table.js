@@ -108,7 +108,7 @@
       const g = rb.geometry;
       if (!g.boundingBox) g.computeBoundingBox();
       const len = b.len > 0 ? b.len : (g.boundingBox.max.z - g.boundingBox.min.z) * rb.scale.z;
-      HAND.bitMesh = jobBitMesh(Object.assign(HandSetup.toDef(b), { overallLength: len, fluteLength: b.flen > 0 ? b.flen : b.d > COLLET + 0.01 ? undefined : Math.min(len, b.d * 3) }), TOOL_RGB[0]);
+      HAND.bitMesh = jobBitMesh(Object.assign(HandSetup.toDef(b), { overallLength: len, fluteLength: b.flen > 0 ? b.flen : b.d > colletMax() + 0.01 ? undefined : Math.min(len, b.d * 3) }), TOOL_RGB[0]);
       if (HAND.bitMesh) scene.add(HAND.bitMesh);
       applyVisibility();
       move(HOME.pose ? [HOME.pose.x, HOME.pose.y, HOME.pose.z] : undefined);
@@ -705,8 +705,18 @@
     jobPlaying(!JOB.playing);
   });
   $("job-prev").addEventListener("click", () => (JOB.preview ? previewEnd() : previewStart()));
-  $("job-resume").addEventListener("click", () => {
+  $("job-resume").addEventListener("click", async () => {
     if ($("job-resume").disabled) return;
+    if (JOB.toolAsk && TC_ON.anim && typeof tcPlay === "function") {   // the change, animated (tool_change.js): then it goes in
+      const b = bitForm($("job-pop-bit")), btn = $("job-resume"), t = btn.textContent;
+      btn.disabled = true; btn.textContent = "Changing the bit…";
+      $("job-pop").classList.add("tc-min");
+      const e = JOB.toolAsk, ev = JOB.tl.events.filter((q) => q.kind === "tool" && q.index < e.index);   // the bit going out: the tool before
+      const t0 = ev.length ? ev[ev.length - 1].tool : JOB.tl.segs[0] && JOB.tl.segs[0].toolNumber, d0 = t0 != null && JOB.tl.tools.get(t0);
+      await tcPlay({ bit: b, cam: true, from: d0 ? { d: d0.diameter, mesh: JOB.bits && JOB.bits.get(t0) } : null });
+      $("job-pop").classList.remove("tc-min");
+      btn.disabled = false; btn.textContent = t;
+    }
     if (JOB.toolAsk) toolPut();
     resumeWhenSettled(() => {                        // the popup stays up (saying so) while the touch plate moves
       $("job-pop").hidden = true;

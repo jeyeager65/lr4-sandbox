@@ -47,57 +47,61 @@ ok(both.length === 1 && both[0].rpm === 24000 && both[0].dial === 4, `M3 S + a d
 
 // Build your router: clean() makes any stored / imported object a valid preset (or null), define() puts it in
 const B = require("../web/js/router_body.js"), SC = require("../web/js/strut_cam.js");
-ok(R.clean(null) === null && R.clean({ name: "x" }) === null && R.clean({ body: { nut: [20, 10] } }) === null, "clean: no body / no head -> null");
-const junk = R.clean({ name: "J".repeat(99), source: "manual", dial: [[1, "a"], [2, 5], [3, 9e9], 4, [5, 1], [6, 20000]], mount: "?",
-  body: { nut: [-5, "x"], grip: "no", overall: 1, head: { L: 1e6, W: "?", dial: "top" } } });
-ok(junk && junk.name.length === 40 && junk.mount === "makita" && junk.body.nut[0] === 5 && junk.body.head.L === 300 && junk.body.head.dial.place === "top",
-  `clean: junk clamped (${JSON.stringify(junk && junk.body.head)})`);
-ok(junk.dial.every(([d, v], i) => d === i + 1 && v >= 1000 && (i === 0 || v >= junk.dial[i - 1][1])), `clean: dial table 1..6, never slower up the dial ${JSON.stringify(junk.dial)}`);
-ok(junk.body.overall > R.ROUTERS.makita.body.nut[1] && B.build(junk.body).parts.head.pos.every(Number.isFinite), "clean: builds");
+ok(R.clean(null) === null && R.clean({ name: "x" }) === null && R.clean({ body: { nut: [20, 10] } }) === null, "clean: no model (or an old body) -> null");
+const junk = R.clean({ name: "J".repeat(99), source: "manual", speeds: [[1, "a"], [2, 5], [3, 9e9], 4, [5, 1], [6, 20000]], mount: "?",
+  model: { collet_nut: { af: -5, h: "x" }, housing: "no", motor_cap: { L: 1e6, W: "?" }, dial: { place: "top" }, looks: { housing: { c: [2, -1, 0.5], f: "?" } } } });
+ok(junk && junk.name.length === 40 && junk.mount === "makita" && junk.model.collet_nut.af === 5 && junk.model.motor_cap.L === 300 && junk.model.dial.place === "top",
+  `clean: junk clamped (${JSON.stringify(junk && junk.model.motor_cap)})`);
+ok(junk.speeds.every(([d, v], i) => d === i + 1 && v >= 1000 && (i === 0 || v >= junk.speeds[i - 1][1])), `clean: speed table 1..6, never slower up the dial ${JSON.stringify(junk.speeds)}`);
+ok(junk.model.looks.housing.c.join() === "1,0,0.5" && junk.model.looks.housing.f === "metal" && R.LOOK_PARTS.every((k) => junk.model.looks[k]), "clean: a look for every part, clamped");
+ok(B.overall(junk.model) > junk.model.collet_nut.h && B.build(junk.model).parts.motor_cap.pos.every(Number.isFinite), "clean: builds");
+ok(R.ROUTERS.kobalt.model.collet.type === "ER11" && R.ROUTERS.kobalt.model.collet.sizes.join() === "3.175,6.35" && R.ROUTERS.kobalt.model.collet_nut.type === "ER11A"
+  && R.ROUTERS.kobalt.model.shaft.thread.pitch === 0.75 && R.ROUTERS.carbide.model.collet.type === "ER11", "Kobalt + Carbide: ER11 1/8 + 1/4, ER11A nut, M13 x 0.75");
+ok(R.ROUTERS.carbide.model.shaft.flats && !R.ROUTERS.carbide.model.shaft_lock && R.ROUTERS.kobalt.model.shaft_lock && !R.ROUTERS.kobalt.model.shaft.flats,
+  "Carbide: 2 wrenches (flats, no lock); Kobalt: the shaft lock");
 const mine = R.preset("makita");
-mine.name = "Mine"; mine.body.head.L = 111; mine.source = "gcode"; mine.s = [8000, 24000];
+mine.name = "Mine"; mine.model.motor_cap.L = 111; mine.source = "gcode"; mine.s = [8000, 24000];
 const id = R.newId(mine.name);
 R.define(id, mine);
-ok(id === "custom-mine" && R.ROUTERS[id].custom && !R.manual(id) && R.rpm({ router: id, dial: 3 }, 30000) === 24000 && !SC.ROUTERS[id], "define: a G-code custom router (its top speed, no dial table)");
+ok(id === "custom-mine" && R.ROUTERS[id].custom && !R.manual(id) && R.rpm({ router: id, dial: 3 }, 30000) === 24000 && !SC.ROUTERS[id], "define: a G-code custom router (its top speed, no speed table)");
 mine.source = "manual"; R.define(id, mine);
-ok(SC.ROUTERS[id] && R.dialRpm(1, id) === R.ROUTERS.kobalt.dial[0][1] && R.newId("Mine") === "custom-mine-2", "define: manual without a table -> the Kobalt's; ids stay unique");
+ok(SC.ROUTERS[id] && R.dialRpm(1, id) === R.ROUTERS.kobalt.speeds[0][1] && R.newId("Mine") === "custom-mine-2", "define: manual without a table -> the Kobalt's; ids stay unique");
 R.define(id, null);
-ok(!R.ROUTERS[id] && !SC.ROUTERS[id] && R.define("makita", null).body.head.L === 78, "define(null): a custom one gone, a preset back to its data");
+ok(!R.ROUTERS[id] && !SC.ROUTERS[id] && R.define("makita", null).model.motor_cap.L === 78, "define(null): a custom one gone, a preset back to its data");
 
-// the head always sits on the turned part: a short H or an odd overall can't leave a gap; a longer grip lifts the head
-const hb = (p) => { const m = B.build(p.body).parts.head; let z = Infinity; for (let i = 2; i < m.pos.length; i += 3) z = Math.min(z, m.pos[i]); return z; };
+// the motor cap always sits on the turned part; a longer housing lifts it; it covers the turned part
+const hb = (p) => { const m = B.build(p.model).parts.motor_cap; let z = Infinity; for (let i = 2; i < m.pos.length; i += 3) z = Math.min(z, m.pos[i]); return z; };
 const gap = R.preset("makita");
-gap.body.head.H = 20; gap.body.overall = 300;
+gap.model.motor_cap.H = 20;
 const g1 = R.clean(gap);
-ok(Math.abs(hb(g1) - B.stackTop(g1.body)) < 0.5 && g1.body.overall === B.stackTop(g1.body) + 20, `H 20 with overall 300: on the grip, overall ${g1.body.overall}`);
-gap.body.grip[1] += 30;
+ok(Math.abs(hb(g1) - B.stackTop(g1.model)) < 0.5 && B.overall(g1.model) === B.stackTop(g1.model) + 20, `H 20: on the housing, overall ${B.overall(g1.model)}`);
+gap.model.housing.l += 30;
 const g2 = R.clean(gap);
-ok(Math.abs(hb(g2) - B.stackTop(g2.body)) < 0.5 && g2.body.overall === g1.body.overall + 30, `grip 30 longer: the head rides up (overall ${g2.body.overall})`);
-gap.body.head.W = 30; gap.body.head.L = 40;
-const g3 = R.clean(gap).body.head;
-ok(g3.W === 65 && g3.L === 65, `a head narrower than the grip -> the grip's 65 (${g3.L} x ${g3.W})`);
+ok(Math.abs(hb(g2) - B.stackTop(g2.model)) < 0.5 && B.overall(g2.model) === B.overall(g1.model) + 30, `housing 30 longer: the cap rides up (overall ${B.overall(g2.model)})`);
+gap.model.motor_cap.W = 30; gap.model.motor_cap.L = 40;
+const g3 = R.clean(gap).model.motor_cap;
+ok(g3.W === 65 && g3.L === 65, `a cap narrower than the housing -> the housing's 65 (${g3.L} x ${g3.W})`);
 
 // the dimensions on the model (router_dims.js): every editable one names a builder input; read-only where it's derived
 const DM = require("../web/js/router_dims.js");
 const dm = (id, c = 36.5) => Object.fromEntries(DM.dims(R.ROUTERS[id], c).map((d) => [d.id, d]));
 const mk = dm("makita");
-ok(mk["head-L"].v === 78 && mk["head-L"].k === "body.head.L" && mk["head-L"].f === 2 && mk.overall.v === 205 && mk.overall.k === "body.overall" && mk.clamp.v === 36.5,
-  "dims: the Makita's head length (centered: drag x2), overall, nut below the clamp");
+ok(mk["cap-L"].v === 78 && mk["cap-L"].k === "model.motor_cap.L" && mk["cap-L"].f === 2 && mk.overall.v === 205 && mk.overall.k === "model.overall" && mk.clamp.v === 29.5,
+  "dims: the Makita's motor cap length (centered: drag x2), overall, nut below the clamp");
 ok(Object.values(mk).every((d) => d.views.length && Number.isFinite(d.v) && [d.a, d.b, d.off].every((p) => p.length === 3 && p.every(Number.isFinite))), "dims: all placed, in a view");
+ok(mk["len-shaft"].k === "model.shaft.exposed" && mk["len-collet_nut"].k === "model.collet_nut.h" && mk["dia-collet_nut"].k === "model.collet_nut.af", "dims: the exposed shaft + the collet nut");
 const cb = dm("carbide");
-ok(cb["len-trans"].k === "body.trans.l" && cb["len-trans"].v === 38 && cb["dia-trans"].v === 73 && cb["grip-ch"].k === "body.grip_ch", "dims: the Carbide's transition (its old shoulder rows) + the grip chamfer");
-// the 3 sections (2026-10-29): old lathe rows -> the transition; a head-shaped one has no Ø; its edge; the looks kept
-const old = R.clean({ name: "Old", body: { nut: [20, 12], grip: [65, 90], cast: [66, 10], lathe: [[66, 112], [72, 140]], head: { L: 90, W: 80 }, overall: 220 } });
-ok(!old.body.lathe && old.body.trans.l === 28 && old.body.trans.d === 72 && old.body.trans.shape === "round", "clean: lathe rows -> the transition " + JSON.stringify(old.body.trans));
-const hs = R.clean({ name: "H", body: { nut: [20, 12], grip: [65, 90], grip_ch: 2.5, trans: { l: 20, shape: "head", edge: "fillet", e: 4 }, head: { L: 90, W: 80 }, overall: 220,
-  looks: { grip: { c: [0.1, 0.1, 0.1], f: "rubber" }, trans: { c: [2, -1, 0.5], f: "?" } } } });
+ok(cb["len-transition"].k === "model.transition.l" && cb["len-transition"].v === 38 && cb["dia-transition"].v === 73 && cb["housing-ch"].k === "model.housing.ch", "dims: the Carbide's transition + the housing chamfer");
+const hs = R.clean({ name: "H", model: { collet_nut: { af: 20, h: 12 }, shaft: { d: 12, exposed: 0 }, housing: { d: 65, l: 90, ch: 2.5 },
+  transition: { l: 20, shape: "cap", edge: "fillet", e: 4 }, motor_cap: { L: 90, W: 80, H: 98 } } });
 const hd = Object.fromEntries(DM.dims(hs, 36.5).map((d) => [d.id, d]));
-ok(hs.body.grip_ch === 2.5 && !hd["dia-trans"] && hd["trans-e"].kind === "rad" && hs.body.looks.grip.f === "rubber" && hs.body.looks.trans.c.join() === "1,0,0.5" && hs.body.looks.trans.f === "metal",
-  "clean + dims: a head-shaped transition (no Ø), its fillet, the looks clamped");
-ok(Math.abs(hb(hs) - B.stackTop(hs.body)) < 0.5 && B.stackTop(hs.body) === 12 + 90 + 20, "the head on the transition");
+ok(hs.model.housing.ch === 2.5 && !hd["dia-transition"] && hd["transition-e"].kind === "rad", "clean + dims: a cap-shaped transition (no Ø), its fillet");
+ok(Math.abs(hb(hs) - B.stackTop(hs.model)) < 0.5 && B.stackTop(hs.model) === 12 + 90 + 20, "the cap on the transition");
 const sp = dm("spindle65");
-ok(sp["len-can"].k === "body.can.1" && sp.overall.k === null && !sp["head-L"], "dims: a spindle's can; its overall shown only, no head");
+ok(sp["len-housing"].k === "model.housing.l" && sp.overall.k === null && !sp["cap-L"], "dims: a spindle's can; its overall shown only, no motor cap");
 ok(!dm("makita", null).clamp && DM.dims(Object.assign({}, R.ROUTERS.makita, { mount: "none" }), 36.5).every((d) => d.id !== "clamp"), "dims: no clamp line without a mount");
+ok(DM.pick(R.ROUTERS.kobalt, "housing", [0, 0, 60]) === "housing" && DM.pick(R.ROUTERS.kobalt, "switch", [0, 0, 0]) === "motor_cap" && DM.pick(R.ROUTERS.kobalt, null, [0, 0, 0], "Tool_Mount_B_Kobalt") === "mount",
+  "pick: a part's mesh -> its region");
 
 console.log(`${checks - fails}/${checks} routers checks passed`);
 process.exit(fails ? 1 : 0);

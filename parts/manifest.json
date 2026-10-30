@@ -20,6 +20,16 @@
    "title": "Peter Plates",
    "by": "V1 Engineering",
    "url": "https://www.printables.com/model/1044487"
+  },
+  "makita": {
+   "title": "Makita 701 / AutoSpin T1 tool mount + dust shoe",
+   "by": "V1 Engineering",
+   "url": "https://www.printables.com/model/1033926"
+  },
+  "dewalt": {
+   "title": "DeWalt 611 tool mount + dust shoe",
+   "by": "V1 Engineering",
+   "url": "https://www.printables.com/model/1034374"
   }
  },
  "files": {
@@ -409,6 +419,78 @@
     "fb682bd5794e95dc8cd85c297e78dc5fc737fce213d43fb81d6e6b514b6faa0d"
    ],
    "date": "2026-10-29"
+  },
+  "makita/Tool_Mount_B_Makita.stl": {
+   "source": "makita",
+   "use": "page",
+   "bytes": 403884,
+   "sha256": [
+    "d43a4181f0da709bb34ec98cbc02ba8b91e617040c9226f9d60bad0643f5dfe5"
+   ],
+   "date": "2026-10-30"
+  },
+  "makita/Tool_Mount_T_Makita.stl": {
+   "source": "makita",
+   "use": "page",
+   "bytes": 415884,
+   "sha256": [
+    "958676868ad64cc0cdde7bc1748bba3e0997f0855cd9970fbe440c99f0a03765"
+   ],
+   "date": "2026-10-30"
+  },
+  "makita/Dust_Shoe_Makita.stl": {
+   "source": "makita",
+   "use": "page",
+   "bytes": 3192084,
+   "sha256": [
+    "770aaf27b987789f642d8aad7e2b5095a495d0c0ab3f3e55f51ef8b9f02957a9"
+   ],
+   "date": "2026-10-30"
+  },
+  "makita/Dust_Skirt_Makita.stl": {
+   "source": "makita",
+   "use": "page",
+   "bytes": 321484,
+   "sha256": [
+    "65d24b71c41c9ab16aa493416c502a22c2ceba18c8b5dddd2546c8fec9bc7a08"
+   ],
+   "date": "2026-10-30"
+  },
+  "dewalt/Tool_Mount_B_DeWalt.stl": {
+   "source": "dewalt",
+   "use": "page",
+   "bytes": 457884,
+   "sha256": [
+    "75569f957459d510f963e890232ffa9518e0c898222e3567ae58fab822d85d1e"
+   ],
+   "date": "2026-10-30"
+  },
+  "dewalt/Tool_Mount_T_DeWalt.stl": {
+   "source": "dewalt",
+   "use": "page",
+   "bytes": 467884,
+   "sha256": [
+    "637c6b7c0cc9f6c3991697de8aa1843c718af37642b764992e56dcd3537f3ae1"
+   ],
+   "date": "2026-10-30"
+  },
+  "dewalt/Dust_Shoe_DeWalt.stl": {
+   "source": "dewalt",
+   "use": "page",
+   "bytes": 3228984,
+   "sha256": [
+    "c2063a58c13bb46573cc7f03ca4b4a74e364b7cd6a127dcaaf0e8a9daf1622ec"
+   ],
+   "date": "2026-10-30"
+  },
+  "dewalt/Dust_Skirt_DeWalt.stl": {
+   "source": "dewalt",
+   "use": "page",
+   "bytes": 320984,
+   "sha256": [
+    "56fa5b97333d9d14f2b2ea65f8c07bf2aa41432ff194c38ae048162e441edd3b"
+   ],
+   "date": "2026-10-30"
   }
  }
 }

@@ -185,12 +185,12 @@
   // square to the axle, away from the part it's in. A part in SLIDE (or info.slide) goes that way instead of along its
   // screws.
   // one component drawn as several meshes moves as one: X_Stepper_Face / _Shaft / _Lead_Red ... with X_Stepper,
-  // Endstop_X_Lever with Endstop_X, the router's pieces with Router_Kobalt (not numbered copies: Y_Clip_2 has no parent)
+  // Endstop_X_Lever with Endstop_X, the router's pieces with Router_Housing (not numbered copies: Y_Clip_2 has no parent)
   function unitOf(set, isBolt) {
     const ids = [...set].filter((id) => !isBolt(id)), up = {};
     for (const id of ids) {
       const p = ids.filter((q) => q !== id && id.startsWith(q + "_") && !/^\d+$/.test(id.slice(q.length + 1)))
-        .sort((a, b) => b.length - a.length)[0] || (/^Router_/.test(id) && id !== "Router_Kobalt" && set.has("Router_Kobalt") ? "Router_Kobalt" : null);
+        .sort((a, b) => b.length - a.length)[0] || (/^Router_/.test(id) && id !== "Router_Housing" && set.has("Router_Housing") ? "Router_Housing" : null);
       if (p) up[id] = p;
     }
     const top = (id) => { let q = id; while (up[q]) q = up[q]; return q; };

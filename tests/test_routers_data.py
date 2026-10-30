@@ -1,5 +1,5 @@
 # The router presets (web/data/routers.js, the page's) vs fluidnc_post.py's ROUTERS: the post stays self-contained
-# (it's copied into FreeCAD's Macro folder alone), so its dial tables are a copy - this keeps them the same.
+# (it's copied into FreeCAD's Macro folder alone), so its speed tables are a copy - this keeps them the same.
 #   python tests/test_routers_data.py
 import json
 import os
@@ -25,7 +25,7 @@ def main():
     manual = {k: r for k, r in data.items() if r["source"] == "manual"}
     for k, r in manual.items():
         p = post.ROUTERS.get(k)
-        same = p is not None and [list(q) for q in p["dial"]] == r["dial"] and p["name"] == r["name"]
+        same = p is not None and [list(q) for q in p["speeds"]] == r["speeds"] and p["name"] == r["name"]
         print(("  ok   " if same else "  FAIL ") + f"{k}: fluidnc_post's table = routers.js's")
         fails += not same
     extra = set(post.ROUTERS) - set(manual)

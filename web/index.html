@@ -316,7 +316,8 @@
           <button type="button" role="tab" data-v="speed" aria-selected="true">Speed</button>
           <button type="button" role="tab" data-v="mount" aria-selected="false">Mount</button>
           <button type="button" role="tab" data-v="stack" aria-selected="false">Turned part</button>
-          <button type="button" role="tab" data-v="head" aria-selected="false" class="rb-router">Head</button>
+          <button type="button" role="tab" data-v="bitend" aria-selected="false">Bit end</button>
+          <button type="button" role="tab" data-v="head" aria-selected="false" class="rb-router">Motor cap</button>
           <button type="button" role="tab" data-v="colors" aria-selected="false">Colors</button>
           <button type="button" class="q" id="rb-tab-q" data-help="help-rb-speed" aria-label="About these settings" title="About these settings">?</button></div>
         <div class="rb-sec" data-sec="speed">
@@ -325,10 +326,12 @@
           <p><b>G-code S:</b> the controller sets the speed (a PWM router like the AutoSpin T1, or a spindle). Put in its
           lowest accurate and its top speed.</p></div>
         <div class="help" id="help-rb-mount" hidden>
-          <p><b>Mount:</b> which V1E router mount it fits (a 65 mm spindle fits the Makita 65 mm one). <b>None:</b> no V1E dust shoe, so no shoe or vacuum hose is drawn (or in the BOM).</p>
+          <p><b>Mount:</b> which V1E tool mount + dust shoe set it fits: Kobalt, Makita 701 / AutoSpin T1 (also the
+          Carbide Compact Router and a 65 mm spindle) or DeWalt 611. Their files come from V1 Engineering on Printables:
+          add the set's zip under Parts, or it's drawn as the Kobalt set until you do. <b>None:</b> no V1E dust shoe, so no shoe or vacuum hose is drawn (or in the BOM).</p>
           <p><b>Nut below the clamp:</b> where you clamp it - mm from the bottom of the collet nut up to the bottom of the
           mount's lower clamp. More = the router and its bit sit lower (further out under the shoe). Kept with the router; a
-          note shows if a clamp ends up off the grip.</p></div>
+          note shows if a clamp ends up off the motor housing.</p></div>
         <div class="variant" id="rb-source"><span>Speed comes from</span>
           <button type="button" data-v="manual" aria-pressed="true">Speed dial</button>
           <button type="button" data-v="gcode" aria-pressed="false">G-code S</button></div>
@@ -337,41 +340,57 @@
         </div>
         <div class="rb-sec" data-sec="mount">
         <div class="field"><label for="rb-mount">Mount</label>
-          <select id="rb-mount"><option value="kobalt">Kobalt</option><option value="makita">Makita 65 mm</option><option value="dewalt">DeWalt 69 mm</option><option value="none">None</option></select></div>
+          <select id="rb-mount"><option value="kobalt">Kobalt</option><option value="makita">Makita 701 / T1 (65 mm)</option><option value="dewalt">DeWalt 611 (69 mm)</option><option value="none">None</option></select></div>
+        <p class="foot" id="rb-mountnote" hidden></p>
         </div>
         <div class="rb-sec" data-sec="stack">
-        <div class="help" id="help-rb-stack" hidden><p>The round part, stacked up from the collet nut: the nut, the spindle
-          showing above it, the nose, the grip (the part the mount clamps) and the cast collar on top of it. A part with a
-          0 size is left out.</p>
-          <p><b>Overall height:</b> nut bottom to the top of the head.</p>
-          <p><b>Grip chamfer:</b> the 45° bevel round the grip's bottom edge, at the collet end (0 = square).</p>
-          <p><b>Transition to the head:</b> the part between the collar and the head (length 0 = none). <b>Round</b>: a cone
-          from the collar to its top Ø. <b>To the head's shape</b>: it changes from round at the collar to the head's rounded
-          box under it. <b>Where it meets the head</b>: plain, or a fillet / chamfer of that size blending it into the head's
-          underside. The head sits on it.</p>
-          <p>Each section's color and finish (metal, plastic, rubber) are under Colors.</p>
-          <p><b>Spindle lock button:</b> the button you press to hold the shaft while you change bits - its height up from
+        <div class="help" id="help-rb-stack" hidden><p>The round part, stacked up from the collet nut: the nut, the
+          <b>exposed shaft</b> (the gap between the nut's top and the bearing cap), the <b>bearing cap</b>, the <b>motor
+          housing</b> (the part the mount clamps) and the <b>collar</b> on top of it. A part with a 0 size is left out.</p>
+          <p><b>Overall height:</b> nut bottom to the top of the motor cap.</p>
+          <p><b>Motor housing chamfer:</b> the 45° bevel round its bottom edge, at the collet end (0 = square).</p>
+          <p><b>Transition to the motor cap:</b> the part between the collar and the cap (length 0 = none). <b>Round</b>: a cone
+          from the collar to its top Ø. <b>To the cap's shape</b>: it changes from round at the collar to the cap's rounded
+          box under it. <b>Where it meets the cap</b>: plain, or a fillet / chamfer of that size blending it into the cap's
+          underside. The cap sits on it.</p>
+          <p><b>Shaft lock button:</b> the button you press to hold the shaft while you change bits - its height up from
           the nut's bottom, its angle round from the switch end (counter-clockwise from above, negative = clockwise), its
-          Ø and how far it reaches out from the router's center.</p>
-          <p><b>A spindle:</b> the nut, the nose (the bearing cap under the can) and the can - its diameter (65 mm for the
-          V1E mount) and length up to the top. Air-cooled has a fan on top, water-cooled two hose barbs.</p></div>
+          Ø, how far it reaches out from the router's center and how far it presses in. With no lock, a bit change holds
+          the shaft with a second wrench on its flats (Bit end).</p>
+          <p><b>A spindle:</b> the nut, the exposed shaft, the bearing cap and the can - its diameter (65 mm for the
+          V1E mount) and length up to the top. Air-cooled has a fan on top, water-cooled two hose barbs.</p>
+          <p>Each part's color and finish (metal, plastic, rubber) are under Colors.</p></div>
         <div class="rb-grid" id="rb-stack"></div>
         </div>
+        <div class="rb-sec" data-sec="bitend">
+        <div class="help" id="help-rb-bitend" hidden><p>What a bit change takes apart. <b>Collet sizes:</b> every shank the
+          router's collets take (mm, comma apart: 1/8" = 3.175, 1/4" = 6.35); a bit with another shank swaps the collet, a
+          shank no collet takes can't go in. The <b>collet</b> sits in the nut, its wide end down.</p>
+          <p><b>Nut face below the shaft end:</b> how far the shaft's end sits up inside the nut. The <b>thread</b> (Ø, pitch,
+          length) is what the nut spins off: one turn per pitch.</p>
+          <p><b>Wrench flats:</b> two flats on the exposed shaft (across, height from the nut's bottom, length) for a
+          second wrench to hold it while the first turns the nut - for a router with no shaft lock.</p>
+          <p>The Kobalt and the Carbide take ER11 collets (1/8" + 1/4") with an ER11A nut on an M13 x 0.75 thread; the
+          rest of these sizes are guesses until measured.</p></div>
+        <div class="rb-grid" id="rb-bitend"></div>
+        </div>
         <div class="rb-sec" data-sec="head">
-        <div class="help" id="help-rb-head" hidden><p>A rounded box sitting on the grip: length along the switch end, width
-          across, height up from the turned part (it always sits right on it: Overall height = the turned part + this, and changing either one changes the other).</p>
+        <div class="help" id="help-rb-head" hidden><p>The motor cap: a rounded box sitting on the turned part - length along the
+          switch end, width across, height up from the turned part (it always sits right on it: Overall height = the turned
+          part + this, and changing either one changes the other).</p>
           <p><b>Fillets:</b> top = the top edges, front = the upright corners at the switch end, back = at the cord end,
           under = the bottom edges.</p>
-          <p><b>Dial:</b> on the end = lying flat, its rim out of the switch end; on top = standing across the head, its rim
+          <p><b>Dial:</b> on the end = lying flat, its rim out of the switch end; on top = standing across the cap, its rim
           up through the top.</p></div>
-        <p class="foot" id="rb-detailed" hidden>This router's head is modelled from photos.
-          <button type="button" id="rb-simple">Use a simple head</button></p>
         <div class="rb-grid" id="rb-head"></div>
         <div class="variant" id="rb-dialplace"><span>Dial</span>
           <button type="button" data-v="end" aria-pressed="true">On the end</button>
           <button type="button" data-v="top" aria-pressed="false">On top</button></div>
         </div>
         <div class="rb-sec" data-sec="colors">
+        <div class="help" id="help-rb-colors" hidden><p>Each part's color and finish: <b>metal</b> reflects the shop (the
+          housing, the shaft, the collet nut), <b>plastic</b> is satin (the motor cap, the dial), <b>rubber</b> is matte (the
+          cord). The dial's color sets its numbered ring too.</p></div>
         <div class="rb-grid" id="rb-colors"></div>
         </div>
       </div>
@@ -728,11 +747,15 @@
       cutting diameter). <b>Angle</b>: V-bit / chamfer / tapered ball, tip to tip. <b>Tip</b>: the flat at a V-bit's or
       chamfer's point, or a tapered ball's ball diameter. <b>Corner radius</b>: a bullnose's. <b>Flutes</b>: how many
       (0 = not said). <b>Sticks out</b>: mm below the collet, for the drawing only (0 = as the model's bit).
-      The router's collet takes 1/4" shanks at most, so a bit wider than that is drawn on a 1/4" shank.</p>
+      The router's collets (My LR4 &gt; Router &gt; Bit end) set the biggest shank it takes: a bit wider than that is drawn on that shank.</p>
+      <p><b>Show the bit change</b>: Install bit and resume first plays the change on the router - the shaft held (its
+      lock, or a wrench on its flats), the collet nut off with a wrench and by hand, the old bit out, the collet swapped
+      if the shank changes, the new bit in, the nut back on and tightened. Off: the bit just goes in.</p>
       <p><b>From my bits</b>: your bits, kept in this browser for all your machines. They start as the bits in the
       V1 Engineering store (store ↗ opens a bit's page) and a 3/4" surfacing bit; <b>Save to my bits</b> keeps the one
       set here, <b>Delete</b> drops the picked one, <b>Reset my bits</b> goes back to the store's list.</p>
       <p>Your pick is kept for this file.</p></div>
+    <label class="check tc-anim"><input type="checkbox" id="tc-anim" checked> Show the bit change</label>
     <div class="pair">
       <div class="field bit-lib"><label>From my bits</label><div class="bit-lib-row"><select data-k="lib" aria-label="From my bits"></select><a class="bit-store" target="_blank" rel="noopener" hidden title="This bit in the V1 Engineering store">store ↗</a></div></div>
       <div class="field"><label>Bit</label><select data-k="shape"><option value="flat">Flat end mill</option><option value="ball">Ball end</option><option value="bullnose">Bullnose</option><option value="vbit">V-bit</option><option value="chamfer">Chamfer</option><option value="taperball">Tapered ball</option></select></div>
@@ -1172,6 +1195,7 @@
 <script src="js/page/router.js"></script>
 <script src="js/page/router_build.js"></script>
 <script src="js/page/router_edit.js"></script>
+<script src="js/page/tool_change.js"></script>
 <script src="js/page/ui.js"></script>
 <script src="js/page/scripting.js"></script>
 <script src="js/page/director.js"></script>

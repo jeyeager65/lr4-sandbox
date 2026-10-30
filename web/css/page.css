@@ -635,6 +635,12 @@ button.big { padding: 10px 6px; font: 600 15px var(--font-display); letter-spaci
 .rt-readout.on { opacity: 0.94; transition: opacity 0.1s; }
 .rt-readout b { display: block; font: 700 34px var(--font-display); }
 .rt-readout span { font-size: 15px; color: var(--muted); }
+/* a bit change, animated (tool_change.js): its caption over the view; the popup steps back while it plays */
+.tc-caption { position: absolute; left: 50%; bottom: 52px; transform: translateX(-50%); pointer-events: none; opacity: 0;
+  transition: opacity 0.3s; background: var(--panel); border: 1px solid var(--line, var(--muted)); border-radius: 10px;
+  padding: 0.5em 1em; font-size: clamp(15px, 1.5vw, 36px); text-align: center; box-shadow: 0 4px 18px rgba(0, 0, 0, 0.25); z-index: 5; max-width: 80%; }
+.tc-caption.on { opacity: 0.95; }
+.job-pop.tc-min { opacity: 0; pointer-events: none; transition: opacity 0.3s; }
 .estop-mini { color: #c8241b; font-weight: 700; }
 .estop-mini[aria-pressed=true] { background: #c8241b; color: #fff; }
 button.pri { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }

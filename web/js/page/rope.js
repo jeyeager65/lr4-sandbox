@@ -22,9 +22,9 @@
     p: null, q: null, Lc: 0, Lp: 0, at: null, mesh: null, eBase: null, tBase: null, pBase: null, flung: null, spun: 0, cols: null, colsT: 0, clank: 0 };
   const ROPE_G = 9810, ROPE_H = 1 / 240;              // mm/s^2; the step (s)
   // (not the core / mounts: their boxes hold the hole the wires come out of - they shoved the wires out, 2026-10-27)
-  const ROPE_COLS = /^(Router_Kobalt|Router_Nut|Router_Bit|Tool_Mount_[TB]_Kobalt|Dust_Shoe|Spoilboard)$/;
+  const ROPE_COLS = /^(Router_Housing|Router_ColletNut|Router_Bit|Tool_Mount_[TB]_Kobalt|Dust_Shoe|Spoilboard)$/;
   const ROPE_STUB = /^TouchPlate_(Wire|Clip_Insulation)$/;   // drawn by the ropes instead (panel.js applyVisibility)
-  const ROPE_COLS_HELD = /^(Router_Kobalt|Tool_Mount_[TB]_Kobalt|Spoilboard)$/;   // held: the nut / bit hold the clip itself
+  const ROPE_COLS_HELD = /^(Router_Housing|Tool_Mount_[TB]_Kobalt|Spoilboard)$/;   // held: the nut / bit hold the clip itself
   const ROPE_RING = 43;                               // mm: the tool mounts' clamp rings round the router's axis (FCStd: median
                                                       // 39-41, the bolt ears 49-51; 47 had the hanging wire fighting it; their
                                                       // boxes held the wires' hole, 2026-10-27)
@@ -83,7 +83,7 @@
       if (!m.geometry.boundingBox) m.geometry.computeBoundingBox();
       m.updateMatrixWorld();
       const b = m.geometry.boundingBox.clone().applyMatrix4(m.matrixWorld);
-      if (/^Router_Kobalt$/.test(m.userData.name)) {
+      if (/^Router_Housing$/.test(m.userData.name)) {
         const c = b.getCenter(new THREE.Vector3()), s = b.getSize(new THREE.Vector3());
         out.push({ cyl: true, x: c.x, y: c.y, r: Math.min(s.x, s.y) / 2, z0: b.min.z, z1: b.max.z });
         axis = c;
@@ -91,7 +91,7 @@
       else out.push({ b });
     };
     const list = meshes.filter((m) => (held ? ROPE_COLS_HELD : ROPE_COLS).test(m.userData.name || ""));
-    for (const m of list.sort((a, b) => (a.userData.name === "Router_Kobalt" ? -1 : b.userData.name === "Router_Kobalt" ? 1 : 0))) add(m);   // the router first: its axis
+    for (const m of list.sort((a, b) => (a.userData.name === "Router_Housing" ? -1 : b.userData.name === "Router_Housing" ? 1 : 0))) add(m);   // the router first: its axis
     if (JOB.stock && JOB.stock.visible) out.push({ b: new THREE.Box3().setFromObject(JOB.stock) });   // a group: top + walls
     return out;
   }
@@ -175,7 +175,7 @@
     });
   }
   function ropeFling() {                              // the magnet lets go: off the nut's flat, along the turn (clockwise)
-    const nut = meshes.find((m) => m.userData.name === "Router_Nut"), { CE, CT } = RN;
+    const nut = meshes.find((m) => m.userData.name === "Router_ColletNut"), { CE, CT } = RN;
     const c = nut ? new THREE.Box3().setFromObject(nut).getCenter(new THREE.Vector3()) : ROPE.p[CE].clone();
     const r = ROPE.p[CE].clone().sub(c).setZ(0).normalize(), tan = new THREE.Vector3(0, 0, 1).cross(r).negate();
     const v = tan.multiplyScalar(1300).addScaledVector(r, 450).add(new THREE.Vector3(0, 0, 250));   // ~1.4 m/s: early in the spin-up

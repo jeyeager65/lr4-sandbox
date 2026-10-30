@@ -291,8 +291,12 @@
     const attach = tl.plates.find((q) => q.index >= c && noCut(c, q.index) && Math.hypot(q.x - here.x, q.y - here.y) < 1);
     const remove = !attach && J.plate && noCut(J.plate.index + 1, c + 1);
     if (attach) fjPlate(attach); else if (remove) fjPlate(null);
-    const tool = J.toolStop;
+    let tool = J.toolStop;
     J.toolStop = null;
+    if (!tool) {                                     // FluidNC held at the M6 before the trackers reached it (slow
+      const k = tl.events.findIndex((q, i) => i >= J.k && q.kind === "tool");   // frames): the next one, no cut between
+      if (k >= 0 && noCut(c + 1, tl.events[k].index)) { tool = tl.events[k]; J.k = k + 1; }
+    }
     $("job-pop-h").textContent = tool ? "Tool change" : FJ.lastMsg ? "Paused (M0)" : "Feed hold";
     $("job-pop-msg").textContent = tool ? tool.text : FJ.lastMsg || "Held. Resume to carry on.";
     $("job-resume").textContent = "Resume (cycle start)";

@@ -125,6 +125,7 @@ const TWO = ["G21 G90", "T1", "G0 Z5", "G0 X20 Y40", "G1 Z-1 F600", "G1 X80 F150
       await T.until(H.pop, 120000);
       const out = { h: document.getElementById("job-pop-h").textContent, bit: !document.getElementById("job-pop-bit").hidden };
       document.querySelector('#job-pop-bit [data-k="d"]').value = 3;
+      const an = document.getElementById("tc-anim"); an.checked = false; an.dispatchEvent(new Event("change"));   // (the animation: test_page_tool_change)
       document.getElementById("job-resume").click();
       await T.until(H.done, 60000);
       out.t2 = LR4Job.tl().tools.get(2).diameter; out.router = LR4Job.hand().bit.d;

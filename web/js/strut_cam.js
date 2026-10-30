@@ -28,12 +28,12 @@
     title: "LowRider4 strut plates",
   };
 
-  // the hand-set routers' dial tables (dial, RPM), half steps interpolated: web/data/routers.js (fluidnc_post.ROUTERS
+  // the hand-set routers' speed tables (dial, RPM), half steps interpolated: web/data/routers.js (fluidnc_post.ROUTERS
   // has to match: tests/test_routers_data.py)
   const RD = typeof module !== "undefined" && module.exports ? require("../data/routers.js") : root.LR4RouterData;
-  const ROUTERS = Object.fromEntries(Object.entries(RD.routers).filter(([, r]) => r.dial).map(([k, r]) => [k, { name: r.name, dial: r.dial }]));
+  const ROUTERS = Object.fromEntries(Object.entries(RD.routers).filter(([, r]) => r.speeds).map(([k, r]) => [k, { name: r.name, speeds: r.speeds }]));
   function dialRpm(dial, router) {
-    const pts = ROUTERS[router].dial;
+    const pts = ROUTERS[router].speeds;
     if (dial <= pts[0][0]) return pts[0][1];
     for (let k = 1; k < pts.length; k++)
       if (dial <= pts[k][0]) return pts[k - 1][1] + (pts[k][1] - pts[k - 1][1]) * (dial - pts[k - 1][0]) / (pts[k][0] - pts[k - 1][0]);
@@ -261,7 +261,7 @@
       `#<probe_depth>=${g(o.probeDepth)} (probe goes down to Z-${g(o.probeDepth)} at most, below the work zero)`,
       `#<probe_clear>=${g(o.probeClear)} (Z after probing)`,
       `#<probe_x>=${g(o.margin / 2)} (probe spot X)`, `#<probe_y>=${g(o.margin / 2)} (probe spot Y)`);
-    const lo = router.dial[0][1], hi = router.dial[router.dial.length - 1][1];
+    const lo = router.speeds[0][1], hi = router.speeds[router.speeds.length - 1][1];
     const note = rpm < lo * 0.97 ? ` - ${router.name} can't go below ~${lo} RPM` : rpm > hi * 1.03 ? ` - above this router's ~${hi} RPM max` : "";
     // (comment lines kept short: FluidNC stops a job on a line over 127 bytes, "14 Line too long")
     const t1Min = ops.filter(op => op.tool === 1).reduce((s, op) => s + op.minutes, 0);

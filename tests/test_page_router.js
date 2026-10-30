@@ -40,7 +40,7 @@ const JOBTXT = ["(LR4 router test)", STOCK, "(ToolDef 1: SHAPE=flat D=6.35 FLUTE
       out.rpmText = document.getElementById("rt-rpm").textContent;
       // the camera at the wheel's open edge
       const dm = meshes.find((m) => m.userData.name === "Router_Dial"), ring = dm.userData.ring;
-      const c = ring.getWorldPosition(new THREE.Vector3()), o = ring.parent.localToWorld(ring.position.clone().add(new THREE.Vector3(Math.cos(ring.userData.out), Math.sin(ring.userData.out), 0))).sub(c).normalize();
+      const c = ring.getWorldPosition(new THREE.Vector3()), o = new THREE.Vector3(...dm.userData.dial.out).normalize();
       camera.position.copy(c).addScaledVector(o, 160).add(new THREE.Vector3(0, -60, 40)); controls.target.copy(c); controls.update(); camera.updateMatrixWorld();
       await T.sleep(300);
       const [x, y] = LR4Router.screen();
@@ -87,13 +87,13 @@ const JOBTXT = ["(LR4 router test)", STOCK, "(ToolDef 1: SHAPE=flat D=6.35 FLUTE
       fs.writeFileSync(process.env.ROUTER_SHOT, Buffer.from(s.data, "base64"));
     }
     const b = await page.val(`(async () => {
-      // Part 45b: the body from the preset, swapped in place mid-job (Carbide: head 75 wide, its wheel across the head)
+      // Part 45b: the model from the preset, swapped mid-job (Carbide: motor cap 75 wide)
       const look = () => {
-        const m = (n) => meshes.find((q) => q.userData.name === n), h = new THREE.Box3().setFromObject(m("Router_Head"));
+        const m = (n) => meshes.find((q) => q.userData.name === n), h = new THREE.Box3().setFromObject(m("Router_MotorCap"));
         const ring = m("Router_Dial").userData.ring, ax = new THREE.Vector3(0, 0, 1).applyQuaternion(ring.getWorldQuaternion(new THREE.Quaternion()));
         const cp = cordMesh && cordMesh.geometry.attributes.position;
         return { w: +(h.max.y - h.min.y).toFixed(1), top: +h.max.z.toFixed(1), ax: ax.toArray().map((v) => +Math.abs(v).toFixed(2)),
-          label: m("Router_Kobalt").userData.label, cord: cp ? new THREE.Vector3(cp.getX(0), cp.getY(0), cp.getZ(0)).sub(new THREE.Box3().setFromObject(m("Router_Nut")).getCenter(new THREE.Vector3())).toArray().map((v) => +v.toFixed(1)) : null, running: LR4Job.running() };
+          label: m("Router_Housing").userData.label, cord: cp ? new THREE.Vector3(cp.getX(0), cp.getY(0), cp.getZ(0)).sub(new THREE.Box3().setFromObject(m("Router_ColletNut")).getCenter(new THREE.Vector3())).toArray().map((v) => +v.toFixed(1)) : null, running: LR4Job.running() };
       };
       const kob = look();
       LR4Router.set({ router: "t1" });
@@ -109,9 +109,9 @@ const JOBTXT = ["(LR4 router test)", STOCK, "(ToolDef 1: SHAPE=flat D=6.35 FLUTE
       out.kob2 = look();
       return out;
     })()`);
-    ok(b.kob.w === 80 && b.t1.w === 72 && b.carb.w === 75 && b.kob2.w === 80 && b.carb.top < b.kob.top, `the body from the preset: head 80 wide (Kobalt) -> 72 (T1) -> 75 (Carbide, lower) -> 80 (${JSON.stringify([b.kob.w, b.t1.w, b.carb.w, b.kob2.w, b.kob.top, b.carb.top])})`);
+    ok(b.kob.w === 80 && b.t1.w === 72 && b.carb.w === 75 && b.kob2.w === 80 && b.carb.top < b.kob.top, `the model from the preset: motor cap 80 wide (Kobalt) -> 72 (T1) -> 75 (Carbide, lower) -> 80 (${JSON.stringify([b.kob.w, b.t1.w, b.carb.w, b.kob2.w, b.kob.top, b.carb.top])})`);
     ok(b.kob.ax[2] > 0.99 && b.carb.ax[2] > 0.99, `the wheel's axis: upright (Kobalt; the Carbide too, generic head) (${JSON.stringify([b.kob.ax, b.carb.ax])})`);
-    ok(/Carbide/.test(b.carb.label) && /Kobalt/.test(b.kob2.label), `the body's label follows (${b.carb.label})`);
+    ok(/Carbide/.test(b.carb.label) && /Kobalt/.test(b.kob2.label), `the housing's label follows (${b.carb.label})`);
     ok(b.carb.cord && b.kob.cord && Math.hypot(...b.carb.cord.map((v, i) => v - b.kob.cord[i])) > 10 && JSON.stringify(b.kob2.cord) === JSON.stringify(b.kob.cord),
       `the cord leaves where the router's does, from the nut (${JSON.stringify([b.kob.cord, b.carb.cord])})`);
     ok(b.carb.running && b.kob2.running, "the job keeps running through the swaps");
