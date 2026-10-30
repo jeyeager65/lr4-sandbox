@@ -23,17 +23,20 @@
     ["Orange", "#e8661c"], ["Yellow", "#f3c22f"], ["Green", "#2f8f46"], ["Blue", "#1f5fbf"], ["Purple", "#6b3fa0"],
     ["Pink", "#f08cb4"], ["Magenta", "#c8287a"], ["Teal", "#1f8f8f"], ["Brown", "#6e4a2f"], ["Natural", "#e4d9bf"], ["Carbon", "#2a2a2c"]];
   const MAIN = "#292a2e", ACCENT = "#cc1f1a", FIBER = "#2a2a2c";
-  const TPU_PART = /^Bristles_TPU/;                   // always TPU, in its data color, never on a spool
+  // the bristles: TPU only - on a TPU spool (picked, else the first TPU spool), with none in its own data color (user
+  // 2026-10-29: "I can't change the filament for the bristles. It should be TPU"); a rigid part is never on a TPU spool
+  const TPU_PART = /^Bristles_TPU/;
   const MOUNTS = /^Tool_Mount_[TB]_/;                 // the router mounts: "commonly PETG but can be PLA" (user)
   const PETER_T = /^PeterPlate_T_/, PETER_B = /^PeterPlate_B_/;   // classic look (user): top Peter Plate black, bottom red
   const classicRole = (p) => (PETER_T.test(p.name) ? 0 : PETER_B.test(p.name) ? 1 : p.role === "accent" ? 1 : 0);
   const FIBER_PARTS = /^(Core|YZ_Plate_M(in|ax)|Tool_Mount_[TB]_.*)$/;   // + the two outer braces (by position)
   // a preset: its spools and a rule (part -> spool index). part: { name, role ("main" / "accent"), outer (an end brace) }
+  // (each ends with the bristles' TPU, black: there's always a TPU spool - clean adds one - and only the bristles use it)
   const PRESETS = {
-    classic: { label: "V1E classic", spools: [["PLA", MAIN], ["PLA", ACCENT], ["PETG", ACCENT]],
+    classic: { label: "V1E classic", spools: [["PLA", MAIN], ["PLA", ACCENT], ["PETG", ACCENT], ["TPU", MAIN]],
       rule: (p) => (MOUNTS.test(p.name) ? 2 : classicRole(p)) },
-    single: { label: "Single color", spools: [["PLA", MAIN]], rule: () => 0 },
-    fiber: { label: "Fiber upgrade", spools: [["PLA", MAIN], ["PLA", ACCENT], ["PET-CF", FIBER]],
+    single: { label: "Single color", spools: [["PLA", MAIN], ["TPU", MAIN]], rule: () => 0 },
+    fiber: { label: "Fiber upgrade", spools: [["PLA", MAIN], ["PLA", ACCENT], ["PET-CF", FIBER], ["TPU", MAIN]],
       rule: (p) => (FIBER_PARTS.test(p.name) || p.outer ? 2 : classicRole(p)) }};
   // the strut plates (Part 40: visual only): material -> default color, roughness, wood grain, see-through
   const PLATES = {
@@ -80,6 +83,11 @@
     out.saved = typeof s.saved === "string" && s.saved ? s.saved.slice(0, 40) : null;
     const sp = Array.isArray(s.spools) ? s.spools.filter((x) => x && MATERIALS[x.mat] && HEX.test(x.color)).slice(0, 12) : [];
     out.spools = sp.length ? sp.map((x) => ({ mat: x.mat, color: x.color.toLowerCase() })) : d.spools;
+    if (!out.spools.some((x) => x.mat === "TPU")) {   // stored before every preset had one: the bristles' TPU added
+      if (out.spools.length >= 12) out.spools.pop();
+      out.spools.push({ mat: "TPU", color: MAIN });
+    }
+    if (!out.spools.some((x) => x.mat !== "TPU")) out.spools.unshift({ mat: "PLA", color: MAIN });   // something rigid too
     out.parts = {};
     if (s.parts && typeof s.parts === "object")
       for (const [k, v] of Object.entries(s.parts)) if (Number.isInteger(v) && v >= 0 && v < out.spools.length) out.parts[k] = v;
@@ -126,22 +134,28 @@
     const p = { name: name.trim().slice(0, 40), preset: s.preset, spools: s.spools.map((x) => ({ mat: x.mat, color: x.color.toLowerCase() })), parts: copy(s.parts) };
     return [[...saved.filter((x) => x.name !== p.name), p], Object.assign({}, s, { saved: p.name })];
   }
+  const isTpu = (s, i) => !!s.spools[i] && s.spools[i].mat === "TPU";
+  const onlyTpu = (s, i) => isTpu(s, i) && s.spools.filter((x) => x.mat === "TPU").length === 1;   // the bristles' last TPU spool
   function removeSpool(s, i) {                        // its parts go back to the rule; later overrides shift down
-    if (s.spools.length <= 1) return s;
+    if (s.spools.length <= 1 || onlyTpu(s, i)) return s;
+    if (!isTpu(s, i) && s.spools.filter((x) => x.mat !== "TPU").length === 1) return s;   // nor the last rigid one
     const parts = {};
     for (const [k, v] of Object.entries(s.parts)) if (v !== i) parts[k] = v > i ? v - 1 : v;
     return Object.assign({}, s, { spools: s.spools.filter((_, j) => j !== i), parts });
   }
-  // parts: [{ name, role, cx }] (the printed parts on show) -> Map name -> spool index (-1 = TPU, its own look).
-  // The outer braces = the Brace_* with the lowest and highest cx (any size).
+  // parts: [{ name, role, cx }] (the printed parts on show) -> Map name -> spool index (-1 = TPU in its own color: the
+  // bristles with no TPU spool). The outer braces = the Brace_* with the lowest and highest cx (any size).
   function assign(parts, s) {
     const br = parts.filter((p) => /^Brace_/.test(p.name)).sort((a, b) => a.cx - b.cx);
     const outer = new Set(br.length ? [br[0].name, br[br.length - 1].name] : []);
     const rule = (PRESETS[s.preset] || PRESETS.classic).rule, n = s.spools.length, out = new Map();
+    const tpu = s.spools.findIndex((x) => x.mat === "TPU"), hard = s.spools.findIndex((x) => x.mat !== "TPU");
     for (const p of parts) {
-      if (TPU_PART.test(p.name)) { out.set(p.name, -1); continue; }
-      const o = s.parts[p.name];
-      out.set(p.name, Number.isInteger(o) && o < n ? o : Math.min(rule(Object.assign({ outer: outer.has(p.name) }, p)), n - 1));
+      const o = s.parts[p.name], ok = Number.isInteger(o) && o < n;
+      if (TPU_PART.test(p.name)) { out.set(p.name, ok && isTpu(s, o) ? o : tpu); continue; }
+      let i = ok && !isTpu(s, o) ? o : Math.min(rule(Object.assign({ outer: outer.has(p.name) }, p)), n - 1);
+      if (isTpu(s, i) && hard >= 0) i = hard;           // the rule's spool is TPU now: the first rigid one
+      out.set(p.name, i);
     }
     return out;
   }
@@ -181,7 +195,7 @@
     return clean(s);
   }
 
-  const api = { MATERIALS, NAMES, PALETTE, colorName, filamentName, cleanSaved, sourceOf, edited, useSaved, resetTo, saveAs, PRESETS, PLATES, LAYER, TPU_PART, defaults, clean, setPreset, removeSpool, assign,
+  const api = { isTpu, onlyTpu, MATERIALS, NAMES, PALETTE, colorName, filamentName, cleanSaved, sourceOf, edited, useSaved, resetTo, saveAs, PRESETS, PLATES, LAYER, TPU_PART, defaults, clean, setPreset, removeSpool, assign,
     lookOn, toLink, fromLink };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.LR4Filaments = api;

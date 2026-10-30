@@ -260,6 +260,8 @@ p.foot:empty { display: none; }
 .insp { position: absolute; right: 12px; top: 52px; width: min(340px, calc(100% - 24px)); max-height: calc(100% - 110px);
   display: flex; flex-direction: column; align-items: flex-end; gap: 6px; pointer-events: none; }
 .insp > * { pointer-events: auto; }
+.insp-top { display: flex; gap: 6px; }
+.insp.min .insp-tools, .insp.min .insp-card { display: none; }   /* Hide panels: just the view (+ Back) */
 #insp-back { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
 .insp-tools { width: 100%; display: flex; flex-direction: column; gap: 6px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 6px;
   background: color-mix(in srgb, var(--panel) 92%, transparent); backdrop-filter: blur(4px); font-size: 13px; }
@@ -281,6 +283,11 @@ canvas.measuring { cursor: crosshair; }
 .insp-card summary em { font-style: normal; font-size: 12px; color: var(--muted); }
 .insp-card h3 { margin: 10px 0 2px; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
 .insp-card td, .insp-card td:last-child { padding: 1px 0; vertical-align: top; text-align: left; font-family: var(--font-body); font-size: 13px; }
+.insp-card label { display: flex; gap: 6px; align-items: baseline; cursor: pointer; }
+.insp-card h3 label { display: inline-flex; }
+.insp-card input[type=checkbox] { margin: 0; accent-color: var(--accent); flex: none; }
+.insp-card tr.off td { color: var(--muted); text-decoration: line-through; }
+.insp-all { margin-top: 6px; font-size: 12px; }
 .insp-card td.num { width: 2.5em; text-align: right; padding-right: 8px; font-family: var(--font-data); }
 .tree .ins { border: 0; background: none; padding: 0 4px; color: var(--muted); cursor: pointer; font-size: 13px; }
 .tree .ins:hover { color: var(--accent); }
@@ -932,3 +939,62 @@ body.rec-ui .ab-exag { top: 52px; }
 body.rec-ui .rec-badge { top: calc(3.5% + 44px); font-size: clamp(18px, 3.4vh, 52px); }   /* ui videos: under the view's toolbar */
 body.rec-ui .rec-caption { font-size: clamp(16px, 2.7vh, 42px); }
 body.rec-ui .rec-msg { top: calc(3.5% + 44px); font-size: clamp(15px, 2.4vh, 38px); }
+
+/* Build your router (My LR4 > Router) */
+.rb-btns { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+.rb-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 0 10px; }
+.rb-grid .field { margin-top: 8px; }
+.rb-grid input[type="color"] { width: 100%; height: 30px; padding: 0; border: 1px solid var(--line); border-radius: 4px; background: var(--bg); }
+.rb-look select { width: 100%; margin-top: 4px; }
+/* one tab of settings at a time (user 2026-10-29: too many fields at once) */
+.rb-tabs { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; margin-top: 14px; padding-bottom: 6px; border-bottom: 1px solid var(--line); }
+.rb-tabs [role="tab"] { padding: 4px 9px; }
+.rb-tabs [role="tab"][aria-selected="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.rb-tabs .q { margin-left: auto; }
+.rb-sec:not(.on) { display: none; }
+.rb-show { display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: center; margin-top: 8px; font-size: 13px; }
+.rb-show .check { margin: 0; }
+/* the router's dimensions on the model (router_edit.js) */
+.rbx { position: absolute; inset: 0; pointer-events: none; }
+.rbx[hidden] { display: none; }
+.rbx-svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.rbx-d line { stroke: var(--accent); stroke-width: 1.2; }
+.rbx-d line.ext { stroke-width: 0.8; stroke-dasharray: 3 2; opacity: 0.7; }
+.rbx-d .arr, .rbx-d circle { fill: var(--accent); }
+.rbx-d.hot line { stroke-width: 2.2; }
+.rbx-n, .rbx-h { position: absolute; transform: translate(-50%, -50%); pointer-events: auto; white-space: nowrap; }
+.rbx-n { z-index: 1; padding: 1px 6px; font: 12px var(--font-data); border-radius: 4px; background: var(--panel); color: var(--ink);
+  border: 1px solid var(--accent); cursor: text; }
+.rbx-n:disabled { border-color: var(--line); color: var(--muted); cursor: default; }
+.rbx-n.hot, .rbx-n:hover:not(:disabled) { background: var(--accent); color: var(--accent-ink); }
+.rbx-h { padding: 0; width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--panel); background: var(--accent);
+  cursor: grab; touch-action: none; box-shadow: 0 0 0 1px var(--accent); }
+.rbx-h.hot, .rbx-h:hover { background: var(--ink); width: 14px; height: 14px; }
+.rbx-in { width: 5.5em; padding: 0 2px; font: 12px var(--font-data); }
+.rbx-views { position: absolute; left: 12px; top: 52px; display: flex; pointer-events: auto; }
+.rbx-views button { border-radius: 0; margin-left: -1px; padding: 3px 10px; }
+.rbx-views button:first-child { border-radius: 4px 0 0 4px; margin-left: 0; }
+.rbx-views button:last-child { border-radius: 0 4px 4px 0; }
+.rbx-views button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.rbx-card { position: absolute; left: 12px; bottom: 40px; width: min(330px, calc(100% - 24px)); pointer-events: auto; padding: 8px 12px 10px;
+  border: 1px solid var(--accent); border-radius: 6px; background: color-mix(in srgb, var(--panel) 94%, transparent); backdrop-filter: blur(4px); font-size: 13px; }
+.rbx-card[hidden] { display: none; }
+.rbx-card-h { display: flex; align-items: center; margin-bottom: 4px; }
+.rbx-card-h strong { flex: 1; font-family: var(--font-display); font-weight: 600; font-size: 15px; }
+.rbx-x { border: 0; background: none; padding: 2px 6px; color: var(--muted); }
+.rbx-row { display: grid; grid-template-columns: 6.5em 1fr 4.8em 2em; gap: 6px; align-items: center; margin-top: 4px; }
+.rbx-row input[type=range] { width: 100%; accent-color: var(--accent); }
+.rbx-row input[type=number] { width: 100%; padding: 2px 4px; font: 12px var(--font-data); }
+.rbx-row em { font-style: normal; color: var(--muted); font-size: 12px; }
+.rbx-row.rbx-sel { grid-template-columns: 6.5em 1fr; }
+.rbx-opt { display: flex; align-items: center; margin-top: 8px; }
+.rbx-opt span { width: 6.5em; flex: none; }
+.rbx-opt button { border-radius: 0; margin-left: -1px; padding: 2px 9px; }
+.rbx-opt span + button { border-radius: 4px 0 0 4px; margin-left: 0; }
+.rbx-opt button:last-child { border-radius: 0 4px 4px 0; }
+.rbx-opt button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.rbx-simple { margin-top: 6px; }
+.rbx-undo { position: absolute; left: 236px; top: 52px; display: flex; gap: 4px; pointer-events: auto; }
+.rbx-undo button { padding: 3px 10px; }
+.rbx-tip { position: absolute; left: 12px; top: 84px; margin: 0; font-size: 12px; color: var(--muted); }
+#rb-view[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }

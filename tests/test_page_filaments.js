@@ -45,7 +45,7 @@ const STATE = `(() => {
     let a = await page.val(STATE);
     ok(a.n > 40, `${a.n} printed meshes with the print shader`);
     ok(a.noDir.every((n) => /^(Bristles_TPU|Pendant_)/.test(n)), `a print Z on all but the bristles / pendant: ${a.noDir.join(", ") || "-"}`);
-    ok(a.core === 0 && a.stub === 1 && a.mount === 2 && a.bristle === -1 && a.spools[2] === "PETG", `classic: ${JSON.stringify([a.core, a.stub, a.mount, a.bristle, a.spools])}`);
+    ok(a.core === 0 && a.stub === 1 && a.mount === 2 && a.bristle === 3 && a.spools[2] === "PETG" && a.spools[3] === "TPU", `classic: ${JSON.stringify([a.core, a.stub, a.mount, a.bristle, a.spools])}`);
     ok(a.lines === 1, "layer lines on (headless Chrome is Lite: auto would be off)");
     await shot(page, "filaments_far.png");
 
@@ -67,6 +67,20 @@ const STATE = `(() => {
     await page.val(`document.querySelector('#pick-fil .fil-dd-menu button[data-v="0"]').click(); true`);
     a = await page.val(STATE);
     ok(a.stub === 0, `override: Z_Stub_Min on spool 1 (${a.stub})`);
+    // the bristles: TPU only - their chip offers the preset's TPU + a new TPU spool; picked, they're on it; the rigid
+    // chip doesn't list it; then it's taken off again (the rest of the test as before)
+    const tpu = await page.val(`(() => { const out = {}, b = document.getElementById("pick-fil");
+      select(meshes.find((m) => /^Bristles_TPU/.test(m.userData.name)));
+      out.shown = !b.hidden; out.opts = [...b.querySelectorAll(".fil-dd-menu button")].map((x) => x.dataset.v);
+      b.querySelector('.fil-dd-menu button[data-v="new-tpu"]').click();
+      const n = meshes.find((m) => /^Bristles_TPU/.test(m.userData.name)).userData.name;
+      out.spool = FIL.s.spools.length - 1; out.mat = FIL.s.spools[out.spool].mat; out.on = FIL.map.get(n);
+      select(meshes.find((m) => m.userData.name === "Z_Stub_Min"));
+      out.rigid = [...b.querySelectorAll(".fil-dd-menu button")].map((x) => x.dataset.v);
+      delete FIL.s.parts[n]; FIL.s = LR4Filaments.removeSpool(FIL.s, out.spool); filSave(); applyColours(); select(null);
+      return out; })()`);
+    ok(tpu.shown && tpu.opts.join() === ",3,new-tpu" && tpu.mat === "TPU" && tpu.on === tpu.spool && !tpu.rigid.includes(String(tpu.spool)),
+      `bristles: TPU only (${JSON.stringify(tpu)})`);
     const link = await page.val(`shareLink()`);
     ok(/preset=fiber/.test(link) && /parts=Z_Stub_Min\.1/.test(link), `link: ${link}`);
     const back = await page.val(`JSON.stringify(LR4Filaments.fromLink(Object.fromEntries(new URLSearchParams(shareLink().split("&").slice(1).join("&"))))) === JSON.stringify(FIL.s)`);
@@ -81,7 +95,7 @@ const STATE = `(() => {
       edited: !document.getElementById("fil-edited").hidden, stored: JSON.parse(MS.get("lr4-fil-presets") || "[]").length,
       names: [...document.querySelectorAll("#fil-spools .fil-n")].map((e) => e.textContent) }))()`);
     ok(mine.mine.join() === "My fiber:true" && !mine.edited && mine.stored === 1, `saved preset: ${mine.mine.join()} (stored ${mine.stored})`);
-    ok(mine.names.join() === "Black PLA,Red PLA,Black PET-CF", `filament names: ${mine.names.join(", ")}`);
+    ok(mine.names.join() === "Black PLA,Red PLA,Black PET-CF,Black TPU", `filament names: ${mine.names.join(", ")}`);
     // change it: "Unsaved changes to My fiber" + Save "My fiber"; saving says so and clears the line
     const upd = await page.val(`(async () => { FIL.s.spools[1].color = "#1f5fbf"; filSave(); applyColours();
       const w = { what: document.getElementById("fil-ed-what").textContent, btn: document.getElementById("fil-update").textContent,
@@ -146,7 +160,7 @@ const STATE = `(() => {
     const lk = await page.val(`JSON.stringify({ preset: FIL.s.preset, sp: FIL.s.spools.length, parts: FIL.s.parts, layer: FIL.s.layer, front: FIL.s.plates.front.mat,
       core: FIL.map.get("Core"), brace: FIL.map.get("Brace_1"), y: FIL.map.get("Y_Clip_1"),
       coreCol: "#" + meshes.find((m) => m.userData.name === "Core").material.color.clone().convertLinearToSRGB().getHexString() })`);
-    ok(lk === JSON.stringify({ preset: "single", sp: 2, parts: { Core: 1, Brace_1: 1 }, layer: 0.28, front: "acrylic", core: 1, brace: 1, y: 0, coreCol: "#cc1f1a" }),
+    ok(lk === JSON.stringify({ preset: "single", sp: 3, parts: { Core: 1, Brace_1: 1 }, layer: 0.28, front: "acrylic", core: 1, brace: 1, y: 0, coreCol: "#cc1f1a" }),
       `fresh page from a link (per-part filaments too): ${lk}`);
     const abl = await page.val(`(() => { const a = LR4AsBuilt.get(); const l = shareLink(); LR4AsBuilt.set({ on: false, motor0: "min", warp: { x: 0.3 } });
       return { on: a.on, m0: a.motor0, wx: a.warp.x, link: /ab=1/.test(l) && /abx=m0_max~wx_-0.3/.test(l) }; })()`);

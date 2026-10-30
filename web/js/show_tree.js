@@ -122,27 +122,30 @@
     return out;
   }
   // the parts list of a set: parts: the meshes' userData (threads skipped) ->
-  // [{ title, rows: [[qty, label]] }] - Printed / Cut / Hardware / Electronics by label, then Fasteners by item from
-  // meta.fast (screws + nuts); a bolt mesh without counts (temp struts, coupler grubs) is listed by name, qty null
+  // [{ title, rows: [[qty, label, ids]] }] - Printed / Cut / Hardware / Electronics by label, then Fasteners by item from
+  // meta.fast (screws + nuts); a bolt mesh without counts (temp struts, coupler grubs) is listed by name, qty null.
+  // ids: the part ids in that row (Inspect's list shows / hides them; a bolt is in each of its items' rows)
   function partsList(parts) {
     const secs = KINDS.filter(([k]) => k !== "hardware").map(([k, t]) => [k, t]);
     secs.splice(2, 0, ["hardware", "Hardware"]);
-    const by = {}, fast = new Map(), unknown = [];
+    const by = {}, fast = new Map(), unknown = [], ids = new Map();
+    const idsOf = (k, id) => { if (!ids.has(k)) ids.set(k, new Set()); ids.get(k).add(id); };
     for (const p of parts) {
       if (/~thread$/.test(p.name)) continue;
       if (isBolt(p)) {
-        if (p.fast) for (const [n, it] of p.fast) fast.set(it, (fast.get(it) || 0) + n);
-        else unknown.push(boltLabel(p));
+        if (p.fast) for (const [n, it] of p.fast) { fast.set(it, (fast.get(it) || 0) + n); idsOf("fast:" + it, partId(p)); }
+        else unknown.push([boltLabel(p), partId(p)]);
         continue;
       }
       const k = kindOf(p), m = by[k] = by[k] || new Map();
       const l = String(p.label || p.name).replace(/ (\d{1,2})$/, (w, n) => (+n <= 16 ? "" : w));   // copies: "Y Clip 3" -> "Y Clip" (not "Rail 85")
       m.set(l, (m.get(l) || 0) + 1);
+      idsOf(k + ":" + l, partId(p));
     }
     const sort = (rows) => rows.sort((a, b) => String(a[1]).localeCompare(String(b[1]), "en", { numeric: true }));
-    const out = secs.filter(([k]) => by[k]).map(([k, t]) => ({ title: t, rows: sort([...by[k]].map(([l, n]) => [n, l])) }));
+    const out = secs.filter(([k]) => by[k]).map(([k, t]) => ({ title: t, rows: sort([...by[k]].map(([l, n]) => [n, l, [...ids.get(k + ":" + l)]])) }));
     if (fast.size || unknown.length)
-      out.push({ title: "Fasteners", rows: sort([...fast].map(([it, n]) => [n, it])).concat(unknown.map((l) => [null, l])) });
+      out.push({ title: "Fasteners", rows: sort([...fast].map(([it, n]) => [n, it, [...ids.get("fast:" + it)]])).concat(unknown.map(([l, id]) => [null, l, [id]])) });
     return out;
   }
 

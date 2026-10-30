@@ -28,13 +28,10 @@
     title: "LowRider4 strut plates",
   };
 
-  // fluidnc_post.ROUTERS: (dial, RPM), half steps interpolated
-  const ROUTERS = {
-    kobalt: { name: "Kobalt trim router", dial: [[1, 10000], [2, 14000], [3, 18000], [4, 22000], [5, 26000], [6, 35000]] },
-    makita: { name: "Makita RT0701C", dial: [[1, 10000], [2, 12000], [3, 17000], [4, 22000], [5, 27000], [6, 30000]] },
-    carbide: { name: "Carbide Compact Router", dial: [[1, 11000], [2, 13500], [3, 18250], [4, 24500], [5, 29250], [6, 31000]] },
-    dewalt: { name: "DeWalt DWP611", dial: [[1, 16000], [2, 18200], [3, 20400], [4, 22600], [5, 24800], [6, 27000]] },
-  };
+  // the hand-set routers' dial tables (dial, RPM), half steps interpolated: web/data/routers.js (fluidnc_post.ROUTERS
+  // has to match: tests/test_routers_data.py)
+  const RD = typeof module !== "undefined" && module.exports ? require("../data/routers.js") : root.LR4RouterData;
+  const ROUTERS = Object.fromEntries(Object.entries(RD.routers).filter(([, r]) => r.dial).map(([k, r]) => [k, { name: r.name, dial: r.dial }]));
   function dialRpm(dial, router) {
     const pts = ROUTERS[router].dial;
     if (dial <= pts[0][0]) return pts[0][1];

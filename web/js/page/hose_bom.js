@@ -226,7 +226,10 @@
   let bomReady = false;
   function renderBom() {
     if (!bomReady) return;
-    const secs = bomAtSize(), body = document.getElementById("bom-body"), sum = document.getElementById("bom-sum");
+    let secs = bomAtSize();
+    const body = document.getElementById("bom-body"), sum = document.getElementById("bom-sum");
+    if (bristleLen === "long")                        // the Options step's extra-long bristles: that file to print
+      secs = secs.map((sec) => Object.assign({}, sec, { rows: (sec.rows || []).map((r) => (r[1] === "TPU_Bristles_22mm" ? [r[0], "TPU_Bristles_32mm_Extra_Long", ...r.slice(2)] : r)) }));
     const open = new Set([...body.querySelectorAll("details")].filter((d) => d.open).map((d) => d.dataset.title));
     body.textContent = "";
     if (!secs.length) { sum.textContent = "Not in this export."; return; }
@@ -353,6 +356,7 @@
     ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
     ray.setFromCamera(ndc, camera);
     const hit = pickRay(ray);                         // the spoilboard selects its part; the stock, nothing
+    if (typeof rxClick === "function" && rxClick(hit)) return;   // the router's close-up: a part of it to edit (router_edit.js)
     select(hit ? (hit.block ? hit.block.owner : hit.object) : null);
   });
   function select(m) {

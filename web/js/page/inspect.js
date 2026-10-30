@@ -15,7 +15,9 @@
     }
     return id;
   }
-  function inspect(id) {
+  // opt: { label, drop: RegExp of part ids left out, plus: another row shown with it, as: a name for this view
+  // (router_build.js: "router") }
+  function inspect(id, opt = {}) {
     if (!id || !LR4ShowTree.members(tree, id).length) return;
     if (MEAS.main) mainMeasure(false);               // inspect has its own Measure
     const saved = INSPECT ? INSPECT.saved
@@ -23,7 +25,8 @@
     const up = tree.place[id] ? tree.place[id].flatMap(([a, k]) => [a, a + "." + k]) : [id.split(".")[0]];
     for (const x of [id, ...up]) showOff.delete(x);   // what you inspect is shown
     if (!INSPECT) document.getElementById("insp-card").open = !matchMedia("(max-width: 760px)").matches;   // phones: list closed
-    INSPECT = { id, label: rowLabel(id), saved, set: null };
+    INSPECT = { id, label: opt.label || rowLabel(id), saved, set: null, drop: opt.drop, plus: opt.plus, as: opt.as,
+      hide: new Set() };                              // the parts list's unticked rows (part ids), this view only
     document.body.classList.add("inspecting");
     document.getElementById("insp").hidden = false;
     applyVisibility();
@@ -32,6 +35,13 @@
     fitView([d.x, d.y, d.z]);
     INSPECT.step = radius * 0.35;                     // explode: the slider's full travel moves a part this far per step
     setExplode();
+    if (typeof rbViewMark === "function") rbViewMark();
+  }
+  function inspectSetOf() {                           // the row's set, less opt.drop
+    const s = LR4ShowTree.inspectSet(tree, INSPECT.id);
+    if (INSPECT.plus) for (const id of LR4ShowTree.inspectSet(tree, INSPECT.plus)) s.add(id);   // another row with it (the core)
+    if (INSPECT.drop) for (const id of [...s]) if (INSPECT.drop.test(id)) s.delete(id);
+    return s;
   }
   function inspectEnd() {
     if (!INSPECT) return;
@@ -45,6 +55,7 @@
     camera.position.copy(s.pos); controls.target.copy(s.target);
     freeTurn(false);                                  // upright again
     upright();
+    if (typeof rbViewMark === "function") rbViewMark();
   }
   function inspectScene() {                           // the set (after applyVisibility's tree), scenery, the parts list
     if (shop) shop.visible = !INSPECT;
@@ -56,14 +67,32 @@
     const host = document.getElementById("insp-list");
     host.textContent = "";
     let n = 0;
+    const rows = INSPECT.rows = [];                   // a checkbox's data-i -> its part ids (a row, or a whole section)
+    const box = (ids, label) => {                     // ticked = shown; a section part-shown = indeterminate
+      const off = ids.filter((id) => INSPECT.hide.has(id)).length, c = document.createElement("input");
+      c.type = "checkbox"; c.dataset.i = rows.push(ids) - 1;
+      c.checked = off < ids.length; c.indeterminate = off > 0 && off < ids.length;
+      c.setAttribute("aria-label", "Show " + label);
+      return c;
+    };
+    if (INSPECT.hide.size) {
+      const all = document.createElement("button");
+      all.type = "button"; all.className = "link insp-all"; all.textContent = "Show all";
+      all.addEventListener("click", () => { INSPECT.hide.clear(); applyVisibility(); });
+      host.append(all);
+    }
     for (const s of LR4ShowTree.partsList(ud)) {
-      const h = document.createElement("h3"), t = document.createElement("table");
-      h.textContent = s.title;
-      for (const [q, l] of s.rows) {
+      const h = document.createElement("h3"), t = document.createElement("table"), hl = document.createElement("label");
+      hl.append(box([...new Set(s.rows.flatMap((r) => r[2]))], s.title), s.title);
+      h.append(hl);
+      for (const [q, l, ids] of s.rows) {
         const r = t.insertRow();
         r.insertCell().textContent = q === null ? "?" : q;
         r.cells[0].className = "num";
-        r.insertCell().textContent = l;
+        const lb = document.createElement("label");
+        lb.append(box(ids, l), l);
+        r.insertCell().append(lb);
+        if (ids.every((id) => INSPECT.hide.has(id))) r.classList.add("off");
         if (q === null) r.title = "Count not in the data (the reference build has none of these)";
         if (s.title !== "Fasteners") n += q || 0;
       }
@@ -74,6 +103,25 @@
     if (INSPECT.step) setExplode();
   }
   document.getElementById("insp-back").addEventListener("click", inspectEnd);
+  // the parts list's checkboxes (user 2026-10-29): untick a row / a section to take those parts out of this view
+  document.getElementById("insp-list").addEventListener("change", (e) => {
+    const c = e.target;
+    if (!INSPECT || !c.dataset || c.dataset.i === undefined) return;
+    for (const id of INSPECT.rows[+c.dataset.i] || []) if (c.checked) INSPECT.hide.delete(id); else INSPECT.hide.add(id);
+    applyVisibility();
+  });
+  function inspectMin(on) {                           // Hide panels (user 2026-10-29): the tools + the parts list folded away; kept
+    const b = document.getElementById("insp-min");
+    document.getElementById("insp").classList.toggle("min", on);
+    b.textContent = on ? "Show panels" : "Hide panels";
+    b.setAttribute("aria-expanded", String(!on));
+  }
+  inspectMin(kvGet("lr4-insp-min") === "1");
+  document.getElementById("insp-min").addEventListener("click", () => {
+    const on = !document.getElementById("insp").classList.contains("min");
+    inspectMin(on);
+    kvSet("lr4-insp-min", on ? "1" : "0");
+  });
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && INSPECT && !(e.target.closest && e.target.closest("input, select, textarea, dialog"))) inspectEnd();
   });

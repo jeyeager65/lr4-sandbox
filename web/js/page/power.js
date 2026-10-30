@@ -63,7 +63,10 @@
       if (n === "SwitchPanel_EStop") at(ud, PWR.estop ? SWP.travel : 0, 0);
       else if (n === "SwitchPanel_Lamp") lit(m, !PWR.estop);
       else if (n === "SwitchPanel_Router" || n === "SwitchPanel_Vac") { m.rotation.x = PWR[ud.click] ? -0.17 : 0.17; lit(m, PWR[ud.click] && !PWR.estop); }
-      else if (n === "Router_Switch") at(ud, 0, PWR.body ? 0 : -3);   // off: slid down (GUESS: the Kobalt's slide)
+      else if (n === "Router_Switch") {                 // a rocker (the preset's two states, router.js); else slid down
+        if (ud.rocker) { at(ud, 0, 0); m.geometry = ud.rocker[PWR.body ? "on" : "off"]; if (typeof rtRockerFace === "function") rtRockerFace(m, PWR.body); }
+        else at(ud, 0, PWR.body ? 0 : -3);
+      }
     }
     if (meta && HOME.pose) move([HOME.pose.x, HOME.pose.y, HOME.pose.z]);
     const b = $("pwr-estop");

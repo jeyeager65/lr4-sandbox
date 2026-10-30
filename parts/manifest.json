@@ -400,6 +400,15 @@
     "3e3188290ac60cd7fd283292b5eafce08c16eebdc9ddd9f9dff14fdd8c9998e2"
    ],
    "date": "2026-10-19"
+  },
+  "kobalt/TPU_Bristles_32mm_Extra_Long.stl": {
+   "source": "kobalt",
+   "use": "page",
+   "bytes": 1135684,
+   "sha256": [
+    "fb682bd5794e95dc8cd85c297e78dc5fc737fce213d43fb81d6e6b514b6faa0d"
+   ],
+   "date": "2026-10-29"
   }
  }
 }

@@ -19,10 +19,11 @@
       if (!p.src) continue;
       for (const r of p.src.kind === "peter" ? [p.src.open, p.src.closed] : [p.src])
         (needed.get(r.file) || needed.set(r.file, []).get(r.file)).push(p.meta.name);
+      if (p.src.long) optional.add(p.src.long.file);  // the extra-long bristles: used when picked, never "missing"
     }
     progress("Loading your part files…", null, "kept in this browser");
     try {
-      for (const f of await LR4Files.store.all()) if (needed.has(f.path)) userFiles.set(f.path, f);
+      for (const f of await LR4Files.store.all()) if (needed.has(f.path) || optional.has(f.path)) userFiles.set(f.path, f);
     } catch (e) { console.warn("IndexedDB", e); }
     document.getElementById("parts-chip").hidden = false;
     const drop = document.getElementById("drop");
@@ -78,7 +79,7 @@
     let n = 0;
     try {
       const zip = items.some((it) => /\.zip$/i.test(it.name)) ? await loadJSZip() : null;
-      const match = LR4Files.matcher(cfg.files.files, needed.keys());
+      const match = LR4Files.matcher(cfg.files.files, [...needed.keys(), ...optional]);
       const got = await LR4Files.identify(items, match, zip, (name) => progress("Reading your files…", null, `${++n}: ${name.split("/").pop()}`));
       const keep = got.filter((g) => !(userFiles.get(g.path) && userFiles.get(g.path).ok && !g.ok));   // never trade a match for a near miss
       for (const g of keep) userFiles.set(g.path, g);
@@ -88,6 +89,7 @@
       await nextFrame();
       dropSrcGeometry();
       rebuild();
+      if (setupBristles.mark) setupBristles.mark();  // the extra-long strip's file may have come in
       if (applyLink.left) applyLink(applyLink.left);  // a link's Peter Plates / struts waited for the files
     } catch (e) {
       console.error(e);
@@ -207,8 +209,19 @@
   const OPT_PARTS = { router: /^(Router_(?!Cord_Run)|Tool_Mount_|Dust_Shoe|Dust_Skirt|Bristles_TPU)/, skirt: DUST_PARTS,
     hose: /^(Vacuum_Hose|Router_Cord_Run|Cable_Sleeve|Hose_Holder|Hose_Hook|Dust_Shoe|Dust_Skirt|Bristles_TPU)/, fan: /^Jackpot3_Fan/ };
   const pendantOn = () => document.getElementById("ft-on").checked;   // My machine > FluidTouch pendant (kept)
-  const optsOn = () => ({ router: OPT.router, skirt: OPT.router && OPT.hose && OPT.skirt, hose: OPT.router && OPT.hose, fan: OPT.fan,
-    pendant: pendantOn() });
+  // a router with mount "none" (My LR4 > Router, user 2026-10-29): no dust shoe, so no hose either
+  const mountNone = () => { const r = typeof LR4Routers !== "undefined" && typeof RT !== "undefined" && RT.set && LR4Routers.ROUTERS[RT.set.router]; return !!r && r.mount === "none"; };
+  const optsOn = () => { const hose = OPT.router && OPT.hose && !mountNone();
+    return { router: OPT.router, skirt: hose && OPT.skirt, hose, fan: OPT.fan, pendant: pendantOn() }; };
+  function optsRefresh() {                           // the router / its mount changed (router.js, router_build.js)
+    const none = mountNone();
+    for (const k of ["skirt", "hose"]) {
+      const el = document.getElementById("opt-" + k);
+      el.disabled = !OPT.router || none || (k === "skirt" && !OPT.hose);
+      el.title = none ? "The router's mount is None (My LR4 > Router): no dust shoe or hose" : "";
+    }
+    if (meta) { applyVisibility(); renderBom(); }
+  }
   function fitted(m) {
     const n = m.userData.name || "", o = optsOn();
     if (m.userData.group === "Pendant") return o.pendant;
@@ -218,7 +231,7 @@
     try { Object.assign(OPT, JSON.parse(MS.get("lr4-opts") || "{}")); } catch (e) { /* defaults */ }
     const mark = () => {
       for (const k of Object.keys(OPT)) document.getElementById("opt-" + k).checked = OPT[k];
-      for (const k of ["skirt", "hose"]) document.getElementById("opt-" + k).disabled = !OPT.router || (k === "skirt" && !OPT.hose);
+      for (const k of ["skirt", "hose"]) document.getElementById("opt-" + k).disabled = !OPT.router || mountNone() || (k === "skirt" && !OPT.hose);
     };
     for (const k of Object.keys(OPT)) document.getElementById("opt-" + k).addEventListener("change", (e) => {
       OPT[k] = e.target.checked;
@@ -251,19 +264,19 @@
     const key = listed.map((m) => m.userData.name).join();
     if (key !== treeKey) { treeKey = key; tree = LR4ShowTree.build(listed.map((m) => m.userData)); renderShow(); }
     if (INSPECT) {                                     // its set, again (the parts change with the size / options)
-      INSPECT.set = LR4ShowTree.inspectSet(tree, INSPECT.id);
+      INSPECT.set = inspectSetOf();
       INSPECT.ex = null;                              // the explode follows the set
       if (!INSPECT.set.size) return inspectEnd();
     }
     const inTree = new Set(listed);
     for (const m of meshes) {
       m.userData.shown = inTree.has(m) && LR4ShowTree.on(tree, showOff, partId(m))
-        && (!INSPECT || INSPECT.set.has(partId(m)))
+        && (!INSPECT || (INSPECT.set.has(partId(m)) && !INSPECT.hide.has(partId(m))))   // inspect: its set, less the list's unticked rows
         && !(TOUCH_ANIM.skirt >= 1 && PROBE_OFF.test(m.userData.name)) && !(AB.magnified && RACK_OFF.test(m.userData.name)) && !(jobBit && m.userData.name === "Router_Bit");   // off once it's slid out (job.js)
       m.visible = m.userData.shown && !ROPE_STUB.test(m.userData.name);   // the touch plate's wire stubs: rope.js draws the wires
     }
     const rb = meshes.find((m) => m.userData.name === "Router_Bit");
-    bitOK = !!rb && inTree.has(rb) && LR4ShowTree.on(tree, showOff, partId(rb)) && (!INSPECT || INSPECT.set.has(partId(rb)));
+    bitOK = !!rb && inTree.has(rb) && LR4ShowTree.on(tree, showOff, partId(rb)) && (!INSPECT || (INSPECT.set.has(partId(rb)) && !INSPECT.hide.has(partId(rb))));
     if (!bitOK && JOB.bits) for (const b of JOB.bits.values()) b.visible = false;
     // Part 31: the spoilboard's height field is drawn instead of the Spoilboard (Part 33: its own part); the hand-installed
     // bit rides in the router unless the job's own bits show
@@ -366,7 +379,8 @@
 
   // ---- Part 40: filaments. The printed parts are in filaments (material + color: js/filaments.js; "spools" in the
   // code); a part's filament comes from the preset's rule (main / accent by its data color, the router mounts, the fiber
-  // parts) unless the user picked one (Printed in: the selection chip, Inspect). The bristles are always TPU. Presets are
+  // parts) unless the user picked one (Printed in: the selection chip, Inspect). The bristles are TPU only (a TPU spool, or
+  // their own color with none). Presets are
   // starting points; the user's own are saved (lr4-fil-presets). Kept in this browser (lr4-filaments) + the share link. Also the printed look (scene.js PRINT) and the strut plates' material. ----
   const PRINT_ROLE = { main: [0.16, 0.16, 0.18], accent: [0.80, 0.12, 0.10] };   // build.py PRINT_MAIN / PRINT_ACCENT
   const FIL = { s: LR4Filaments.defaults(), map: new Map(), saved: [] };
@@ -446,12 +460,18 @@
   // native select can't show colors); several parts may be mixed. host: the .pick-fil label's .fil-dd
   const spoolText = (i) => LR4Filaments.filamentName(FIL.s, i);
   function swatchEl(color) { const e = document.createElement("i"); e.className = "fil-sw"; e.style.background = color; return e; }
+  // TPU parts (the bristles) take TPU spools only, the rest never one: all TPU -> just the TPU spools + a new one;
+  // a mix (Inspect) -> every spool, each part taking only the kind it can
   function filSelect(host, names) {
     const own = names.map((n) => FIL.s.parts[n]), same = own.every((v) => v === own[0]);
     const rule = names.length === 1 ? FIL.map.get(names[0]) : null;
     const cur = !same ? "mixed" : own[0] === undefined ? "" : String(own[0]);
-    const items = [["", rule !== null && rule >= 0 ? `By the preset (${spoolText(rule)})` : "By the preset", rule !== null && rule >= 0 ? FIL.s.spools[rule].color : null],
-      ...FIL.s.spools.map((sp, i) => [String(i), spoolText(i), sp.color])];
+    const tp = names.map((n) => LR4Filaments.TPU_PART.test(n)), allTpu = tp.every(Boolean), anyTpu = tp.some(Boolean);
+    const fits = (i) => (allTpu ? LR4Filaments.isTpu(FIL.s, i) : anyTpu || !LR4Filaments.isTpu(FIL.s, i));
+    const byRule = rule !== null && rule >= 0 ? `By the preset (${spoolText(rule)})` : rule === -1 ? "By the preset (TPU, its own color)" : "By the preset";
+    const items = [["", byRule, rule !== null && rule >= 0 ? FIL.s.spools[rule].color : null],
+      ...FIL.s.spools.map((sp, i) => [String(i), spoolText(i), sp.color]).filter(([v]) => fits(+v))];
+    if (allTpu) items.push(["new-tpu", "+ New TPU spool", null]);
     const btn = host.querySelector(".fil-dd-btn"), menu = host.querySelector(".fil-dd-menu");
     const shown = items.find(([v]) => v === cur);
     btn.textContent = "";
@@ -467,7 +487,16 @@
       o.append(document.createTextNode(t));
       o.addEventListener("click", () => {
         menu.hidden = true;
-        for (const n of names) { if (v === "") delete FIL.s.parts[n]; else FIL.s.parts[n] = +v; }
+        let pick = v;
+        if (v === "new-tpu") {                        // a TPU spool in the bristles' own color, then on it
+          const m = meshes.find((q) => q.userData.name === names[0]), c = m ? m.userData.color : [0.1, 0.1, 0.1];
+          FIL.s.spools.push({ mat: "TPU", color: "#" + c.map((x) => Math.round(Math.min(Math.max(x, 0), 1) * 255).toString(16).padStart(2, "0")).join("") });
+          pick = String(FIL.s.spools.length - 1);
+        }
+        for (const n of names) {
+          if (pick === "") { delete FIL.s.parts[n]; continue; }
+          if (LR4Filaments.isTpu(FIL.s, +pick) === LR4Filaments.TPU_PART.test(n)) FIL.s.parts[n] = +pick;   // only the kind it can take
+        }
         filSave();
         applyColours();
         if (INSPECT) inspectScene();
@@ -483,12 +512,12 @@
     if (e.key === "Escape") for (const m of document.querySelectorAll(".fil-dd-menu:not([hidden])")) { m.hidden = true; m.parentNode.querySelector(".fil-dd-btn").focus(); }
   });
   function filPick(m) {                               // the selection chip (hose_bom.js select)
-    const box = document.getElementById("pick-fil"), show = !!(m && isPrinted(m) && FIL.map.get(m.userData.name) >= 0);
+    const box = document.getElementById("pick-fil"), show = !!(m && isPrinted(m) && FIL.map.has(m.userData.name));
     box.hidden = !show;
     if (show) filSelect(box.querySelector(".fil-dd"), [m.userData.name]);
   }
   function filInspect(list) {                         // Inspect's card: every printed part in the set
-    const box = document.getElementById("insp-fil"), names = list.filter((m) => isPrinted(m) && FIL.map.get(m.userData.name) >= 0).map((m) => m.userData.name);
+    const box = document.getElementById("insp-fil"), names = list.filter((m) => isPrinted(m) && FIL.map.has(m.userData.name)).map((m) => m.userData.name);
     box.hidden = !names.length;
     if (names.length) filSelect(box.querySelector(".fil-dd"), names);
   }
@@ -529,12 +558,16 @@
       row.className = "fil-row";
       const nm = spoolText(i);
       row.innerHTML = `<input type="color" list="fil-palette" aria-label="${nm}: color">`
-        + `<select aria-label="${nm}: material">${LR4Filaments.NAMES.filter((n) => n !== "TPU").map((n) => `<option>${n}</option>`).join("")}</select>`
+        + `<select aria-label="${nm}: material">${LR4Filaments.NAMES.map((n) => `<option>${n}</option>`).join("")}</select>`
         + `<span class="fil-n">${nm}</span><em>${count[i]} part${count[i] === 1 ? "" : "s"}</em>`
-        + (s.spools.length > 1 ? `<button type="button" aria-label="Remove ${nm}" title="Remove (its parts go back to the preset)">✕</button>` : "");
+        + (LR4Filaments.removeSpool(s, i) !== s ? `<button type="button" aria-label="Remove ${nm}" title="Remove (its parts go back to the preset)">✕</button>` : "");
       const [col, mat] = [row.querySelector("input"), row.querySelector("select")];
       col.value = sp.color;
       mat.value = sp.mat;
+      if (LR4Filaments.onlyTpu(s, i)) {                // the bristles' TPU: stays TPU (only they use it), its color yours
+        mat.disabled = true;
+        mat.title = "The bristles are printed in TPU: this one stays TPU (add another filament for anything else)";
+      }
       col.addEventListener("input", () => {
         sp.color = col.value;
         host.querySelectorAll(".fil-n").forEach((e, j) => (e.textContent = spoolText(j)));

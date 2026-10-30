@@ -477,6 +477,7 @@
   const userFiles = new Map();                        // manifest path -> {name, sha256, ok, buf}
   const srcCache = new Map(), soupCache = new Map();
   let needed = null;                                  // manifest path -> the part names placed from it
+  const optional = new Set();                         // files used only when picked (the extra-long bristles): not counted
   function soup(rel) {                                // the raw STL triangles (file coordinates), or null
     if (soupCache.has(rel)) return soupCache.get(rel);
     const f = userFiles.get(rel);
@@ -522,8 +523,11 @@
     parts.reduce((o, p) => (out.set(p, o), o + p.length), 0);
     return out;
   }
+  // the bristles' strip: Standard (22 mm, what the build bends) or Extra long (32 mm: src.long, its own file) - the
+  // Options step's Bristles; the long one only once its file is loaded (else the standard)
+  const bristleSrc = (s) => (s.kind === "bent" && s.long && bristleLen === "long" && userFiles.has(s.long.file) ? Object.assign({}, s, s.long) : s);
   function srcGeometry(rec) {
-    const s = rec.src, ck = rec.key + (s.kind === "peter" ? "|" + peterStyle : "");
+    const s = bristleSrc(rec.src), ck = rec.key + (s.kind === "peter" ? "|" + peterStyle : "") + (s !== rec.src ? "|long" : "");
     if (srcCache.has(ck)) return srcCache.get(ck);
     let geo = null;
     if (s.kind === "stl" || s.kind === "bent") {
@@ -1126,7 +1130,7 @@ float lr4G(float x) { float s = 2.0 * fract(x) - 1.0; return floor(x) / 3.0 + (s
       // Part 33: the table is drawn from table_model.js (tableMeshes); the size builds' own table parts are left out
       // (TableMDF before the 2026-10-26 refresh, TableBase / Spoilboard / RailStrip_* after)
       if (o.name === "TableMDF" || TABLE_PART.test(o.name)) continue;
-      const g = recGeometry(o.rec);
+      const g = (typeof rtBodyGeo === "function" && rtBodyGeo(o)) || recGeometry(o.rec);   // the router: from its preset (router.js)
       if (!g) {
         const sg = standInGeo(o.rec);
         if (sg) {
@@ -1139,11 +1143,12 @@ float lr4G(float x) { float s = 2.0 * fract(x) - 1.0; return floor(x) / 3.0 + (s
         continue;
       }
       const { geo, fin, hasUV, tris: n } = g;
-      const ud = Object.assign({}, o.rec.meta, { name: o.name, base: { t: o.t, s: o.s } });
+      const ud = Object.assign({}, o.rec.meta, { name: o.name, base: { t: o.t, s: o.s } }, g.ud);
       if (DUST_PARTS.test(o.name)) ud.group = "Shoe";   // own toggle, so the bit shows with the hose on (user 2026-10-20)
       if (o.rec.src) delete ud.variant;              // Peter Plates from files: the style picks the geometry
       if (o.name !== o.rec.meta.name) { ud.label = pretty(o.name); ud.ref = o.rec.meta.name; }
       const mat = ud.source === "printed" && !fin ? printedMaterial(ud.color, printFrame(o.rec.src)) : material(ud.color, fin, hasUV);
+      if (geo.attributes.rm && typeof rtLookMat === "function") rtLookMat(mat);   // the router's turned part: a look per section
       if (o.rec.src && o.rec.src.kind === "peter" && mat.userData.print) bedOutside(mat, geo, o.name);
       if (ud.clip) { ud.clip = Object.assign({}, ud.clip, { p: o.clipP }); mat.clippingPlanes = [new THREE.Plane()]; }
       addMesh(geo, mat, ud);
@@ -1165,6 +1170,7 @@ float lr4G(float x) { float s = 2.0 * fract(x) - 1.0; return floor(x) / 3.0 + (s
     meta = { cut_in: [S.cutX / IN, S.cutY / IN], travel: LR4Model.travel(cfg, S), tip_above_table: cfg.tip_above_table,
       hose: LR4Model.hose(cfg, S, inst), table_mm: [S.TW, S.TL], bom: cfg.bom_ref, peter_style: cfg.peter_style, parts: meshes,
       triangles: tris };
+    if (meta.hose && typeof rtHose === "function") rtHose(meta.hose);   // the cord leaves where this router's does
     if (meta.hose) makeHose();
     assignRoles();
     applyColours();
@@ -1300,7 +1306,7 @@ float lr4G(float x) { float s = 2.0 * fract(x) - 1.0; return floor(x) / 3.0 + (s
       ["Setting up the panels", () => { setupShow(); setupColours(); setupDetail(); }],
       ["Preparing the part meshes", warmGeometry],
       [`Placing the ${cfg.parts.length} parts`, setupSize],
-      ["Bill of materials", () => { setupVariants(); setupBom(); setupAbout(); }],
+      ["Bill of materials", () => { setupVariants(); setupBristles(); setupBom(); setupAbout(); }],
       ["Workshop and lights", () => { setupScenery(); setupLighting(); updateShop(); fitView([1, -1.15, 0.85]); }],
       ["Compiling shaders (first frame)", () => { lighting(); renderer.compile(scene, camera); renderer.render(scene, camera); }]];
     for (const [i, [what, run]] of stages.entries()) {
@@ -1313,14 +1319,14 @@ float lr4G(float x) { float s = 2.0 * fract(x) - 1.0; return floor(x) / 3.0 + (s
     await nextFrame();
     statusEl.hidden = true;
     const dev = cfg.files && new URLSearchParams(location.search).get("parts");   // testing: fetch the files from a folder URL
-    if (dev) await addFiles([...needed.keys()].map((p) => ({ name: p,
+    if (dev) await addFiles([...needed.keys(), ...optional].map((p) => ({ name: p,
       read: () => fetch(dev + p).then((q) => q.ok ? q.arrayBuffer() : Promise.reject(new Error(p + " " + q.status))) })));
     applyLink();
     ctlStartup();                                    // FluidNC boots on the built machine (controller.js)
   }
 
   // ---- Peter Plates: solid (stepper openings filled) or open honeycomb in a solid border - one shown at a time ----
-  let peterStyle = "solid";
+  let peterStyle = "solid", bristleLen = "std";
   // "none" hides both styles and the covers' M3s (peter_hw: the screws and their threads, shown with either style)
   const variantOK = (m) => m.userData.peter_hw ? peterStyle !== "none"
     : !m.userData.variant || m.userData.variant === peterStyle;
@@ -1343,6 +1349,33 @@ float lr4G(float x) { float s = 2.0 * fract(x) - 1.0; return floor(x) / 3.0 + (s
     box.hidden = false;
     mark();
     applyVisibility();
+  }
+
+  // the bristles' length (user 2026-10-29: standard or extra long): kept; a change rebuilds the two strips
+  function setupBristles() {
+    const box = document.getElementById("bristle-len");
+    if (!cfg.files || !cfg.parts.some((p) => p.src && p.src.long)) return;
+    try { bristleLen = MS.get("lr4-bristles") === "long" ? "long" : "std"; } catch (e) { /* default */ }
+    const longFile = cfg.parts.find((p) => p.src && p.src.long).src.long.file;
+    const mark = () => {
+      const have = userFiles.has(longFile);
+      box.querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.v === bristleLen)));
+      const lb = box.querySelector('[data-v="long"]');
+      lb.title = have ? "TPU_Bristles_32mm_Extra_Long: 10 mm longer, for an uneven or deep spoilboard"
+        : `Needs ${longFile.split("/").pop()} (tpu-bristles-32mm-extra-long.stl in the Kobalt tool mount files): add it under Parts`;
+      document.getElementById("bristle-note").hidden = !(bristleLen === "long" && !have);
+    };
+    box.querySelectorAll("button").forEach((b) => b.addEventListener("click", () => {
+      if (bristleLen === b.dataset.v) return;
+      bristleLen = b.dataset.v;
+      try { MS.set("lr4-bristles", bristleLen); } catch (e) { /* not kept */ }
+      mark();
+      rebuild();
+      if (typeof renderBom === "function") renderBom();
+    }));
+    box.hidden = false;
+    mark();
+    setupBristles.mark = mark;
   }
 
   // from the user's files: Open (PeterPlates_w_locations, stepper locations open - what the build places), Closed

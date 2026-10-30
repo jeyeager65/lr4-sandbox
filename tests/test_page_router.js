@@ -51,6 +51,13 @@ const JOBTXT = ["(LR4 router test)", STOCK, "(ToolDef 1: SHAPE=flat D=6.35 FLUTE
       out.readout = !!document.querySelector(".rt-readout.on") && document.querySelector(".rt-readout").textContent;
       ev("pointerup", x - 70, y + 10);
       out.drag = LR4Router.state().dial;
+      const wh = (dy, shift) => canvas.dispatchEvent(new WheelEvent("wheel", { clientX: x, clientY: y, deltaY: dy, shiftKey: !!shift, bubbles: true, cancelable: true }));
+      LR4Router.set({ dial: 3 });
+      wh(-100); out.wheel = [LR4Router.state().dial];
+      for (let i = 0; i < 10; i++) wh(-10);          // a touchpad: 10 small deltas = one notch
+      out.wheel.push(LR4Router.state().dial);
+      wh(100); out.wheel.push(LR4Router.state().dial);
+      LR4Router.set({ dial: 3.2 }); out.half = LR4Router.state().dial === 3 && (ev("pointerdown", x, y), ev("pointermove", x + 18, y), ev("pointermove", x + 22, y), ev("pointerup", x + 22, y), LR4Router.state().dial);
       LR4Router.set({ dial: 3 });
 
       document.getElementById("t-run").click();
@@ -80,17 +87,40 @@ const JOBTXT = ["(LR4 router test)", STOCK, "(ToolDef 1: SHAPE=flat D=6.35 FLUTE
       fs.writeFileSync(process.env.ROUTER_SHOT, Buffer.from(s.data, "base64"));
     }
     const b = await page.val(`(async () => {
+      // Part 45b: the body from the preset, swapped in place mid-job (Carbide: head 75 wide, its wheel across the head)
+      const look = () => {
+        const m = (n) => meshes.find((q) => q.userData.name === n), h = new THREE.Box3().setFromObject(m("Router_Head"));
+        const ring = m("Router_Dial").userData.ring, ax = new THREE.Vector3(0, 0, 1).applyQuaternion(ring.getWorldQuaternion(new THREE.Quaternion()));
+        const cp = cordMesh && cordMesh.geometry.attributes.position;
+        return { w: +(h.max.y - h.min.y).toFixed(1), top: +h.max.z.toFixed(1), ax: ax.toArray().map((v) => +Math.abs(v).toFixed(2)),
+          label: m("Router_Kobalt").userData.label, cord: cp ? new THREE.Vector3(cp.getX(0), cp.getY(0), cp.getZ(0)).sub(new THREE.Box3().setFromObject(m("Router_Nut")).getCenter(new THREE.Vector3())).toArray().map((v) => +v.toFixed(1)) : null, running: LR4Job.running() };
+      };
+      const kob = look();
       LR4Router.set({ router: "t1" });
       await T.sleep(300);
       const j = soundJob(), out = { rpm: j && j.rpm, slider: document.getElementById("rt-dial").disabled, text: document.getElementById("rt-rpm").textContent };
+      out.kob = kob;
+      out.t1 = look();
+      LR4Router.set({ router: "carbide" });
+      await T.sleep(300);
+      out.carb = look();
       LR4Router.set({ router: "kobalt", dial: 3 });
+      await T.sleep(300);
+      out.kob2 = look();
       return out;
     })()`);
+    ok(b.kob.w === 80 && b.t1.w === 72 && b.carb.w === 75 && b.kob2.w === 80 && b.carb.top < b.kob.top, `the body from the preset: head 80 wide (Kobalt) -> 72 (T1) -> 75 (Carbide, lower) -> 80 (${JSON.stringify([b.kob.w, b.t1.w, b.carb.w, b.kob2.w, b.kob.top, b.carb.top])})`);
+    ok(b.kob.ax[2] > 0.99 && b.carb.ax[2] > 0.99, `the wheel's axis: upright (Kobalt; the Carbide too, generic head) (${JSON.stringify([b.kob.ax, b.carb.ax])})`);
+    ok(/Carbide/.test(b.carb.label) && /Kobalt/.test(b.kob2.label), `the body's label follows (${b.carb.label})`);
+    ok(b.carb.cord && b.kob.cord && Math.hypot(...b.carb.cord.map((v, i) => v - b.kob.cord[i])) > 10 && JSON.stringify(b.kob2.cord) === JSON.stringify(b.kob.cord),
+      `the cord leaves where the router's does, from the nut (${JSON.stringify([b.kob.cord, b.carb.cord])})`);
+    ok(b.carb.running && b.kob2.running, "the job keeps running through the swaps");
     ok(a.ring3 !== null && Math.abs(a.ring3 - a.ring5 - 100 * Math.PI / 180) < 1e-3, `the ring turns 50 deg a step (dial 3 -> 5: ${a.ring3} -> ${a.ring5})`);
     ok(a.kept && a.kept.dial === 5 && a.kept.router === "kobalt", `kept per machine ${JSON.stringify(a.kept)}`);
     ok(/26,000 RPM/.test(a.rpmText), `Run shows the dial's speed (${a.rpmText})`);
     ok(a.click === 6, `a click on the wheel: the next number (5 -> ${a.click})`);
     ok(a.drag === 4, `a drag left 70 / down 10 px: 2 steps slower (6 -> ${a.drag})`);
+    ok(JSON.stringify(a.wheel) === "[3.5,4,3.5]" && a.half === 3.5, `0.5 stops: scroll a stop a notch, small deltas summed; a drag snaps (3 -> ${a.half} / ${JSON.stringify(a.wheel)})`);
     ok(a.readout && /Dial/.test(a.readout), `the big readout while it turns (${a.readout})`);
     ok(a.run.rpm === 18000, `Kobalt dial 3, the file's S24000: runs at 18000 (${a.run.rpm})`);
     ok(/dial 4/.test(a.run.note) && a.run.log, `the file's dial 4 noted in Run + the terminal (${a.run.note})`);

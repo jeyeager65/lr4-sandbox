@@ -27,6 +27,9 @@ jobs:
       - name: Python scripts compile
         run: python -m compileall -q freecad pipeline tools tests
 
+      - name: Router dial tables match (fluidnc_post.py = web/data/routers.js)
+        run: python tests/test_routers_data.py
+
       - name: Node tests
         working-directory: tests
         run: |

@@ -155,6 +155,9 @@ for piece, tag in enumerate(("T", "B")):
 from fclib import mesh as fm                          # noqa: E402  (lr4 put freecad/ on the path)
 sg = lr4.SKIRT_GROOVE
 SKIRT, STRIP = "kobalt/Dust_Skirt_Kobalt.stl", "kobalt/TPU_Bristles_22mm.stl"
+# the extra-long strip (the page's Bristles option, 2026-10-29): the same strip 10 mm wider, centered the same, so the
+# same bend with its spine 5 mm further out
+LONG = "kobalt/TPU_Bristles_32mm_Extra_Long.stl"
 groove = np.asarray(lr4.skirt_groove(Mesh.Mesh(os.path.join(PARTS, SKIRT))), dtype=float)
 glen = float(np.hypot(*np.diff(groove, axis=0).T).sum())
 flat = Mesh.Mesh(os.path.join(PARTS, STRIP))
@@ -170,6 +173,9 @@ for nm in [u for u in unmatched if u.startswith("Bristles_TPU")]:
         raise SystemExit(f"{nm}: bent strip off the built one by {d.max():.4f} mm")
     out[nm] = dict(kind="bent", **file_rec(STRIP, A=A.round(9).tolist(), path=groove.round(5).tolist(), err=float(d.max()),
                                            **bend))
+    if os.path.exists(os.path.join(PARTS, LONG)):
+        lr = file_rec(LONG)
+        out[nm]["long"] = dict(file=lr["file"], sha256=lr["sha256"], height=[0, round(sg["strip_spine_x"] + 5.0, 5), 1])
     unmatched.remove(nm)
 
 dst = os.path.join(SIZES_DIR, "source_frames_temp.json" if TEMP else "source_frames.json")

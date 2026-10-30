@@ -67,8 +67,8 @@
   const ROUTER = { up: 0.5, down: 1.5, sag: 0.12, whine: 14, rpmRef: 18000 };   // s, s, fraction at full load, x rotation
   const VAC = { up: 0.9, down: 3.0 };                // s
   const MRR_FULL = 150;                // mm^3/s = full cutting load (1/8" bit slotting ~3 mm deep at 1000 mm/min)
-  // the user's router: Kobalt trim router dial -> RPM (lib/fclib/fluidnc_post.py ROUTERS["kobalt"]); half steps interpolate
-  const KOBALT = [[1, 10000], [2, 14000], [3, 18000], [4, 22000], [5, 26000], [6, 35000]];
+  // the user's router: Kobalt trim router dial -> RPM (web/data/routers.js); half steps interpolate
+  const KOBALT = (typeof module !== "undefined" && module.exports ? require("../data/routers.js") : root.LR4RouterData).routers.kobalt.dial;
   const DEFAULT_RPM = 18000;           // a job that never says (no M3, no "Turn On Router"): dial 3
 
   // ---- pure helpers (tests/test_sounds.js) ----

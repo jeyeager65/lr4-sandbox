@@ -15,7 +15,7 @@ const parts = [
 let s = F.defaults(), a = F.assign(parts, s);
 ok(a.get("Core") === 0 && a.get("Z_Stub_Min") === 1 && a.get("Tool_Mount_T_Kobalt") === 2, "classic: main / accent / mounts on PETG");
 ok(a.get("PeterPlate_T_Max") === 0 && a.get("PeterPlate_B_Min") === 1, "classic: top Peter Plate black, bottom red");
-ok(s.spools[2].mat === "PETG" && a.get("Bristles_TPU_1") === -1, "classic: spool 3 PETG, bristles TPU");
+ok(s.spools[2].mat === "PETG" && a.get("Bristles_TPU_1") === 3 && s.spools[3].mat === "TPU", "classic: spool 3 PETG, the bristles on its TPU (spool 4)");
 
 s = F.setPreset(s, "fiber"); a = F.assign(parts, s);
 ok(["Core", "YZ_Plate_Min", "YZ_Plate_Max", "Brace_1", "Brace_Max", "Tool_Mount_B_Kobalt"].every((n) => a.get(n) === 2), "fiber: the fiber parts");
@@ -23,18 +23,19 @@ ok(a.get("Brace_2") === 0 && a.get("Z_Stub_Min") === 1 && a.get("PeterPlate_T_Ma
 ok(s.spools[2].mat === "PET-CF", "fiber: PET-CF spool");
 
 s = F.setPreset(s, "single"); a = F.assign(parts, s);
-ok([...a.values()].every((v) => v === 0 || v === -1), "single: one spool");
+ok([...a].every(([n, v]) => v === (/^Bristles/.test(n) ? 1 : 0)), "single: one spool (+ the bristles' TPU)");
 
 s = F.setPreset(F.defaults(), "classic");
 s.parts = { Core: 1, Brace_2: 2 };
 a = F.assign(parts, s);
 ok(a.get("Core") === 1 && a.get("Brace_2") === 2, "overrides win");
 const r = F.removeSpool(s, 1);
-ok(r.spools.length === 2 && !("Core" in r.parts) && r.parts.Brace_2 === 1, "remove: its overrides go, later ones shift");
+ok(r.spools.length === 3 && !("Core" in r.parts) && r.parts.Brace_2 === 1, "remove: its overrides go, later ones shift");
 ok(F.assign(parts, r).get("Z_Stub_Min") === 1, "remove: the rule clamps to the spools left");
-ok(F.removeSpool(F.setPreset(s, "single"), 0).spools.length === 1, "the last spool stays");
+ok(F.removeSpool(F.setPreset(s, "single"), 0).spools.length === 2 && F.removeSpool(F.setPreset(s, "single"), 1).spools.length === 2, "the last rigid spool + the last TPU one stay");
 
-ok(F.clean({ spools: [{ mat: "ABS", color: "#000000" }], layer: 5, bed: "x", parts: { Core: 9 } }).spools.length === 3, "clean: bad spools -> preset");
+ok(F.clean({ spools: [{ mat: "ABS", color: "#000000" }], layer: 5, bed: "x", parts: { Core: 9 } }).spools.length === 4, "clean: bad spools -> preset");
+ok(F.clean({ spools: [{ mat: "PLA", color: "#000000" }] }).spools.map((x) => x.mat).join() === "PLA,TPU", "clean: a stored state without TPU gets the bristles' TPU");
 ok(F.clean({ layer: 5 }).layer === 0.2 && F.clean({ layer: 0.12 }).layer === 0.12, "clean: layer range");
 
 ok(Object.keys(F.toLink(F.defaults())).length === 0, "link: defaults say nothing");
@@ -74,5 +75,19 @@ ok(F.resetTo(Object.assign(F.defaults(), { saved: "gone" }), []).saved === null,
   ok(F.fromLink({ plates: "plywood_dbad70~mdf_a7865f" }).plates.front.paint === null, "an old link: unpainted");
   ok(F.clean({ plates: { front: { mat: "mdf", color: "#a7865f", paint: "red" } } }).plates.front.paint === null, "a bad paint color: none");
 }
+// the bristles: TPU only (user 2026-10-29) - a TPU spool picked / the first TPU spool / their own color; never a rigid
+// one; a rigid part never on a TPU spool, whatever the rule or an override says
+{
+  const t = F.clean({ preset: "single", spools: [{ mat: "PLA", color: "#292a2e" }, { mat: "TPU", color: "#1f5fbf" }, { mat: "TPU", color: "#cc1f1a" }] });
+  ok(F.assign(parts, t).get("Bristles_TPU_1") === 1, "bristles: the first TPU spool by the preset");
+  t.parts.Bristles_TPU_1 = 2; t.parts.Core = 1; t.parts.Z_Stub_Min = 2;
+  const ta = F.assign(parts, t);
+  ok(ta.get("Bristles_TPU_1") === 2 && ta.get("Core") === 0 && ta.get("Z_Stub_Min") === 0, "a TPU override for the bristles; rigid parts' TPU overrides ignored");
+  t.parts.Bristles_TPU_1 = 0;
+  ok(F.assign(parts, t).get("Bristles_TPU_1") === 1, "bristles on a PLA spool: ignored (the first TPU one)");
+  const c = F.clean({ preset: "classic", spools: [{ mat: "PLA", color: "#292a2e" }, { mat: "PLA", color: "#cc1f1a" }, { mat: "TPU", color: "#cc1f1a" }] });
+  ok(F.assign([{ name: "Tool_Mount_T_Kobalt", role: "accent", cx: 0 }], c).get("Tool_Mount_T_Kobalt") === 0, "the rule's spool turned TPU: the mount goes to the first rigid one");
+}
+
 console.log(`${checks - fails}/${checks} filament checks passed`);
 process.exit(fails ? 1 : 0);

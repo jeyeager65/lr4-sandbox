@@ -90,6 +90,18 @@ const steps = [
    handPlate(false); for (let i = 0; i < 40; i++) touchAnimTick(0.1);
    out.home = [wc(g('TouchPlate_Magnet')).distanceTo(m0), wc(g('TouchPlate')).distanceTo(p0), wc(g('Dust_Skirt_Kobalt')).distanceTo(s0)];
    out.skirtBack = g('Dust_Skirt_Kobalt').visible; return out`,
+  `LR4Inspect.open('core'); const L = document.getElementById('insp-list'); try {
+   const rowBox = (t) => [...L.querySelectorAll('tr')].find((r) => r.cells[1].textContent === t).querySelector('input');
+   const secBox = (t) => [...L.querySelectorAll('h3')].find((h) => h.textContent === t).querySelector('input');
+   const vis = (re) => meshes.filter((m) => re.test(m.userData.name || '') && m.userData.shown).length;
+   const n0 = vis(/^Core$/), b0 = vis(/__/);
+   const one = rowBox('Core'); one.click();
+   const r = { n0, n1: vis(/^Core$/), struck: [...L.querySelectorAll('tr.off')].length, all: !!L.querySelector('.insp-all') };
+   secBox('Fasteners').click(); r.b = [b0, vis(/__/)];
+   rowBox('M5 x 30 mm button head screw').click(); r.mixed = secBox('Fasteners').indeterminate;
+   L.querySelector('.insp-all').click(); r.back = [vis(/^Core$/), vis(/__/), !L.querySelector('.insp-all')];
+   rowBox('Core').click(); LR4Inspect.open('yz-min'); LR4Inspect.open('core'); r.fresh = vis(/^Core$/);
+   document.getElementById('insp-back').click(); return r; } catch (e) { return { err: e.message }; }`,
 ];
 
 const server = spawn("python", ["-m", "http.server", String(PORT)], { cwd: ROOT, stdio: "ignore" });
@@ -108,6 +120,10 @@ ok(ev.length === steps.length, `${steps.length} results, got ${ev.length}`);
 if (ev.length !== steps.length) console.log(out);
 else {
   const [a, b, c, d, t, e, f, g, h] = ev;
+  const k = ev[9];
+  ok(k.n0 === 1 && k.n1 === 0 && k.struck === 1 && k.all, "parts list: a row unticked hides it (struck, Show all): " + JSON.stringify(k));
+  ok(k.b[0] > 0 && k.b[1] === 0 && k.mixed, "parts list: a section unticked hides its parts; one row back = part-shown: " + JSON.stringify(k.b));
+  ok(k.back[0] === 1 && k.back[1] === k.b[0] && k.back[2] && k.fresh === 1, "Show all brings them back; another view starts with all shown: " + JSON.stringify([k.back, k.fresh]));
   ok(h.state.every((v) => v === 1) && !h.skirt && h.order === "scp", "probing: skirt off, then clip, then plate: " + JSON.stringify([h.state, h.skirt, h.order]));
   ok(h.onNut > 8 && h.onNut < 14 && h.dz < 1 && h.plate > 50, "the clip's magnet on the collet nut, the plate out: " + JSON.stringify([h.onNut, h.dz, h.plate]));
   ok(h.home.every((v) => v < 1e-3) && h.skirtBack, "all of it home again afterwards: " + JSON.stringify([h.home, h.skirtBack]));

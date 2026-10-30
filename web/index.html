@@ -162,6 +162,10 @@
         <div class="opts" id="opts">
           <label class="check"><input type="checkbox" id="opt-router" checked> Router + dust shoe (Kobalt mount)</label>
           <label class="check sub"><input type="checkbox" id="opt-skirt" checked> Dust skirt + bristles</label>
+          <div class="variant sub" id="bristle-len" hidden><span>Bristles</span>
+            <button type="button" data-v="std" aria-pressed="true">Standard (22 mm)</button>
+            <button type="button" data-v="long" aria-pressed="false">Extra long (32 mm)</button></div>
+          <p class="foot" id="bristle-note" hidden>Showing the standard ones: add tpu-bristles-32mm-extra-long.stl (Kobalt tool mount files) under Parts.</p>
           <label class="check sub"><input type="checkbox" id="opt-hose" checked> Dust shoe + vacuum hose, router cord + cable sleeve</label>
           <label class="check"><input type="checkbox" id="opt-fan" checked> Jackpot3 lid fan</label>
           <label class="check no-phone" title="The FluidTouch touchscreen pendant (github.com/jeyeager65/FluidTouch) on the table's front, running its real firmware in the page"><input type="checkbox" id="ft-on"> FluidTouch pendant</label>
@@ -270,8 +274,110 @@
         </div>
       </div>
     </details>
+    <details class="step" id="st-rt">
+      <summary><span class="st-n">5</span><span class="st-t" id="h-rt">Router</span><span class="st-dot" id="dot-rt" hidden aria-label="needs a look"></span><span class="st-sum" id="sum-rt"></span></summary>
+      <div class="st-body">
+        <div class="field"><label for="rb-pick">Your router <button type="button" class="q" data-help="help-rb" aria-label="About building your router" title="About building your router">?</button></label>
+          <select id="rb-pick" title="The router on your machine (the same as Run's router list)"></select></div>
+        <div class="help" id="help-rb" hidden><p>Pick the router you have, or shape your own: every size below changes the router in
+          the view as you type, and is kept with this machine.</p>
+          <p><b>Undo</b> / <b>Redo</b> (Ctrl+Z / Ctrl+Shift+Z) step back and forward through your changes, New and Delete too.</p>
+          <p><b>New</b> makes a copy of this router to shape. <b>Reset</b> puts a built-in router back the way it came;
+          <b>Delete</b> removes one you made. <b>Export</b> saves it as a file to share; <b>Import</b> loads one someone
+          shared (it's added to the list).</p>
+          <p><b>Close-up</b> shows just the router, its mount and the top of the dust shoe (no skirt or bristles), framed,
+          with its sizes drawn on it: click a part of the router to light it up and get sliders for just that part, click a number to type a new one (Enter), or drag a dot to pull that end. Side,
+          Front and Top are flat like a drawing (scroll to zoom, right-drag to pan); 3D turns any way. Its <b>Show</b> boxes take out the shoe top or either mount, or add the core to see
+          how the router fits in it. Back or Esc puts the
+          machine back.</p>
+          <p>Sizes are mm, measured with the router standing up: z from the bottom of the collet nut, x toward the switch
+          and dial end of the head, the cord out of the other end.</p></div>
+        <div class="rb-btns">
+          <button type="button" id="rb-view" aria-pressed="false" title="Just the router, its mount and the top of the shoe, close up (Back or Esc to leave)">⤢ Close-up</button>
+          <button type="button" id="rb-undo" disabled title="Undo the last change to a router (Ctrl+Z)">↶ Undo</button>
+          <button type="button" id="rb-redo" disabled title="Redo (Ctrl+Shift+Z)">↷ Redo</button>
+          <button type="button" id="rb-new" title="A copy of this router to shape">New</button>
+          <button type="button" id="rb-reset" title="Put this router back the way it came / remove one you made">Reset</button>
+          <button type="button" id="rb-export" title="Save this router as a file to share">Export</button>
+          <button type="button" id="rb-import" title="Load a router file someone shared">Import</button>
+          <input type="file" id="rb-file" accept=".json,application/json" hidden>
+        </div>
+        <div class="rb-show" id="rb-core-box" hidden><span>Show</span>
+          <label class="check"><input type="checkbox" id="rb-shoe" checked> Shoe top</label>
+          <label class="check"><input type="checkbox" id="rb-mb" checked> Lower mount</label>
+          <label class="check"><input type="checkbox" id="rb-mt" checked> Upper mount</label>
+          <label class="check" title="To see how the router fits in the core"><input type="checkbox" id="rb-core"> Core</label></div>
+        <p class="foot" id="rb-msg" hidden></p>
+        <div class="field"><label for="rb-name">Name</label><input id="rb-name" type="text" maxlength="40"></div>
+        <div class="variant" id="rb-kind"><span>It's a</span>
+          <button type="button" data-v="router" aria-pressed="true">Router</button>
+          <button type="button" data-v="spindle" aria-pressed="false">Spindle</button></div>
+        <div class="rb-tabs" id="rb-tabs" role="tablist" aria-label="Router settings">
+          <button type="button" role="tab" data-v="speed" aria-selected="true">Speed</button>
+          <button type="button" role="tab" data-v="mount" aria-selected="false">Mount</button>
+          <button type="button" role="tab" data-v="stack" aria-selected="false">Turned part</button>
+          <button type="button" role="tab" data-v="head" aria-selected="false" class="rb-router">Head</button>
+          <button type="button" role="tab" data-v="colors" aria-selected="false">Colors</button>
+          <button type="button" class="q" id="rb-tab-q" data-help="help-rb-speed" aria-label="About these settings" title="About these settings">?</button></div>
+        <div class="rb-sec" data-sec="speed">
+        <div class="help" id="help-rb-speed" hidden><p><b>Speed dial:</b> a trim router you turn on by hand; the G-code's S does
+          nothing, the dial sets the speed. Put in the RPM at each number of the dial (the manual's table).</p>
+          <p><b>G-code S:</b> the controller sets the speed (a PWM router like the AutoSpin T1, or a spindle). Put in its
+          lowest accurate and its top speed.</p></div>
+        <div class="help" id="help-rb-mount" hidden>
+          <p><b>Mount:</b> which V1E router mount it fits (a 65 mm spindle fits the Makita 65 mm one). <b>None:</b> no V1E dust shoe, so no shoe or vacuum hose is drawn (or in the BOM).</p>
+          <p><b>Nut below the clamp:</b> where you clamp it - mm from the bottom of the collet nut up to the bottom of the
+          mount's lower clamp. More = the router and its bit sit lower (further out under the shoe). Kept with the router; a
+          note shows if a clamp ends up off the grip.</p></div>
+        <div class="variant" id="rb-source"><span>Speed comes from</span>
+          <button type="button" data-v="manual" aria-pressed="true">Speed dial</button>
+          <button type="button" data-v="gcode" aria-pressed="false">G-code S</button></div>
+        <div class="rb-grid" id="rb-dial"></div>
+        <div class="rb-grid" id="rb-s"></div>
+        </div>
+        <div class="rb-sec" data-sec="mount">
+        <div class="field"><label for="rb-mount">Mount</label>
+          <select id="rb-mount"><option value="kobalt">Kobalt</option><option value="makita">Makita 65 mm</option><option value="dewalt">DeWalt 69 mm</option><option value="none">None</option></select></div>
+        </div>
+        <div class="rb-sec" data-sec="stack">
+        <div class="help" id="help-rb-stack" hidden><p>The round part, stacked up from the collet nut: the nut, the spindle
+          showing above it, the nose, the grip (the part the mount clamps) and the cast collar on top of it. A part with a
+          0 size is left out.</p>
+          <p><b>Overall height:</b> nut bottom to the top of the head.</p>
+          <p><b>Grip chamfer:</b> the 45° bevel round the grip's bottom edge, at the collet end (0 = square).</p>
+          <p><b>Transition to the head:</b> the part between the collar and the head (length 0 = none). <b>Round</b>: a cone
+          from the collar to its top Ø. <b>To the head's shape</b>: it changes from round at the collar to the head's rounded
+          box under it. <b>Where it meets the head</b>: plain, or a fillet / chamfer of that size blending it into the head's
+          underside. The head sits on it.</p>
+          <p>Each section's color and finish (metal, plastic, rubber) are under Colors.</p>
+          <p><b>Spindle lock button:</b> the button you press to hold the shaft while you change bits - its height up from
+          the nut's bottom, its angle round from the switch end (counter-clockwise from above, negative = clockwise), its
+          Ø and how far it reaches out from the router's center.</p>
+          <p><b>A spindle:</b> the nut, the nose (the bearing cap under the can) and the can - its diameter (65 mm for the
+          V1E mount) and length up to the top. Air-cooled has a fan on top, water-cooled two hose barbs.</p></div>
+        <div class="rb-grid" id="rb-stack"></div>
+        </div>
+        <div class="rb-sec" data-sec="head">
+        <div class="help" id="help-rb-head" hidden><p>A rounded box sitting on the grip: length along the switch end, width
+          across, height up from the turned part (it always sits right on it: Overall height = the turned part + this, and changing either one changes the other).</p>
+          <p><b>Fillets:</b> top = the top edges, front = the upright corners at the switch end, back = at the cord end,
+          under = the bottom edges.</p>
+          <p><b>Dial:</b> on the end = lying flat, its rim out of the switch end; on top = standing across the head, its rim
+          up through the top.</p></div>
+        <p class="foot" id="rb-detailed" hidden>This router's head is modelled from photos.
+          <button type="button" id="rb-simple">Use a simple head</button></p>
+        <div class="rb-grid" id="rb-head"></div>
+        <div class="variant" id="rb-dialplace"><span>Dial</span>
+          <button type="button" data-v="end" aria-pressed="true">On the end</button>
+          <button type="button" data-v="top" aria-pressed="false">On top</button></div>
+        </div>
+        <div class="rb-sec" data-sec="colors">
+        <div class="rb-grid" id="rb-colors"></div>
+        </div>
+      </div>
+    </details>
     <details class="step" id="st-look">
-      <summary><span class="st-n">5</span><span class="st-t" id="h-look">Look</span><span class="st-dot" id="dot-look" hidden aria-label="needs a look"></span><span class="st-sum" id="sum-look"></span></summary>
+      <summary><span class="st-n">6</span><span class="st-t" id="h-look">Look</span><span class="st-dot" id="dot-look" hidden aria-label="needs a look"></span><span class="st-sum" id="sum-look"></span></summary>
       <div class="st-body">
       <section aria-labelledby="h-colours">
         <h3 id="h-colours">Filaments <button type="button" class="q" data-help="help-fil" aria-label="About filaments" title="About filaments">?</button></h3>
@@ -350,7 +456,7 @@
       </div>
     </details>
     <details class="step" id="st-files">
-      <summary><span class="st-n">6</span><span class="st-t" id="h-files">Get the files</span><span class="st-dot" id="dot-files" hidden aria-label="needs a look"></span><span class="st-sum" id="sum-files"></span></summary>
+      <summary><span class="st-n">7</span><span class="st-t" id="h-files">Get the files</span><span class="st-dot" id="dot-files" hidden aria-label="needs a look"></span><span class="st-sum" id="sum-files"></span></summary>
       <div class="st-body">
       <section aria-labelledby="h-bom">
         <h3 id="h-bom">Bill of materials</h3>
@@ -574,7 +680,8 @@
   <div class="pick" id="pick" role="status" hidden><div><strong></strong><p></p><div class="pick-fil" id="pick-fil" hidden><span>Printed in</span><span class="fil-dd"><button type="button" class="fil-dd-btn" aria-haspopup="listbox"></button><span class="fil-dd-menu" role="listbox" hidden></span></span></div></div>
     <button type="button" id="pick-insp" title="Inspect it on its own (double-click a part does too)">Inspect</button><button type="button" id="pick-clear" aria-label="Clear the selection" title="Clear">✕</button></div>
   <div class="insp" id="insp" hidden>
-    <button type="button" id="insp-back">← Back to the machine</button>
+    <div class="insp-top"><button type="button" id="insp-min" aria-expanded="true" title="Fold the tools and the parts list away (again to bring them back)">Hide panels</button>
+      <button type="button" id="insp-back">← Back to the machine</button></div>
     <div class="insp-tools" id="insp-tools">
       <label class="tool">Explode <input type="range" id="insp-ex" min="0" max="1" step="0.01" value="0" aria-label="Exploded view"></label>
       <div class="tool seg" id="insp-sec" role="group" aria-label="Section cut"><span>Section</span>
@@ -729,7 +836,7 @@
     </div>
     <div class="rt-row">
       <label for="rt-dial">Dial <b id="rt-dial-v"></b></label>
-      <input id="rt-dial" type="range" min="1" max="6" step="0.1" title="The router's speed dial (or drag the wheel on the router in the view)">
+      <input id="rt-dial" type="range" min="1" max="6" step="0.5" title="The router's speed dial (or drag the wheel on the router in the view)">
       <span class="rt-rpm" id="rt-rpm"></span>
     </div>
     <p class="pwr-note" id="rt-note" hidden></p>
@@ -746,7 +853,7 @@
         it.</li>
       </ul>
       <p><b>Dial</b>: 1 is slowest, 6 is fastest. You can also turn the wheel at the switch end of the router in the
-      view: drag it (up or right is faster), click it for the next number, or scroll over it for half steps. Each
+      view: drag it (up or right is faster), click it for the next number, or scroll over it. Like the real dial it clicks in half steps. Each
       machine keeps its own router and dial.</p>
     </div>
     <div class="help" id="help-pwr" hidden>
@@ -1019,8 +1126,11 @@
 <script src="js/calculator.js"></script>
 <script src="js/table_model.js"></script>
 <script src="js/strut_plate.js"></script>
+<script src="data/routers.js"></script>
 <script src="js/strut_cam.js"></script>
 <script src="js/routers.js"></script>
+<script src="js/router_body.js"></script>
+<script src="js/router_dims.js"></script>
 <script src="js/plate_design.js"></script>
 <script src="js/lib/cnc-gcode-tools/gcode-expander.js"></script>
 <script src="js/lib/cnc-gcode-tools/stock-sim.js"></script>
@@ -1060,6 +1170,8 @@
 <script src="js/page/inspect.js"></script>
 <script src="js/page/power.js"></script>
 <script src="js/page/router.js"></script>
+<script src="js/page/router_build.js"></script>
+<script src="js/page/router_edit.js"></script>
 <script src="js/page/ui.js"></script>
 <script src="js/page/scripting.js"></script>
 <script src="js/page/director.js"></script>

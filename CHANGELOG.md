@@ -3,6 +3,16 @@
 The version is the sandbox page's (`VERSION` in `web/js/page/job.js`, shown in its footer). The footer also shows
 the date the model data was built and the Printables file set it was solved for.
 
+## 0.60.0 - 2026-10-29
+- **Build your router** (My LR4 > 5 Router): every router is a preset you can copy and edit, spindles too. A
+  close-up editor draws the sizes on the model: click or drag one to change it, pick a part, switch Side / Front /
+  Top / 3D, show the boxes, undo / redo (Ctrl+Z / Ctrl+Y).
+- **Routers drawn from their own shapes:** a turned part (motor housing, collar, a round or shaped transition) and a
+  rounded head, each section with its own color and finish (metal, plastic, rubber). The Kobalt is built this way
+  now; the other routers' shapes are still rough.
+- **Dust shoe bristles are TPU:** they print only on TPU spools, and come Standard (22 mm) or Extra long (32 mm).
+- **Inspect:** parts list toggles and a Hide panels button.
+
 ## 0.59.0 - 2026-10-28
 - **Pick your router, set its speed dial** (Run, under the switch panel). Kobalt, Makita RT0701C, Carbide Compact
   Router and DeWalt DWP611 are set by hand: the dial sets the speed and the G-code's S does nothing. The sound, chip

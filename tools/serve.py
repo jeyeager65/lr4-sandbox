@@ -3,6 +3,8 @@
 #                                              (e.g. 48x96 = a 48 x 96 in cutting area): the public page and data,
 #                                              with your part files fetched from parts/
 #   (--no-open: serve only, e.g. for tools/record_demo.js)
+#   (--lan: also to other computers on the network; private/ and dotfiles are refused. Plain http from another
+#    machine is not a secure context, so FluidNC in the browser needs that origin allowed in the browser's flags)
 #   python tools/serve.py viewer               exports/web on http://127.0.0.1:8765 (full detail; refresh it with
 #                                              freecad/export_web.py)
 # The viewer's page comes from export_web (web/viewer.html copied next to its data).
@@ -11,6 +13,7 @@
 import functools
 import http.server
 import os
+import socket
 import sys
 import threading
 import webbrowser
@@ -25,13 +28,24 @@ class Isolated(http.server.SimpleHTTPRequestHandler):
         self.send_header("Cache-Control", "no-cache")   # always check for a newer file (edited scripts show on reload)
         super().end_headers()
 
+    def send_head(self):                       # --lan: never hand private/ or .git to the network
+        rel = os.path.relpath(os.path.realpath(self.translate_path(self.path)), os.path.realpath(self.directory))
+        top = rel.replace("\\", "/").split("/", 1)[0].lower()
+        if LAN and (top == "private" or top.startswith(".")):
+            self.send_error(404)
+            return None
+        return super().send_head()
+
+
+LAN = "--lan" in sys.argv
+
 
 PAGES = {"sandbox": (ROOT, 8767, "web/index.html"),
          "viewer": (os.path.join(ROOT, "exports", "web"), 8765, "LowRider4_local.html")}
 
 
 if __name__ == "__main__":
-    args = [a for a in sys.argv[1:] if a != "--no-open"]
+    args = [a for a in sys.argv[1:] if a not in ("--no-open", "--lan")]
     no_open = "--no-open" in sys.argv          # headless: tools/record_demo.js, the page tests
     which = args[0] if args else ""
     which = {"configurator": "sandbox"}.get(which, which)   # the page's old name
@@ -42,8 +56,13 @@ if __name__ == "__main__":
         sys.exit(f"{os.path.join(folder, page)} not found - run: python tools/run.py freecad/export_web.py")
     url = f"http://127.0.0.1:{port}/{page}" + ("?parts=/parts/" if which == "sandbox" else "") + (f"#{args[1]}" if len(args) > 1 else "")
     handler = functools.partial(Isolated, directory=folder)
-    server = http.server.ThreadingHTTPServer(("127.0.0.1", port), handler)
+    server = http.server.ThreadingHTTPServer(("0.0.0.0" if LAN else "127.0.0.1", port), handler)
     print(f"serving {folder} at {url} - Ctrl+C to stop", flush=True)
+    if LAN:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("192.0.2.1", 9))           # no packet sent: just picks the interface the default route uses
+        print(f"  on the network: {url.replace('127.0.0.1', s.getsockname()[0])}", flush=True)
+        s.close()
     if not no_open:
         threading.Timer(0.5, webbrowser.open, (url,)).start()
     try:

@@ -98,9 +98,9 @@ const SHORT = HEAD.concat(["G0 X20 Y50", "G1 Z-1 F300", "G1 X120 F600", "G0 Z5",
       document.getElementById("pwr-router").click();
       for (let i = 0; i < 40 && LR4Job.running() && !JOB.spinning; i++) await T.sleep(100);
       out.rockerOn = JOB.spinning || !LR4Job.running();
-      const sw = meshes.find((m) => m.userData.name === "Router_Switch"), z0 = sw && sw.position.z;
+      const sw = meshes.find((m) => m.userData.name === "Router_Switch"), g0 = sw && sw.geometry;
       LR4Power.set("body", false);
-      out.body = { dz: sw ? +(sw.position.z - z0).toFixed(2) : null, why: LR4Power.why() };
+      out.body = { tipped: !!(sw && sw.userData.rocker && sw.geometry === sw.userData.rocker.off && g0 === sw.userData.rocker.on), why: LR4Power.why() };
       LR4Power.set("body", true);
       return out;
     })()`);
@@ -118,7 +118,7 @@ const SHORT = HEAD.concat(["G0 X20 Y50", "G1 Z-1 F300", "G1 X120 F600", "G0 Z5",
       `released: FluidNC up, not homed, lamp lit, head out ${JSON.stringify(a.released)}`);
     ok(/rocker is off/.test(a.why), `Run says why: ${a.why}`);
     ok(!a.rockerOff.spun && a.rockerOn, `the router rocker off: no spin in a job; on again: it turns ${JSON.stringify(a.rockerOff)}`);
-    ok(a.body.dz === -3 && /own switch/.test(a.body.why), `the router's own switch off: slid 3 mm, Run says why ${JSON.stringify(a.body)}`);
+    ok(a.body.tipped && /own switch/.test(a.body.why), `the router's own switch off: the rocker tips over, Run says why ${JSON.stringify(a.body)}`);
   } catch (e) {
     ok(false, "threw: " + (e && e.stack || e));
   } finally {

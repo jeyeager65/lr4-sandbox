@@ -417,6 +417,7 @@
     ftPopDraw();
     if (vr.active()) vr.tick(dt);
     else { smApply(dt); camStep(); controlsTick(); }
+    if (typeof rxTick === "function") rxTick();      // the router's dimensions on the model (router_edit.js)
     lighting();
     renderer.render(scene, camera);
   }

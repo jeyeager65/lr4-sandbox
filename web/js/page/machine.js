@@ -210,6 +210,7 @@
     if (nut) nut.userData.rest = { p: nut.position.clone(), q: nut.quaternion.clone() };
     spinApply();                                      // the file's own bit rides on the router (homing, jogs, the video's
                                                       // moves), the hand-installed one too; + the router's lean, turning
+    if (typeof rtPocketClip === "function") rtPocketClip();   // the router's pocket cut rides with it (router.js)
     if (hoseMesh) updateHose(dx, dy, dz);
     if (CAPS.list.length) placeSection();             // inspect's section cut follows the set
     HOME.pose = { x: dx, y: dy, z: dz };
