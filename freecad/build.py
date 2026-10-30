@@ -19,6 +19,7 @@ import importlib
 import json
 import math
 import os
+import subprocess
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -162,9 +163,6 @@ PRINT_ACCENT = (0.80, 0.12, 0.10)      # printed accents (V1E red)
 MDF = (0.55, 0.42, 0.30)
 MDF_TABLE = (0.78, 0.66, 0.50)
 SPOIL_RGB = (0.72, 0.60, 0.45)         # the spoilboard, a shade darker than the rail strips
-ROUTER_HEAD = (0.13, 0.33, 0.80)       # Kobalt blue head; brush caps / button / switch / dial / cord black
-ROUTER_CAP = (0.07, 0.07, 0.08)
-ROUTER_DIAL = (0.07, 0.07, 0.08)
 LR4 = os.path.join(lr4.PARTS, "lr4")
 KOB = os.path.join(lr4.PARTS, "kobalt")
 JP3 = os.path.join(lr4.PARTS, "jackpot3")
@@ -483,17 +481,22 @@ stl("Core", "Core", pl_core, "Core", PRINT_MAIN)
 for f in ("Tool_Mount_T_Kobalt", "Tool_Mount_B_Kobalt", "Dust_Shoe_Kobalt", "Dust_Skirt_Kobalt"):
     stl(f, f, pl_kobalt, "Core", PRINT_ACCENT if "Mount" in f else PRINT_MAIN, folder=KOB)
 hw_extra["shoe_screw"] = tuple(tuple(pl_kobalt.multVec(V(*q))) for q in lr4.SHOE_SCREW_HOLE)   # hole ends, world
-# router: Kobalt K7TR-03 (measured), axis on the mount bore centre, height and turn from the dust shoe's notch for
-# its spindle lock button (user 2026-10-19; was a Makita-style guess with the cord facing -X)
-rt = hw.kobalt_k7tr03(pl_kobalt.multiply(App.Placement(V(*lr4.ROUTER_AXIS_IN_KOBALT, lr4.ROUTER["nut_z"]), App.Rotation())),
-                      switch_deg=lr4.ROUTER["switch_deg"], button_deg=lr4.KOBALT_NOTCH["deg"] - lr4.ROUTER["switch_deg"],
-                      cord_out=lr4.ROUTER["cord_out"],
-                      bit=(3.175, lr4.ROUTER["bit_out"]))   # placed by the shoe's notch (lr4.KOBALT_NOTCH)
-for k, nm, col in (("body", "Router_Kobalt", hw.ALUMINIUM), ("head", "Router_Head", ROUTER_HEAD),   # aluminium motor housing
-                   ("cap", "Router_Cap", ROUTER_CAP), ("dial", "Router_Dial", ROUTER_DIAL),
-                   ("switch", "Router_Switch", ROUTER_CAP), ("cord", "Router_Cord", ROUTER_CAP),
-                   ("nut", "Router_Nut", ROUTER_CAP), ("bit", "Router_Bit", hw.STEEL)):
-    m.add(nm, rt[k], group="Core", colour=col)
+# router: the page's default preset (Part 45b step 4, user 2026-10-29: the model and the page match) - its parts from
+# tools/router_export.js (node: web/js/router_body.js) in its own frame (z up from the collet nut's bottom, +x = the
+# switch end), on the mount bore centre at lr4.ROUTER's nut height, its switch turned to switch_deg in the Kobalt frame
+# (the preset's shaft lock angle is from the switch: the shoe's notch, lr4.KOBALT_NOTCH). The bit: a plain 1/8"
+# cylinder bit_out below the nut (the page draws its own bits).
+RT_DIR = os.path.join(ROOT, "build", "router")
+subprocess.run(["node", os.path.join(ROOT, "tools", "router_export.js"), RT_DIR], check=True)
+rt_info = json.load(open(os.path.join(RT_DIR, "router.json"), encoding="utf-8"))
+pl_router = pl_kobalt.multiply(App.Placement(V(*lr4.ROUTER_AXIS_IN_KOBALT, lr4.ROUTER["nut_z"]),
+                                             App.Rotation(V(0, 0, 1), lr4.ROUTER["switch_deg"])))
+for nm, p_ in rt_info["parts"].items():
+    m.add_mesh(nm, mesh.load(os.path.join(RT_DIR, p_["file"])), pl_router, group="Core", colour=tuple(p_["c"]))
+m.add("Router_Bit", Part.makeCylinder(3.175 / 2, lr4.ROUTER["bit_out"] + 18.0, V(0, 0, -lr4.ROUTER["bit_out"])).transformGeometry(
+    pl_router.toMatrix()), group="Core", colour=hw.STEEL)
+rt_cord = [pl_router.multVec(V(*rt_info["cord"]["tip"])),            # the stub's end + 10 mm on (the cord route's start)
+           pl_router.multVec(V(*rt_info["cord"]["tip"]) + V(*rt_info["cord"]["dir"]) * 10.0)]
 # Tiny Touch Plate in the top mount's slot (lr4.TOUCH_SLOT / TOUCH_STORE): plate in the slot's mid-plane, strip
 # centred in it, pad down beside the bottom mount, spade up above the top mount; the clip bites the strip's front
 # edge between the mounts (V1E: store them touching)
@@ -898,7 +901,7 @@ def hose_rest_along_y(name, x, y, r):
 port = pl_kobalt.multVec(V(*lr4.HOSE["port_kobalt"]))
 core_bb = m.shape("Core").BoundBox            # the hose lies lengthwise on the core's top, between the tie pairs
 r_h = lr4.HOSE["od"] / 2
-ROUTER_TOP_PARTS = ["Router_Kobalt", "Router_Head", "Router_Cap", "Router_Dial"]
+ROUTER_TOP_PARTS = ["Router_Housing", "Router_Collar", "Router_MotorCap", "Router_Trim", "Router_Dial"]
 router_top = max(m.shape(n).BoundBox.ZMax for n in ROUTER_TOP_PARTS)
 over_z = max(router_top + lr4.HOSE["clear"] + r_h,   # going back over the core beside the router
              max(hose_rest_along_y("Core", port.x, core_bb.YMin + 3 * k, r_h) for k in range(int(core_bb.YLength / 3))))
@@ -928,11 +931,11 @@ HOSE["run"] = HOSE["port"][0] + T_X[1] + HOSE["core_end_dx"] + 2 * HOSE["uturn_g
 hose_pts = lr4.hose_route(HOSE)
 hose_curve = lr4.catmull_rom(hose_pts, 12)
 hose_len = sum(math.dist(a, b) for a, b in zip(hose_curve, hose_curve[1:]))
-m.add_mesh("Vac_Hose", mesh.tube_along(hose_curve, HOSE["od"], 32), group="Hose", colour=(0.82, 0.86, 0.88),
-           transparency=55)                    # clear PVC, steel wire helix
+# (the hose, the router cord + cable sleeve along it aren't in the model since Part 45b: the page sweeps them from
+# build/hose.json; hosecheck.py sweeps the hose through every pose)
 # router cord + cable sleeve tied along the hose: on the core's top behind it, then between the runs (lr4.cord_route,
 # lr4.cable_places)
-cord_tip = [tuple(v.Point) for v in rt["cord_tip"].Vertexes]
+cord_tip = [tuple(v) for v in rt_cord]
 places = lr4.cable_places(HOSE, lr4.CORD["d"], lr4.SLEEVE["d"])
 HOSE["cord"] = dict(lr4.CORD, tip=cord_tip[0], tip2=cord_tip[1], **places["cord"])
 HOSE["sleeve"] = dict(lr4.SLEEVE, **places["sleeve"])
@@ -954,10 +957,6 @@ braces = sorted((o["name"] for o in m.parts if o["name"].startswith("Brace_") an
                 key=lambda n_: m.shape(n_).BoundBox.Center.x)
 mid_brace = m.shape(braces[len(braces) // 2]).BoundBox
 HOSE["sleeve"]["exit"] = dict(x=mid_brace.XMin - 5.0, p=tuple(jp), d=tuple(jd), via=via)
-cord_curve = lr4.catmull_rom(lr4.cord_route(hose_curve, HOSE, HOSE["cord"], *cord_tip), 6)
-m.add_mesh("Router_Cord_Run", mesh.tube_along(cord_curve, lr4.CORD["d"], 8), group="Hose", colour=ROUTER_CAP)
-sleeve_curve = lr4.catmull_rom(lr4.cord_route(hose_curve, HOSE, HOSE["sleeve"]), 6)
-m.add_mesh("Cable_Sleeve", mesh.tube_along(sleeve_curve, lr4.SLEEVE["d"], 8), group="Hose", colour=(0.12, 0.12, 0.13))
 os.makedirs(os.path.join(ROOT, "build"), exist_ok=True)
 json.dump(dict(HOSE, x_pos=X_POS), open(os.path.join(ROOT, "build", "hose.json"), "w"), indent=1)   # for export_web
 json.dump(threads, open(os.path.join(ROOT, "build", "threads.json"), "w"), indent=0)        # for export_web

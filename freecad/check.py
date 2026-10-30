@@ -1,8 +1,10 @@
 # Interference checks for the LowRider4 assembly: parts that should touch but not intersect.
 # Shared section area (mm^2) on a few planes through each pair's common bounding box; build.py
 # runs this when headless. A clamp on a rail (bore 29.34 vs 29.5 EMT) is expected to show a
-# little - that's the press fit. Router_Kobalt in the Tool_Mount rings shows ~32 mm^2: the bore pinches to
-# 64.8 over a short arc on the clamp side (66.7 elsewhere) round the 65.8 grip - the clamp fit.
+# little - that's the press fit. Router_Housing in the Tool_Mount rings shows ~32 mm^2: the bore pinches to
+# 64.8 over a short arc on the clamp side (66.7 elsewhere) round the 65.8 housing - the clamp fit. The router is the
+# page's default preset (Part 45b: tools/router_export.js); the vacuum hose, router cord + cable sleeve aren't in the
+# model since then (the page sweeps them from build/hose.json; hosecheck.py checks the hose's sweep).
 
 # Speed (2026-10-18): fclib mesh.overlap_fast (numpy, only the triangles crossing each plane, sections filled
 # on a ~0.1 mm grid) instead of FreeCAD face booleans, and a cache: a pair whose two parts haven't changed
@@ -47,13 +49,12 @@ PAIRS = [
     # core
     ("Core", "X_Rail_Upper"), ("Core", "X_Rail_Lower"), ("Core", "StrutPlate_Front"),
     ("Core", "StrutPlate_Bottom"), ("Core", "Tool_Mount_T_Kobalt"), ("Core", "Tool_Mount_B_Kobalt"),
-    ("Core", "Dust_Shoe_Kobalt"), ("Core", "Router_Kobalt"), ("Core", "X_Stepper"),
-    ("Router_Kobalt", "Tool_Mount_T_Kobalt"), ("Router_Kobalt", "Tool_Mount_B_Kobalt"), ("Router_Kobalt", "Dust_Shoe_Kobalt"),
-    ("Router_Nut", "Dust_Shoe_Kobalt"), ("Router_Bit", "Dust_Shoe_Kobalt"), ("Router_Kobalt", "X_Stepper"),
-    ("Router_Nut", "Dust_Skirt_Kobalt"), ("Router_Kobalt", "Dust_Skirt_Kobalt"),
-    ("Router_Head", "Core"), ("Router_Head", "Tool_Mount_T_Kobalt"), ("Router_Head", "X_Stepper"), ("Router_Cord", "Core"),
-    ("Router_Cord", "Tool_Mount_T_Kobalt"), ("Router_Cap", "Core"), ("Router_Switch", "Core"),
-    ("Router_Switch", "Tool_Mount_T_Kobalt"), ("Router_Cord", "X_Stepper"), ("Router_Cord", "Hose_Holder_Shorty_1"),
+    ("Core", "Dust_Shoe_Kobalt"), ("Core", "Router_Housing"), ("Core", "X_Stepper"),
+    *[(r, o) for r in ("Router_Housing", "Router_Collar", "Router_BearingCap", "Router_ShaftLock")
+      for o in ("Tool_Mount_T_Kobalt", "Tool_Mount_B_Kobalt", "Dust_Shoe_Kobalt", "Dust_Skirt_Kobalt", "X_Stepper", "Core")],
+    ("Router_ColletNut", "Dust_Shoe_Kobalt"), ("Router_Bit", "Dust_Shoe_Kobalt"), ("Router_ColletNut", "Dust_Skirt_Kobalt"),
+    *[(r, o) for r in ("Router_MotorCap", "Router_Trim", "Router_Dial", "Router_Switch", "Router_StrainRelief", "Router_Cord")
+      for o in ("Core", "Tool_Mount_T_Kobalt", "X_Stepper", "Hose_Holder_Shorty_1")],
     ("Bristles_TPU_1", "Dust_Skirt_Kobalt"), ("Bristles_TPU_2", "Dust_Skirt_Kobalt"), ("Bristles_TPU_1", "Dust_Shoe_Kobalt"),
     ("Bristles_TPU_2", "Dust_Shoe_Kobalt"), ("Bristles_TPU_1", "Bristles_TPU_2"), ("Bristles_TPU_1", "Router_Bit"),
     # table
@@ -76,7 +77,7 @@ PAIRS = [
     ("TableBase", "RailStrip_Min"), ("TableBase", "Spoilboard"), ("TableRib_Y1", "TableRib_X1"),
     ("TableRib_Y2", "TableRib_X2"), ("TableRib_Y1", "RailStrip_Min"), ("TableRib_X2", "Spoilboard"),
     ("RailEdge_Min", "RailStrip_Min"), ("RailEdge_Min", "TableRib_X1"), ("RailEdge_Max", "RailStrip_Max"),
-    ("RailEdge_Min", "Vac_Hose"), ("RailEdge_Min", "Y_Belt_MinF"), ("RailEdge_Max", "Y_Belt_MaxF"),
+    ("RailEdge_Min", "Y_Belt_MinF"), ("RailEdge_Max", "Y_Belt_MaxF"),
     # electronics
     ("Jackpot3_Box", "StrutPlate_Bottom"), ("Jackpot3_Box", "X_Rail_Lower"), ("Jackpot3_Box", "Brace_1"),
     ("Jackpot3_Box", "Jackpot3_Lid"), ("Jackpot3_Box", "Brace_2"), ("Jackpot3_Box", "Hose_Hook_70_1"),
@@ -87,42 +88,23 @@ PAIRS = [
                 f"Endstop_Z_{s}", f"Z_Stepper_{s}", f"Y_Stepper_{s}")],
     ("PeterPlate_T_Min", "PeterPlate_B_Min"), ("PeterPlate_T_Max", "PeterPlate_B_Max"),
     ("Jackpot3_Fan", "Jackpot3_Lid"), ("Jackpot3_Fan", "Jackpot3_Box"), ("Jackpot3_Fan", "StrutPlate_Bottom"),
-    ("Jackpot3_Fan", "Vac_Hose"),
     # hose holders in the brace slots, PSU on the bottom plate
     ("Hose_Holder_Shorty_1", "Brace_1"), ("Hose_Hook_70_1", "Brace_2"), ("Hose_Holder_Shorty_2", "Brace_3"),
     ("Hose_Holder_Hook_1", "Brace_4"), ("Hose_Holder_Hook_2", "Brace_Max"), ("Hose_Hook_70_1", "X_Rail_Upper"),
     ("Hose_Holder_Shorty_1", "XZ_Plate_Min"), ("Hose_Holder_Shorty_1", "YZ_Plate_Min"),
     ("Hose_Holder_Shorty_1", "Z_Stub_Min"), ("Hose_Holder_Shorty_1", "X_Rail_Upper"),
     ("PSU_24V", "StrutPlate_Bottom"), ("PSU_24V", "Hose_Holder_Shorty_2"), ("PSU_24V", "Brace_2"), ("PSU_24V", "Brace_3"),
-    # vacuum hose (parked pose; the ~73 mm wire hose threaded into the shoe's 69 mm socket shows there, and the
-    # hose resting in a tray shows up to ~30 mm^2 - the rest height is solved to 0.15 mm)
-    ("Vac_Hose", "Dust_Shoe_Kobalt"), ("Vac_Hose", "Core"), ("Vac_Hose", "Router_Kobalt"), ("Vac_Hose", "X_Stepper"),
-    ("Vac_Hose", "Router_Head"), ("Vac_Hose", "Router_Cap"), ("Vac_Hose", "Router_Cord"),
-    ("Vac_Hose", "Hose_Holder_Shorty_1"), ("Vac_Hose", "Hose_Hook_70_1"), ("Vac_Hose", "Hose_Holder_Shorty_2"),
-    ("Vac_Hose", "Brace_1"), ("Vac_Hose", "Brace_2"), ("Vac_Hose", "Jackpot3_Lid"), ("Vac_Hose", "YZ_Plate_Min"),
-    ("Vac_Hose", "RailStrip_Min"), ("Vac_Hose", "TableBase"), ("Vac_Hose", "TableRib_Y1"), ("Vac_Hose", "Hose_Holder_Hook_1"), ("Vac_Hose", "Brace_3"), ("Vac_Hose", "Brace_4"),
     # temp struts (build.py STRUTS = "temp"), instead of the strut plates
     *[(f"Temp_Strut_{w}_{e}", b) for w in ("Front", "Bottom") for e in ("Min", "Max")
       for b in ("Brace_1", "Brace_2", "Brace_3", "Brace_4", "Brace_5", "Brace_6", "Brace_7", "Brace_Max", "X_Rail_Upper",
                 "X_Rail_Lower", "X_Belt", "Belt_X_Min", "Belt_X_Max", "Core", "Jackpot3_Box", "Jackpot3_Lid", "PSU_24V",
-                "XZ_Plate_Min", "XZ_Plate_Max", "Cable_Sleeve", "Router_Cord_Run", "Vac_Hose")],
+                "XZ_Plate_Min", "XZ_Plate_Max")],
     # Tiny Touch Plate in the top mount's slot (2026-10-19)
     *[(a, b) for a in ("TouchPlate", "TouchPlate_Spade", "TouchPlate_Spade_Metal", "TouchPlate_Wire", "TouchPlate_Magnet",
                        *TOUCH_CLIP_PARTS)
-      for b in ("Tool_Mount_T_Kobalt", "Tool_Mount_B_Kobalt", "Core", "Router_Kobalt", "Router_Head", "Router_Cap",
-                "Router_Switch", "Router_Cord", "Router_Cord_Run", "Dust_Shoe_Kobalt", "Vac_Hose", "X_Stepper",
+      for b in ("Tool_Mount_T_Kobalt", "Tool_Mount_B_Kobalt", "Core", "Router_Housing", "Router_MotorCap", "Router_Trim",
+                "Router_ShaftLock", "Router_ColletNut", "Router_Switch", "Router_StrainRelief", "Router_Cord", "Dust_Shoe_Kobalt", "X_Stepper",
                 "Tool_Mount_T_Kobalt__clamp", "Tool_Mount_B_Kobalt__clamp", "Tool_Mount_T_Kobalt__M5_to_Core")],
-    # router cord tied along the hose (2026-10-19)
-    *[("Router_Cord_Run", n) for n in ("Vac_Hose", "Dust_Shoe_Kobalt", "Core", "Router_Kobalt", "Router_Head",
-                                       "Router_Cap", "Router_Dial", "Router_Switch", "X_Stepper", "Hose_Holder_Shorty_1",
-                                       "Hose_Hook_70_1", "Hose_Holder_Shorty_2", "Hose_Holder_Hook_1",
-                                       "Hose_Holder_Hook_2", "Brace_1", "Brace_2", "Brace_3", "Brace_4", "Brace_Max",
-                                       "Jackpot3_Lid", "YZ_Plate_Min", "RailStrip_Min", "TableBase", "XZ_Plate_Max", "YZ_Plate_Max")],
-    *[("Cable_Sleeve", n) for n in ("Vac_Hose", "Router_Cord_Run", "Jackpot3_Box", "Jackpot3_Fan", "Dust_Shoe_Kobalt", "Core", "Router_Kobalt", "Router_Head",
-                                       "Router_Cap", "Router_Dial", "Router_Switch", "X_Stepper", "Hose_Holder_Shorty_1",
-                                       "Hose_Hook_70_1", "Hose_Holder_Shorty_2", "Hose_Holder_Hook_1",
-                                       "Hose_Holder_Hook_2", "Brace_1", "Brace_2", "Brace_3", "Brace_4", "Brace_Max",
-                                       "Jackpot3_Lid", "YZ_Plate_Min", "RailStrip_Min", "TableBase", "XZ_Plate_Max", "YZ_Plate_Max")],
 ]
 
 
