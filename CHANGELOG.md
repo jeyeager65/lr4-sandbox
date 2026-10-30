@@ -3,6 +3,17 @@
 The version is the sandbox page's (`VERSION` in `web/js/page/job.js`, shown in its footer). The footer also shows
 the date the model data was built and the Printables file set it was solved for.
 
+## 0.62.0 - 2026-10-30
+- **Bit change, as done by hand:** the wrench handles point out the front (the shaft is turned first until the
+  flats line up, then the wrench swings 30 deg to either side). Only the lower dust shoe comes off; the upper one
+  stays on. **Hold the shaft** (in the bit popup): the lock button, or 2 wrenches on the shaft's flats (a router with
+  a lock has flats too). **Collets**: each in its own nut (nut and collet swap together), or one nut for all.
+- **ER11 collet modeled:** the nose, the groove the nut's ring snaps into, the 8 deg taper and 8 slits cut in turn
+  from each end (the slit count and width are GUESSES). A collet is bored for its own shank.
+- The Carbide has a shaft lock and the Kobalt has shaft flats (both GUESSES).
+- Fixed: the page wouldn't load ("Cannot read properties of undefined (reading 'source')") when this browser had an
+  edit kept from 0.60.0 for a built-in router. The edit is dropped now and the router keeps its own preset.
+
 ## 0.61.0 - 2026-10-30
 - **Router parts by their real names:** collet nut, exposed shaft, bearing cap, motor housing, collar, transition,
   motor cap, shaft lock, strain relief. Build your router's tabs and the close-up use them too. A router file from

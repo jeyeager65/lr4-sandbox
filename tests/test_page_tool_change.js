@@ -1,7 +1,8 @@
 // Part 45b step 3 in headless Chrome (serve.py's headers): a bit change, animated (tool_change.js).
-//  - the Kobalt (shaft lock + 1 wrench): the lock presses in, the nut comes down the thread length and turns the
-//    turns that takes, the bit swaps 1/8" -> 1/4" with a collet swap, everything back where it was after;
-//  - the Carbide (no lock, flats: 2 wrenches): both wrenches out;
+//  - the Kobalt + Carbide (a lock and flats), held by the lock (1 wrench) or 2 wrenches: the lock presses in or both
+//    wrenches go on, handles out the front; the nut comes down the thread length and turns the turns that takes; the
+//    bit swaps 1/8" -> 1/4" with a collet swap (in its own nut, or out of the one nut); only the lower dust shoe
+//    comes off; everything back where it was after;
 //  - a job's tool change (M6; its first tool is asked by the Start check, not a popup): Install bit and resume plays
 //    it, then the bit goes in and the job runs on.
 //  TC_SHOT=dir: a screenshot of each router mid-change (wrenches on).
@@ -36,19 +37,23 @@ const JOBTXT = ["(LR4 tool change test)", STOCK, "(ToolDef 1: SHAPE=flat D=3.175
       const s = await page.send("Page.captureScreenshot", { format: "png" });
       fs.writeFileSync(`${process.env.TC_SHOT}/${name}.png`, Buffer.from(s.data, "base64"));
     };
-    const run = (router) => page.val(`(async () => {
+    const run = (router, hold, nuts) => page.val(`(async () => {
       const errs = []; window.addEventListener("error", (e) => errs.push(e.message));
       LR4Router.set({ router: ${JSON.stringify(router)} }); await T.sleep(300);
+      TC_ON.hold = ${JSON.stringify(hold)}; TC_ON.nuts = ${JSON.stringify(nuts)};
       handBit({ shape: "flat", d: 3.175, len: 38, flen: 12 }); await T.sleep(100);   // a 1/8" in: the change to 1/4" swaps the collet
       const m = (n) => meshes.find((q) => q.userData.name === n), wc = (q) => new THREE.Box3().setFromObject(q).getCenter(new THREE.Vector3());
       const nut0 = wc(m("Router_ColletNut")), lock = m("Router_ShaftLock"), lock0 = lock && lock.position.clone();
       const c = nut0.clone(); camera.position.copy(c).add(new THREE.Vector3(70, -200, 25)); controls.target.copy(c).add(new THREE.Vector3(0, 0, -14)); controls.update();
-      const out = { router: ${JSON.stringify(router)}, maxDz: 0, minA: 0, press: 0, two: false, wrench: false, caps: new Set(), swap: null };
+      const up = m("Dust_Shoe_Kobalt"), up0 = up && up.position.clone();   // the upper shoe stays on
+      const out = { router: ${JSON.stringify(router)}, maxDz: 0, minA: 0, press: 0, two: false, wrench: false, caps: new Set(), swap: null, fMin: 1, fMax: -1, upMove: 0, upHidden: false, each: false };
       const done = LR4ToolChange.play({ bit: { shape: "flat", d: 6.35, len: 38, flen: 19 } });
       let st, shot = false;
       while ((st = LR4ToolChange.state())) {
         out.maxDz = Math.max(out.maxDz, st.nutDz); out.minA = Math.min(out.minA, st.nutA); out.press = Math.max(out.press, st.press);
-        out.two = out.two || st.two; out.swap = st.swap; if (st.caption) out.caps.add(st.caption);
+        out.two = out.two || st.two; out.swap = st.swap; out.each = out.each || st.nutEach; if (st.caption) out.caps.add(st.caption);
+        if (st.front !== null) { out.fMin = Math.min(out.fMin, st.front); out.fMax = Math.max(out.fMax, st.front); }
+        if (up) { out.upMove = Math.max(out.upMove, up.position.distanceTo(up0)); out.upHidden = out.upHidden || !up.visible; }
         if (st.wrench && !shot && st.k >= 3) { shot = true; out.wrench = true; window.__shot = true; await T.sleep(400); window.__shot = false; }
         await T.sleep(50);
       }
@@ -62,20 +67,24 @@ const JOBTXT = ["(LR4 tool change test)", STOCK, "(ToolDef 1: SHAPE=flat D=3.175
       out.errs = errs;
       return out;
     })()`);
-    for (const router of ["kobalt", "carbide"]) {
-      const p = run(router);
+    // the Kobalt + Carbide both have a lock and flats: each held both ways, each nut mode
+    for (const [router, hold, nuts] of [["kobalt", "lock", "each"], ["kobalt", "wrenches", "one"], ["carbide", "lock", "one"], ["carbide", "wrenches", "each"]]) {
+      const p = run(router, hold, nuts), id = `${router} (${hold}, ${nuts})`;
       if (process.env.TC_SHOT) {                     // the frame with the wrench(es) on
-        for (let i = 0; i < 200; i++) { await sleep(100); if (await page.val("!!window.__shot")) { await shot(`tc_${router}`); break; } }
+        for (let i = 0; i < 200; i++) { await sleep(100); if (await page.val("!!window.__shot")) { await shot(`tc_${router}_${hold}`); break; } }
       }
       const r = await p;
-      const E = router === "kobalt" ? 8 : 8;         // the thread length (both ER11 M13 x 0.75, 8 mm)
-      ok(r.maxDz > E + 10 && r.maxDz < E + 13, `${router}: the nut comes off the thread and down (${r.maxDz.toFixed(1)} mm)`);
-      ok(r.minA < -2 * Math.PI * (E / 0.75) * 0.95, `${router}: it turns ~${(E / 0.75).toFixed(1)} times to come off (${(-r.minA / 2 / Math.PI).toFixed(1)})`);
-      ok(router === "kobalt" ? r.press > 0.99 && !r.two : r.two && r.press === 0, `${router}: ${router === "kobalt" ? "the shaft lock pressed, 1 wrench" : "2 wrenches, no lock"} (${r.press}, ${r.two})`);
-      ok(r.wrench && r.wrenchesHidden, `${router}: the wrench on the nut, put away after`);
-      ok(r.swap === true && r.caps.some((c) => /collet out/.test(c)) && r.caps.some((c) => /new bit in/.test(c)), `${router}: 1/8" -> 1/4": the collet swapped (${r.caps.length} captions)`);
-      ok(r.back < 0.01 && r.lockBack < 0.01, `${router}: the nut + lock back where they were (${r.back}, ${r.lockBack})`);
-      ok(r.errs.length === 0, `${router}: no page errors (${r.errs})`);
+      const E = 8;                                   // the thread length (both ER11 M13 x 0.75, 8 mm)
+      ok(r.maxDz > E + 10 && r.maxDz < E + 13, `${id}: the nut comes off the thread and down (${r.maxDz.toFixed(1)} mm)`);
+      ok(r.minA < -2 * Math.PI * (E / 0.75) * 0.95, `${id}: it turns ~${(E / 0.75).toFixed(1)} times to come off (${(-r.minA / 2 / Math.PI).toFixed(1)})`);
+      ok(hold === "lock" ? r.press > 0.99 && !r.two : r.two && r.press === 0, `${id}: ${hold === "lock" ? "the shaft lock pressed, 1 wrench" : "2 wrenches, the lock not pressed"} (${r.press}, ${r.two})`);
+      ok(r.fMin > 0.85 && r.fMax > 0.99, `${id}: the wrench's handle out the front, 30 deg either side (cos ${r.fMin}..${r.fMax})`);
+      ok(r.wrench && r.wrenchesHidden, `${id}: the wrench on the nut, put away after`);
+      ok(r.swap === true && r.caps.some((c) => nuts === "each" ? /aside in its nut/.test(c) : /collet out/.test(c)) && r.each === (nuts === "each") && r.caps.some((c) => /new bit in/.test(c)),
+        `${id}: 1/8" -> 1/4": the collet swapped, ${nuts === "each" ? "in its own nut" : "out of the one nut"} (${r.caps.length} captions)`);
+      ok(r.upMove < 0.01 && !r.upHidden && r.caps.some((c) => /lower dust shoe off/.test(c)), `${id}: only the lower dust shoe comes off (the upper moved ${r.upMove})`);
+      ok(r.back < 0.01 && r.lockBack < 0.01, `${id}: the nut + lock back where they were (${r.back}, ${r.lockBack})`);
+      ok(r.errs.length === 0, `${id}: no page errors (${r.errs})`);
     }
     // a job's tool change: Install bit and resume plays the change, then the bit goes in and the job carries on
     const j = await page.val(`(async () => {

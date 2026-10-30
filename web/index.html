@@ -748,14 +748,21 @@
       chamfer's point, or a tapered ball's ball diameter. <b>Corner radius</b>: a bullnose's. <b>Flutes</b>: how many
       (0 = not said). <b>Sticks out</b>: mm below the collet, for the drawing only (0 = as the model's bit).
       The router's collets (My LR4 &gt; Router &gt; Bit end) set the biggest shank it takes: a bit wider than that is drawn on that shank.</p>
-      <p><b>Show the bit change</b>: Install bit and resume first plays the change on the router - the shaft held (its
-      lock, or a wrench on its flats), the collet nut off with a wrench and by hand, the old bit out, the collet swapped
-      if the shank changes, the new bit in, the nut back on and tightened. Off: the bit just goes in.</p>
+      <p><b>Show the bit change</b>: Install bit and resume first plays the change on the router - the lower dust shoe
+      off (the upper one stays on), the shaft held, the collet nut off with a wrench and by hand, the old bit out, the
+      collet swapped if the shank changes, the new bit in, the nut back on and tightened. Off: the bit just goes in.</p>
+      <p><b>Hold the shaft</b>: press the router's lock button, or hold the shaft's flats with a second wrench (a router
+      with no lock always uses 2 wrenches). <b>Collets</b>: each collet kept in its own nut (the nut and collet swap
+      together), or one nut the collets snap in and out of. Both are kept in this browser.</p>
       <p><b>From my bits</b>: your bits, kept in this browser for all your machines. They start as the bits in the
       V1 Engineering store (store ↗ opens a bit's page) and a 3/4" surfacing bit; <b>Save to my bits</b> keeps the one
       set here, <b>Delete</b> drops the picked one, <b>Reset my bits</b> goes back to the store's list.</p>
       <p>Your pick is kept for this file.</p></div>
     <label class="check tc-anim"><input type="checkbox" id="tc-anim" checked> Show the bit change</label>
+    <div class="pair tc-opts">
+      <div class="field"><label for="tc-hold">Hold the shaft</label><select id="tc-hold"><option value="lock">Lock button</option><option value="wrenches">2 wrenches</option></select></div>
+      <div class="field"><label for="tc-nuts">Collets</label><select id="tc-nuts"><option value="each">Each in its own nut</option><option value="one">One nut for all</option></select></div>
+    </div>
     <div class="pair">
       <div class="field bit-lib"><label>From my bits</label><div class="bit-lib-row"><select data-k="lib" aria-label="From my bits"></select><a class="bit-store" target="_blank" rel="noopener" hidden title="This bit in the V1 Engineering store">store ↗</a></div></div>
       <div class="field"><label>Bit</label><select data-k="shape"><option value="flat">Flat end mill</option><option value="ball">Ball end</option><option value="bullnose">Bullnose</option><option value="vbit">V-bit</option><option value="chamfer">Chamfer</option><option value="taperball">Tapered ball</option></select></div>

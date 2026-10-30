@@ -22,6 +22,8 @@
 // housing, the upper one 3 mm under its top (V1E doesn't say how high each router sits).
 // GUESS = not measured: the shaft flats, thread length, collet sizes / types except the Kobalt + Carbide (user:
 // ER11 1/8 + 1/4, ER11A nut, M13 x 0.75), every Makita / DeWalt / T1 / spindle size. MEASURE YOURS.
+// A router with a lock has flats too (user 2026-10-30: "any router with a spindle lock, you should still be able to
+// use the 2 wrench method"): the Kobalt's flats and the Carbide's lock (it has one) are GUESS.
 (function (root) {
   "use strict";
   const DATA =
@@ -39,7 +41,7 @@
         "label": "Kobalt K7TR-03 (measured)",
         "collet_nut": {"type": "ER11A", "af": 16.9, "h": 13.0, "shape": "hex", "below": 1.5},
         "collet": {"type": "ER11", "sizes": [3.175, 6.35], "l": 18.0, "d": 11.5, "taper": 8},
-        "shaft": {"d": 12.0, "exposed": 4.0, "thread": {"d": 13.0, "pitch": 0.75, "length": 8.0}},
+        "shaft": {"d": 12.0, "exposed": 4.0, "thread": {"d": 13.0, "pitch": 0.75, "length": 8.0}, "flats": {"af": 10.0, "z": 13.5, "l": 3.0}},
         "bearing_cap": {"d": 30.4, "l": 11.0},
         "housing": {"d": 65.8, "l": 100.0},
         "collar": {"d": 66.6, "l": 22.0},
@@ -95,6 +97,7 @@
         "transition": {"l": 38.0, "d": 73.0, "shape": "round", "edge": "none"},
         "motor_cap": {"L": 100.0, "W": 75.0, "H": 44.0, "top_r": 14.0, "front_r": 14.0, "back_r": 14.0, "bot_r": 4.0},
         "dial": {"place": "end", "d": 28.0, "t": 9.0, "ring": ["#c22a22", "#871a15"]},
+        "shaft_lock": {"z": 20.0, "a": -50.0, "d": 10.0, "r": 36.0, "travel": 3.0},
         "strain_relief": {"at": [-50.0, 0, 176.0], "l": 40.0, "d": 12.0, "bend": 45.0},
         "looks": {
           "motor_cap": {"c": [0.36, 0.37, 0.39], "f": "plastic"},

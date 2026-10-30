@@ -57,8 +57,8 @@ ok(junk.model.looks.housing.c.join() === "1,0,0.5" && junk.model.looks.housing.f
 ok(B.overall(junk.model) > junk.model.collet_nut.h && B.build(junk.model).parts.motor_cap.pos.every(Number.isFinite), "clean: builds");
 ok(R.ROUTERS.kobalt.model.collet.type === "ER11" && R.ROUTERS.kobalt.model.collet.sizes.join() === "3.175,6.35" && R.ROUTERS.kobalt.model.collet_nut.type === "ER11A"
   && R.ROUTERS.kobalt.model.shaft.thread.pitch === 0.75 && R.ROUTERS.carbide.model.collet.type === "ER11", "Kobalt + Carbide: ER11 1/8 + 1/4, ER11A nut, M13 x 0.75");
-ok(R.ROUTERS.carbide.model.shaft.flats && !R.ROUTERS.carbide.model.shaft_lock && R.ROUTERS.kobalt.model.shaft_lock && !R.ROUTERS.kobalt.model.shaft.flats,
-  "Carbide: 2 wrenches (flats, no lock); Kobalt: the shaft lock");
+ok(["carbide", "kobalt"].every((id) => R.ROUTERS[id].model.shaft.flats && R.ROUTERS[id].model.shaft_lock),
+  "Kobalt + Carbide: a shaft lock and flats (held either way)");
 const mine = R.preset("makita");
 mine.name = "Mine"; mine.model.motor_cap.L = 111; mine.source = "gcode"; mine.s = [8000, 24000];
 const id = R.newId(mine.name);
@@ -102,6 +102,9 @@ ok(sp["len-housing"].k === "model.housing.l" && sp.overall.k === null && !sp["ca
 ok(!dm("makita", null).clamp && DM.dims(Object.assign({}, R.ROUTERS.makita, { mount: "none" }), 36.5).every((d) => d.id !== "clamp"), "dims: no clamp line without a mount");
 ok(DM.pick(R.ROUTERS.kobalt, "housing", [0, 0, 60]) === "housing" && DM.pick(R.ROUTERS.kobalt, "switch", [0, 0, 0]) === "motor_cap" && DM.pick(R.ROUTERS.kobalt, null, [0, 0, 0], "Tool_Mount_B_Kobalt") === "mount",
   "pick: a part's mesh -> its region");
+// an old page's stored edit (0.60 schema: dial + body) of a data-file router: dropped, the router keeps its own preset (user 2026-10-30: the page wouldn't load)
+const kob = JSON.stringify(R.ROUTERS.kobalt.model), left = R.loadEdits({ get: () => JSON.stringify({ kobalt: { name: "Kobalt", dial: [[1, 10000]], body: { nut: {} } } }) });
+ok(R.ROUTERS.kobalt && JSON.stringify(R.ROUTERS.kobalt.model) === kob && !left.kobalt && R.settings({ router: "kobalt" }).router === "kobalt", "an old stored edit of the Kobalt: dropped, the Kobalt stays");
 
 console.log(`${checks - fails}/${checks} routers checks passed`);
 process.exit(fails ? 1 : 0);

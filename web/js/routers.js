@@ -155,8 +155,11 @@
     q.model = m;
     return q;
   }
-  function define(id, p) {                           // put preset p (cleaned) in as router id; null = back to the data file's
+  // put preset p (cleaned) in as router id; null = back to the data file's. A p that won't clean (an old file's / edit's
+  // schema) returns null: a data-file router keeps its own preset, a custom one is gone
+  function define(id, p) {
     const q = p ? clean(p) : ORIG[id] ? clean(ORIG[id]) : null;
+    if (!q && p && ORIG[id]) { define(id, null); return null; }
     if (!q) { delete ROUTERS[id]; delete SC.ROUTERS[id]; return null; }
     ROUTERS[id] = Object.assign({ name: q.name, source: q.source }, q.speeds ? { speeds: q.speeds } : {}, q.s ? { s: q.s } : {},
       { model: q.model, mount: q.mount, edited: !!p, custom: !ORIG[id] });

@@ -183,11 +183,51 @@
     return { shaft, thread: turned(tp, [0, 0, 0], [0, 0, 1], 48), shaftEnd: z0 };
   }
   // the collet: its nut end (wide, 30 deg nose) down at the nut's face, tapering `taper` deg up into the shaft; a bore
-  // for the shank (the biggest it takes)
-  function colletPart(m) {
+  // for the shank `bore` mm (else the biggest it takes). An ER collet (type ER...) is slit: erCollet
+  function colletPart(m, bore) {
     const C = m.collet || { d: 11.5, l: 18, taper: 8, sizes: [6.35] }, z0 = 0.6, R = C.d / 2, top = R - C.l * Math.tan((C.taper || 8) * Math.PI / 180);
-    const bore = Math.max(...(C.sizes || [6.35])) / 2, nose = Math.min(2.5, C.l / 6);
-    return turned([[bore, z0], [R - nose * 0.58, z0], [R, z0 + nose], [Math.max(top, bore + 0.6), z0 + C.l], [bore, z0 + C.l], [bore, z0]], [0, 0, 0], [0, 0, 1], 48);
+    const rb = (bore > 0 ? bore : Math.max(...(C.sizes || [6.35]))) / 2, nose = Math.min(2.5, C.l / 6);
+    if (/^ER/i.test(C.type || "")) return erCollet(C, rb, z0);
+    return turned([[rb, z0], [R - nose * 0.58, z0], [R, z0 + nose], [Math.max(top, rb + 0.6), z0 + C.l], [rb, z0 + C.l], [rb, z0]], [0, 0, 0], [0, 0, 1], 48);
+  }
+  // an ER collet: the nose, then the groove the nut's eccentric ring snaps into, a short band and the taper; ER_SLITS
+  // slits cut in turn from each end, each to ER_LAND short of the other (GUESS: 8 slits 0.7 wide, from photos). Built
+  // as cells round x along the axis: a slit cell is open over its slit's length, its faces close every open side
+  const ER_SLITS = 8, ER_SLIT = 0.7, ER_LAND = 2.5;
+  function erCollet(C, rb, z0) {
+    const R = C.d / 2, L = C.l, nose = Math.min(2.5, L / 6), t = Math.tan((C.taper || 8) * Math.PI / 180), zt = z0 + nose + 2;
+    const top = Math.max(R - (z0 + L - zt) * t, rb + 0.6);
+    const prof = [[z0, R - nose * 0.58], [z0 + nose, R], [z0 + nose + 0.2, R - 0.6], [z0 + nose + 1.2, R - 0.6], [z0 + nose + 1.4, R], [zt, R], [z0 + L, top]];
+    const ro = (z) => {
+      for (let k = 1; k < prof.length; k++) if (z <= prof[k][0] + 1e-9) { const [za, ra] = prof[k - 1], [zb, rz] = prof[k]; return ra + (rz - ra) * (z - za) / (zb - za); }
+      return top;
+    };
+    const zs = [...new Set(prof.map((p) => +p[0].toFixed(6)).concat([z0 + ER_LAND, z0 + L - ER_LAND]))].sort((a, b) => a - b);
+    const n = ER_SLITS, da = ER_SLIT / 2 / ((R + rb) / 2), cells = [];   // [a0, a1, slit: 0 solid | 1 from the nut end | 2 from the shaft end]
+    for (let k = 0; k < n; k++) {
+      const c = 2 * Math.PI * (k + 0.5) / n, g0 = c - 2 * Math.PI / n + da, g1 = c - da;   // slits between, so +x is solid (the widest point)
+      for (let s = 0; s < 6; s++) cells.push([g0 + (g1 - g0) * s / 6, g0 + (g1 - g0) * (s + 1) / 6, 0]);
+      cells.push([g1, c + da, k % 2 ? 2 : 1]);
+    }
+    const nz = zs.length - 1, nc = cells.length;
+    const solid = (i, j) => {
+      if (j < 0 || j >= nz) return false;
+      const [, , s] = cells[(i + nc) % nc], zm = (zs[j] + zs[j + 1]) / 2;
+      return s === 0 || (s === 1 ? zm > z0 + L - ER_LAND : zm < z0 + ER_LAND);
+    };
+    const m = mesh(), P = (a, r, z) => [r * Math.cos(a), r * Math.sin(a), z];
+    const quad = (...q) => { const k = m.pos.length / 3; for (const p of q) m.pos.push(...p); m.idx.push(k, k + 1, k + 2, k, k + 2, k + 3); };
+    for (let i = 0; i < nc; i++) for (let j = 0; j < nz; j++) {
+      if (!solid(i, j)) continue;
+      const [a0, a1] = cells[i], z1 = zs[j], z2 = zs[j + 1], r1 = ro(z1), r2 = ro(z2);
+      quad(P(a0, r1, z1), P(a1, r1, z1), P(a1, r2, z2), P(a0, r2, z2));                  // outside
+      quad(P(a0, rb, z1), P(a0, rb, z2), P(a1, rb, z2), P(a1, rb, z1));                  // the bore
+      if (!solid(i - 1, j)) quad(P(a0, rb, z1), P(a0, r1, z1), P(a0, r2, z2), P(a0, rb, z2));   // a slit's sides
+      if (!solid(i + 1, j)) quad(P(a1, rb, z1), P(a1, rb, z2), P(a1, r2, z2), P(a1, r1, z1));
+      if (!solid(i, j - 1)) quad(P(a0, rb, z1), P(a1, rb, z1), P(a1, r1, z1), P(a0, r1, z1));   // the ends, a slit's end
+      if (!solid(i, j + 1)) quad(P(a0, rb, z2), P(a0, r2, z2), P(a1, r2, z2), P(a1, rb, z2));
+    }
+    return m;
   }
 
   // the turned part above the shaft: bearing cap, the motor housing (its collet end chamfered ch at 45 deg), the collar,
@@ -341,7 +381,7 @@
     return [o[0] + c * v[0] - s * v[1], o[1] + s * v[0] + c * v[1], o[2] + v[2]];
   };
 
-  const api = { PARTS, build, expand, stackTop, overall, transitionEdgeMax, place, placeV, topAt };
+  const api = { PARTS, build, colletPart, expand, stackTop, overall, transitionEdgeMax, place, placeV, topAt };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.LR4RouterBody = api;
 })(typeof self !== "undefined" ? self : this);
