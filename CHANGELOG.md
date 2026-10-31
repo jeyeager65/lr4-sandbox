@@ -30,6 +30,9 @@ the date the model data was built and the Printables file set it was solved for.
   turns to the view (Top, Front, or Right for the cross-section) with the Flat lens and closes in on the cap; drag the
   points on the model itself. Picking Top / Front / Right on the camera switches the drawing too. Turn the camera
   away and the drawing waits. **Over the model** off puts the drawing back in the panel (more room for a photo).
+- **Cutaway for cross-sections:** with more than one slice, the Cross-section view cuts the router away at the picked
+  slice (the gray face is the cap's real shape there), the other slices show dotted with their X, and Top / Front
+  mark the picked slice solid. Works over the model and in the panel.
 
 ## 0.62.0 - 2026-10-30
 - **Speed dials that look like the real ones:** the wheel sits inside the head, and a slice of its rim shows through

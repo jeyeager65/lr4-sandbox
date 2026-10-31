@@ -281,7 +281,7 @@
       if (d.dot(w) < 0.9994) { RX.view = null; rxViewMark(); }   // over ~2°
     }
     rxFace();
-    rxDraw();
+    rxTick();                                         // (the shape editor's drawing too: not waiting for a frame)
   });
 
   // on with the Close-up (router_build.js rbViewMark), off when it ends

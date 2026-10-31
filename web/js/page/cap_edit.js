@@ -115,6 +115,7 @@
     for (let y = Math.ceil(y0 / step) * step; y <= y1; y += step) { const [, Y] = toS(0, y); el("line", { x1: 0, y1: Y, x2: W, y2: Y, class: y === 0 ? "ax" : "" }, gr); }
     const t = el("text", { x: 8, y: H - 8, class: "ce-step" }, s); t.textContent = `grid ${step} mm`;
     guides(s, sh);
+    if (CE.view === "section") others(s, sh, v);
     const pl = S.path(pts, v.closed, v.axis);
     if (v.axis) el("path", { d: d(pl.map(([x, y]) => (v.axis === "x" ? [x, -y] : [-x, y]))), class: "ce-mirror" }, s);
     el("path", { d: d(pl) + (v.closed ? "Z" : ""), class: "ce-line" }, s);
@@ -166,6 +167,21 @@
     table();
   });
   $("ce-pop-flip").addEventListener("click", () => { const i = CE.sel; edit((pts) => { if (pts[i]) pts[i].r = -(pts[i].r || 0); }); table(); });
+  // the cross-section's other sections (more than one: blended along the cap), dashed + their X at the widest point
+  function others(s, sh, v) {
+    const secs = sections(sh), cur = Math.min(CE.sec, secs.length - 1);
+    if (secs.length < 2) return;
+    const g = el("g", { class: "ce-other" }, s);
+    secs.forEach((e, j) => {
+      if (j === cur) return;
+      const pl = S.path(e.pts, v.closed, v.axis);
+      el("path", { d: d(pl) }, g);
+      el("path", { d: d(pl.map(([x, y]) => [-x, y])) }, g);
+      const w = pl.reduce((a, q) => (q[0] > a[0] + 0.01 || (Math.abs(q[0] - a[0]) <= 0.01 && q[1] > a[1]) ? q : a), pl[0]);
+      const [X, Y] = toS(w[0], w[1]), t = el("text", { x: X + 6, y: Y + 4 }, g);
+      t.textContent = `X ${+e.at.toFixed(1)}`;
+    });
+  }
   // the other views' extents (dashed) + the end sections' places
   function guides(s, sh) {
     const g = el("g", { class: "ce-guide" }, s), V = S.views(S.clean(sh) || sh), [W, H] = box();
@@ -174,7 +190,10 @@
     if (CE.view === "top" || CE.view === "front") {
       vline(V.x0); vline(V.x1);
       const secs = sections(sh);
-      if (secs.length > 1) for (const e of secs) { const [X] = toS(e.at, 0); el("line", { x1: X, y1: 0, x2: X, y2: H, class: "sec" }, g); }
+      if (secs.length > 1) secs.forEach((e, j) => {   // (the picked one solid: it's the one the Cross-section view edits)
+        const [X] = toS(e.at, 0);
+        el("line", { x1: X, y1: 0, x2: X, y2: H, class: "sec" + (j === Math.min(CE.sec, secs.length - 1) ? " on" : "") }, g);
+      });
     }
     if (CE.view === "section") { vline(V.W / 2); vline(-V.W / 2); hline(V.zmin); hline(V.zmax); }
     if (CE.view === "front") hline(0);
@@ -506,6 +525,55 @@
     controls.update();
     draw();
   }
+  // Part 48f (user 2026-10-31, several cross-sections: "show a cutaway view at that point"): while the Cross-section
+  // view is open (over the model or in the panel) the router is cut at the picked section's X - what's past it (toward
+  // the Right camera) above the cap's bottom: two clip planes, only their intersection cut - and the cut face filled (a
+  // flat copy of each cut mesh's back faces), so the drawn slice sits on the cap's real one there.
+  const CUT = { key: "", planes: null, mats: new Map(), fills: [], fill: null };
+  function uncut() {
+    for (const [mat, o] of CUT.mats) Object.assign(mat, o, { needsUpdate: true });
+    CUT.mats.clear();
+    for (const f of CUT.fills) if (f.parent) f.parent.remove(f);
+    CUT.fills = [];
+  }
+  function capCut() {
+    let at = null, m = null;
+    if (!$("ce").hidden && CE.view === "section" && typeof rxWorld === "function" && typeof meshes !== "undefined") {
+      const secs = sections(shapeNow());
+      m = LR4Routers.preset(rbCur()).model;
+      at = secs[Math.min(CE.sec, secs.length - 1)].at ?? (m.motor_cap.at || [0, 0])[0];
+    }
+    const list = at === null ? [] : meshes.filter((q) => q.visible && q.isMesh && /^Router_/.test(q.userData.name || ""));
+    const key = list.map((q) => q.uuid + q.geometry.uuid).join();
+    if (key !== CUT.key) {
+      uncut();
+      CUT.key = key;
+      if (key) {
+        CUT.planes = CUT.planes || [new THREE.Plane(), new THREE.Plane()];
+        CUT.fill = CUT.fill || new THREE.MeshBasicMaterial({ side: THREE.BackSide, clippingPlanes: CUT.planes, clipIntersection: true });
+        CUT.fill.color.set(css("--muted") || "#888888");
+        for (const q of list) {
+          q.traverse((o) => {                       // (its own parts too: the dial's ring, the switch's marks)
+            if (!o.isMesh || o.userData.cutFill) return;
+            for (const mat of [].concat(o.material)) {
+              if (CUT.mats.has(mat)) continue;
+              CUT.mats.set(mat, { clippingPlanes: mat.clippingPlanes, clipIntersection: mat.clipIntersection });
+              Object.assign(mat, { clippingPlanes: CUT.planes, clipIntersection: true, needsUpdate: true });
+            }
+          });
+          const f = new THREE.Mesh(q.geometry, CUT.fill);
+          f.raycast = () => {};
+          f.userData.cutFill = true;
+          q.add(f); CUT.fills.push(f);
+        }
+      }
+    }
+    if (!key) return;
+    const z0 = LR4RouterBody.stackTop(m), W = rxWorld([at, 0, z0]), X1 = rxWorld([at + 1, 0, z0]), Z1 = rxWorld([at, 0, z0 + 1]);
+    if (!W || !X1 || !Z1) return;
+    CUT.planes[0].setFromNormalAndCoplanarPoint(W.clone().sub(X1).normalize(), W);   // kept: x <= at
+    CUT.planes[1].setFromNormalAndCoplanarPoint(W.clone().sub(Z1).normalize(), W);   // kept: below the cap
+  }
   function capEditOpen(on) {
     const was = !$("ce").hidden;
     $("ce").hidden = !on;
@@ -514,6 +582,7 @@
     if (on && !was) { CE.cam = {}; show(CE.view); }
     if (typeof rtiShow === "function") rtiShow();   // the inspector steps aside for it (router_inspect.js)
     if (on !== was) fitRoom(); else viewRoom();
+    capCut();
   }
   $("ce-close").addEventListener("click", () => { $("ce").dataset.shut = "1"; capEditOpen(false); });   // shut: stays shut on the tab
   window.capEditToggle = () => { const on = $("ce").hidden; if (on) delete $("ce").dataset.shut; else $("ce").dataset.shut = "1"; capEditOpen(on); };
@@ -532,11 +601,13 @@
     setTimeout(capFit, 420);                          // after the snap's turn (router_edit.js: ~0.35 s)
   };
   window.capEditTick = () => {
+    capCut();
     if (!overOn() || CE.drag) return;
     const c = live(), key = c ? [c.cx, c.cy, c.k].map((q) => q.toFixed(2)).join() : "-";
     if (key !== CE.key) { CE.key = key; draw(); }
   };
   window.capEditOver = () => overOn();
+  window.capEditCut = () => (CUT.key ? { planes: CUT.planes.map((q) => q.clone()), fills: CUT.fills.length } : null);   // (tests)
   window.capEditRoom = viewRoom;
   window.capEditFit = fitRoom;
   window.capEditView = () => Object.assign({ view: CE.view }, cam());   // (tests: the view's px a mm)

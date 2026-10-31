@@ -114,6 +114,19 @@ const SHOT = process.env.CE_SHOT;                    // a folder: screenshots of
       out.end = { pts: svg.querySelectorAll(".ce-pt").length, mirror: !!svg.querySelector(".ce-mirror"), secs: !$$("ce-secs").hidden };
       $$("ce-sec-add").click(); await T.sleep(300);
       out.sections = Array.isArray(edit().motor_cap.shape.section[0].pts) ? edit().motor_cap.shape.section.length : 1;
+      // the cutaway (Part 48f): the router cut at the picked section's X (past it, above the cap's bottom), the cut filled;
+      // the other section dashed with its X; Front: no cut, the cap's material as it was
+      const cutOf = () => {
+        const c = capEditCut(), m1 = LR4RouterBuild.preset().model, z1 = LR4RouterBody.stackTop(m1), at = edit().motor_cap.shape.section[CE_SEC()].at;
+        const gone = (x, z) => c && c.planes.every((q) => q.distanceToPoint(rxWorld([x, 0, z])) < 0);
+        return c && { fills: c.fills, past: gone(at + 5, z1 + 10), before: !gone(at - 5, z1 + 10), below: !gone(at + 5, z1 - 10) };
+      };
+      const CE_SEC = () => +$$("ce-sec").value;
+      const capMat = () => meshes.find((q) => q.userData.name === "Router_MotorCap").material;
+      out.cut = { on: cutOf(), others: svg.querySelectorAll(".ce-other path").length, label: (svg.querySelector(".ce-other text") || {}).textContent, clip: !!capMat().clippingPlanes };
+      $$("ce-views").querySelector("[data-v=front]").click(); await T.sleep(200);
+      out.cut.front = [capEditCut(), capMat().clippingPlanes, svg.querySelectorAll(".ce-guide line.sec").length, svg.querySelectorAll(".ce-guide line.sec.on").length];
+      $$("ce-views").querySelector("[data-v=section]").click(); await T.sleep(200);
       // start from a pear: the shape replaced, the model too; Length stretches it
       const st = $$("ce-start"); st.value = "pear"; st.dispatchEvent(new Event("change", { bubbles: true })); await T.sleep(400);
       out.pear = { n: edit().motor_cap.shape.top.length, box: cap() };
@@ -171,6 +184,12 @@ const SHOT = process.env.CE_SHOT;                    // a folder: screenshots of
     ok(a.added === 1 && a.deleted === 1, `clicking the outline adds a point, Delete removes the picked one (${a.added}, ${a.deleted})`);
     ok(a.side.pts === 4 && !a.side.mirror && a.side.hy === "Up", `Front view: all round, not mirrored (${JSON.stringify(a.side)})`);
     ok(a.end.pts === 4 && a.end.mirror && a.end.secs && a.sections === 2, `Cross-section: one half, mirrored; + Section makes 2 (${JSON.stringify(a.end)}, ${a.sections})`);
+    const cu = a.cut;
+    ok(cu.on && cu.on.fills > 0 && cu.on.past && cu.on.before && cu.on.below && cu.clip,
+      `Cross-section: the router cut away past the picked section's X (above the cap's bottom only), the cut filled (${JSON.stringify(cu.on)})`);
+    ok(cu.others === 2 && /^X -?\d/.test(cu.label || ""), `the other section dashed (both halves) with its X (${cu.others}, ${cu.label})`);
+    ok(cu.front[0] === null && !cu.front[1] && cu.front[2] === 2 && cu.front[3] === 1,
+      `Front: no cut, the cap's material as it was; the sections' places marked, the picked one solid (${JSON.stringify(cu.front.slice(2))})`);
     ok(a.pear.n === 5, `Start from Pear: its 5 top points (${JSON.stringify(a.pear)})`);
     ok(Math.abs(a.stretch.L - 130) < 0.1 && Math.abs(a.stretch.box[0] - 130) < 1 && a.stretch.filletsHidden && a.stretch.note,
       `Length 130 stretches the drawn cap; the fillets hidden, "drawn" noted (${JSON.stringify(a.stretch)})`);
