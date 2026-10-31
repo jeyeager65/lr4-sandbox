@@ -118,8 +118,10 @@
   row("dial", "Window", "model.dial.win.r", "Window corner", "len", { min: 0, max: 60, step: 0.5, when: win, csg: true, help: "Rounds the window's corners as seen from above (the Makita's U); 0 = square." });
   row("dial", "Window", "model.dial.win.bevel", "Window bevel", "len", { min: 0, max: 10, step: 0.5, when: win, help: "The 45° edge from the top down into the window." });
   row("dial", "Window", "model.dial.win.open", "Open at the end (a notch)", "bool", { when: win });
-  row("dial", "Numbers", "model.dial.style", "Numbers", "choice", { opts: [["rim", "On the rim"], ["dome", "On a domed top"]],
-    help: "On the rim (between its ridges) or on a domed top (the wheel's upper half rounds up to a flat top). A domed dial shows best in a window." });
+  row("dial", "Numbers", "model.dial.style", "Numbers", "choice", { opts: [["rim", "On the rim"], ["dome", "On a domed top"], ["bevel", "On a beveled edge"]],
+    help: "On the rim (between its ridges), on a domed top (the wheel's upper half rounds up to a flat top), or on a beveled edge (a straight slope up to a flat top, the ridges running up it - the Makita's). Domed and beveled dials show best in a window." });
+  row("dial", "Numbers", "model.dial.bevel.top", "Flat top", "num", { unit: "x r", min: 0, max: 0.95, step: 0.05, when: (m) => m.dial && m.dial.style === "bevel",
+    help: "The flat top's share of the radius: the bevel runs from the rim in to it." });
   row("dial", "Numbers", "model.dial.dome.top", "Flat top", "num", { unit: "x r", min: 0, max: 0.95, step: 0.05, when: (m) => m.dial && m.dial.style === "dome",
     help: "The flat top's share of the radius (0 = a full dome)." });
   const slot = (m) => place(m) !== "window";

@@ -158,8 +158,9 @@
       }
       // its style (user 2026-10-30, an option): numbers on the ridged rim, or on a domed top (dome.top: the flat top's
       // share of the radius); the slot it shows through + the surround round that (Part 46d: end / top; js/router_body.js)
-      m.dial.style = D.style === "dome" ? "dome" : "rim";
+      m.dial.style = ["dome", "bevel"].includes(D.style) ? D.style : "rim";
       if (m.dial.style === "dome") m.dial.dome = { top: num(obj(D.dome) && D.dome.top, 0, 0.95, 0.45) };
+      if (m.dial.style === "bevel") m.dial.bevel = { top: num(obj(D.bevel) && D.bevel.top, 0, 0.95, 0.6) };   // (the Makita's: a straight bevel, user 2026-10-31)
       if (m.dial.place !== "window") {
         const Sl = obj(D.slot), Su = obj(D.surround) || {}, kind = ["sunk", "raised"].includes(Su.kind) ? Su.kind : "none";
         if (D.slot === false) m.dial.slot = false;

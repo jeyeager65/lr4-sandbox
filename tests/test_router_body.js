@@ -177,6 +177,11 @@ CSG.init().then((loaded) => {
     m.dial = Object.assign({}, m.dial, { slot: false });
     ok(with_ > B.build(m).parts.trim.idx.length && B.expand(m).dial.open === undefined, "dial slot: a dark back in the pocket; slot: false = the old look (no opening)");
   }
+  {                                                  // a beveled dial (user 2026-10-31, the Makita's): rim, a straight slope, a flat top
+    const b = B.build(M("makita")), prof = B.dialProfile({ d: 30, t: 8, bevel: { top: 0.6 } });
+    ok(M("makita").dial.style === "bevel" && b.dial.bevel && b.dial.bevel.top === 0.6 && !b.dial.dome && prof.join() === "15,0,15,4,9,8,0,8",
+      `dial style bevel: the Makita's, the profile rim -> slope -> flat top (${prof.join(" ")})`);
+  }
   {                                                  // the dial's style (user 2026-10-30, an option): numbers on the rim / on a domed top
     const dome = B.build(M("kobalt")), m = JSON.parse(JSON.stringify(M("kobalt")));
     m.dial = Object.assign({}, m.dial, { style: "rim" });

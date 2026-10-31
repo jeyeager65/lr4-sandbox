@@ -53,7 +53,9 @@
   // a domed dial (user 2026-10-28, again 2026-10-30: "the numbers are on the dome"): the lower half a plain rim, the
   // upper half a dome (parabolic) up to a flat top (dome.top x its radius); [r, h] up its axis from the bottom face,
   // h 0..t. The page puts the numbers on the dome's shoulder (router.js rtDomeRingGeo).
+  // A beveled one (D.bevel, the Makita's, user 2026-10-31): the upper half a straight slope in to the flat top.
   function dialProfile(D, n) {
+    if (D.bevel) return [[D.d / 2, 0], [D.d / 2, D.t / 2], [D.d / 2 * D.bevel.top, D.t], [0, D.t]];
     const R = D.d / 2, h = D.t / 2, rt = R * D.dome.top, out = [[R, 0], [R, h]];
     n = n || 10;
     for (let i = 1; i <= n; i++) { const u = 1 - i / n; out.push([rt + (R - rt) * u, 2 * h - h * u * u]); }   // sloped at the rim, flat on top
@@ -186,7 +188,8 @@
       : dp.place === "top" ? z0 + H / 2 : Math.min(z0 + H * 0.4, dial.at[2] - t / 2 - sh / 2 - 3);
     return Object.assign({}, m, {
       cap: Object.assign({ at, L: h.L, W: h.W, r: [rb, rf], z: [z0, z1], top_r: e, bot_r: Math.min(h.bot_r ?? 2, H / 2 - e) }, h.shape ? { shape: h.shape } : {}),
-      dial: Object.assign(dial, dp.at ? { at: dp.at } : {}, { ring: dp.ring, dome: dp.style === "dome" ? { top: Math.min(dp.dome ? dp.dome.top ?? 0.45 : 0.45, 0.95) } : null }),
+      dial: Object.assign(dial, dp.at ? { at: dp.at } : {}, { ring: dp.ring, dome: dp.style === "dome" ? { top: Math.min(dp.dome ? dp.dome.top ?? 0.45 : 0.45, 0.95) } : null,
+        bevel: dp.style === "bevel" ? { top: Math.min(dp.bevel ? dp.bevel.top ?? 0.6 : 0.6, 0.95) } : null }),
       switch: Object.assign({ at: [(h.shape ? (CS.ends(h.shape, swz - z0) || [0, x1])[1] : x1) + 0.75, at[1], swz], size: [1.5, sw, sh], rocker: [3.0, sw * 0.7, sh * 0.65] }, m.switch),
       strain_relief: Object.assign({ at: [h.shape ? (CS.ends(h.shape, H * 0.6) || [at[0] - h.L / 2])[0] : at[0] - h.L / 2, at[1], z0 + H * 0.6], l: 40.0, d: 12.0, bend: 45.0 }, m.strain_relief),
       cord: Object.assign({ d: 7.4, out: 15.0 }, m.cord),
@@ -642,7 +645,7 @@
       Z.lock = { dir, z: L.z, travel: tr };
     }
     const D = m.dial, ax = D.axis === "y" ? [0, 1, 0] : [0, 0, 1];
-    if (D.dome) append(P.dial, turned([[0, 0], ...dialProfile(Object.assign({}, D, { d: D.d - 1 }))], add(D.at, mul(ax, -D.t / 2)), ax, 72));   // rim + domed top
+    if (D.dome || D.bevel) append(P.dial, turned([[0, 0], ...dialProfile(Object.assign({}, D, { d: D.d - 1 }))], add(D.at, mul(ax, -D.t / 2)), ax, 72));   // rim + domed top
     else append(P.dial, cyl(add(D.at, mul(ax, -D.t / 2)), ax, D.d - 1, D.t, 72));   // (1 under: the page's ridged rim rounds over its edges)
     const oa = (D.out || 0) * Math.PI / 180, out = D.axis === "y" ? [Math.cos(oa), 0, Math.sin(oa)] : [Math.cos(oa), Math.sin(oa), 0];
     if (D.plate) {                                   // (no booleans) the dark slot round a dial on top: a thin plate on the cap's top
@@ -666,7 +669,7 @@
       }
     }
     const { cord } = cordParts(P, m.strain_relief, m.cord);
-    return { parts: P, dial: { c: D.at, axis: ax, out, r: D.d / 2, t: D.t, ring: D.ring || null, dome: D.dome }, cord, rocker, top, z: Z };
+    return { parts: P, dial: { c: D.at, axis: ax, out, r: D.d / 2, t: D.t, ring: D.ring || null, dome: D.dome, bevel: D.bevel || null }, cord, rocker, top, z: Z };
   }
   // a spindle (user 2026-10-29: some run a 65 mm spindle instead of a router): the nut, shaft, bearing cap and the
   // can (housing) up to the top, a dark end cap (motor_cap) on it; air-cooled: a fan grille on top, water-cooled: two

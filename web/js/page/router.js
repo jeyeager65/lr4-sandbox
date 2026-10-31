@@ -121,7 +121,7 @@
       }
       if (part === "dial") {                         // the wheel's centre, axis and the rim that shows (ref frame)
         const d = B.b.dial;
-        ud.dial = d && { c: LR4RouterBody.placeV(d.c, B.f), axis: LR4RouterBody.placeV(d.axis, B.f, true), out: LR4RouterBody.placeV(d.out, B.f, true), r: d.r, t: d.t, dome: d.dome };
+        ud.dial = d && { c: LR4RouterBody.placeV(d.c, B.f), axis: LR4RouterBody.placeV(d.axis, B.f, true), out: LR4RouterBody.placeV(d.out, B.f, true), r: d.r, t: d.t, dome: d.dome, bevel: d.bevel };
       }
       if (part === "shaft_lock" && B.b.z.lock) ud.lockDir = LR4RouterBody.placeV(B.b.z.lock.dir, B.f, true);
       out.push([dress(geo, null, false), rtMaterial(L), ud]);
@@ -187,14 +187,15 @@
     return geo.rotateX(Math.PI / 2);
   }
   // a domed dial's band: the rim + the dome up to its flat top, the rim ridged (as rtRingGeo), the dome smooth with the
-  // numbers on it (geometry.userData.v = how far up the band). Same frame as rtRingGeo: axis z, centred, u = deg / 360
+  // numbers on it (geometry.userData.v = how far up the band). Same frame as rtRingGeo: axis z, centred, u = deg / 360.
+  // A beveled one (the Makita's): the ridges run up the bevel too, the numbers flat on it, halfway up
   function rtDomeRingGeo(D) {
-    const prof = LR4RouterBody.dialProfile({ d: D.r * 2 + 0.1, t: D.t, dome: D.dome }, 16).slice(0, -1);
+    const prof = LR4RouterBody.dialProfile({ d: D.r * 2 + 0.1, t: D.t, dome: D.dome, bevel: D.bevel }, 16).slice(0, -1);
     const s = [0];
     for (let j = 1; j < prof.length; j++) s.push(s[j - 1] + Math.hypot(prof[j][0] - prof[j - 1][0], prof[j][1] - prof[j - 1][1]));
     const N = 720, M = prof.length, pos = [], uv = [], idx = [];
     for (let j = 0; j < M; j++) for (let i = 0; i <= N; i++) {
-      const u = i / N, th = u * 2 * Math.PI, [r, h] = prof[j], R = r + (h <= D.t / 2 + 1e-6 && h > 0 ? ringRise(u * 360) : 0);   // ridged rim, smooth dome
+      const u = i / N, th = u * 2 * Math.PI, [r, h] = prof[j], R = r + ((D.bevel || h <= D.t / 2 + 1e-6) && h > 0 ? ringRise(u * 360) : 0);   // ridged rim (+ bevel), smooth dome
       pos.push(R * Math.sin(th), -R * Math.cos(th), h - D.t / 2);
       uv.push(u, s[j] / s[M - 1]);
     }
@@ -208,8 +209,8 @@
     geo.setIndex(idx);
     geo.computeVertexNormals();
     const k = prof.findIndex(([, h]) => h > D.t / 2 + 1e-6);                 // where the dome starts
-    geo.userData.v = +((s[k] + 0.45 * (s[M - 1] - s[k])) / s[M - 1]).toFixed(3);   // on the dome, toward its outer edge (room for them)
-    geo.userData.vRim = +(s[k - 1] / s[M - 1]).toFixed(3);                    // the ridged rim's top
+    geo.userData.v = +((D.bevel ? (s[k - 1] + s[k]) / 2 : s[k] + 0.45 * (s[M - 1] - s[k])) / s[M - 1]).toFixed(3);   // on the dome, toward its outer edge (room for them); halfway up a bevel
+    geo.userData.vRim = D.bevel ? null : +(s[k - 1] / s[M - 1]).toFixed(3);   // the ridged rim's top (a bevel: ridged all the way)
     const sv = geo.userData.v * s[M - 1], j = s.findIndex((q) => q >= sv), f = j > 0 ? (sv - s[j - 1]) / (s[j] - s[j - 1] || 1) : 0;
     geo.userData.mm = { band: s[M - 1], circ: 2 * Math.PI * (j > 0 ? prof[j - 1][0] + f * (prof[j][0] - prof[j - 1][0]) : prof[0][0]), h: 2.6 };   // (the numbers' size)
     return geo;
@@ -270,7 +271,7 @@
         const pivot = new THREE.Object3D();          // x = the rim that shows, z = the wheel's axis
         pivot.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(ox, ax.clone().cross(ox), ax));
         pivot.position.set(...D.c);
-        ring = new THREE.Mesh(D.dome ? rtDomeRingGeo(D) : rtRingGeo(D.r + 0.05, D.t * 0.96), new THREE.MeshStandardMaterial({ roughness: 0.5, metalness: 0 }));
+        ring = new THREE.Mesh(D.dome || D.bevel ? rtDomeRingGeo(D) : rtRingGeo(D.r + 0.05, D.t * 0.96), new THREE.MeshStandardMaterial({ roughness: 0.5, metalness: 0 }));
         ring.castShadow = false;
         pivot.add(ring);
         dm.add(pivot);

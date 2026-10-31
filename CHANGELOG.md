@@ -35,8 +35,11 @@ the date the model data was built and the Printables file set it was solved for.
   mark the picked slice solid. Works over the model and in the panel.
 - **Cut at slider:** slide the cut along the cap to see its shape anywhere; near a section it picks that one to edit,
   between sections **+ Section here** adds one there, shaped like the cut (the cap doesn't change until you edit it).
-- **Makita RT0701C:** its speed dial now sits in a window like the real one - a domed wheel lying flat in the cap, up
-  near the top, its ridged rim showing through a U-shaped notch at the end (was a slot in the end face).
+- **Makita RT0701C:** its speed dial now sits in a window like the real one - a wheel lying flat in the cap, up near
+  the top, showing through a U-shaped notch at the end (was a slot in the end face), with a beveled edge: the numbers
+  flat on the bevel, the grip ridges running up it to a flat top.
+- **Beveled dial:** a new Numbers style for any dial - a straight bevel from the rim up to a flat top (Flat top sets
+  how far in it runs), ridged all the way up, the numbers on the bevel.
 - **Window corner:** a dial in a window can have its corners rounded as seen from above (the bevel follows).
 
 ## 0.62.0 - 2026-10-30

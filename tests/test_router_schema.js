@@ -12,10 +12,10 @@ const ok = (cond, msg) => { checks++; if (!cond) { fails++; console.log("FAIL " 
 const clone = (x) => JSON.parse(JSON.stringify(x));
 
 // a preset with everything on: every feature added, a window dial and a slot dial (two presets), a sunk surround
-const full = (id, place) => {
+const full = (id, place, style = "dome") => {
   const p = R.preset(id);
   for (const F of S.FEATURES) if ((!F.only || F.only === "r") && !F.has(p.model)) F.add(p);
-  Object.assign(p.model.dial, { place, style: "dome", dome: { top: 0.4 } });
+  Object.assign(p.model.dial, { place, style }, style === "bevel" ? { bevel: { top: 0.6 } } : { dome: { top: 0.4 } });
   if (place !== "window") Object.assign(p.model.dial, { slot: { w: 10, h: 5, r: 2 }, set: 0.3, surround: { kind: "sunk", depth: 2, margin: 3, r: 2, edge: "fillet", e: 1, out: "top" } });
   p.model.switch = { down: 30 };
   p.model.clamp = 30;
@@ -36,13 +36,13 @@ const leaves = (o, pre = "", out = []) => {
 const NOT_ROWS = /^(model\.label|speeds_source|model\.collet_nut\.type|model\.collet\.type|model\.collet\.taper|model\.motor_cap\.at|model\.motor_cap\.shape|model\.dial\.ring|model\.strain_relief\.|model\.cord\.|model\.kind$)/;
 const keyOf = (path) => path.replace(/^speeds\.(\d)\.\d$/, "speeds.$1").replace(/^model\.looks\.(\w+)\.[cf]$/, "looks.$1").replace(/^s\.\d$/, (m) => m);
 const rowKeys = new Set(S.ROWS.map((r) => r.k));
-for (const [id, place] of [["kobalt", "window"], ["kobalt", "end"], ["carbide", "top"], ["spindle65", null]]) {
-  const p = place ? full(id, place) : R.clean(Object.assign(R.preset(id), { source: "gcode", s: [8000, 24000] }));
+for (const [id, place, style] of [["kobalt", "window"], ["kobalt", "end"], ["carbide", "top"], ["makita", "window", "bevel"], ["spindle65", null]]) {
+  const p = place ? full(id, place, style) : R.clean(Object.assign(R.preset(id), { source: "gcode", s: [8000, 24000] }));
   const miss = [...new Set(leaves(p).map(keyOf))].filter((k) => !NOT_ROWS.test(k) && !rowKeys.has(k));
   ok(!miss.length, `${id} ${place || "spindle"}: every setting clean() keeps has a row (missing: ${miss.join(", ")})`);
 }
 // every row's path: one clean() keeps (in some preset), or a special key
-const all = new Set(["kobalt:window", "kobalt:end", "carbide:top"].flatMap((s) => leaves(full(...s.split(":"))).map(keyOf)));
+const all = new Set(["kobalt:window", "kobalt:end", "carbide:top", "makita:window:bevel"].flatMap((s) => leaves(full(...s.split(":"))).map(keyOf)));
 for (const k of leaves(R.clean(Object.assign(R.preset("spindle65"), { source: "gcode", s: [8000, 24000] }))).map(keyOf)) all.add(k);
 for (const k of leaves(R.preset("kobalt")).map(keyOf)) all.add(k);
 const SPECIAL = new Set(["kind", "model.overall", "shape", "model.collet.sizes", "s.0", "s.1"]);
