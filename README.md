@@ -433,6 +433,8 @@ only data, and it holds no V1E geometry (the page places your downloaded files).
   UI built for the browser (`web/fluidtouch/`).
 - [coi-serviceworker](https://github.com/gzuidhof/coi-serviceworker) (MIT, `web/coi-serviceworker.js`) makes the page
   cross-origin isolated on GitHub Pages, which FluidNC's threads need.
+- [Manifold](https://github.com/elalish/manifold) (Apache-2.0, `web/manifold/`, the `manifold-3d` package copied
+  unmodified) cuts the pockets in the router model: the dial window and the brush cap recesses.
 
 ### Built with Claude
 
@@ -444,5 +446,5 @@ instructions Claude follows when working in this repo.
 ## License
 
 The code in this repo is [MIT-licensed](LICENSE), except `web/fluidnc/` (FluidNC, built from its source:
-[GPL-3.0](web/fluidnc/LICENSE)). The LowRider 4 design and its part files belong to V1 Engineering and their other
+[GPL-3.0](web/fluidnc/LICENSE)) and `web/manifold/` (Manifold: [Apache-2.0](web/manifold/LICENSE)). The LowRider 4 design and its part files belong to V1 Engineering and their other
 authors, and are not covered by this license.

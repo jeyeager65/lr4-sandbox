@@ -20,11 +20,12 @@
     if (why) rtReadout();
     return RT.set;
   }
-  // the dial wheel's look (user's photos 2026-10-28: the Makita's and the Kobalt's are the same style): rounded ridges
-  // all round its edge, white numbers 1..6 on flat lands DIAL_STEP deg apart (number d at the texture's u 0.25 +
-  // (d - 1) x step / 360). RING: ridge pitch (8 to a step, so every land sits on the same phase), land half-width,
-  // ridge height (mm). ringColor: the wheel + its groove bottoms (the preset's dial.ring: Kobalt black, Makita red)
-  const RING = { pitch: LR4Routers.DIAL_STEP / 8, land: 9, rise: 0.45 };
+  // the dial wheel's look (user's photos 2026-10-28: the Makita's and the Kobalt's are the same style; Part 46d from the
+  // makers' close-ups: fine sharp ridges, small numbers on narrow lands): ridges all round its edge, white numbers 1..6
+  // on flat lands DIAL_STEP deg apart (number d at the texture's u 0.25 + (d - 1) x step / 360). RING: ridge pitch (8 to
+  // a step, so every land sits on the same phase), land half-width (deg), ridge height, the rim's edges rounded (mm).
+  // ringColor: the wheel + its groove bottoms (the preset's dial.ring: Kobalt black, Makita red)
+  const RING = { pitch: LR4Routers.DIAL_STEP / 8, land: 5.5, rise: 0.5, round: 0.5 };
   const ringColor = (id) => { const r = LR4Routers.ROUTERS[id]; return (r && r.model.dial && r.model.dial.ring) || ["#202022", "#0b0b0c"]; };
 
   // ---- the router's model, the page's own (Part 45b step 2, user 2026-10-29: "page decoupled from the FreeCAD
@@ -74,7 +75,7 @@
   function rtBody() {                                // the current router's built model + frame (kept until either changes)
     const r = LR4Routers.ROUTERS[RT.set.router], f = r && rtFrame(r);
     if (!f) return null;
-    const key = JSON.stringify(f);
+    const key = JSON.stringify(f) + (window.LR4Csg && LR4Csg.ready() ? "+csg" : "");   // (rebuilt once the pockets can be cut)
     if (!RT.body || RT.body.id !== RT.set.router || RT.body.key !== key) RT.body = { id: RT.set.router, key, f, b: LR4RouterBody.build(r.model) };
     return RT.body;
   }
@@ -120,7 +121,7 @@
       }
       if (part === "dial") {                         // the wheel's centre, axis and the rim that shows (ref frame)
         const d = B.b.dial;
-        ud.dial = d && { c: LR4RouterBody.placeV(d.c, B.f), axis: LR4RouterBody.placeV(d.axis, B.f, true), out: LR4RouterBody.placeV(d.out, B.f, true), r: d.r, t: d.t };
+        ud.dial = d && { c: LR4RouterBody.placeV(d.c, B.f), axis: LR4RouterBody.placeV(d.axis, B.f, true), out: LR4RouterBody.placeV(d.out, B.f, true), r: d.r, t: d.t, dome: d.dome };
       }
       if (part === "shaft_lock" && B.b.z.lock) ud.lockDir = LR4RouterBody.placeV(B.b.z.lock.dir, B.f, true);
       out.push([dress(geo, null, false), rtMaterial(L), ud]);
@@ -173,28 +174,64 @@
     return false;
   }
   // radius out from the wheel at deg: lands flush with the ridge tops, grooves down to the wheel's own radius
-  const ringRise = (deg) => ringLand(deg) ? RING.rise : RING.rise * Math.pow(Math.abs(Math.cos(Math.PI * (deg - ringTheta(1)) / RING.pitch)), 0.5);
+  const ringRise = (deg) => ringLand(deg) ? RING.rise * 0.8 : RING.rise * (1 - Math.abs(Math.sin(Math.PI * (deg - ringTheta(1)) / RING.pitch)));   // sharp crests
   function rtRingGeo(r, h) {
-    const geo = new THREE.CylinderGeometry(r, r, h, 720, 1, true), p = geo.attributes.position, uv = geo.attributes.uv;
-    for (let i = 0; i < p.count; i++) {
-      const th = uv.getX(i) * 2 * Math.PI, R = r + ringRise(uv.getX(i) * 360);
+    const geo = new THREE.CylinderGeometry(r, r, h, 720, 16, true), p = geo.attributes.position, uv = geo.attributes.uv;
+    for (let i = 0; i < p.count; i++) {              // (its top + bottom edges rounded over RING.round)
+      const y = uv.getY(i) * h, q = Math.max(0, 1 - Math.min(y, h - y) / RING.round);
+      const th = uv.getX(i) * 2 * Math.PI, R = r + ringRise(uv.getX(i) * 360) * (1 - q) - RING.round * (1 - Math.sqrt(1 - q * q));
       p.setX(i, R * Math.sin(th)); p.setZ(i, R * Math.cos(th));
     }
     geo.computeVertexNormals();
+    geo.userData.mm = { band: h, circ: 2 * Math.PI * r, h: Math.min(h * 0.5, 3.5) };
     return geo.rotateX(Math.PI / 2);
   }
-  function rtRingTex(col) {
-    const c = document.createElement("canvas"), W = 2048, H = 96, g = c.getContext("2d");
+  // a domed dial's band: the rim + the dome up to its flat top, the rim ridged (as rtRingGeo), the dome smooth with the
+  // numbers on it (geometry.userData.v = how far up the band). Same frame as rtRingGeo: axis z, centred, u = deg / 360
+  function rtDomeRingGeo(D) {
+    const prof = LR4RouterBody.dialProfile({ d: D.r * 2 + 0.1, t: D.t, dome: D.dome }, 16).slice(0, -1);
+    const s = [0];
+    for (let j = 1; j < prof.length; j++) s.push(s[j - 1] + Math.hypot(prof[j][0] - prof[j - 1][0], prof[j][1] - prof[j - 1][1]));
+    const N = 720, M = prof.length, pos = [], uv = [], idx = [];
+    for (let j = 0; j < M; j++) for (let i = 0; i <= N; i++) {
+      const u = i / N, th = u * 2 * Math.PI, [r, h] = prof[j], R = r + (h <= D.t / 2 + 1e-6 && h > 0 ? ringRise(u * 360) : 0);   // ridged rim, smooth dome
+      pos.push(R * Math.sin(th), -R * Math.cos(th), h - D.t / 2);
+      uv.push(u, s[j] / s[M - 1]);
+    }
+    for (let j = 0; j + 1 < M; j++) for (let i = 0; i < N; i++) {
+      const a = j * (N + 1) + i, b = a + N + 1;
+      idx.push(a, a + 1, b, a + 1, b + 1, b);         // faces out
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+    geo.setAttribute("uv", new THREE.Float32BufferAttribute(uv, 2));
+    geo.setIndex(idx);
+    geo.computeVertexNormals();
+    const k = prof.findIndex(([, h]) => h > D.t / 2 + 1e-6);                 // where the dome starts
+    geo.userData.v = +((s[k] + 0.45 * (s[M - 1] - s[k])) / s[M - 1]).toFixed(3);   // on the dome, toward its outer edge (room for them)
+    geo.userData.vRim = +(s[k - 1] / s[M - 1]).toFixed(3);                    // the ridged rim's top
+    const sv = geo.userData.v * s[M - 1], j = s.findIndex((q) => q >= sv), f = j > 0 ? (sv - s[j - 1]) / (s[j] - s[j - 1] || 1) : 0;
+    geo.userData.mm = { band: s[M - 1], circ: 2 * Math.PI * (j > 0 ? prof[j - 1][0] + f * (prof[j][0] - prof[j - 1][0]) : prof[0][0]), h: 2.6 };   // (the numbers' size)
+    return geo;
+  }
+  function rtRingTex(col, v, vRim, mm) {             // v: the numbers' height up the band (0 bottom .. 1 top); none = a plain rim;
+    // mm: { band, circ, h } the band's length up + its circumference there (mm), the numbers' height: drawn true to size
+    const c = document.createElement("canvas"), W = 2048, H = v ? 192 : 96, g = c.getContext("2d");
     c.width = W; c.height = H;
     g.fillStyle = col[0]; g.fillRect(0, 0, W, H);
     g.fillStyle = col[1];                            // the groove bottoms a little darker
     for (let deg = ringTheta(1) + RING.pitch / 2 - 360; deg < 360; deg += RING.pitch) {
       const x = ((deg % 360) + 360) % 360 / 360 * W;
-      if (!ringLand(deg)) g.fillRect(x - 3, 0, 6, H);
+      if (!ringLand(deg)) g.fillRect(x - 3, vRim ? H * (1 - vRim) : 0, 6, H);   // (a domed band: on its rim only)
     }
     const D = LR4Routers.DIAL;
-    g.fillStyle = "#f4f4f4"; g.textAlign = "center"; g.textBaseline = "middle"; g.font = "bold 50px sans-serif";
-    for (let d = D[0]; d <= D[1]; d++) g.fillText(String(d), ringTheta(d) / 360 * W, H / 2 + 2);
+    const px = W / mm.circ, sy = (H / mm.band) / px;   // canvas px per mm across; the band's px per mm up, relative
+    g.fillStyle = "#f4f4f4"; g.textAlign = "center"; g.textBaseline = "middle"; g.font = `bold ${Math.round(mm.h * px / 0.72)}px sans-serif`;
+    for (let d = D[0]; d <= D[1]; d++) {
+      g.save(); g.translate(ringTheta(d) / 360 * W, v ? H * (1 - v) : H / 2); g.scale(1, sy);
+      g.fillText(String(d), 0, 0.04 * mm.h * px);
+      g.restore();
+    }
     const t = new THREE.CanvasTexture(c);
     t.encoding = THREE.sRGBEncoding;
     t.anisotropy = 4;
@@ -233,16 +270,16 @@
         const pivot = new THREE.Object3D();          // x = the rim that shows, z = the wheel's axis
         pivot.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(ox, ax.clone().cross(ox), ax));
         pivot.position.set(...D.c);
-        ring = new THREE.Mesh(rtRingGeo(D.r + 0.05, D.t * 0.96), new THREE.MeshStandardMaterial({ roughness: 0.5, metalness: 0 }));
+        ring = new THREE.Mesh(D.dome ? rtDomeRingGeo(D) : rtRingGeo(D.r + 0.05, D.t * 0.96), new THREE.MeshStandardMaterial({ roughness: 0.5, metalness: 0 }));
         ring.castShadow = false;
         pivot.add(ring);
         dm.add(pivot);
         dm.userData.ring = ring;
       }
       ring.rotation.z = -LR4Routers.dialDeg(RT.set.dial) * Math.PI / 180;
-      const col = ringColor(RT.set.router), key = col.join();   // one texture per color, kept
+      const col = ringColor(RT.set.router), gv = ring.geometry.userData, key = [col.join(), gv.v, gv.vRim, gv.mm.band.toFixed(2), gv.mm.circ.toFixed(2)].join("|");   // one texture per look + size, kept
       RT.texs = RT.texs || {};
-      if (!RT.texs[key]) RT.texs[key] = rtRingTex(col);
+      if (!RT.texs[key]) RT.texs[key] = rtRingTex(col, gv.v, gv.vRim, gv.mm);
       if (ring.material.map !== RT.texs[key]) { ring.material.map = RT.texs[key]; ring.material.needsUpdate = true; }
     }
     const sel = $("rt-router"), man = LR4Routers.manual(RT.set.router);
@@ -330,7 +367,10 @@
   }
   if (typeof meta !== "undefined" && meta && !meshes.some((m) => RT_OWN.test(m.userData.name || ""))) rtSwap();   // a model built before this file loaded
   rtLook();
+  // the pockets (js/csg.js, Part 46c): manifold-3d loads in the background; a router already shown is built again with them
+  if (window.LR4Csg) LR4Csg.init().then((loaded) => { if (loaded && RT.body) rtSwap(); });
   // tests / videos: the settings, set them, the dial's ring turn (rad) + where the dial is on screen (client px)
   window.LR4Router = { state: () => Object.assign({}, RT.set), set: (o) => rtSet(o || {}),
     ring() { const dm = meshes.find((m) => m.userData.name === "Router_Dial"); return dm && dm.userData.ring ? +dm.userData.ring.rotation.z.toFixed(4) : null; },
-    screen() { return LR4Power.screen("Router_Dial"); }, frame: () => (RT.body ? JSON.parse(JSON.stringify(RT.body.f)) : null) };
+    screen() { return LR4Power.screen("Router_Dial"); }, frame: () => (RT.body ? JSON.parse(JSON.stringify(RT.body.f)) : null),
+    csg: () => !!(window.LR4Csg && LR4Csg.ready()) };

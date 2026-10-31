@@ -36,6 +36,8 @@ function stl(m) {                                    // binary STL, normals from
   return buf;
 }
 fs.mkdirSync(out, { recursive: true });
+// the pockets (Part 46c): manifold-3d first, so the model gets the page's real ones
+require("../web/js/csg.js").init().then(() => {
 const built = B.build(r.model), parts = {};
 for (const [k, name] of Object.entries(NAMES)) {
   const m = built.parts[k];
@@ -47,3 +49,4 @@ for (const [k, name] of Object.entries(NAMES)) {
 const info = { id, name: r.name, label: r.model.label, parts, cord: built.cord, top: B.overall(r.model), collet_nut: r.model.collet_nut };
 fs.writeFileSync(path.join(out, "router.json"), JSON.stringify(info, null, 1) + "\n");
 console.log(`router_export: ${r.name} -> ${out} (${Object.keys(parts).length} parts)`);
+});

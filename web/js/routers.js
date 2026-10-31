@@ -156,6 +156,22 @@
           win: { l: num(Wn.l, 2, 120, +(dd * 0.35).toFixed(1)), w: num(Wn.w, 2, 120, +(dd * 0.8).toFixed(1)), open: Wn.open !== false,
           bevel: num(Wn.bevel, 0, 10, 2) } });   // bevel: the 45 deg edge from the top into the window
       }
+      // its style (user 2026-10-30, an option): numbers on the ridged rim, or on a domed top (dome.top: the flat top's
+      // share of the radius); the slot it shows through + the surround round that (Part 46d: end / top; js/router_body.js)
+      m.dial.style = D.style === "dome" ? "dome" : "rim";
+      if (m.dial.style === "dome") m.dial.dome = { top: num(obj(D.dome) && D.dome.top, 0, 0.95, 0.45) };
+      if (m.dial.place !== "window") {
+        const Sl = obj(D.slot), Su = obj(D.surround) || {}, kind = ["sunk", "raised"].includes(Su.kind) ? Su.kind : "none";
+        if (D.slot === false) m.dial.slot = false;
+        else if (Sl) {
+          m.dial.slot = {};
+          for (const [k, lo, hi] of [["w", 2, 120], ["h", 1, 60], ["r", 0, 60]]) if (Sl[k] !== undefined && Sl[k] !== null && Sl[k] !== "") m.dial.slot[k] = num(Sl[k], lo, hi, undefined);
+        }
+        if (D.set !== undefined) m.dial.set = num(D.set, -10, 10, 0.3);
+        if (kind !== "none") m.dial.surround = Object.assign({ kind, depth: num(Su.depth, 0.2, 30, 2), margin: num(Su.margin, 0, 40, 3),
+          edge: Su.edge === "fillet" ? "fillet" : "chamfer", e: num(Su.e, 0, 10, 1), out: Su.out === "top" ? "top" : "none" },
+          Su.r !== undefined && Su.r !== null && Su.r !== "" ? { r: num(Su.r, 0, 60, 0) } : {});
+      }
       if (Array.isArray(D.ring) && D.ring.length === 2 && D.ring.every((v) => /^#[0-9a-f]{6}$/i.test(v))) m.dial.ring = D.ring.slice();
       const Sw = obj(b.switch);                      // the switch: its centre `down` under the head's top (else placed by the dial)
       if (Sw && Number.isFinite(+Sw.down)) m.switch = { down: num(Sw.down, 0, 300, 20) };

@@ -88,6 +88,11 @@
     rbField("rb-head", "rb-h-sw", "Switch below the top", "num", "mm").dataset.k = "model.switch.down";
     for (const [k, l] of [["in", "Rim in from the end"], ["drop", "Below the top"], ["win.l", "Window length"], ["win.w", "Window width"], ["win.bevel", "Window bevel"]])
       rbField("rb-dialwin-g", `rb-dw-${k.replace(".", "-")}`, l, "num", "mm").dataset.k = `model.dial.${k}`;
+    rbField("rb-dome-g", "rb-dome-top", "Flat top", "num", "x r").dataset.k = "model.dial.dome.top";   // (Part 46d: the dial's slot + surround)
+    for (const [k, l] of [["slot.w", "Slot width"], ["slot.h", "Slot height"], ["slot.r", "Slot corner"], ["set", "Rim in from the slot"]])
+      rbField("rb-dialslot-g", `rb-ds-${k.replace(".", "-")}`, l, "num", "mm").dataset.k = `model.dial.${k}`;
+    for (const [k, l] of [["depth", "Depth"], ["margin", "Margin"], ["r", "Corner"], ["e", "Edge"]])
+      rbField("rb-sur-g", `rb-su-${k}`, l, "num", "mm").dataset.k = `model.dial.surround.${k}`;
     LOOKS.forEach(([k, l, kind], i) => {             // a color + a finish each
       const el = rbField("rb-colors", `rb-lk${i}`, l, "color"), f = el.closest(".field"), sel = document.createElement("select");
       el.dataset.look = k;
@@ -147,7 +152,8 @@
     mnote.hidden = !mnote.textContent;   // (Part 45c: scene.js mountAlt)
     const ex = spin ? null : LR4RouterBody.expand(m);   // the switch's height as placed (until one's typed)
     const swDown = ex ? +(ex.cap.z[1] - ex.switch.at[2]).toFixed(1) : 0;
-    const shown = Object.assign({}, p, { model: Object.assign({}, m, { overall: LR4RouterBody.overall(m), switch: { down: swDown }, housing: Object.assign({ ch: 0 }, m.housing),
+    const O = ex && ex.dial.open, dialShown = O ? Object.assign({}, m.dial, { slot: O.S, set: m.dial.set ?? 0.3, surround: O.R }) : m.dial;   // (the slot's sizes as used)
+    const shown = Object.assign({}, p, { model: Object.assign({}, m, { dial: dialShown, overall: LR4RouterBody.overall(m), switch: { down: swDown }, housing: Object.assign({ ch: 0 }, m.housing),
       bearing_cap: m.bearing_cap || { d: 0, l: 0 }, collar: m.collar || { d: 0, l: 0 } }) });
     for (const el of document.querySelectorAll("#rte input[data-k]")) {
       const k = el.dataset.k, v = k.startsWith("speeds.") ? (p.speeds ? p.speeds[+k.split(".")[1]][1] : "") : rbPath(shown, k);
@@ -174,6 +180,18 @@
     if (!spin) for (const btn of $("rb-dialplace").querySelectorAll("button")) btn.setAttribute("aria-pressed", String(btn.dataset.v === m.dial.place));
     $("rb-dialwin").hidden = spin || m.dial.place !== "window";
     if (!spin && m.dial.place === "window") $("rb-win-open").checked = m.dial.win.open;
+    const Su = (!spin && m.dial.surround) || { kind: "none" };
+    if (!spin) {
+      for (const btn of $("rb-dialstyle").querySelectorAll("button")) btn.setAttribute("aria-pressed", String(btn.dataset.v === m.dial.style));
+      for (const btn of $("rb-surkind").querySelectorAll("button")) btn.setAttribute("aria-pressed", String(btn.dataset.v === Su.kind));
+      for (const btn of $("rb-suredge").querySelectorAll("button")) btn.setAttribute("aria-pressed", String(btn.dataset.v === (Su.edge || "chamfer")));
+      $("rb-sur-top").checked = Su.out === "top";
+    }
+    $("rb-dialstyle").hidden = spin;
+    $("rb-dome").hidden = spin || m.dial.style !== "dome";
+    $("rb-dialslot").hidden = spin || m.dial.place === "window" || !(window.LR4Csg && LR4Csg.ready());
+    $("rb-sur").hidden = Su.kind === "none";
+    $("rb-sur-topbox").hidden = spin || Su.kind !== "sunk" || m.dial.place !== "end";
     const shaped = !spin && !!(m.motor_cap && m.motor_cap.shape);   // drawn in the shape editor: no fillets
     for (const [k] of CAP.slice(3)) $(`rb-h-${k}`).closest(".field").hidden = shaped;
     $("rb-shapenote").hidden = !shaped;
@@ -352,6 +370,11 @@
   $("rb-cooling").addEventListener("click", (e) => { const v = e.target.dataset && e.target.dataset.v; if (v) rbEdit((p) => { p.model.cooling = v; }, true); });
   $("rb-dialplace").addEventListener("click", (e) => { const v = e.target.dataset && e.target.dataset.v; if (v) rbEdit((p) => { p.model.dial.place = v; }, true); });
   $("rb-win-open").addEventListener("change", (e) => rbEdit((p) => { p.model.dial.win = Object.assign({}, p.model.dial.win, { open: e.target.checked }); }, true));
+  $("rb-dialstyle").addEventListener("click", (e) => { const v = e.target.dataset && e.target.dataset.v; if (v) rbEdit((p) => { p.model.dial.style = v; }, true); });
+  const rbSur = (o) => rbEdit((p) => { p.model.dial.surround = Object.assign({ kind: "none" }, p.model.dial.surround, o); }, true);
+  $("rb-surkind").addEventListener("click", (e) => { const v = e.target.dataset && e.target.dataset.v; if (v) rbSur({ kind: v }); });
+  $("rb-suredge").addEventListener("click", (e) => { const v = e.target.dataset && e.target.dataset.v; if (v) rbSur({ edge: v }); });
+  $("rb-sur-top").addEventListener("change", (e) => rbSur({ out: e.target.checked ? "top" : "none" }));
   $("rte").addEventListener("input", (e) => {
     const el = e.target, k = el.dataset.k;
     if (el.dataset.lookf || el.dataset.list) return;   // (their change events)

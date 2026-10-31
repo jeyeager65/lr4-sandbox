@@ -5,13 +5,15 @@
 // or drawn in three views: js/cap_shape.js),
 // the dial wheel, switch (+ its rocker both ways), shaft lock, strain relief + cord stub, trim (small dark details),
 // and the parts a bit change shows (js/page/tool_change.js): the collet nut, the collet and the shaft's threaded end.
-// No booleans: pieces overlap. Plain JS, no THREE (tests/test_router_body.js); the page wraps the arrays.
+// Pieces overlap; the dial window and the bordered brush caps' recess are real pockets (Part 46c: js/csg.js, manifold-3d,
+// once its init() has run - else patches). Plain JS, no THREE (tests/test_router_body.js); the page wraps the arrays.
 //   build(model) -> { parts: { name: { pos: number[], idx: number[] } }, dial: { c, axis, out, r, t } | null, cord: { tip, dir },
 //                     rocker, noSwitch, z: { nutTop, shaftEnd, flats, lock } }
 //   place(mesh, frame) -> a copy moved into frame { o: [x, y, z], a: rad about z }
 (function (root) {
   "use strict";
   const CS = root.LR4CapShape || (typeof require === "function" ? require("./cap_shape.js") : null);   // a shaped motor cap (Part 46b)
+  const CSG = root.LR4Csg || (typeof require === "function" ? require("./csg.js") : null);   // pockets (Part 46c; init() first, else the old patches)
   const N = 96;                                      // points round a turned piece / the motor cap
   const add = (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]], mul = (a, k) => [a[0] * k, a[1] * k, a[2] * k];
   const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
@@ -48,6 +50,16 @@
     })));
   }
   const cyl = (o, dir, d, l, n) => turned([[0, 0], [d / 2, 0], [d / 2, l], [0, l]], o, dir, n);
+  // a domed dial (user 2026-10-28, again 2026-10-30: "the numbers are on the dome"): the lower half a plain rim, the
+  // upper half a dome (parabolic) up to a flat top (dome.top x its radius); [r, h] up its axis from the bottom face,
+  // h 0..t. The page puts the numbers on the dome's shoulder (router.js rtDomeRingGeo).
+  function dialProfile(D, n) {
+    const R = D.d / 2, h = D.t / 2, rt = R * D.dome.top, out = [[R, 0], [R, h]];
+    n = n || 10;
+    for (let i = 1; i <= n; i++) { const u = 1 - i / n; out.push([rt + (R - rt) * u, 2 * h - h * u * u]); }   // sloped at the rim, flat on top
+    out.push([0, D.t]);
+    return out;
+  }
   const zcyl = (d, z0, z1, n) => turned([[0, z0], [d / 2, z0], [d / 2, z1], [0, z1]], [0, 0, 0], [0, 0, 1], n);
 
   // ---- the motor cap: a box with its own corner radius per end, top edges rounded, bottom edges rounded ----
@@ -141,19 +153,40 @@
     const rf = fit(h.front_r, 10), rb = fit(h.back_r, 10), e = Math.min(h.top_r ?? 6, H / 2);
     const dp = Object.assign({ place: "end" }, m.dial), d = dp.d || 24, t = dp.t || 6;
     let dial;
-    if (dp.place === "top") dial = { axis: "y", at: [x1 - d / 2 - Math.max(e, 8), at[1], topX(x1 - d / 2 - Math.max(e, 8)) - d / 2 + 5], d, t, out: 90, slot: [d + 4, t + 3] };
-    else if (dp.place === "window") {                // flat inside the cap, rim `in` from the end, its top `drop` under the cap's top; the window
+    // the wheel inside the head, a slice of its rim through a slot in the face, a surround round that (Part 46d): needs
+    // the booleans (else today's look: the rim standing 5 out / a dark plate round a dial on top)
+    const cut = !!(CSG && CSG.ready()) && dp.slot !== false;
+    const S = Object.assign({ w: +(0.9 * d).toFixed(1), h: t + 2 }, dp.slot || {});
+    S.r = Math.min(S.r ?? S.h / 2, S.w / 2, S.h / 2);
+    const R = Object.assign({ kind: "none", depth: 2, margin: 3, edge: "chamfer", e: 1, out: "none" }, dp.surround);
+    const lift = R.kind === "raised" ? R.depth : R.kind === "sunk" ? -R.depth : 0, set = dp.set ?? 0.3;
+    if (dp.place === "top") {
+      const xt = x1 - d / 2 - Math.max(e, 8), zt = topX(xt);
+      dial = cut ? { axis: "y", at: [xt, at[1], zt + lift - set - d / 2], d, t, out: 90,
+        open: { o: [xt, at[1], zt], n: [0, 0, 1], u: [1, 0, 0], v: [0, 1, 0], lift, deep: set + d / 2, S, R: Object.assign({}, R, { out: "none" }) } }
+        : { axis: "y", at: [xt, at[1], zt - d / 2 + 5], d, t, out: 90, plate: [d + 4, t + 3] };
+    } else if (dp.place === "window") {                // flat inside the cap, rim `in` from the end, its top `drop` under the cap's top; the window
       const W = dp.win || {}, cx = x1 - (dp.in ?? 1) - d / 2, wl = W.l || d * 0.35, ww = W.w || d * 0.8;   // over its rim (open at the end: a notch)
       const cz = topX(cx + d / 2 - 2) - (dp.drop ?? 2) - t / 2;
       dial = { axis: "z", at: [cx, at[1], cz], d, t, out: 0,
         win: { x: [cx + d / 2 - wl, W.open === false ? cx + d / 2 + 1.5 : x1 + 5], y: [at[1] - ww / 2, at[1] + ww / 2], z: cz - t / 2 - 0.6, bevel: W.bevel ?? 2 } };
-    } else dial = { axis: "z", at: [x1 - d / 2 + 5, at[1], topX(x1 - d / 2) - e - t / 2 - 1], d, t, out: 0 };
+    } else {
+      let zc = topX(x1 - d / 2) - e - t / 2 - 1, xe = h.shape ? (CS.ends(h.shape, zc - z0) || [0, x1])[1] : x1;
+      if (cut) {                                     // a hood over the slot: the top where it meets the face (a shaped top falls
+        const hood = S.h / 2 + (R.kind === "none" ? 0 : R.margin + R.e) + 2;   // away there) well above the slot + surround
+        zc = Math.min(zc, topX(xe - 1) - hood);
+        if (h.shape) xe = (CS.ends(h.shape, zc - z0) || [0, xe])[1];
+      }
+      dial = cut ? { axis: "z", at: [xe + lift - set - d / 2, at[1], zc], d, t, out: 0,
+        open: { o: [xe, at[1], zc], n: [1, 0, 0], u: [0, 1, 0], v: [0, 0, 1], lift, deep: set + d / 2, S, R, vTop: z1 + 20 - zc } }
+        : { axis: "z", at: [x1 - d / 2 + 5, at[1], zc], d, t, out: 0 };
+    }
     const sw = Math.max(Math.min(20, h.W - 2 * rf - 2), 6), sh = Math.min(14, H * 0.4);   // on the flat of the +x end
     const swz = m.switch && Number.isFinite(m.switch.down) ? z1 - m.switch.down   // switch.down: its centre under the head's top (user 2026-10-30)
       : dp.place === "top" ? z0 + H / 2 : Math.min(z0 + H * 0.4, dial.at[2] - t / 2 - sh / 2 - 3);
     return Object.assign({}, m, {
       cap: Object.assign({ at, L: h.L, W: h.W, r: [rb, rf], z: [z0, z1], top_r: e, bot_r: Math.min(h.bot_r ?? 2, H / 2 - e) }, h.shape ? { shape: h.shape } : {}),
-      dial: Object.assign(dial, dp.at ? { at: dp.at } : {}, { ring: dp.ring }),
+      dial: Object.assign(dial, dp.at ? { at: dp.at } : {}, { ring: dp.ring, dome: dp.style === "dome" ? { top: Math.min(dp.dome ? dp.dome.top ?? 0.45 : 0.45, 0.95) } : null }),
       switch: Object.assign({ at: [(h.shape ? (CS.ends(h.shape, swz - z0) || [0, x1])[1] : x1) + 0.75, at[1], swz], size: [1.5, sw, sh], rocker: [3.0, sw * 0.7, sh * 0.65] }, m.switch),
       strain_relief: Object.assign({ at: [h.shape ? (CS.ends(h.shape, H * 0.6) || [at[0] - h.L / 2])[0] : at[0] - h.L / 2, at[1], z0 + H * 0.6], l: 40.0, d: 12.0, bend: 45.0 }, m.strain_relief),
       cord: Object.assign({ d: 7.4, out: 15.0 }, m.cord),
@@ -326,6 +359,136 @@
     rings.push(th.map(() => [at[0], at[1], z1]));
     return sweep(rings);
   }
+  // a solid over the plan grid xs x ys, its bottom at zb(x, y), its top flat at zl (zb kept a hair under it)
+  function heightSolid(xs, ys, zb, zl) {
+    const m = mesh(), nx = xs.length, ny = ys.length, v = (i, j, l) => l * nx * ny + i * ny + j;
+    for (const l of [0, 1]) for (const x of xs) for (const y of ys) m.pos.push(x, y, l ? zl : Math.min(zb(x, y), zl - 0.05));
+    for (let i = 0; i + 1 < nx; i++) for (let j = 0; j + 1 < ny; j++) {
+      const q = (l) => [v(i, j, l), v(i + 1, j, l), v(i + 1, j + 1, l), v(i, j + 1, l)];
+      const [a, b, c, d] = q(1), [e, f, g, h] = q(0);
+      m.idx.push(a, b, c, a, c, d, e, g, f, e, h, g);   // top up, bottom down
+    }
+    for (let i = 0; i + 1 < nx; i++) {               // the -y and +y sides
+      m.idx.push(v(i, 0, 0), v(i + 1, 0, 0), v(i + 1, 0, 1), v(i, 0, 0), v(i + 1, 0, 1), v(i, 0, 1));
+      const j = ny - 1;
+      m.idx.push(v(i, j, 0), v(i + 1, j, 1), v(i + 1, j, 0), v(i, j, 0), v(i, j, 1), v(i + 1, j, 1));
+    }
+    for (let j = 0; j + 1 < ny; j++) {               // the -x and +x sides
+      m.idx.push(v(0, j, 0), v(0, j + 1, 1), v(0, j + 1, 0), v(0, j, 0), v(0, j, 1), v(0, j + 1, 1));
+      const i = nx - 1;
+      m.idx.push(v(i, j, 0), v(i, j + 1, 0), v(i, j + 1, 1), v(i, j, 0), v(i, j + 1, 1), v(i, j, 1));
+    }
+    return m;
+  }
+  // the dial window as a real pocket (Part 46c): the opening box straight down to the floor, and a 45 deg bevel `bevel`
+  // wide from the top down into it (mitred at the corners, following the top's slope); all the head's own faces.
+  // null when the booleans aren't loaded (or fail): dialWindow's patch instead
+  function windowPocket(capM, B, s) {
+    if (!CSG || !CSG.ready()) return null;
+    const bv = B.bevel ?? 2, xCap = s.at[0] + s.L / 2, open = B.x[1] > xCap;
+    const E = { x: [B.x[0] - bv - 1, open ? B.x[1] : B.x[1] + bv + 1], y: [B.y[0] - bv - 1, B.y[1] + bv + 1] };   // (1 past the bevel)
+    const steps = (a, b) => { const k = Math.max(1, Math.ceil((b - a) / 0.5)); return Array.from({ length: k + 1 }, (_, i) => a + (b - a) * i / k); };
+    const axis = (e, b, o) => [...steps(e[0], b[0]), ...steps(b[0], b[1]).slice(1), ...(o ? [] : steps(b[1], e[1]).slice(1))];
+    const xs = axis(E.x, B.x, open), ys = axis(E.y, B.y, false);
+    let zl = s.z[1];
+    for (const x of xs) for (const y of ys) { const t = topAt(s, x - s.at[0], y - s.at[1]); if (t !== null) zl = Math.max(zl, t); }
+    zl += 5;
+    // the bevel runs out where the top is steep (user 2026-10-30: on a rounded edge, following it down left wedges at the
+    // notch's corners, held level it left ears): full width where the top at the opening's nearest edge is under 15 deg,
+    // none from 35 deg; there the notch's sides meet the rounding square, as a moulding's would
+    const tAt = (x, y) => topAt(s, x - s.at[0], y - s.at[1]);
+    const steep = (x, y) => {                        // the top's slope (deg) at the opening's edge nearest (x, y)
+      const px = Math.max(B.x[0], Math.min(open ? xCap - 0.3 : B.x[1], x)), py = Math.max(B.y[0], Math.min(B.y[1], y)), t = tAt(px, py);
+      const g = (dx, dy) => { const a = tAt(px + dx, py + dy), b = tAt(px - dx, py - dy); return a === null || b === null || t === null ? 9 : (a - b) / (2 * Math.hypot(dx, dy)); };
+      return Math.atan(Math.hypot(g(0.2, 0), g(0, 0.2))) * 180 / Math.PI;
+    };
+    const zb = (x, y) => {                           // depth bvx under the top at the opening's edge, up 45 deg to the top bvx out
+      const t = tAt(x, y);                           // (and on up, clear of it)
+      if (t === null) return zl;
+      const bvx = bv * Math.max(0, Math.min(1, (35 - steep(x, y)) / 20));
+      return t - bvx + Math.max(B.x[0] - x, open ? 0 : x - B.x[1], B.y[0] - y, y - B.y[1], 0);
+    };
+    const opening = box([(B.x[0] + B.x[1]) / 2, (B.y[0] + B.y[1]) / 2, (B.z + zl) / 2], [B.x[1] - B.x[0], B.y[1] - B.y[0], zl - B.z]);
+    // a box-type head (user 2026-10-30: "bevel all edges of the window"): every edge where the opening meets the head -
+    // round the top, down the notch's sides in the end and across its bottom - the same 45 deg band, bv wide: the
+    // points within bv of both the opening and the head's surface, o + depth < bv (a level set of the two distances)
+    if (!s.shape && bv > 0) {
+      const sd = planSd(s), rt = s.top_r || 0, z1 = s.z[1], at = s.at || [0, 0];
+      const depth = (x, y, z) => {                   // how far inside the head (its plan + rounded top edge; < 0 outside)
+        const qx = sd(x - at[0], y - at[1]) + rt, qz = z - z1 + rt;
+        return -(Math.hypot(Math.max(qx, 0), Math.max(qz, 0)) + Math.min(Math.max(qx, qz), 0) - rt);
+      };
+      const o = (x, y, z) => {                       // outside the opening's box (< 0 in it)
+        const dx = Math.max(B.x[0] - x, x - B.x[1]), dy = Math.max(B.y[0] - y, y - B.y[1]), dz = Math.max(B.z - z, z - zl);
+        return Math.hypot(Math.max(dx, 0), Math.max(dy, 0), Math.max(dz, 0)) + Math.min(Math.max(dx, dy, dz), 0);
+      };
+      const g = bv + 1, band = CSG.levelSet((x, y, z) => bv - Math.max(o(x, y, z), 0) - Math.max(depth(x, y, z), 0),
+        [B.x[0] - g, B.y[0] - g, B.z - g], [B.x[1] + g, B.y[1] + g, zl], 0.4);   // (0.4 mm: ~0.35 s; 0.3 looked no better at 0.8 s)
+      const cutter = band && CSG.union(opening, band);
+      if (cutter) return CSG.subtract(capM, cutter);
+    }
+    let r = CSG.subtract(capM, heightSolid(xs, ys, zb, zl));
+    if (r) r = CSG.subtract(r, opening);
+    return r;
+  }
+  // ---- the dial's opening (Part 46d): rounded rects in the face's frame (o; u across, v up the face, n out), lofted
+  // along n. A ring: [c (along n), a0, a1, b0, b1, r] grown by g; caps at both ends; faces out whichever way it ran ----
+  function rrLoft(F, rings) {
+    const K = 6, P = (a, b, c) => [0, 1, 2].map((i) => F.o[i] + F.u[i] * a + F.v[i] * b + F.n[i] * c);
+    const ring = ([c, a0, a1, b0, b1, r]) => {
+      r = Math.max(0, Math.min(r, (a1 - a0) / 2, (b1 - b0) / 2));
+      const pts = [];
+      for (const [ca, cb, q] of [[a1 - r, b1 - r, 0], [a0 + r, b1 - r, 1], [a0 + r, b0 + r, 2], [a1 - r, b0 + r, 3]])
+        for (let k = 0; k <= K; k++) { const th = (q + k / K) * Math.PI / 2; pts.push(P(ca + r * Math.cos(th), cb + r * Math.sin(th), c)); }
+      return pts;
+    };
+    const mid = ([c, a0, a1, b0, b1]) => Array(4 * (K + 1)).fill(P((a0 + a1) / 2, (b0 + b1) / 2, c));
+    const m = sweep([mid(rings[0]), ...rings.map(ring), mid(rings[rings.length - 1])]);
+    let v = 0;                                       // the signed volume: inside out -> flip
+    for (let i = 0; i < m.idx.length; i += 3) {
+      const [a, b, c] = [0, 1, 2].map((k) => m.pos.slice(m.idx[i + k] * 3, m.idx[i + k] * 3 + 3));
+      v += a[0] * (b[1] * c[2] - b[2] * c[1]) - a[1] * (b[0] * c[2] - b[2] * c[0]) + a[2] * (b[0] * c[1] - b[1] * c[0]);
+    }
+    if (v < 0) for (let i = 0; i < m.idx.length; i += 3) { const t = m.idx[i + 1]; m.idx[i + 1] = m.idx[i + 2]; m.idx[i + 2] = t; }
+    return m;
+  }
+  const grow = (B, c, g) => [c, B[0] - g, B[1] + g, B[2] - g, B[3] + g, B[4] + g];
+  // the edge from the face (c0, grown e) round to the wall (c0 -+ e, grown 0): chamfer 45 deg or a quarter round;
+  // into the head (sunk: the lip) or out of it (raised: the pad's top, grown -e at c0)
+  function edgeRings(B, c0, e, kind, into) {
+    const out = [], n = kind === "fillet" ? 6 : 1;
+    for (let k = 0; k <= n; k++) {
+      const f = k / n, ph = f * Math.PI / 2;
+      if (into) out.push(kind === "fillet" ? grow(B, c0 - e + e * Math.cos(ph), e - e * Math.sin(ph)) : grow(B, c0 - e * f, e * (1 - f)));
+      else out.push(kind === "fillet" ? grow(B, c0 - e + e * Math.sin(ph), -e + e * Math.cos(ph)) : grow(B, c0 - e + e * f, -e * f));
+    }
+    return out;
+  }
+  // the opening in capM for dial D (expand: D.open) -> the new cap, a dark backing appended to trim; null (no booleans
+  // or one failed): the caller keeps the plain cap
+  function dialOpening(capM, D, trim) {
+    const O = D.open;
+    if (!O || !CSG || !CSG.ready()) return null;
+    const S = O.S, R = O.R, sb = Math.min(0.8, S.h / 4);
+    let cap = capM;
+    const slot = [-S.w / 2, S.w / 2, -S.h / 2, S.h / 2, S.r], L = O.lift;
+    let cutter = rrLoft(O, [grow(slot, L + 20, sb), grow(slot, L, sb), grow(slot, L - sb, 0), grow(slot, L - O.deep, 0)]);
+    if (R.kind !== "none") {
+      const m = R.margin, e = Math.max(0, Math.min(R.e, R.depth - 0.2, m)), B = [-S.w / 2 - m, S.w / 2 + m, -S.h / 2 - m, S.h / 2 + m, R.r ?? S.r + m];
+      if (R.kind === "sunk") {                       // a recess round the slot (out top: open up through the top's edge), one cut with it
+        if (R.out === "top" && O.vTop) B[3] = O.vTop;
+        cutter = CSG.union(cutter, rrLoft(O, [grow(B, 20, e), ...edgeRings(B, 0, e, R.edge, true), grow(B, -R.depth, 0)]));
+        if (!cutter) return null;
+      } else {                                       // a pad standing `depth` out, its edge rounded, its back well into the head
+        cap = CSG.union(cap, rrLoft(O, [grow(B, -6, 0), ...edgeRings(B, R.depth, e, R.edge, false)]));
+        if (!cap) return null;
+      }
+    }
+    const r = CSG.subtract(cap, cutter);
+    if (!r) return null;
+    append(trim, rrLoft(O, [grow(slot, L - O.deep + 0.3, -0.05), grow(slot, L - O.deep + 0.05, -0.05)]));   // the dark back of the pocket
+    return r;
+  }
   // a window in the cap for a dial lying inside it (dial.win: the box x [a, b], y [a, b], above z; bevel): the cap's faces
   // round it taken out; in the head's color a bevel (45 deg, `bevel` wide) from the cap's top down into the opening, a
   // strip on the top round that (it hides the cut's ragged edge: whole faces came out) and a pocket below (floor + walls)
@@ -409,11 +572,12 @@
     if (m.kind === "spindle") return spindle(m, P, Z);
     m = expand(m);
     const top = stack(m, P);
-    const capM = m.cap.shape ? CS.mesh(m.cap.shape, m.cap.z[0]) : slab(m.cap);
-    if (m.dial && m.dial.win) dialWindow(capM, m.dial.win, m.cap);
+    let capM = m.cap.shape ? CS.mesh(m.cap.shape, m.cap.z[0]) : slab(m.cap);
+    if (m.dial && m.dial.win) { const w = windowPocket(capM, m.dial.win, m.cap); if (w) capM = w; else dialWindow(capM, m.dial.win, m.cap); }
+    if (m.dial && m.dial.open) capM = dialOpening(capM, m.dial, P.trim) || capM;
     append(P.motor_cap, capM);
     if (m.brushes) {                                 // the brush caps: n round the axis from a, each a disc from r out `out`
-      const Bc = m.brushes;
+      const Bc = m.brushes, holes = CSG && CSG.ready() ? mesh() : null;
       for (let i = 0; i < Bc.n; i++) {
         const a = (Bc.a + 360 * i / Bc.n) * Math.PI / 180, dir = [Math.cos(a), Math.sin(a), 0];
         // its screwdriver slot (user 2026-10-30: "they all have one"): a dark bar on its face, `slot` deg from upright
@@ -432,7 +596,10 @@
           append(P.brush_ring, turned([[ri, 0], [ro, 0], [ro, l + bk], [ri, l + bk], [ri, 0]], bat, dir, 36));
           append(P.brush_cap, cyl(at, dir, Bc.d, Math.max(4 - (Bc.inset ?? 1), 0.5), 36));
         } else append(P.brush_cap, cyl([dir[0] * Bc.r, dir[1] * Bc.r, Bc.z], dir, Bc.d, Bc.out, 36));   // no border: standing out `out`
-        if (Bc.ring > 0) for (const M of [P.motor_cap, P.transition]) {   // a bordered cap: the head's + transition's faces under the boss
+        if (Bc.ring > 0 && holes) {                  // a bordered cap: a round pocket the boss's size in the head + transition, to its back
+          const ro = Bc.d / 2 + 0.05 + Bc.ring + 0.02, back = Bc.r - 4 - 6 - 0.5;
+          append(holes, cyl([dir[0] * back, dir[1] * back, Bc.z], dir, 2 * ro, 30, 48));
+        } else if (Bc.ring > 0) for (const M of [P.motor_cap, P.transition]) {   // (no booleans) the head's + transition's faces under the boss
           const ri = Bc.d / 2 + 0.05, ro = ri + Bc.ring, p = M.pos, keep = [];   // come out (it hides their edge; the cap shows in it) -
           const q = (v) => { const k = v * 3, al = p[k] * dir[0] + p[k + 1] * dir[1], side = -p[k] * dir[1] + p[k + 1] * dir[0];   // nothing
             return al > Bc.r - 15 ? Math.hypot(side, p[k + 2] - Bc.z) : Infinity; };   // moved, no blend (user 2026-10-30): its face must be
@@ -442,7 +609,11 @@
           }
           M.idx = keep;
         }
-    }
+      }
+      if (holes && holes.idx.length) for (const k of ["motor_cap", "transition"]) {   // all the pockets in one cut
+        const r = P[k].idx.length ? CSG.subtract(P[k], holes) : null;
+        if (r) P[k] = r;
+      }
     }
     if (m.shaft_lock) {                              // a boss from `in` out to r, the button on its end: pressed in `travel` (tool_change.js);
       // arm: a bracket from the boss up to the housing's bottom (the spokes' face on a vented one), e.g. the Carbide's U
@@ -460,12 +631,13 @@
       Z.lock = { dir, z: L.z, travel: tr };
     }
     const D = m.dial, ax = D.axis === "y" ? [0, 1, 0] : [0, 0, 1];
-    append(P.dial, cyl(add(D.at, mul(ax, -D.t / 2)), ax, D.d, D.t, 72));
+    if (D.dome) append(P.dial, turned([[0, 0], ...dialProfile(Object.assign({}, D, { d: D.d - 1 }))], add(D.at, mul(ax, -D.t / 2)), ax, 72));   // rim + domed top
+    else append(P.dial, cyl(add(D.at, mul(ax, -D.t / 2)), ax, D.d - 1, D.t, 72));   // (1 under: the page's ridged rim rounds over its edges)
     const oa = (D.out || 0) * Math.PI / 180, out = D.axis === "y" ? [Math.cos(oa), 0, Math.sin(oa)] : [Math.cos(oa), Math.sin(oa), 0];
-    if (D.slot) {                                    // the dark slot round a dial on top: a thin plate on the cap's top
+    if (D.plate) {                                   // (no booleans) the dark slot round a dial on top: a thin plate on the cap's top
       const s = m.cap, nx = 6, ny = 6, base = P.trim.pos.length / 3;
       for (let i = 0; i <= nx; i++) for (let j = 0; j <= ny; j++) {
-        const x = D.at[0] + D.slot[0] * (i / nx - 0.5), y = D.at[1] + D.slot[1] * (j / ny - 0.5), t = topAt(s, x - s.at[0], y - s.at[1]);
+        const x = D.at[0] + D.plate[0] * (i / nx - 0.5), y = D.at[1] + D.plate[1] * (j / ny - 0.5), t = topAt(s, x - s.at[0], y - s.at[1]);
         P.trim.pos.push(x, y, (t === null ? s.z[1] : t) + 0.12);
       }
       for (let i = 0; i < nx; i++) for (let j = 0; j < ny; j++) { const a = base + i * (ny + 1) + j, b = a + ny + 1; P.trim.idx.push(a, b, b + 1, a, b + 1, a + 1); }
@@ -483,7 +655,7 @@
       }
     }
     const { cord } = cordParts(P, m.strain_relief, m.cord);
-    return { parts: P, dial: { c: D.at, axis: ax, out, r: D.d / 2, t: D.t, ring: D.ring || null }, cord, rocker, top, z: Z };
+    return { parts: P, dial: { c: D.at, axis: ax, out, r: D.d / 2, t: D.t, ring: D.ring || null, dome: D.dome }, cord, rocker, top, z: Z };
   }
   // a spindle (user 2026-10-29: some run a 65 mm spindle instead of a router): the nut, shaft, bearing cap and the
   // can (housing) up to the top, a dark end cap (motor_cap) on it; air-cooled: a fan grille on top, water-cooled: two
@@ -539,7 +711,7 @@
     return [o[0] + c * v[0] - s * v[1], o[1] + s * v[0] + c * v[1], o[2] + v[2]];
   };
 
-  const api = { PARTS, build, colletPart, expand, stackTop, overall, transitionEdgeMax, place, placeV, topAt };
+  const api = { PARTS, build, colletPart, expand, stackTop, overall, transitionEdgeMax, place, placeV, topAt, dialProfile };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.LR4RouterBody = api;
 })(typeof self !== "undefined" ? self : this);

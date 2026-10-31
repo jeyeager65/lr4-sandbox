@@ -56,7 +56,7 @@
         "housing": {"d": 65.8, "l": 94.0, "vent": {"depth": 10.0, "inset": 0.5, "wall": 3.5, "spokes": 12, "w": 3.0}},
         "collar": {"d": 66.6, "l": 22.0},
         "motor_cap": {"L": 105, "W": 80, "H": 60, "top_r": 14, "front_r": 14, "back_r": 14, "bot_r": 14},
-        "dial": {"place": "end", "d": 22.0, "t": 8.0, "ring": ["#202022", "#0b0b0c"]},
+        "dial": {"place": "window", "win": {"open": true}, "style": "dome", "dome": {"top": 0.45}, "d": 22.0, "t": 8.0, "ring": ["#202022", "#0b0b0c"]},
         "shaft_lock": {"z": 24.0, "a": -51.5, "d": 17.0, "in": 10.0, "r": 28.0, "button": 12.0, "pin": 5.0, "out": 4.0, "travel": 1.5},
         "strain_relief": {"at": [-52.5, 0, 185], "l": 45.0, "d": 13.0, "bend": 45.0},
         "looks": {
@@ -86,7 +86,7 @@
           "top": [{"x": -62, "y": 0, "s": "line"}, {"x": -62, "y": 14, "s": "line"}, {"x": -54, "y": 14, "s": "line"}, {"x": -36, "y": 28, "s": "curve"}, {"x": -26, "y": 34.5, "s": "curve"}, {"x": 0, "y": 37.6, "s": "curve"}, {"x": 24, "y": 34.5, "s": "curve"}, {"x": 34, "y": 31, "s": "curve"}, {"x": 38.5, "y": 22, "s": "curve"}, {"x": 41.6, "y": 0, "s": "line"}],
           "front": [{"x": -62, "y": 6, "s": "line"}, {"x": -50, "y": 6, "s": "line"}, {"x": -50, "y": 0, "s": "line"}, {"x": 41.6, "y": 0, "s": "line", "r": 1}, {"x": 41.6, "y": 24, "s": "curve"}, {"x": 40, "y": 31, "s": "curve"}, {"x": 36, "y": 38, "s": "curve"}, {"x": 31, "y": 43.8, "s": "curve"}, {"x": 25, "y": 46, "s": "line"}, {"x": -25, "y": 46, "s": "curve"}, {"x": -33, "y": 43, "s": "curve"}, {"x": -37, "y": 40, "s": "line"}, {"x": -52, "y": 40, "s": "line", "r": 3}, {"x": -56, "y": 34, "s": "line"}, {"x": -62, "y": 34, "s": "line", "r": 2}],
           "section": [{"x": 0, "y": 46, "s": "line"}, {"x": 37.6, "y": 46, "s": "line", "r": 12}, {"x": 37.6, "y": 0, "s": "line", "r": 1}, {"x": 0, "y": 0, "s": "line"}]}},
-        "dial": {"place": "end", "d": 30, "t": 8, "ring": ["#c8322b", "#8e1f1a"]},
+        "dial": {"place": "end", "surround": {"kind": "sunk", "depth": 3, "margin": 4, "r": 9, "edge": "fillet", "e": 1.5}, "d": 30, "t": 8, "ring": ["#c8322b", "#8e1f1a"]},
         "shaft_lock": {"z": 25.72, "a": -55, "d": 14, "in": 14, "arm": 15, "pin": 7, "r": 24, "travel": 3, "button": 12, "out": 5.5},
         "brushes": {"n": 2, "z": 153.87, "a": 90, "d": 12, "r": 37.6, "out": 2.5, "ring": 2, "inset": 1},
         "strain_relief": {"l": 73, "d": 20, "bend": 0, "at": [-62, 0, 173.87]},
@@ -116,7 +116,7 @@
         "collar": {"d": 66.0, "l": 9.0},
         "transition": {"l": 38.0, "d": 73.0, "shape": "round", "edge": "none"},
         "motor_cap": {"L": 100.0, "W": 75.0, "H": 44.0, "top_r": 14.0, "front_r": 14.0, "back_r": 14.0, "bot_r": 4.0},
-        "dial": {"place": "end", "d": 28.0, "t": 9.0, "ring": ["#c22a22", "#871a15"]},
+        "dial": {"place": "top", "surround": {"kind": "sunk", "depth": 2, "margin": 3, "edge": "chamfer", "e": 0.8}, "d": 28.0, "t": 9.0, "ring": ["#c22a22", "#871a15"]},
         "shaft_lock": {"z": 24.0, "a": -51.5, "d": 14.0, "in": 10.0, "arm": 15.0, "r": 26.0, "button": 10.0, "pin": 5.0, "out": 4.0, "travel": 3.5},
         "strain_relief": {"at": [-50.0, 0, 176.0], "l": 40.0, "d": 12.0, "bend": 45.0},
         "looks": {
@@ -143,7 +143,7 @@
         "housing": {"d": 69.0, "l": 100.0},
         "collar": {"d": 69.0, "l": 6.0},
         "motor_cap": {"L": 82.0, "W": 76.0, "H": 90.0, "top_r": 10.0, "front_r": 14.0, "back_r": 14.0, "bot_r": 4.0},
-        "dial": {"place": "end", "d": 22.0, "t": 6.0},
+        "dial": {"place": "end", "surround": {"kind": "raised", "depth": 1, "margin": 2, "edge": "fillet", "e": 0.6}, "d": 22.0, "t": 6.0},
         "shaft_lock": {"z": 26.0, "a": -50.0, "d": 12.0, "r": 37.5, "travel": 3.0},
         "looks": {
           "motor_cap": {"c": [0.996, 0.741, 0.09], "f": "plastic"}

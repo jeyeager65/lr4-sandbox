@@ -1,0 +1,4 @@
+manifold-3d 3.5.4 (https://github.com/elalish/manifold, npm: manifold-3d)
+Copyright the Manifold authors. Licensed under the Apache License 2.0 (LICENSE in this folder).
+Vendored unmodified (manifold.js + manifold.wasm from the npm package) by lr4-sandbox, which uses it
+for the router model's pockets (web/js/csg.js). package.json here only marks manifold.js as an ES module for Node.

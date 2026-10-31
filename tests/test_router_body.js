@@ -116,5 +116,65 @@ ok(g.cap.z[0] === 100 && g.cap.z[1] === 160 && g.cap.r[0] === 8 && g.cap.r[1] ==
   ok(volume(mc) > 0 && Math.abs(zhi - zlo - 20) < 0.01 && Math.abs(rmax - 7) < 0.01, `Makita collet: closed + out, 20 long, Ø14 at the cone (${(zhi - zlo).toFixed(2)}, ${(2 * rmax).toFixed(2)})`);
 }
 
-console.log(fails ? `${fails} of ${checks} failed` : `${checks}/${checks} checks passed`);
-process.exit(fails ? 1 : 0);
+// Part 46c: the pockets as real booleans (everything above ran without them: the patches). Every edge on two faces
+// (welded), the volume down by the pocket, the dial window's floor + bevel in the head; brush pockets in the Makita
+const CSG = require("../web/js/csg.js");
+const watertight = (m) => {
+  const w = CSG.weld(m), e = new Map();
+  for (let t = 0; t < w.idx.length; t += 3) for (let k = 0; k < 3; k++) {
+    const a = w.idx[t + k], b = w.idx[t + (k + 1) % 3], key = a < b ? a * 1e7 + b : b * 1e7 + a;
+    e.set(key, (e.get(key) || 0) + 1);
+  }
+  return [...e.values()].every((n) => n === 2);
+};
+CSG.init().then((loaded) => {
+  ok(loaded && CSG.ready(), "csg: manifold-3d loads (web/manifold/)");
+  const cut = B.build(M("makita"));
+  for (const k of ["motor_cap", "transition"]) ok(watertight(cut.parts[k]), `Makita ${k}: the brush pockets leave it closed`);
+  ok(volume(cut.parts.motor_cap) > 0, "Makita motor_cap: faces out after the brush pockets");
+  for (const open of [true, false]) {
+    const m = JSON.parse(JSON.stringify(M("kobalt")));
+    m.dial = Object.assign({}, m.dial, { place: "window", win: { open } });
+    const w = B.build(m), cap = w.parts.motor_cap, ex = B.expand(m), Wn = ex.dial.win;
+    const nowin = B.build(Object.assign({}, m, { dial: Object.assign({}, m.dial, { place: "end", slot: false }) })).parts.motor_cap;   // (uncut)
+    const dv = volume(nowin) - volume(cap), box = (Wn.x[1] - Wn.x[0]) * (Wn.y[1] - Wn.y[0]);
+    ok(watertight(cap) && dv > 100, `Kobalt window (open ${open}): closed, the pocket takes ${(dv / 1000).toFixed(2)} cm3 out`);
+    let floor = 0;                                   // the floor: head faces at the window's z inside its box
+    for (let i = 0; i < cap.pos.length; i += 3) {
+      const [x, y, z] = [cap.pos[i], cap.pos[i + 1], cap.pos[i + 2]];
+      if (Math.abs(z - Wn.z) < 0.01 && x >= Wn.x[0] - 0.01 && y >= Wn.y[0] - 0.01 && y <= Wn.y[1] + 0.01) floor++;
+    }
+    ok(floor >= 4 && box > 0, `Kobalt window (open ${open}): its floor at z ${Wn.z.toFixed(1)} in the head (${floor} points)`);
+  }
+  // Part 46d: the wheel inside the head, its rim through a slot; a surround round it: none / sunk (+ out the top) /
+  // raised, on the end and on top. Closed every way; sunk takes more out than none, raised adds; the rim `set` in from
+  // the slot's face; a dark back in the pocket (trim)
+  for (const id of ["kobalt", "makita", "carbide"]) for (const place of ["end", "top"]) {
+    const vols = {};
+    for (const [k, sur] of [["none", { kind: "none" }], ["sunk", { kind: "sunk", depth: 3, margin: 3, edge: "fillet", e: 1, out: "top" }], ["raised", { kind: "raised", depth: 2, margin: 3 }]]) {
+      const m = JSON.parse(JSON.stringify(M(id)));
+      m.dial = Object.assign({}, m.dial, { place, surround: sur, set: 0.3 });
+      const b = B.build(m), cap = b.parts.motor_cap, D = B.expand(m).dial;
+      vols[k] = volume(cap);
+      ok(watertight(cap) && vols[k] > 0, `${id} dial ${place} ${k}: the head stays closed`);
+      const [lo, hi] = bbox(b.parts.dial), O = D.open, face = O.o.map((v, i) => v + O.n[i] * O.lift);
+      const rim = place === "end" ? hi[0] + 0.5 - face[0] : hi[2] + 0.5 - face[2];   // (the disc is 1 under the rim)
+      ok(Math.abs(rim + 0.3) < 0.05 && lo.every(Number.isFinite), `${id} dial ${place} ${k}: the rim 0.3 in from the slot's face (${rim.toFixed(2)})`);
+    }
+    ok(vols.sunk < vols.none && vols.none < vols.raised, `${id} dial ${place}: sunk < none < raised (${Object.values(vols).map((v) => (v / 1000).toFixed(2)).join(" / ")} cm3)`);
+  }
+  {
+    const m = JSON.parse(JSON.stringify(M("makita"))), with_ = B.build(m).parts.trim.idx.length;
+    m.dial = Object.assign({}, m.dial, { slot: false });
+    ok(with_ > B.build(m).parts.trim.idx.length && B.expand(m).dial.open === undefined, "dial slot: a dark back in the pocket; slot: false = the old look (no opening)");
+  }
+  {                                                  // the dial's style (user 2026-10-30, an option): numbers on the rim / on a domed top
+    const dome = B.build(M("kobalt")), m = JSON.parse(JSON.stringify(M("kobalt")));
+    m.dial = Object.assign({}, m.dial, { style: "rim" });
+    const rim = B.build(m), [, dh] = bbox(dome.parts.dial), [, rh] = bbox(rim.parts.dial);
+    ok(M("kobalt").dial.style === "dome" && dome.dial.dome && dome.dial.dome.top === 0.45 && rim.dial.dome === null, "dial style: the Kobalt's dome kept by the cleaning; rim = no dome");
+    ok(volume(dome.parts.dial) > 0 && volume(dome.parts.dial) < volume(rim.parts.dial) && Math.abs(dh[2] - rh[2]) < 0.01, "dial style: the dome closed + out, less than the plain wheel, the same height");
+  }
+  console.log(fails ? `${fails} of ${checks} failed` : `${checks}/${checks} checks passed`);
+  process.exit(fails ? 1 : 0);
+});

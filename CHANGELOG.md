@@ -4,6 +4,17 @@ The version is the sandbox page's (`VERSION` in `web/js/page/job.js`, shown in i
 the date the model data was built and the Printables file set it was solved for.
 
 ## 0.62.0 - 2026-10-30
+- **Speed dials that look like the real ones:** the wheel sits inside the head, and a slice of its rim shows through
+  a rounded slot (on the end, or on top), with the rim about flush. Round the slot there's a sunk recess (Makita) or a
+  raised rim (DeWalt). The rim has finer, sharper ridges with rounded edges, and the numbers are true to size. Build
+  your router > Dial: **Numbers** on the rim or on a **domed top** (the Kobalt's, in its window), the **slot**'s
+  size, and **Round the slot**: none, sunk (it can run out through the top, as a thumb scoop) or raised, with its depth,
+  margin, corner and a chamfer or fillet edge. The Kobalt's dial window is beveled on every edge, the notch through the
+  end included. The Carbide's dial is on top.
+- **Real pockets in the router model** (the page's own geometry booleans, Manifold): the dial window is cut with
+  a beveled edge and a floor, and bordered brush caps sit in a round recess. Before, faces were deleted and patched,
+  which left ragged edges. **In a window** is back under Dial (Build your router), and the Kobalt's dial sits in a
+  window notched through the end of its head.
 - **Bit change, as done by hand:** the wrench handles point out the front (the shaft is turned first until the
   flats line up, then the wrench swings 30 deg to either side). Only the lower dust shoe comes off; the upper one
   stays on. **Hold the shaft** (in the bit popup): the lock button, or 2 wrenches on the shaft's flats (a router with

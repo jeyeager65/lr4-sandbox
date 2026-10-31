@@ -653,20 +653,42 @@
       under = the bottom edges.</p>
       <p><b>Switch below the top:</b> how far the switch's center is under the top of the head (until you type one, it's
       placed by the dial).</p>
-      <p><b>Dial:</b> on the end = lying flat, its rim out of the switch end; on top = standing across the cap, its rim
-      up through the top; in a window = lying flat inside the cap, its rim seen through a window in the top (the Kobalt's,
-      most trim routers'): <b>Rim in from the end</b> and <b>Below the top</b> place the wheel, <b>Window length</b> (from
-      the rim inward) and <b>width</b> size the opening, <b>Window bevel</b> the 45° edge down into it, <b>Open at the end</b>
-      makes it a notch through the end too.</p></div>
+      <p><b>Dial:</b> on the end = lying flat inside the head, a slice of its rim showing through a slot in the switch
+      end (the Makita's, the DeWalt's); on top = standing across the head, its rim up through a slot in the top; in a
+      window = lying flat inside the head, seen through a window in the top: <b>Rim in from the end</b> and <b>Below the
+      top</b> place the wheel, <b>Window length</b> (from the rim inward) and <b>width</b> size the opening, <b>Window
+      bevel</b> the 45° edge down into it, <b>Open at the end</b> makes it a notch through the end too.</p>
+      <p><b>Numbers:</b> on the rim (between its ridges) or on a domed top (the wheel's upper half rounds up to a flat
+      top; <b>Flat top</b> is its share of the radius, 0 = a full dome). A domed dial shows best in a window.</p>
+      <p><b>Slot</b> (on the end / on top): its <b>width</b>, <b>height</b> and <b>corner</b> radius (half the height =
+      round ends; blank = sized from the dial), <b>Rim in from the slot</b> = how far the rim sits behind it.
+      <b>Round the slot:</b> none, <b>sunk</b> = a recess (the Makita's: <b>Runs out through the top</b> opens it up
+      through the top edge, a thumb scoop) or <b>raised</b> = a pad standing out (the DeWalt's); <b>Depth</b> how far in
+      or out, <b>Margin</b> how much bigger than the slot, <b>Corner</b> its corner radius, its edge a chamfer or a
+      fillet <b>Edge</b> wide.</p></div>
     <div class="rb-shapebar"><button type="button" id="rb-shape" aria-pressed="false" aria-controls="ce">✎ Shape…</button>
       <span class="foot" id="rb-shapenote" hidden>Drawn in the shape editor.</span></div>
     <div class="rb-grid" id="rb-head"></div>
     <div class="variant" id="rb-dialplace"><span>Dial</span>
       <button type="button" data-v="end" aria-pressed="true">On the end</button>
       <button type="button" data-v="top" aria-pressed="false">On top</button>
-      <button type="button" data-v="window" aria-pressed="false" hidden>In a window</button></div>
+      <button type="button" data-v="window" aria-pressed="false">In a window</button></div>
         <div id="rb-dialwin" hidden><div class="rb-grid" id="rb-dialwin-g"></div>
       <label class="check"><input type="checkbox" id="rb-win-open"> Window open at the end (a notch)</label></div>
+    <div class="variant" id="rb-dialstyle"><span>Numbers</span>
+      <button type="button" data-v="rim" aria-pressed="true">On the rim</button>
+      <button type="button" data-v="dome" aria-pressed="false">On a domed top</button></div>
+    <div id="rb-dome" hidden><div class="rb-grid" id="rb-dome-g"></div></div>
+    <div id="rb-dialslot" hidden><div class="rb-grid" id="rb-dialslot-g"></div>
+      <div class="variant" id="rb-surkind"><span>Round the slot</span>
+        <button type="button" data-v="none" aria-pressed="true">None</button>
+        <button type="button" data-v="sunk" aria-pressed="false">Sunk</button>
+        <button type="button" data-v="raised" aria-pressed="false">Raised</button></div>
+      <div id="rb-sur" hidden><div class="rb-grid" id="rb-sur-g"></div>
+        <div class="variant" id="rb-suredge"><span>Edge</span>
+          <button type="button" data-v="chamfer" aria-pressed="true">Chamfer</button>
+          <button type="button" data-v="fillet" aria-pressed="false">Fillet</button></div>
+        <label class="check" id="rb-sur-topbox"><input type="checkbox" id="rb-sur-top"> Runs out through the top</label></div></div>
     </div>
     <div class="rb-sec" data-sec="colors">
     <div class="help" id="help-rb-colors" hidden><p>Each part's color and finish: <b>metal</b> reflects the shop (the
@@ -1244,6 +1266,7 @@
 <script src="js/strut_cam.js"></script>
 <script src="js/cap_shape.js"></script>
 <script src="js/routers.js"></script>
+<script src="js/csg.js"></script>
 <script src="js/router_body.js"></script>
 <script src="js/router_dims.js"></script>
 <script src="js/plate_design.js"></script>
