@@ -171,14 +171,18 @@
   function others(s, sh, v) {
     const secs = sections(sh), cur = Math.min(CE.sec, secs.length - 1);
     if (secs.length < 2) return;
-    const g = el("g", { class: "ce-other" }, s);
+    const g = el("g", { class: "ce-other" }, s), used = [];
     secs.forEach((e, j) => {
       if (j === cur) return;
       const pl = S.path(e.pts, v.closed, v.axis);
       el("path", { d: d(pl) }, g);
       el("path", { d: d(pl.map(([x, y]) => [-x, y])) }, g);
       const w = pl.reduce((a, q) => (q[0] > a[0] + 0.01 || (Math.abs(q[0] - a[0]) <= 0.01 && q[1] > a[1]) ? q : a), pl[0]);
-      const [X, Y] = toS(w[0], w[1]), t = el("text", { x: X + 6, y: Y + 4 }, g);
+      const [X, Y0] = toS(w[0], w[1]);
+      let Y = Y0 + 4;
+      while (used.some((u) => Math.abs(u - Y) < 13)) Y += 13;   // (labels at the same spot: stacked)
+      used.push(Y);
+      const t = el("text", { x: X + 6, y: Y }, g);
       t.textContent = `X ${+e.at.toFixed(1)}`;
     });
   }
@@ -550,15 +554,16 @@
       CUT.key = key;
       if (key) {
         CUT.planes = CUT.planes || [new THREE.Plane(), new THREE.Plane()];
-        CUT.fill = CUT.fill || new THREE.MeshBasicMaterial({ side: THREE.BackSide, clippingPlanes: CUT.planes, clipIntersection: true });
+        CUT.fill = CUT.fill || new THREE.MeshBasicMaterial({ side: THREE.BackSide, clippingPlanes: CUT.planes, clipIntersection: true,
+          polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -4 });   // (over faces it lies on: the part under the cap)
         CUT.fill.color.set(css("--muted") || "#888888");
         for (const q of list) {
           q.traverse((o) => {                       // (its own parts too: the dial's ring, the switch's marks)
             if (!o.isMesh || o.userData.cutFill) return;
             for (const mat of [].concat(o.material)) {
               if (CUT.mats.has(mat)) continue;
-              CUT.mats.set(mat, { clippingPlanes: mat.clippingPlanes, clipIntersection: mat.clipIntersection });
-              Object.assign(mat, { clippingPlanes: CUT.planes, clipIntersection: true, needsUpdate: true });
+              CUT.mats.set(mat, { clippingPlanes: mat.clippingPlanes, clipIntersection: mat.clipIntersection, side: mat.side });
+              Object.assign(mat, { clippingPlanes: CUT.planes, clipIntersection: true, side: THREE.FrontSide, needsUpdate: true });   // (front only: its own back faces would fight the fill)
             }
           });
           const f = new THREE.Mesh(q.geometry, CUT.fill);
@@ -569,10 +574,10 @@
       }
     }
     if (!key) return;
-    const z0 = LR4RouterBody.stackTop(m), W = rxWorld([at, 0, z0]), X1 = rxWorld([at + 1, 0, z0]), Z1 = rxWorld([at, 0, z0 + 1]);
+    const z0 = LR4RouterBody.stackTop(m) + 0.5, W = rxWorld([at, 0, z0]), X1 = rxWorld([at + 1, 0, z0]), Z1 = rxWorld([at, 0, z0 + 1]);
     if (!W || !X1 || !Z1) return;
     CUT.planes[0].setFromNormalAndCoplanarPoint(W.clone().sub(X1).normalize(), W);   // kept: x <= at
-    CUT.planes[1].setFromNormalAndCoplanarPoint(W.clone().sub(Z1).normalize(), W);   // kept: below the cap
+    CUT.planes[1].setFromNormalAndCoplanarPoint(W.clone().sub(Z1).normalize(), W);   // kept: below the cap (+0.5: not on its bottom face)
   }
   function capEditOpen(on) {
     const was = !$("ce").hidden;
