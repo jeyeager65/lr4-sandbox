@@ -22,6 +22,10 @@ the date the model data was built and the Printables file set it was solved for.
   the brush caps' border are switched on and off. Undo, Redo, New, Reset, Export and Import are a toolbar at the
   top; Show folds away. Clearer names (for example "Shaft end up inside" the nut, "Switch-end corners").
 - The motor cap's shape editor opens from **Edit shape** in the motor cap's settings.
+- **Fit checklist** on the Router item: the six numbers that decide how it sits in the machine (grip Ø, nut below
+  the clamp, overall height, the motor cap's size, collet sizes, the speed table), each with its value, **How to
+  measure** (a line and a small drawing) and **Set** to go to it. Tick each as you measure it (kept per router).
+  **Start from** a preset shapes your router like a built-in one (its name stays; Undo puts it back).
 
 ## 0.62.0 - 2026-10-30
 - **Speed dials that look like the real ones:** the wheel sits inside the head, and a slice of its rim shows through

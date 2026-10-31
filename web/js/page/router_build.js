@@ -184,6 +184,20 @@
       if (v === "spindle") { p.source = "gcode"; p.s = p.s || tmpl.s.slice(); p.mount = "makita"; }
     }, true);
   }
+  function rbFromPreset(id) {                        // the shape, mount and speeds of a built-in router; the name kept
+    const t = LR4RouterData.routers[id];
+    if (!t) return;
+    RB.cut = true;
+    rbEdit((p) => {
+      const q = JSON.parse(JSON.stringify(t));
+      p.model = q.model; p.mount = q.mount; p.source = q.source;
+      delete p.speeds; delete p.s;
+      if (q.speeds) p.speeds = q.speeds;
+      if (q.s) p.s = q.s;
+    }, true);
+    RB.cut = true;
+    rbMsg(`Shaped like the ${t.name}. Undo puts it back.`);
+  }
   function rbFeature(id, on) {                       // a part added / taken off (LR4RouterSchema.FEATURES)
     const F = LR4RouterSchema.FEATURES.find((f) => f.id === id);
     if (!F) return;

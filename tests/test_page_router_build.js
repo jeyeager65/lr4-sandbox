@@ -238,6 +238,21 @@ const ok = (cond, msg) => { checks++; console.log((cond ? "  ok   " : "  FAIL ")
       boss().checked = true; boss().dispatchEvent(new Event("change", { bubbles: true })); await T.sleep(300);
       to.boss.push(kbm().shaft_lock.d, rows().includes("model.shaft_lock.d"));
       out.outline = to;
+      // the Fit checklist (Part 48d): the numbers that matter, ticked per router; Set picks its part; Start from a preset
+      rxPick(null); await T.sleep(50);
+      const fit = { list: LR4RouterInspect.fit().map((f) => f[0]).join(), grip: LR4RouterInspect.fit()[0][1] };
+      const fb = document.querySelector('#rti .rti-fit[data-fit="grip"] input'); fb.click(); await T.sleep(50);
+      fit.tick = [LR4RouterInspect.fit()[0][2], $$("rti-fit-n").textContent, JSON.parse(MS.get("lr4-rb-fit")).kobalt.join()];
+      document.querySelector('#rti .rti-fit[data-fit="grip"] [data-go]').click(); await T.sleep(100);
+      fit.go = [RX.sel, document.activeElement && document.activeElement.closest("[data-k]") && document.activeElement.closest("[data-k]").dataset.k];
+      rxPick(null); await T.sleep(50);
+      const d0 = kbm().housing.d, ps = document.querySelector("#rti .rti-preset select");
+      ps.value = "makita"; ps.dispatchEvent(new Event("change", { bubbles: true })); await T.sleep(300);
+      fit.preset = [kbm().housing.d === LR4RouterData.routers.makita.model.housing.d, LR4Routers.ROUTERS.kobalt.name, LR4Routers.ROUTERS.kobalt.mount, ps.value];
+      $$("rb-undo").click(); await T.sleep(300);
+      fit.preset.push(kbm().housing.d === d0);
+      document.querySelector('#rti .rti-fit[data-fit="grip"] input').click(); await T.sleep(50);
+      out.fit = fit;
       rxPick(null);
       document.querySelector('.rbx-views [data-v="front"]').click(); await T.sleep(450);
       $$("rb-reset").click(); await T.sleep(200);
@@ -328,7 +343,11 @@ const ok = (cond, msg) => { checks++; console.log((cond ? "  ok   " : "  FAIL ")
     ok(x.slide[1] === x.slide[0] + 10 && +x.slide[2] === x.slide[1], `the housing's length slider: ${x.slide}`);
     ok(x.head[0] === "motor_cap" && /^Length,Width,Height,Overall height,Top edges,/.test(x.head[1]), `click the motor cap: ${x.head}`);
     ok(x.off[0] === null && x.off[1] && !x.off[2] && x.off[3] === 1, `a click off the router lets it go (the inspector: the router), the mount solid again (${x.off})`);
-    const t = b.rti, o = b.outline;
+    const t = b.rti, o = b.outline, fi = b.fit;
+    ok(fi.list === "grip,clamp,overall,head,collets,speeds" && /^\d+(\.\d)? mm$/.test(fi.grip), `Fit checklist: ${fi.list} (grip ${fi.grip})`);
+    ok(fi.tick[0] && fi.tick[1] === "1 of 6 measured" && fi.tick[2] === "grip", `a Fit item ticked, kept per router (${fi.tick})`);
+    ok(fi.go.join() === "housing,model.housing.d", `its Set: the housing picked, its Ø row focused (${fi.go})`);
+    ok(fi.preset.join() === "true,Kobalt test,makita,,true", `Start from the Makita: its shape + mount, the name kept; Undo back (${fi.preset})`);
     ok(/^router,mount,collet_nut,shaft,flats,bearing_cap,housing,vent,collar,motor_cap,dial,switch,shaft_lock/.test(o.items), `the outline: the Kobalt's parts nut up (${o.items})`);
     ok(o.pick.join() === "housing,housing,housing", `picked from the outline: lit there, on the model, in the inspector (${o.pick})`);
     ok(o.menu[0] && /brushes/.test(o.menu[1]) && !/shaft_lock/.test(o.menu[1]), `+ Add a part: what it hasn't got (${o.menu[1]})`);

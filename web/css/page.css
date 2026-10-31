@@ -1103,3 +1103,22 @@ body.rec-ui .rec-msg { top: calc(3.5% + 44px); font-size: clamp(15px, 2.4vh, 38p
   border: 1px solid var(--accent); border-radius: 6px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3); white-space: nowrap; }
 .ce-pop[hidden] { display: none; }
 .ce-pop input { width: 60px; }
+/* the router item's Fit checklist (Part 48d) */
+.rti-fit-h { display: flex; align-items: baseline; gap: 6px; }
+.rti-fit-h em { font-style: normal; text-transform: none; letter-spacing: 0; font-weight: 400; }
+.rti-fit-why { margin: 2px 0 4px; }
+.rti-fit { display: grid; grid-template-columns: 1fr auto auto; gap: 2px 8px; align-items: center; padding: 5px 0; border-top: 1px solid var(--line); }
+.rti-fit .check { margin: 0; }
+.rti-fit.done .check { color: var(--muted); }
+.rti-fv { font: 12px var(--font-data); font-weight: 400; text-align: right; }
+.rti-fit button { padding: 1px 8px; }
+.rti-fit details { grid-column: 1 / -1; font-size: 12px; }
+.rti-fit summary { cursor: pointer; color: var(--muted); width: max-content; }
+.rti-how { display: flex; gap: 8px; align-items: flex-start; margin-top: 4px; }
+.rti-how svg { flex: none; width: 120px; height: 57px; fill: none; stroke: var(--muted); stroke-width: 1.4; }
+.rti-how svg .a { stroke: var(--accent); fill: var(--accent); }
+.rti-how svg line.a { fill: none; stroke-width: 1.6; }
+.rti-how svg text.a { stroke: none; font: 9px var(--font-data); }
+.rti-how svg .t { stroke: var(--accent); stroke-dasharray: 2 2; stroke-width: 1; }
+.rti-how p { margin: 0; }
+.rti-preset { grid-template-columns: 8.2em 1fr; }

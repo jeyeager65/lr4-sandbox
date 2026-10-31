@@ -18,6 +18,57 @@
   const rtiEsc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
   const rtiCtx = () => { const C = typeof rtClamps === "function" && rtClamps(); return { clampDef: C ? C.def : undefined }; };   // the build's clamp height
 
+  // ---- the Fit checklist (Part 48d) on the Router item: the numbers that matter for the machine, ticked as you measure
+  // them (kept per router in this machine: kv lr4-rb-fit), each with how to measure it and a drawing ----
+  const FIT_KEY = "lr4-rb-fit";
+  const fitDone = () => { try { return JSON.parse(kvGet(FIT_KEY) || "{}")[rbCur()] || []; } catch (e) { return []; } };
+  function fitMark(id, on) {
+    let all = {};
+    try { all = JSON.parse(kvGet(FIT_KEY) || "{}") || {}; } catch (e) { /* new */ }
+    const got = new Set(all[rbCur()] || []);
+    if (on) got.add(id); else got.delete(id);
+    all[rbCur()] = [...got];
+    kvSet(FIT_KEY, JSON.stringify(all));
+  }
+  // the drawings: a side view of a router (its head, the round part, the nut) with what's measured in the accent
+  const FIT_BODY = '<rect x="52" y="8" width="56" height="22" rx="5"/><rect x="62" y="30" width="36" height="34"/><rect x="72" y="64" width="16" height="6"/>';
+  const ARR = (x1, y1, x2, y2) => `<line class="a" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"/><circle class="a" cx="${x1}" cy="${y1}" r="1.6"/><circle class="a" cx="${x2}" cy="${y2}" r="1.6"/>`;
+  const FIT_SVG = {
+    grip: FIT_BODY + ARR(62, 47, 98, 47) + '<path class="t" d="M58 40v14M102 40v14"/>',
+    clamp: FIT_BODY + '<rect class="t" x="56" y="50" width="48" height="7" rx="1"/>' + ARR(112, 70, 112, 57) + '<path class="t" d="M88 70h28M104 57h12"/>',
+    overall: FIT_BODY + ARR(118, 8, 118, 70) + '<path class="t" d="M108 8h14M90 70h32"/>',
+    head: FIT_BODY + ARR(52, 4, 108, 4) + ARR(116, 8, 116, 30),
+    collets: '<path d="M64 20l6 40h20l6-40z"/><path d="M70 28l20 0M68 40h24"/><rect class="a" x="77" y="6" width="6" height="64" rx="1"/>',
+    speeds: '<circle cx="80" cy="38" r="26"/><circle cx="80" cy="38" r="4"/>' + [1, 2, 3, 4, 5, 6].map((n, i) => { const a = (-210 + i * 48) * Math.PI / 180;
+      return `<text class="a" x="${(80 + 18 * Math.cos(a)).toFixed(1)}" y="${(41 + 18 * Math.sin(a)).toFixed(1)}" text-anchor="middle">${n}</text>`; }).join(""),
+  };
+  function fitHtml(m) {
+    const S = LR4RouterSchema, spin = m.kind === "spindle", items = S.FIT.filter((f) => !f.only || (f.only === "s") === spin);
+    return '<h4 class="rti-fit-h"><span>Fit</span> <em id="rti-fit-n"></em></h4><p class="foot rti-fit-why">What decides how it sits in the machine. ' +
+      "Measure these on yours; the rest is how it looks.</p>" + items.map((f) => `<div class="rti-fit" data-fit="${f.id}">` +
+      `<label class="check"><input type="checkbox" aria-label="${rtiEsc(f.label)} measured"> ${rtiEsc(f.label)}</label><b class="rti-fv"></b>` +
+      `<button type="button" data-go="${spin && f.spinGo ? f.spinGo : f.go}" data-key="${rtiEsc(f.key)}" title="Go to its setting">Set</button>` +
+      `<details><summary>How to measure</summary><div class="rti-how"><svg viewBox="0 0 160 76" aria-hidden="true">${FIT_SVG[f.id] || ""}</svg>` +
+      `<p>${rtiEsc(f.how)}</p></div></details></div>`).join("");
+  }
+  function fitSync(p, sh) {
+    const done = new Set(fitDone()), els = [...rtiBody.querySelectorAll(".rti-fit")];
+    for (const el of els) {
+      const f = LR4RouterSchema.FIT.find((q) => q.id === el.dataset.fit);
+      el.querySelector(".rti-fv").textContent = f.value(p, sh);
+      el.querySelector("input").checked = done.has(f.id);
+      el.classList.toggle("done", done.has(f.id));
+    }
+    const n = $("rti-fit-n");
+    if (n) n.textContent = `${els.filter((el) => done.has(el.dataset.fit)).length} of ${els.length} measured`;
+  }
+  // Start from a preset: the shape, mount and speeds of a built-in router, the name kept (one undo step)
+  function presetHtml(p) {
+    const opts = Object.entries(LR4RouterData.routers).map(([k, r]) => `<option value="${rtiEsc(k)}">${rtiEsc(r.name)}</option>`).join("");
+    return '<div class="rti-row rti-preset"><span>Start from</span><select aria-label="Start from a preset"><option value="">a preset…</option>' + opts +
+      '</select></div><p class="foot">Shapes this router like the one you pick (its name stays): then change what differs.</p>';
+  }
+
   // ---- the outline (Part 48c): the parts nut up, the picked one lit; an optional one has ✕; + Add a part ----
   function rtoShow() {
     const S = LR4RouterSchema, m = LR4Routers.preset(rbCur()).model, sel = rtiPart();
@@ -75,7 +126,7 @@
     $("rti-h").textContent = id === "router" ? p.name : S.partLabel(id, m);
     $("rti-x").hidden = id === "router";
     const sh = S.shown(p, rtiCtx());
-    let html = '<div class="rti-notes" aria-live="polite"></div>';
+    let html = '<div class="rti-notes" aria-live="polite"></div>' + (id === "router" ? presetHtml(p) + fitHtml(m) : "");
     for (const g of S.groups(rows)) {
       html += `<h4>${rtiEsc(g)}</h4>`;
       for (const r of rows.filter((q) => q.group === g)) {
@@ -117,6 +168,7 @@
     if (rtiEl.dataset.part === "router") $("rti-h").textContent = p.name;
     const notes = typeof rbNotes === "function" ? rbNotes(rtiEl.dataset.part) : [], nb = rtiBody.querySelector(".rti-notes");
     if (nb) { const h = notes.map((t) => `<p class="foot">${rtiEsc(t)}</p>`).join(""); if (nb.innerHTML !== h) nb.innerHTML = h; }
+    fitSync(p, sh);
     for (const el of rtiBody.querySelectorAll("[data-k]")) {
       const v = val(el.dataset.k);
       if (el.classList.contains("rti-opt")) { for (const b of el.querySelectorAll("button")) b.setAttribute("aria-pressed", String(b.dataset.v === String(v))); continue; }
@@ -152,6 +204,9 @@
   rtiBody.addEventListener("change", (e) => {
     const t = e.target, row = t.closest("[data-k]");
     RTI.slide = null;
+    const fit = t.closest(".rti-fit");
+    if (fit && t.type === "checkbox") { fitMark(fit.dataset.fit, t.checked); return rtiSync(); }
+    if (t.closest(".rti-preset")) { if (t.value) rbFromPreset(t.value); t.value = ""; return; }
     if (!row) return;
     const k = row.dataset.k;
     if (row.classList.contains("rti-look")) { if (t.tagName === "SELECT") rbLook(k.slice(6), { f: t.value }); return; }
@@ -162,10 +217,17 @@
   rtiBody.addEventListener("click", (e) => {
     const b = e.target.closest("button");
     if (!b) return;
+    if (b.dataset.go) {                               // a Fit item's Set: its part picked, its row in view
+      if (b.dataset.go === "router") rxPick(null); else rxPick(b.dataset.go);
+      const r = rtiBody.querySelector(`[data-k="${b.dataset.key}"]`);
+      if (r) { r.scrollIntoView({ block: "center" }); const f = r.querySelector("input, select, button"); if (f) f.focus(); }
+      return;
+    }
     if (b.dataset.act === "shape") { if (typeof capEditToggle === "function") capEditToggle(); return; }   // the shape editor (cap_edit.js)
     const row = b.closest(".rti-opt");
     if (row && b.dataset.v) rbSet(row.dataset.k, b.dataset.v);
   });
   $("rti-x").addEventListener("click", () => { if (typeof rxPick === "function") rxPick(null); });
   // tests
-  window.LR4RouterInspect = { part: () => (rtiEl.hidden ? null : rtiEl.dataset.part), rows: () => [...rtiBody.querySelectorAll("[data-k]")].map((el) => el.dataset.k) };
+  window.LR4RouterInspect = { part: () => (rtiEl.hidden ? null : rtiEl.dataset.part), rows: () => [...rtiBody.querySelectorAll("[data-k]")].map((el) => el.dataset.k),
+    fit: () => [...rtiBody.querySelectorAll(".rti-fit")].map((el) => [el.dataset.fit, el.querySelector(".rti-fv").textContent, el.querySelector("input").checked]) };

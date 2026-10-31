@@ -206,6 +206,27 @@
       remove: (p) => { delete p.model.brushes; } },
   ];
 
+  // the Fit checklist on the Router item (Part 48d): the numbers that matter for the machine (the rest is looks), each
+  // with how to measure it; go: the item that sets it (key: a row of it to bring into view). No photos yet (user
+  // 2026-10-31): drawn diagrams (router_inspect.js FIT_SVG). value(p, sh): its current value as text.
+  const mm = (v) => `${+(+v).toFixed(1)} mm`;
+  const FIT = [
+    { id: "grip", label: "Grip Ø", go: "housing", key: "model.housing.d", value: (p) => mm(p.model.housing.d),
+      how: "Calipers across the round body where the mount clamps it - a few readings round it, then the average. The Makita 701 / T1 mount is made for 65 mm, the DeWalt 611's for 69 mm." },
+    { id: "clamp", label: "Nut below the clamp", go: "mount", key: "model.clamp", value: (p, sh) => (sh.model.clamp != null ? mm(sh.model.clamp) : "-"),
+      how: "With the router in its mount: from the bottom face of the collet nut up to the bottom edge of the lower clamp. More = the router and its bit sit lower." },
+    { id: "overall", label: "Overall height", go: "motor_cap", spinGo: "housing", key: "model.overall", value: (p, sh) => mm(sh.model.overall),
+      how: "Stand it on its head on the bench; from the bench up to the bottom face of the collet nut, square to the bench. The cord and its strain relief don't count." },
+    { id: "head", label: "Motor cap L × W × H", go: "motor_cap", key: "model.motor_cap.L", only: "r",
+      value: (p) => { const h = p.model.motor_cap; return `${+h.L.toFixed(1)} × ${+h.W.toFixed(1)} × ${+h.H.toFixed(1)} mm`; },
+      how: "The head at its widest: length along the switch end, width front to back, height from where it meets the round part to its top. It decides what clears the gantry and the hose." },
+    { id: "collets", label: "Collet sizes", go: "router", key: "model.collet.sizes", value: (p) => p.model.collet.sizes.map((v) => +v.toFixed(3)).join(", ") + " mm",
+      how: "Every shank your collets take: 1/8\" = 3.175 mm, 1/4\" = 6.35 mm, 6 mm, 8 mm. A bit change swaps the collet when the shank changes." },
+    { id: "speeds", label: "Speed table", go: "router", key: "source",
+      value: (p) => (p.source === "manual" ? `dial 1-6: ${p.speeds[0][1]}-${p.speeds[5][1]} RPM` : `S ${p.s[0]}-${p.s[1]} RPM`),
+      how: "From the manual's table: the RPM at each number of the speed dial. A router the controller runs (G-code S): its lowest speed it holds well and its top speed." },
+  ];
+
   const kindOK = (r, m) => !r.only || (r.only === "s") === spinOf(m);
   function partShown(id, m) {                         // the item applies to this kind (and, a feature, is on)
     const P = PARTS.find((q) => q.id === id);
@@ -244,7 +265,7 @@
     return path(s, k);
   }
 
-  const api = { PARTS, ROWS, FEATURES, partLabel, partShown, rows, labelOf, groups, shown, value, path };
+  const api = { PARTS, ROWS, FEATURES, FIT, partLabel, partShown, rows, labelOf, groups, shown, value, path };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.LR4RouterSchema = api;
 })(typeof self !== "undefined" ? self : this);

@@ -90,6 +90,10 @@ ok(!S.value(lk, "has:lock.d") && !lockKeys().includes("model.shaft_lock.d") && !
 ok(S.ROWS.filter((r) => r.kind === "has").every((r) => S.ROWS.some((q) => q.k === r.of)) && !S.ROWS.some((r) => /0 = none/.test(S.labelOf(r, kb.model))),
   "every toggle has its size row; no label says 0 = none");
 
+// the Fit checklist: each goes to an outline item and a row of it; a value for every preset
+ok(S.FIT.every((f) => S.PARTS.some((P) => P.id === f.go) && (f.key === "source" || S.ROWS.some((r) => r.k === f.key)) && f.how.length > 40), "Fit items: their part, their row, how to measure");
+ok(["kobalt", "spindle65", "testbox"].every((id) => { const q = R.preset(id); return S.FIT.filter((f) => !f.only || (f.only === "s") === (q.model.kind === "spindle")).every((f) => typeof f.value(q, S.shown(q, { clampDef: 36.5 })) === "string"); }), "Fit values for a router and a spindle");
+
 // values as drawn
 const sh = S.shown(kb);
 ok(Math.abs(S.value(kb, "model.overall", sh) - 210) < 30 && S.value(kb, "speeds.0") > 0 && S.value(kb, "kind") === "router" && S.value(sp, "kind") === "spindle",
