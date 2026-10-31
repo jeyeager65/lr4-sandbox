@@ -154,7 +154,7 @@
         const Wn = obj(D.win) || {}, dd = m.dial.d;
         Object.assign(m.dial, { in: num(D.in, -20, 60, 1), drop: num(D.drop, 0, 60, 2),
           win: { l: num(Wn.l, 2, 120, +(dd * 0.35).toFixed(1)), w: num(Wn.w, 2, 120, +(dd * 0.8).toFixed(1)), open: Wn.open !== false,
-          bevel: num(Wn.bevel, 0, 10, 2) } });   // bevel: the 45 deg edge from the top into the window
+          bevel: num(Wn.bevel, 0, 10, 2), r: num(Wn.r, 0, 60, 0) } });   // bevel: the 45 deg edge from the top into the window; r: its corners (plan)
       }
       // its style (user 2026-10-30, an option): numbers on the ridged rim, or on a domed top (dome.top: the flat top's
       // share of the radius); the slot it shows through + the surround round that (Part 46d: end / top; js/router_body.js)

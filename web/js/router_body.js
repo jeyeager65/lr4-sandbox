@@ -169,7 +169,7 @@
       const W = dp.win || {}, cx = x1 - (dp.in ?? 1) - d / 2, wl = W.l || d * 0.35, ww = W.w || d * 0.8;   // over its rim (open at the end: a notch)
       const cz = topX(cx + d / 2 - 2) - (dp.drop ?? 2) - t / 2;
       dial = { axis: "z", at: [cx, at[1], cz], d, t, out: 0,
-        win: { x: [cx + d / 2 - wl, W.open === false ? cx + d / 2 + 1.5 : x1 + 5], y: [at[1] - ww / 2, at[1] + ww / 2], z: cz - t / 2 - 0.6, bevel: W.bevel ?? 2 } };
+        win: { x: [cx + d / 2 - wl, W.open === false ? cx + d / 2 + 1.5 : x1 + 5], y: [at[1] - ww / 2, at[1] + ww / 2], z: cz - t / 2 - 0.6, bevel: W.bevel ?? 2, r: W.r || 0 } };
     } else {
       let zc = topX(x1 - d / 2) - e - t / 2 - 1, xe = h.shape ? (CS.ends(h.shape, zc - z0) || [0, x1])[1] : x1;
       if (cut) {                                     // a hood over the slot: the top where it meets the face (a shaped top falls
@@ -386,6 +386,14 @@
   function windowPocket(capM, B, s) {
     if (!CSG || !CSG.ready()) return null;
     const bv = B.bevel ?? 2, xCap = s.at[0] + s.L / 2, open = B.x[1] > xCap;
+    // its corners rounded r in plan (the Makita's U; an open notch's far corners pushed out past the end); r 0: square,
+    // the bevel mitred at the corners as before
+    const rr = Math.max(0, Math.min(B.r || 0, (B.y[1] - B.y[0]) / 2, (B.x[1] - B.x[0]) / 2)), bx1 = open && rr ? B.x[1] + rr : B.x[1];
+    const sdW = (x, y) => {                          // how far outside the opening in plan (< 0 in it)
+      if (!rr) return Math.max(B.x[0] - x, open ? -Infinity : x - B.x[1], B.y[0] - y, y - B.y[1]);
+      const qx = Math.abs(x - (B.x[0] + bx1) / 2) - ((bx1 - B.x[0]) / 2 - rr), qy = Math.abs(y - (B.y[0] + B.y[1]) / 2) - ((B.y[1] - B.y[0]) / 2 - rr);
+      return Math.hypot(Math.max(qx, 0), Math.max(qy, 0)) + Math.min(Math.max(qx, qy), 0) - rr;
+    };
     const E = { x: [B.x[0] - bv - 1, open ? B.x[1] : B.x[1] + bv + 1], y: [B.y[0] - bv - 1, B.y[1] + bv + 1] };   // (1 past the bevel)
     const steps = (a, b) => { const k = Math.max(1, Math.ceil((b - a) / 0.5)); return Array.from({ length: k + 1 }, (_, i) => a + (b - a) * i / k); };
     const axis = (e, b, o) => [...steps(e[0], b[0]), ...steps(b[0], b[1]).slice(1), ...(o ? [] : steps(b[1], e[1]).slice(1))];
@@ -406,9 +414,10 @@
       const t = tAt(x, y);                           // (and on up, clear of it)
       if (t === null) return zl;
       const bvx = bv * Math.max(0, Math.min(1, (35 - steep(x, y)) / 20));
-      return t - bvx + Math.max(B.x[0] - x, open ? 0 : x - B.x[1], B.y[0] - y, y - B.y[1], 0);
+      return t - bvx + Math.max(sdW(x, y), 0);
     };
-    const opening = box([(B.x[0] + B.x[1]) / 2, (B.y[0] + B.y[1]) / 2, (B.z + zl) / 2], [B.x[1] - B.x[0], B.y[1] - B.y[0], zl - B.z]);
+    const opening = rr ? rrLoft({ o: [0, 0, 0], u: [1, 0, 0], v: [0, 1, 0], n: [0, 0, 1] }, [[B.z, B.x[0], bx1, B.y[0], B.y[1], rr], [zl, B.x[0], bx1, B.y[0], B.y[1], rr]])
+      : box([(B.x[0] + B.x[1]) / 2, (B.y[0] + B.y[1]) / 2, (B.z + zl) / 2], [B.x[1] - B.x[0], B.y[1] - B.y[0], zl - B.z]);
     // a box-type head (user 2026-10-30: "bevel all edges of the window"): every edge where the opening meets the head -
     // round the top, down the notch's sides in the end and across its bottom - the same 45 deg band, bv wide: the
     // points within bv of both the opening and the head's surface, o + depth < bv (a level set of the two distances)
@@ -419,7 +428,9 @@
         return -(Math.hypot(Math.max(qx, 0), Math.max(qz, 0)) + Math.min(Math.max(qx, qz), 0) - rt);
       };
       const o = (x, y, z) => {                       // outside the opening's box (< 0 in it)
-        const dx = Math.max(B.x[0] - x, x - B.x[1]), dy = Math.max(B.y[0] - y, y - B.y[1]), dz = Math.max(B.z - z, z - zl);
+        const dz = Math.max(B.z - z, z - zl);
+        if (rr) { const dxy = sdW(x, y); return Math.hypot(Math.max(dxy, 0), Math.max(dz, 0)) + Math.min(Math.max(dxy, dz), 0); }
+        const dx = Math.max(B.x[0] - x, x - B.x[1]), dy = Math.max(B.y[0] - y, y - B.y[1]);
         return Math.hypot(Math.max(dx, 0), Math.max(dy, 0), Math.max(dz, 0)) + Math.min(Math.max(dx, dy, dz), 0);
       };
       const g = bv + 1, band = CSG.levelSet((x, y, z) => bv - Math.max(o(x, y, z), 0) - Math.max(depth(x, y, z), 0),

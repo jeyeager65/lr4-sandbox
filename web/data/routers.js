@@ -15,7 +15,7 @@
 //   none | fillet | chamfer, e } up to the motor cap { L (x), W (y), H (z), top_r, front_r (+x end), back_r (-x end),
 //   bot_r, at: [x, y], shape: { top, side, end } (drawn in the builder's shape editor, js/cap_shape.js: then L / W / H /
 //   at are the shape's size and the fillets don't apply) }; dial { place: end | top | window, d, t, ring: [wheel, groove] colors; window: in (its rim from the end), drop
-//   (its top under the cap's top), win { l, w, open: a notch through the end too } }; switch { at, size, rocker };
+//   (its top under the cap's top), win { l, w, r: its corners rounded from above, bevel, open: a notch through the end too } }; switch { at, size, rocker };
 //   shaft_lock { z, a: deg from +x (counter-clockwise from above), d: its boss's Ø (0 = none), in: where the boss starts out from the axis,
 //   arm: a bracket that wide from the boss up to the housing (0 = none), pin: Ø of the button's pin into the shaft's
 //   hole (square to the flats; 0 = none), r: reach from the axis (the boss's end),
@@ -86,7 +86,7 @@
           "top": [{"x": -62, "y": 0, "s": "line"}, {"x": -62, "y": 14, "s": "line"}, {"x": -54, "y": 14, "s": "line"}, {"x": -36, "y": 28, "s": "curve"}, {"x": -26, "y": 34.5, "s": "curve"}, {"x": 0, "y": 37.6, "s": "curve"}, {"x": 24, "y": 34.5, "s": "curve"}, {"x": 34, "y": 31, "s": "curve"}, {"x": 38.5, "y": 22, "s": "curve"}, {"x": 41.6, "y": 0, "s": "line"}],
           "front": [{"x": -62, "y": 6, "s": "line"}, {"x": -50, "y": 6, "s": "line"}, {"x": -50, "y": 0, "s": "line"}, {"x": 41.6, "y": 0, "s": "line", "r": 1}, {"x": 41.6, "y": 24, "s": "curve"}, {"x": 40, "y": 31, "s": "curve"}, {"x": 36, "y": 38, "s": "curve"}, {"x": 31, "y": 43.8, "s": "curve"}, {"x": 25, "y": 46, "s": "line"}, {"x": -25, "y": 46, "s": "curve"}, {"x": -33, "y": 43, "s": "curve"}, {"x": -37, "y": 40, "s": "line"}, {"x": -52, "y": 40, "s": "line", "r": 3}, {"x": -56, "y": 34, "s": "line"}, {"x": -62, "y": 34, "s": "line", "r": 2}],
           "section": [{"x": 0, "y": 46, "s": "line"}, {"x": 37.6, "y": 46, "s": "line", "r": 12}, {"x": 37.6, "y": 0, "s": "line", "r": 1}, {"x": 0, "y": 0, "s": "line"}]}},
-        "dial": {"place": "end", "surround": {"kind": "sunk", "depth": 3, "margin": 4, "r": 9, "edge": "fillet", "e": 1.5}, "d": 30, "t": 8, "ring": ["#c8322b", "#8e1f1a"]},
+        "dial": {"place": "window", "in": 4, "drop": 3, "win": {"l": 10, "w": 30, "r": 8, "bevel": 3, "open": true}, "style": "dome", "dome": {"top": 0.45}, "d": 30, "t": 8, "ring": ["#c8322b", "#8e1f1a"]},
         "shaft_lock": {"z": 25.72, "a": -55, "d": 14, "in": 14, "arm": 15, "pin": 7, "r": 24, "travel": 3, "button": 12, "out": 5.5},
         "brushes": {"n": 2, "z": 153.87, "a": 90, "d": 12, "r": 37.6, "out": 2.5, "ring": 2, "inset": 1},
         "strain_relief": {"l": 73, "d": 20, "bend": 0, "at": [-62, 0, 173.87]},

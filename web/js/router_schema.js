@@ -115,6 +115,7 @@
   row("dial", "Window", "model.dial.drop", "Below the top", "len", { min: 0, max: 60, step: 0.5, when: win });
   row("dial", "Window", "model.dial.win.l", "Window length", "len", { min: 2, max: 120, step: 0.5, when: win, help: "From the rim inward." });
   row("dial", "Window", "model.dial.win.w", "Window width", "len", { min: 2, max: 120, step: 0.5, when: win });
+  row("dial", "Window", "model.dial.win.r", "Window corner", "len", { min: 0, max: 60, step: 0.5, when: win, csg: true, help: "Rounds the window's corners as seen from above (the Makita's U); 0 = square." });
   row("dial", "Window", "model.dial.win.bevel", "Window bevel", "len", { min: 0, max: 10, step: 0.5, when: win, help: "The 45° edge from the top down into the window." });
   row("dial", "Window", "model.dial.win.open", "Open at the end (a notch)", "bool", { when: win });
   row("dial", "Numbers", "model.dial.style", "Numbers", "choice", { opts: [["rim", "On the rim"], ["dome", "On a domed top"]],

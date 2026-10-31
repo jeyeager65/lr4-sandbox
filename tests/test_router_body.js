@@ -146,6 +146,13 @@ CSG.init().then((loaded) => {
     }
     ok(floor >= 4 && box > 0, `Kobalt window (open ${open}): its floor at z ${Wn.z.toFixed(1)} in the head (${floor} points)`);
   }
+  {                                                  // the window's corner (win.r, the Makita's U): rounded in plan, still
+    const m = JSON.parse(JSON.stringify(M("makita"))), sq = JSON.parse(JSON.stringify(m));   // closed; less taken out than square
+    sq.dial = Object.assign({}, m.dial, { win: Object.assign({}, m.dial.win, { r: 0 }) });
+    const cr = B.build(m).parts.motor_cap, cs = B.build(sq).parts.motor_cap;
+    ok(M("makita").dial.win.r === 8 && watertight(cr) && watertight(cs) && volume(cr) > volume(cs),
+      `Makita window corner r 8: closed, takes ${((volume(cr) - volume(cs)) / 1000).toFixed(2)} cm3 less out than square`);
+  }
   // Part 46d: the wheel inside the head, its rim through a slot; a surround round it: none / sunk (+ out the top) /
   // raised, on the end and on top. Closed every way; sunk takes more out than none, raised adds; the rim `set` in from
   // the slot's face; a dark back in the pocket (trim)
@@ -164,7 +171,9 @@ CSG.init().then((loaded) => {
     ok(vols.sunk < vols.none && vols.none < vols.raised, `${id} dial ${place}: sunk < none < raised (${Object.values(vols).map((v) => (v / 1000).toFixed(2)).join(" / ")} cm3)`);
   }
   {
-    const m = JSON.parse(JSON.stringify(M("makita"))), with_ = B.build(m).parts.trim.idx.length;
+    const m = JSON.parse(JSON.stringify(M("makita")));
+    m.dial = Object.assign({}, m.dial, { place: "end" });   // (the Makita's own: in a window since 2026-10-31)
+    const with_ = B.build(m).parts.trim.idx.length;
     m.dial = Object.assign({}, m.dial, { slot: false });
     ok(with_ > B.build(m).parts.trim.idx.length && B.expand(m).dial.open === undefined, "dial slot: a dark back in the pocket; slot: false = the old look (no opening)");
   }
