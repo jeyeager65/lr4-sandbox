@@ -588,6 +588,7 @@
       <b>Motor cap shape</b>
       <span class="ce-seg" id="ce-views" role="group" aria-label="View"><button type="button" data-v="top" aria-pressed="true">Top</button><button type="button" data-v="front" aria-pressed="false">Front</button><button type="button" data-v="section" aria-pressed="false">Cross-section</button></span>
       <select id="ce-start" aria-label="Start from a shape" title="Start again from one of these, at the cap's size"><option value="" selected>Start from…</option><option value="box">Box</option><option value="can">Round can</option><option value="dome">Dome</option><option value="pear">Pear</option></select>
+      <button type="button" id="ce-overb" aria-pressed="true" title="Draw over the model (the camera turns to the view) - or in this panel, with more room for a photo">Over the model</button>
       <button type="button" id="ce-plain" title="Drop the shape: the cap is the box from its sizes again">Plain box</button>
       <button type="button" class="q" data-help="help-ce" aria-label="About the shape editor" title="About the shape editor">?</button>
       <button type="button" id="ce-close" aria-label="Close the shape editor" title="Close">✕</button>
@@ -604,7 +605,8 @@
     </div>
     <div class="ce-bar" id="ce-scalebox" hidden><label class="ce-num">Distance between the two points <input type="number" id="ce-dist" step="0.1" min="0" aria-label="Distance between the two points, mm"> mm</label><button type="button" id="ce-scale-ok">Set</button></div>
     <p class="foot ce-msg" id="ce-msg" aria-live="polite"></p><p class="foot" id="ce-pnote" hidden></p>
-    <div class="ce-draw">
+    <p class="foot ce-wait" id="ce-wait" hidden>The camera has turned away from this view: the drawing waits. <button type="button" id="ce-wait-go">Back to the view</button></p>
+    <div class="ce-draw" id="ce-draw">
       <svg class="ce-svg" id="ce-svg" role="img" aria-label="The view's outline: drag a point, click the line to add one"></svg>
       <div class="ce-pop" id="ce-pop" hidden><label><span id="ce-pop-l">Round</span> <input type="number" id="ce-pop-v" step="0.5" min="0" aria-label="Round this corner, mm"> mm</label>
         <button type="button" id="ce-pop-flip" class="ce-flip" title="Bulge the arc the other way" aria-label="Bulge the arc the other way" hidden>⇄</button></div>
@@ -631,7 +633,11 @@
     between (e.g. across the housing) and type it. Move lines it up; Turn straightens it. Each view keeps its own photo
     in this browser.</p>
     <p><b>Start from</b> a box, round can, dome or pear at the cap's size. <b>Cross-section</b>: + Section adds another
-    slice at X = (e.g. a rounder left end) - the cap blends between them. <b>Plain box</b> drops the shape.</p></div>
+    slice at X = (e.g. a rounder left end) - the cap blends between them. <b>Plain box</b> drops the shape.</p>
+    <p><b>Over the model</b> (on by default): the outline is drawn right on the router - the camera turns to the view
+    (Top, Front, or Right for the cross-section) with the Flat lens and closes in on the cap (<b>Fit</b> does that
+    again). Scroll to zoom and right-drag to pan as usual; if you turn the camera away the drawing waits until you go
+    back to the view. Turn it off to draw in this panel instead, with more room for tracing a photo.</p></div>
   <div class="status" id="status" role="status" aria-live="polite"><div id="status-title">Loading model…</div><div class="bar"><div id="status-bar"></div></div><div class="detail" id="status-detail">&nbsp;</div></div>
   <div class="toolbar" role="toolbar" aria-label="View">
     <button id="v-layers" type="button" aria-expanded="false" aria-controls="layers-pop" title="Layers: what the view shows (L)">Layers</button>

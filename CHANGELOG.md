@@ -26,6 +26,10 @@ the date the model data was built and the Printables file set it was solved for.
   the clamp, overall height, the motor cap's size, collet sizes, the speed table), each with its value, **How to
   measure** (a line and a small drawing) and **Set** to go to it. Tick each as you measure it (kept per router).
   **Start from** a preset shapes your router like a built-in one (its name stays; Undo puts it back).
+- **Draw the motor cap's shape on the model:** Edit shape now draws the outline right over the router. The camera
+  turns to the view (Top, Front, or Right for the cross-section) with the Flat lens and closes in on the cap; drag the
+  points on the model itself. Picking Top / Front / Right on the camera switches the drawing too. Turn the camera
+  away and the drawing waits. **Over the model** off puts the drawing back in the panel (more room for a photo).
 
 ## 0.62.0 - 2026-10-30
 - **Speed dials that look like the real ones:** the wheel sits inside the head, and a slice of its rim shows through

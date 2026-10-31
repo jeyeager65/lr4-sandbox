@@ -12,7 +12,8 @@
     front: { closed: true, axis: null, lx: "Left–right", ly: "Up", note: "From the machine's front, all the way round: up from the cap's bottom (the top of the turned part)" },
     section: { closed: false, axis: "y", lx: "Out from the middle", ly: "Up", note: "A slice across the cap seen from the right, one half (mirrored): stretched to each spot's width (Top) and height (Front)" },
   };
-  const CE = { view: "top", sel: -1, sec: 0, cam: {}, mode: null, drag: null, scaleA: null, photos: null };
+  const CE = { view: "top", sel: -1, sec: 0, cam: {}, mode: null, drag: null, scaleA: null, photos: null, over: true, home: null, lens: null, key: "" };
+  try { CE.over = MS.get("lr4-ce-over") !== "0"; } catch (e) { /* default: over the model */ }
   const PHOTO_KEY = "lr4-cap-photos";
 
   // ---- the shape: the current router's (a box from its sizes until it has one) ----
@@ -54,7 +55,25 @@
     const k = Math.min(W / ((bx[1] - bx[0]) * 1.25 || 1), H / ((by[1] - by[0]) * 1.25 || 1));
     CE.cam[CE.view] = { cx: (bx[0] + bx[1]) / 2, cy: (by[0] + by[1]) / 2, k: Math.max(k, 0.2) };
   }
-  const cam = () => CE.cam[CE.view] || (fit(), CE.cam[CE.view]);
+  // Part 48e (user 2026-10-31, the review's "shape editor in the view"): Over the model, the drawing (.ce-draw) moves
+  // onto the stage and its mm <-> px comes from the router editor's camera, snapped to the view's side (Top = the plan,
+  // Front, Right = the cross-section) with the Flat lens, so the outline sits on the model. Orbit off the snap and the
+  // drawing waits; the view's button snaps back. "In a panel" = the docked editor (more room for a photo).
+  const SNAP = { top: "top", front: "front", section: "right" }, VIEW_OF = { top: "top", front: "front", right: "section" };
+  const overOn = () => CE.over && !$("ce").hidden && typeof rbViewing === "function" && rbViewing() && typeof rxScreen === "function";
+  function live() {                                   // over the model: the view's cam from the 3D camera (null: not snapped there)
+    if (!overOn() || typeof RX === "undefined" || RX.anim || RX.view !== SNAP[CE.view]) return null;
+    const m = LR4Routers.preset(rbCur()).model, h = m.motor_cap, z0 = LR4RouterBody.stackTop(m);
+    const sec = CE.view === "section" ? sections(shapeNow())[Math.min(CE.sec, sections(shapeNow()).length - 1)].at : null;
+    const xs = sec ?? (h.at || [0, 0])[0];             // the slice: at its place along the cap (or the cap's middle)
+    const P = { top: (x, y) => [x, y, z0 + h.H], front: (x, y) => [x, 0, z0 + y], section: (x, y) => [xs, x, z0 + y] }[CE.view];
+    const a = rxScreen(P(0, 0)), b = rxScreen(P(100, 0)), c = rxScreen(P(0, 100));
+    if (!a || !b || !c) return null;
+    const k = Math.hypot(b[0] - a[0], b[1] - a[1]) / 100, [W, H] = box();
+    if (!(k > 0) || c[1] > a[1]) return null;         // (up the screen = up the drawing)
+    return { cx: (W / 2 - a[0]) / k, cy: (a[1] - H / 2) / k, k };
+  }
+  const cam = () => (overOn() ? live() || { cx: 0, cy: 0, k: 1 } : CE.cam[CE.view] || (fit(), CE.cam[CE.view]));
   function toS(x, y) { const c = cam(), [W, H] = box(); return [W / 2 + (x - c.cx) * c.k, H / 2 - (y - c.cy) * c.k]; }
   function toM(e) {
     const r = svg().getBoundingClientRect(), c = cam(), [W, H] = box();
@@ -72,9 +91,16 @@
   function draw() {
     if ($("ce").hidden) return;
     $("ce-note").textContent = VIEWS[CE.view].note;   // (first: the layout settles before the size is read)
-    const s = svg(), sh = shapeNow(), v = VIEWS[CE.view], pts = ptsOf(sh), [W, H] = box(), c = cam();
+    const s = svg(), sh = shapeNow(), v = VIEWS[CE.view], pts = ptsOf(sh), [W, H] = box(), c = cam(), over = overOn();
     s.replaceChildren();
     s.setAttribute("viewBox", `0 0 ${W} ${H}`);
+    s.classList.toggle("ce-mode", !!CE.mode);         // over the model: the background takes clicks only for the photo's tools
+    if (over && !live()) {                            // orbited off the view: the drawing waits
+      $("ce-pop").hidden = true;
+      $("ce-wait").hidden = typeof RX !== "undefined" && !!RX.anim;   // (still turning: no message)
+      return;
+    }
+    $("ce-wait").hidden = true;
     const ph = photo();
     if (ph && ph.src) {                              // the photo, its top-left at (x, y) mm, mmpp mm a pixel, turned rot deg about its middle
       const [sx, sy] = toS(ph.x, ph.y), k = ph.mmpp * c.k, cxp = ph.w / 2, cyp = ph.h / 2;
@@ -83,7 +109,7 @@
     }
     let step = 1;                                    // a grid at 1 / 5 / 10 / 50 mm, whichever is 14 px or more
     for (const g of [1, 5, 10, 50, 100]) { step = g; if (g * c.k >= 14) break; }
-    const gr = el("g", { class: "ce-grid" }, s), [x0, y1] = toM({ clientX: s.getBoundingClientRect().left, clientY: s.getBoundingClientRect().top });
+    const gr = el("g", { class: "ce-grid" + (over ? " ce-off" : "") }, s), [x0, y1] = toM({ clientX: s.getBoundingClientRect().left, clientY: s.getBoundingClientRect().top });
     const x1 = x0 + W / c.k, y0 = y1 - H / c.k;
     for (let x = Math.ceil(x0 / step) * step; x <= x1; x += step) { const [X] = toS(x, 0); el("line", { x1: X, y1: 0, x2: X, y2: H, class: x === 0 ? "ax" : "" }, gr); }
     for (let y = Math.ceil(y0 / step) * step; y <= y1; y += step) { const [, Y] = toS(0, y); el("line", { x1: 0, y1: Y, x2: W, y2: Y, class: y === 0 ? "ax" : "" }, gr); }
@@ -378,8 +404,9 @@
   });
 
   // ---- the bar: views, starting shapes, sections, close ----
-  function show(view) {
+  function show(view, fromCamera) {
     CE.view = view; CE.sel = -1; CE.mode = null; CE.scaleA = null;
+    if (overOn() && !fromCamera && typeof rxLook === "function" && RX.view !== SNAP[view]) rxLook(SNAP[view]);
     for (const b of $("ce-views").querySelectorAll("button")) b.setAttribute("aria-pressed", String(b.dataset.v === view));
     $("ce-msg").textContent = "";
     photoBar(); table(); draw();
@@ -393,7 +420,7 @@
     RB.cut = true;
     if (commit(S.STARTS[k](Object.assign({}, c, { at: (c.at || [0, 0])[0] })))) { CE.cam = {}; CE.sel = -1; table(); draw(); }
   });
-  $("ce-fit").addEventListener("click", () => { fit(); draw(); });
+  $("ce-fit").addEventListener("click", () => { if (overOn()) capFit(); else { fit(); draw(); } });
   $("ce-sec").addEventListener("change", (e) => { CE.sec = +e.target.value; CE.sel = -1; table(); draw(); });
   $("ce-sec-add").addEventListener("click", () => {   // another section, a copy of this one, 20 mm on (or the cap's other half)
     const sh = shapeNow(), secs = sections(sh), V = S.views(S.clean(sh)), cur = secs[Math.min(CE.sec, secs.length - 1)];
@@ -443,9 +470,46 @@
     camera.position.copy(controls.target).addScaledVector(dir, dist);
     controls.update();
   }
+  // over the model / in the panel: the drawing moved onto the stage (the router editor's overlay) or back; the Flat lens
+  // on while it's over the model, back as it was after
+  function overPlace() {
+    const on = overOn(), dr = $("ce-draw");
+    if (!CE.home) CE.home = { parent: dr.parentNode, next: dr.nextSibling };
+    const host = on ? $("rbx") : CE.home.parent;
+    if (dr.parentNode !== host) { if (on) host.append(dr); else host.insertBefore(dr, CE.home.next); }
+    dr.classList.toggle("ce-over", on);
+    $("ce").classList.toggle("ce-over", on);
+    $("ce-overb").setAttribute("aria-pressed", String(CE.over));
+    if (typeof RX !== "undefined" && typeof rxLens === "function") {
+      if (on && CE.lens === null) { CE.lens = RX.flat; if (!RX.flat) rxLens(true); }
+      if (!on && CE.lens !== null) { if (RX.flat !== CE.lens) rxLens(true); CE.lens = null; }
+    }
+    if (on && typeof rxLook === "function" && RX.view !== SNAP[CE.view]) rxLook(SNAP[CE.view]);
+  }
+  $("ce-overb").addEventListener("click", () => {
+    CE.over = !CE.over;
+    try { MS.set("lr4-ce-over", CE.over ? "1" : "0"); } catch (e) { /* not kept */ }
+    overPlace(); fitRoom(); draw();
+  });
+  $("ce-wait-go").addEventListener("click", () => { if (typeof rxLook === "function") rxLook(SNAP[CE.view]); });
+  // over the model: the camera closes in on the motor cap (once the snap has landed: it frames the whole router)
+  function capFit(tries = 3) {
+    if (!overOn() || typeof rxWorld !== "function") return;
+    if (RX.anim) { if (tries) setTimeout(() => capFit(tries - 1), 150); return; }
+    const m = LR4Routers.preset(rbCur()).model, h = m.motor_cap, z0 = LR4RouterBody.stackTop(m);
+    const c = rxWorld([(h.at || [0, 0])[0], 0, z0 + h.H / 2]);
+    if (!c) return;
+    const [w, H] = viewRoom(), v = camera.fov * Math.PI / 360, hh = Math.atan(Math.tan(v) * w / H);
+    const dir = camera.position.clone().sub(controls.target).normalize(), r = Math.hypot(h.L, h.W, h.H) * 0.62;
+    controls.target.copy(c);
+    camera.position.copy(c).addScaledVector(dir, r / Math.sin(Math.min(v, hh)));
+    controls.update();
+    draw();
+  }
   function capEditOpen(on) {
     const was = !$("ce").hidden;
     $("ce").hidden = !on;
+    overPlace();
     for (const b of document.querySelectorAll('[data-act="shape"]')) b.setAttribute("aria-pressed", String(on));   // the motor cap's Edit shape (router_inspect.js)
     if (on && !was) { CE.cam = {}; show(CE.view); }
     if (typeof rtiShow === "function") rtiShow();   // the inspector steps aside for it (router_inspect.js)
@@ -460,6 +524,19 @@
   // the builder calls this after any change (undo, another router): the editor follows
   window.capEditShow = () => { if (!$("ce").hidden && !CE.drag) { table(); draw(); } };
   window.capEditOpen = capEditOpen;
+  // the router editor's camera: a snap to Top / Front / Right switches the drawing's view; each frame, a redraw if the
+  // camera moved (zoom, pan) - router_edit.js calls these
+  window.capEditSnap = (v) => {
+    if (!overOn() || !VIEW_OF[v]) return;
+    if (VIEW_OF[v] !== CE.view) show(VIEW_OF[v], true);
+    setTimeout(capFit, 420);                          // after the snap's turn (router_edit.js: ~0.35 s)
+  };
+  window.capEditTick = () => {
+    if (!overOn() || CE.drag) return;
+    const c = live(), key = c ? [c.cx, c.cy, c.k].map((q) => q.toFixed(2)).join() : "-";
+    if (key !== CE.key) { CE.key = key; draw(); }
+  };
+  window.capEditOver = () => overOn();
   window.capEditRoom = viewRoom;
   window.capEditFit = fitRoom;
   window.capEditView = () => Object.assign({ view: CE.view }, cam());   // (tests: the view's px a mm)

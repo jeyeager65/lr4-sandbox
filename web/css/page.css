@@ -1122,3 +1122,15 @@ body.rec-ui .rec-msg { top: calc(3.5% + 44px); font-size: clamp(15px, 2.4vh, 38p
 .rti-how svg .t { stroke: var(--accent); stroke-dasharray: 2 2; stroke-width: 1; }
 .rti-how p { margin: 0; }
 .rti-preset { grid-template-columns: 8.2em 1fr; }
+/* the shape editor over the model (Part 48e): the drawing on the stage, the panel keeps the tools + the table */
+.ce-draw.ce-over { position: absolute; inset: 0; pointer-events: none; z-index: 2; }
+.ce-draw.ce-over .ce-svg { background: transparent; border: 0; border-radius: 0; pointer-events: none; }
+.ce-draw.ce-over .ce-svg.ce-mode { pointer-events: auto; }
+.ce-draw.ce-over :is(.ce-pt, .ce-h, .ce-hit, .ce-pop) { pointer-events: auto; }
+.ce-draw.ce-over .ce-line { stroke-width: 2.6; }
+.ce-grid.ce-off { display: none; }
+:root.rte-on .ce.ce-over { width: min(440px, calc(100% - 340px)); top: 52px; bottom: 30px; }
+.ce.ce-over .ce-tbl { max-height: none; flex: 1 1 auto; }
+.ce-wait button { margin-left: 6px; }
+#ce-overb[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.ce-draw.ce-over .ce-step { display: none; }

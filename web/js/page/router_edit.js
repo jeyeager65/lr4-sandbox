@@ -28,6 +28,7 @@
   // nothing picked: only the overall height, the head's size and the grip Ø (the fit); a part picked: its own
   const RX_BASE = new Set(["overall", "cap-L", "cap-Lt", "cap-W", "cap-Wt", "cap-H", "cap-Hf", "dia-housing", "diaf-housing"]);
   function rxDims() {
+    if (typeof capEditOver === "function" && capEditOver()) return [];   // drawing the cap's shape over the model: no numbers
     const C = rtClamps(), all = LR4RouterDims.dims(rxRouter(), C ? C.def : null);
     return all.filter((d) => d.views.includes(RX.face) && (RX.sel ? d.g === RX.sel : RX_BASE.has(d.id)));
   }
@@ -53,7 +54,7 @@
   const rxFmt = (d) => (d.kind === "dia" ? "Ø" : d.kind === "rad" ? "R" : d.kind === "ch" ? "C" : "") + (+d.v.toFixed(1)) + (d.kind === "ang" ? "°" : "");
 
   // the drawing: each frame while it's on (the camera moves, the router changes under it); scripting.js's tick
-  function rxTick() { if (!rxBox.hidden) rxDraw(); }
+  function rxTick() { if (!rxBox.hidden) { rxDraw(); if (typeof capEditTick === "function") capEditTick(); } }   // (the shape editor over the model: cap_edit.js)
   function rxDraw() {
     if (RX.sel && !rxValid(RX.sel)) return rxPick(null);   // the part's gone (the lock taken off, now a spindle)
     const W = canvas.clientWidth, H = canvas.clientHeight;
@@ -209,6 +210,7 @@
   function rxViewMark() { for (const b of rxBox.querySelectorAll(".rbx-views [data-v]")) b.setAttribute("aria-pressed", String(b.dataset.v === RX.view)); }
   function rxLook(v, now) {
     if (v === "3d") v = "iso";                        // (the old name)
+    if (typeof capEditSnap === "function") capEditSnap(v);   // the shape editor's drawing follows the snap (cap_edit.js)
     RX.view = v;
     rxViewMark();
     const f = RT.body && RT.body.f;
@@ -343,7 +345,7 @@
   }
   function rxGhost() {                                // the picked part lit (and the mount faded)
     rxFade();
-    const g = !rxBox.hidden && rxRegion(), f = RT.body && RT.body.f, sh = g && g.shape;
+    const g = !rxBox.hidden && $("ce").hidden && rxRegion(), f = RT.body && RT.body.f, sh = g && g.shape;   // (not under the shape editor's drawing)
     // a part with a mesh of its own: a copy of it a little bigger (it hugs the real shape); the rest: a shell
     const own = g && sh && { motor_cap: "Router_MotorCap", dial: "Router_Dial", collet_nut: "Router_ColletNut", shaft_lock: "Router_ShaftLock",
       transition: "Router_Transition", collar: "Router_Collar", bearing_cap: "Router_BearingCap" }[g.id];

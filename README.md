@@ -86,7 +86,7 @@ sizes show on the model (click a number to type it, drag a ● to pull that end)
 **inspector** on the right shows every setting of that part (sizes, options, color + finish). **Router** at the top
 of the list is the router itself (name, speeds, collets). **+ Add a part** puts on a shaft lock, brush caps, wrench
 flats and the like; ✕ takes one off. The toolbar has Undo / Redo, New, Reset, Export / Import (a `.router.json` to
-share). The motor cap's **Edit shape** draws its shape from three views. On the Router item, **Fit** lists the numbers
+share). The motor cap's **Edit shape** draws its shape from three views, right over the model (or in its panel). On the Router item, **Fit** lists the numbers
 that matter for the machine with how to measure each; **Start from** copies a built-in router's shape to begin with.
 
 **As built** is off (Ideal) by default. **Real-world** gives the machine a real build's faults: the Y and Z switches

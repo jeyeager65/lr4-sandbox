@@ -47,6 +47,32 @@ const SHOT = process.env.CE_SHOT;                    // a folder: screenshots of
       rxPick("motor_cap"); await T.sleep(100);
       document.querySelector('#rti [data-act="shape"]').click(); await T.sleep(300);
       out.open = !$$("ce").hidden && $$("rti").hidden;
+      // over the model (Part 48e): the drawing on the stage, the camera snapped to Top with the Flat lens, the cap framed;
+      // its points sit on the model's; a drag moves one; orbit away = it waits; Back to the view; In a panel = docked
+      if ($$("ce-overb").getAttribute("aria-pressed") !== "true") $$("ce-overb").click();
+      await T.sleep(1100);
+      const ov = { place: [$$("ce-draw").parentNode.id, RX.view, RX.flat, $$("ce").classList.contains("ce-over")] };
+      const m0 = LR4RouterBuild.preset().model, z0 = LR4RouterBody.stackTop(m0), sv = $$("ce-svg"), cr = canvas.getBoundingClientRect();
+      const rowv = (k, i) => +$$("ce-rows").querySelectorAll("input[data-k=" + k + "]")[i].value;
+      const ctr = (e) => { const b = e.getBoundingClientRect(); return [b.left + b.width / 2, b.top + b.height / 2]; };
+      const S2 = rxScreen([rowv("x", 1), rowv("y", 1), z0 + m0.motor_cap.H]), c2 = ctr(sv.querySelectorAll(".ce-pt")[1]);
+      ov.align = +Math.hypot(c2[0] - cr.left - S2[0], c2[1] - cr.top - S2[1]).toFixed(1);
+      ov.zoom = capEditView().k;
+      const fireO = (t, x, y, tgt) => tgt.dispatchEvent(new PointerEvent(t, { bubbles: true, clientX: x, clientY: y, pointerId: 1, button: 0 }));
+      const c3o = sv.querySelectorAll(".ce-pt")[2], q3 = ctr(c3o), yb = rowv("y", 2);
+      fireO("pointerdown", q3[0], q3[1], c3o); fireO("pointermove", q3[0], q3[1] - 10 * ov.zoom, sv); fireO("pointerup", q3[0], q3[1] - 10 * ov.zoom, sv);
+      await T.sleep(400);
+      ov.drag = +(rowv("y", 2) - yb).toFixed(1);
+      const tg = controls.target.clone();
+      camera.position.copy(tg).add(new THREE.Vector3(200, -200, 150)); controls.update(); controls.dispatchEvent({ type: "end" }); await T.sleep(100);
+      ov.wait = [!$$("ce-wait").hidden, sv.querySelectorAll(".ce-pt").length];
+      $$("ce-wait-go").click(); await T.sleep(1100);
+      ov.back = [$$("ce-wait").hidden, sv.querySelectorAll(".ce-pt").length, RX.view];
+      $$("ce-overb").click(); await T.sleep(300);
+      ov.panel = [$$("ce-draw").parentNode.id !== "rbx", RX.flat, !$$("ce").classList.contains("ce-over")];
+      $$("rb-undo").click(); await T.sleep(300);   // the drag undone: the box again
+      ov.undone = !(edit() && edit().motor_cap.shape);
+      out.over = ov;
       const svg = $$("ce-svg");
       out.top = { pts: svg.querySelectorAll(".ce-pt").length, line: !!svg.querySelector(".ce-line"), mirror: !!svg.querySelector(".ce-mirror"), rows: $$("ce-rows").children.length };
       // drag point 3 (the front corner) out 10 mm: the width grows by 20
@@ -130,6 +156,12 @@ const SHOT = process.env.CE_SHOT;                    // a folder: screenshots of
     ok(a.rte.on && !a.rte.ce && a.rte.panel === "none" && a.rte.insp === "none" && a.rte.rti && a.rte.builder && a.rte.off > 0,
       `Edit router: the router editor - the builder in the side panel's place, Inspect's panel away, the view centered between it and the inspector (${JSON.stringify(a.rte)})`);
     ok(a.open, "the motor cap's Edit shape docks the shape editor on the right, in the inspector's place");
+    const o = a.over;
+    ok(o.place.join() === "rbx,top,true,true", `over the model: the drawing on the stage, the camera snapped to Top, the Flat lens (${o.place})`);
+    ok(o.align < 3 && o.zoom > 1.5, `its points sit on the model's corners (${o.align} px off), the cap framed (${o.zoom.toFixed(2)} px a mm)`);
+    ok(Math.abs(o.drag - 10) <= 0.5, `a point dragged 10 mm over the model (${o.drag})`);
+    ok(o.wait[0] && o.wait[1] === 0 && o.back.join() === "true,4,top", `orbited away: it waits (${o.wait}); Back to the view (${o.back})`);
+    ok(o.panel.join() === "true,false,true" && o.undone, `In a panel: docked again, the lens back (${o.panel}); the drag undone`);
     ok(a.top.pts === 4 && a.top.line && a.top.mirror && a.top.rows === 4, `top view: the box's 4 points, its outline + the mirrored half, 4 table rows (${JSON.stringify(a.top)})`);
     ok(a.drag.shaped && Math.abs(a.drag.y1 - a.drag.y0 - 10) < 1 && a.drag.box[1] - a.box0[1] > 15 && a.drag.box[1] - a.box0[1] <= 20.1,
       `dragging point 3 out 10 mm: the cap is drawn now, ~20 mm wider (the corner's fillet trims it) (${a.drag.y0} -> ${a.drag.y1}; ${a.box0} -> ${a.drag.box})`);
