@@ -127,6 +127,19 @@ const SHOT = process.env.CE_SHOT;                    // a folder: screenshots of
       $$("ce-views").querySelector("[data-v=front]").click(); await T.sleep(200);
       out.cut.front = [capEditCut(), capMat().clippingPlanes, svg.querySelectorAll(".ce-guide line.sec").length, svg.querySelectorAll(".ce-guide line.sec.on").length];
       $$("ce-views").querySelector("[data-v=section]").click(); await T.sleep(200);
+      // the Cut at slider (Part 48g): between the 2 sections nothing to edit, the cut there, both dotted; + Section here
+      // makes a 3rd there and the cap doesn't change; slid within 1 mm of a section: that one picked
+      const sec2 = edit().motor_cap.shape.section, mid = (sec2[0].at + sec2[1].at) / 2, box1 = cap(), cutI = $$("ce-cut");
+      const slide = (x) => { cutI.value = x; cutI.dispatchEvent(new Event("input")); };
+      slide(mid); await T.sleep(200);
+      const cf = capEditCut(), zc = LR4RouterBody.stackTop(LR4RouterBuild.preset().model) + 10;
+      const gone2 = (x) => !!cf && cf.planes.every((q) => q.distanceToPoint(rxWorld([x, 0, zc])) < 0);
+      out.slide = { free: !$$("ce-free").hidden, pts: svg.querySelectorAll(".ce-pt").length, dotted: svg.querySelectorAll(".ce-other path").length,
+        cut: gone2(mid + 1) && !gone2(mid - 1), add: $$("ce-sec-add").textContent, sel: $$("ce-sec").value };
+      $$("ce-sec-add").click(); await T.sleep(300);
+      out.slide.after = { n: edit().motor_cap.shape.section.length, same: cap().join() === box1.join(), pts: svg.querySelectorAll(".ce-pt").length, sel: $$("ce-sec").value, free: !$$("ce-free").hidden };
+      slide(sec2[0].at + 0.6); await T.sleep(200);
+      out.slide.near = { sel: $$("ce-sec").value, free: !$$("ce-free").hidden, pts: svg.querySelectorAll(".ce-pt").length };
       // start from a pear: the shape replaced, the model too; Length stretches it
       const st = $$("ce-start"); st.value = "pear"; st.dispatchEvent(new Event("change", { bubbles: true })); await T.sleep(400);
       out.pear = { n: edit().motor_cap.shape.top.length, box: cap() };
@@ -190,6 +203,12 @@ const SHOT = process.env.CE_SHOT;                    // a folder: screenshots of
     ok(cu.others === 2 && /^X -?\d/.test(cu.label || ""), `the other section dashed (both halves) with its X (${cu.others}, ${cu.label})`);
     ok(cu.front[0] === null && !cu.front[1] && cu.front[2] === 2 && cu.front[3] === 1,
       `Front: no cut, the cap's material as it was; the sections' places marked, the picked one solid (${JSON.stringify(cu.front.slice(2))})`);
+    const sl = a.slide;
+    ok(sl.free && sl.pts === 0 && sl.dotted === 4 && sl.cut && sl.add === "+ Section here" && sl.sel === "-1",
+      `Cut at slid between the sections: nothing to edit, both dotted, the cut there, + Section here (${JSON.stringify(sl)})`);
+    ok(sl.after.n === 3 && sl.after.same && sl.after.pts === 4 && sl.after.sel === "1" && !sl.after.free,
+      `+ Section here: a 3rd section there, picked to edit, the cap unchanged (${JSON.stringify(sl.after)})`);
+    ok(sl.near.sel === "0" && !sl.near.free && sl.near.pts === 4, `slid within 1 mm of a section: it's picked (${JSON.stringify(sl.near)})`);
     ok(a.pear.n === 5, `Start from Pear: its 5 top points (${JSON.stringify(a.pear)})`);
     ok(Math.abs(a.stretch.L - 130) < 0.1 && Math.abs(a.stretch.box[0] - 130) < 1 && a.stretch.filletsHidden && a.stretch.note,
       `Length 130 stretches the drawn cap; the fillets hidden, "drawn" noted (${JSON.stringify(a.stretch)})`);

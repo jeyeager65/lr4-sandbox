@@ -1058,6 +1058,10 @@ body.rec-ui .rec-msg { top: calc(3.5% + 44px); font-size: clamp(15px, 2.4vh, 38p
 .ce-guide line.sec { stroke: var(--accent); opacity: 0.45; }
 .ce-guide line.sec.on { stroke-dasharray: none; stroke-width: 1.5; opacity: 1; }
 .ce-other path { fill: none; stroke: var(--ink); stroke-width: 1.2; stroke-dasharray: 2 4; opacity: 0.55; }
+.ce-cutl { flex: 1 1 100%; display: flex; align-items: center; gap: 8px; }
+.ce-cutl input { flex: 1; min-width: 120px; }
+.ce-cutl output { min-width: 64px; font-variant-numeric: tabular-nums; }
+.ce-free { margin: 6px 0; color: var(--muted); font-size: 12px; }
 .ce-other text { fill: var(--muted); font-size: 11px; font-family: var(--mono, monospace); }
 .ce-mirror { fill: none; stroke: var(--ink); stroke-width: 1.2; stroke-dasharray: 5 4; opacity: 0.45; }
 .ce-line { fill: none; stroke: var(--accent); stroke-width: 2.2; }

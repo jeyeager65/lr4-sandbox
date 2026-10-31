@@ -612,10 +612,14 @@
         <button type="button" id="ce-pop-flip" class="ce-flip" title="Bulge the arc the other way" aria-label="Bulge the arc the other way" hidden>⇄</button></div>
     </div>
     <p class="foot ce-note" id="ce-note"></p>
-    <div class="ce-bar" id="ce-secs" hidden><label class="ce-num">Section <select id="ce-sec" aria-label="Section"></select></label>
+    <div class="ce-bar" id="ce-secs" hidden><label class="ce-num ce-cutl" title="Slide the cut along the cap: near a section it picks it; between them it shows the blend">Cut at
+      <input type="range" id="ce-cut" step="0.5" aria-label="Where the cut is, left–right"><output id="ce-cut-out" for="ce-cut"></output></label>
+      <label class="ce-num">Section <select id="ce-sec" aria-label="Section"></select></label>
       <span class="field"><label class="ce-num">at X = <input type="number" id="ce-sec-at" step="1" aria-label="Where this section is, left–right"> mm</label></span>
       <button type="button" id="ce-sec-add" title="Another section further along: the cap blends between them">+ Section</button>
       <button type="button" id="ce-sec-del" title="Remove this section">Remove</button></div>
+    <p class="ce-free" id="ce-free" hidden>Between sections: the cut shows the cap as it blends here. <b>+ Section here</b>
+      adds one at X = <span id="ce-free-x"></span>, shaped like the cut, to change it.</p>
     <div class="ce-tbl"><table><thead><tr><th>#</th><th id="ce-hx"></th><th id="ce-hy"></th><th>To the next point</th><th>Round this corner</th><th>Curve here</th></tr></thead><tbody id="ce-rows"></tbody></table></div>
   </section>
   <div class="help" id="help-ce" hidden><p><b>The motor cap from three views,</b> named by where you stand at the machine.
@@ -633,7 +637,8 @@
     between (e.g. across the housing) and type it. Move lines it up; Turn straightens it. Each view keeps its own photo
     in this browser.</p>
     <p><b>Start from</b> a box, round can, dome or pear at the cap's size. <b>Cross-section</b>: + Section adds another
-    slice at X = (e.g. a rounder left end) - the cap blends between them. In the Cross-section view the router is cut
+    slice at X = (e.g. a rounder left end) - the cap blends between them. In the Cross-section view <b>Cut at</b> slides the cut along the cap (near a section it
+    picks it; between them <b>+ Section here</b> adds one, shaped like the cut); the router is cut
     away at the picked slice's X (the gray face is the cap's real shape there) and the other slices show dotted, with
     their X; Top and Front mark each slice's place, the picked one solid. <b>Plain box</b> drops the shape.</p>
     <p><b>Over the model</b> (on by default): the outline is drawn right on the router - the camera turns to the view

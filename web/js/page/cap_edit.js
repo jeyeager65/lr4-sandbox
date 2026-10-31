@@ -14,6 +14,10 @@
   };
   const CE = { view: "top", sel: -1, sec: 0, cam: {}, mode: null, drag: null, scaleA: null, photos: null, over: true, home: null, lens: null, key: "" };
   try { CE.over = MS.get("lr4-ce-over") !== "0"; } catch (e) { /* default: over the model */ }
+  // Part 48g (user 2026-10-31: "a cutaway slider ... slide to a point and add a cross section there"): the Cross-section
+  // view's Cut at slider moves the cut along the cap; near a section (1 mm) it snaps there and picks it; between them
+  // (CE.free = its X) nothing is edited - the cut shows the blend, + Section here adds one there, shaped as the blend.
+  CE.free = null;
   const PHOTO_KEY = "lr4-cap-photos";
 
   // ---- the shape: the current router's (a box from its sizes until it has one) ----
@@ -64,7 +68,7 @@
   function live() {                                   // over the model: the view's cam from the 3D camera (null: not snapped there)
     if (!overOn() || typeof RX === "undefined" || RX.anim || RX.view !== SNAP[CE.view]) return null;
     const m = LR4Routers.preset(rbCur()).model, h = m.motor_cap, z0 = LR4RouterBody.stackTop(m);
-    const sec = CE.view === "section" ? sections(shapeNow())[Math.min(CE.sec, sections(shapeNow()).length - 1)].at : null;
+    const sec = CE.view === "section" ? CE.free ?? sections(shapeNow())[Math.min(CE.sec, sections(shapeNow()).length - 1)].at : null;
     const xs = sec ?? (h.at || [0, 0])[0];             // the slice: at its place along the cap (or the cap's middle)
     const P = { top: (x, y) => [x, y, z0 + h.H], front: (x, y) => [x, 0, z0 + y], section: (x, y) => [xs, x, z0 + y] }[CE.view];
     const a = rxScreen(P(0, 0)), b = rxScreen(P(100, 0)), c = rxScreen(P(0, 100));
@@ -90,6 +94,7 @@
 
   function draw() {
     if ($("ce").hidden) return;
+    capCut();                                         // (the cutaway follows the view / section at once, not a frame later)
     $("ce-note").textContent = VIEWS[CE.view].note;   // (first: the layout settles before the size is read)
     const s = svg(), sh = shapeNow(), v = VIEWS[CE.view], pts = ptsOf(sh), [W, H] = box(), c = cam(), over = overOn();
     s.replaceChildren();
@@ -116,6 +121,7 @@
     const t = el("text", { x: 8, y: H - 8, class: "ce-step" }, s); t.textContent = `grid ${step} mm`;
     guides(s, sh);
     if (CE.view === "section") others(s, sh, v);
+    if (CE.view === "section" && CE.free !== null) { $("ce-pop").hidden = true; return; }
     const pl = S.path(pts, v.closed, v.axis);
     if (v.axis) el("path", { d: d(pl.map(([x, y]) => (v.axis === "x" ? [x, -y] : [-x, y]))), class: "ce-mirror" }, s);
     el("path", { d: d(pl) + (v.closed ? "Z" : ""), class: "ce-line" }, s);
@@ -169,8 +175,8 @@
   $("ce-pop-flip").addEventListener("click", () => { const i = CE.sel; edit((pts) => { if (pts[i]) pts[i].r = -(pts[i].r || 0); }); table(); });
   // the cross-section's other sections (more than one: blended along the cap), dashed + their X at the widest point
   function others(s, sh, v) {
-    const secs = sections(sh), cur = Math.min(CE.sec, secs.length - 1);
-    if (secs.length < 2) return;
+    const secs = sections(sh), cur = CE.free !== null ? -1 : Math.min(CE.sec, secs.length - 1);
+    if (secs.length < 2 && cur >= 0) return;
     const g = el("g", { class: "ce-other" }, s), used = [];
     secs.forEach((e, j) => {
       if (j === cur) return;
@@ -178,6 +184,7 @@
       el("path", { d: d(pl) }, g);
       el("path", { d: d(pl.map(([x, y]) => [-x, y])) }, g);
       const w = pl.reduce((a, q) => (q[0] > a[0] + 0.01 || (Math.abs(q[0] - a[0]) <= 0.01 && q[1] > a[1]) ? q : a), pl[0]);
+      if (e.at === null) return;
       const [X, Y0] = toS(w[0], w[1]);
       let Y = Y0 + 4;
       while (used.some((u) => Math.abs(u - Y) < 13)) Y += 13;   // (labels at the same spot: stacked)
@@ -269,10 +276,19 @@
     const sel = $("ce-sec");
     sel.length = 0;
     secs.forEach((e, i) => sel.add(new Option(secs.length > 1 ? `${i + 1}: at X = ${e.at}` : "One for the whole cap", i)));
-    sel.value = Math.min(CE.sec, secs.length - 1);
-    $("ce-sec-at").closest(".field").hidden = secs.length < 2;
-    $("ce-sec-at").value = secs.length > 1 ? secs[Math.min(CE.sec, secs.length - 1)].at : "";
-    $("ce-sec-del").disabled = secs.length < 2;
+    const free = CE.free !== null, V = S.views(S.clean(sh) || sh), cur = secs[Math.min(CE.sec, secs.length - 1)];
+    if (free) sel.add(new Option("Between sections", -1));
+    sel.value = free ? -1 : Math.min(CE.sec, secs.length - 1);
+    $("ce-sec-at").closest(".field").hidden = secs.length < 2 || free;
+    $("ce-sec-at").value = secs.length > 1 ? cur.at : "";
+    $("ce-sec-del").disabled = secs.length < 2 || free;
+    $("ce-sec-add").textContent = free ? "+ Section here" : "+ Section";
+    const cut = $("ce-cut"), x = CE.free ?? cur.at ?? (V.x0 + V.x1) / 2;
+    cut.min = +V.x0.toFixed(1); cut.max = +V.x1.toFixed(1); cut.value = x;
+    $("ce-cut-out").textContent = `X = ${+x.toFixed(1)}`;
+    $("ce-free").hidden = !free || CE.view !== "section";
+    $("ce-free-x").textContent = +x.toFixed(1);
+    document.querySelector("#ce .ce-tbl").hidden = free && CE.view === "section";
   }
   $("ce-rows").addEventListener("change", (e) => {
     const t = e.target, i = +t.dataset.i, k = t.dataset.k;
@@ -428,7 +444,7 @@
 
   // ---- the bar: views, starting shapes, sections, close ----
   function show(view, fromCamera) {
-    CE.view = view; CE.sel = -1; CE.mode = null; CE.scaleA = null;
+    CE.view = view; CE.sel = -1; CE.mode = null; CE.scaleA = null; CE.free = null;
     if (overOn() && !fromCamera && typeof rxLook === "function" && RX.view !== SNAP[view]) rxLook(SNAP[view]);
     for (const b of $("ce-views").querySelectorAll("button")) b.setAttribute("aria-pressed", String(b.dataset.v === view));
     $("ce-msg").textContent = "";
@@ -444,9 +460,40 @@
     if (commit(S.STARTS[k](Object.assign({}, c, { at: (c.at || [0, 0])[0] })))) { CE.cam = {}; CE.sel = -1; table(); draw(); }
   });
   $("ce-fit").addEventListener("click", () => { if (overOn()) capFit(); else { fit(); draw(); } });
-  $("ce-sec").addEventListener("change", (e) => { CE.sec = +e.target.value; CE.sel = -1; table(); draw(); });
+  $("ce-sec").addEventListener("change", (e) => { if (+e.target.value < 0) return; CE.sec = +e.target.value; CE.free = null; CE.sel = -1; table(); draw(); });
+  $("ce-cut").addEventListener("input", (e) => {    // the cut slid: a section within 1 mm picked, else between them
+    const x = Number(e.target.value), secs = sections(shapeNow());
+    let j = -1, bd = 1.01;
+    secs.forEach((q, i) => { if (q.at !== null && Math.abs(q.at - x) < bd) { bd = Math.abs(q.at - x); j = i; } });
+    if (j >= 0) { CE.sec = j; CE.free = null; } else CE.free = x;
+    CE.sel = -1; table(); draw();
+  });
+  // a new section at X between two others: the blend of them where both have the same points (a copy's), else the nearer's
+  function blendAt(secs, x) {
+    const by = [...secs].sort((p, q) => p.at - q.at), a = by.filter((q) => q.at <= x).pop(), b = by.find((q) => q.at >= x);
+    const copy = (q) => q.pts.map((pt) => Object.assign({}, pt));
+    if (!a || !b || a === b) return copy(a || b);
+    const t = (x - a.at) / (b.at - a.at), near = t < 0.5 ? a : b;
+    if (a.pts.length !== b.pts.length || a.pts.some((pt, i) => (pt.s || "line") !== (b.pts[i].s || "line"))) return copy(near);
+    const mix = (u, v) => +(u + (v - u) * t).toFixed(2);
+    return a.pts.map((pa, i) => {
+      const pb = b.pts[i], o = Object.assign({}, near.pts[i], { x: mix(pa.x, pb.x), y: mix(pa.y, pb.y) });
+      if (pa.r || pb.r) o.r = mix(pa.r || 0, pb.r || 0); else delete o.r;
+      return o;
+    });
+  }
   $("ce-sec-add").addEventListener("click", () => {   // another section, a copy of this one, 20 mm on (or the cap's other half)
     const sh = shapeNow(), secs = sections(sh), V = S.views(S.clean(sh)), cur = secs[Math.min(CE.sec, secs.length - 1)];
+    if (CE.free !== null) {                           // between sections: one here, shaped as the cap is here
+      const x = +CE.free.toFixed(1);
+      if (secs.length === 1 && secs[0].at === null) secs[0].at = +(x > (V.x0 + V.x1) / 2 ? V.x0 : V.x1).toFixed(1);   // (the one: to the far end)
+      secs.push({ at: x, pts: blendAt(secs, x) });
+      secs.sort((a, b) => a.at - b.at);
+      sh.section = secs;
+      RB.cut = true;
+      if (commit(sh)) { CE.free = null; CE.sec = secs.findIndex((e) => e.at === x); table(); draw(); }
+      return;
+    }
     const at0 = cur.at ?? V.x0 + V.L * 0.25, at = Math.min(at0 + Math.max(20, V.L / 4), V.x1);
     if (secs.length === 1) secs[0].at = +at0.toFixed(1);
     secs.push({ at: +at.toFixed(1), pts: cur.pts.map((p) => Object.assign({}, p)) });
@@ -461,13 +508,14 @@
     secs.splice(Math.min(CE.sec, secs.length - 1), 1);
     sh.section = secs.length === 1 ? secs[0].pts : secs;
     RB.cut = true;
-    if (commit(sh)) { CE.sec = 0; table(); draw(); }
+    if (commit(sh)) { CE.sec = 0; CE.free = null; table(); draw(); }
   });
   $("ce-sec-at").addEventListener("change", (e) => {
     const v = Number(e.target.value), sh = shapeNow(), secs = sections(sh);
     if (!Number.isFinite(v) || secs.length < 2) return;
     secs[Math.min(CE.sec, secs.length - 1)].at = v;
     sh.section = secs;
+    CE.free = null;
     if (commit(sh)) { table(); draw(); }
   });
   $("ce-plain").addEventListener("click", () => {    // back to the box from its sizes (the shape dropped)
@@ -545,7 +593,7 @@
     if (!$("ce").hidden && CE.view === "section" && typeof rxWorld === "function" && typeof meshes !== "undefined") {
       const secs = sections(shapeNow());
       m = LR4Routers.preset(rbCur()).model;
-      at = secs[Math.min(CE.sec, secs.length - 1)].at ?? (m.motor_cap.at || [0, 0])[0];
+      at = CE.free ?? secs[Math.min(CE.sec, secs.length - 1)].at ?? (m.motor_cap.at || [0, 0])[0];
     }
     const list = at === null ? [] : meshes.filter((q) => q.visible && q.isMesh && /^Router_/.test(q.userData.name || ""));
     const key = list.map((q) => q.uuid + q.geometry.uuid).join();
