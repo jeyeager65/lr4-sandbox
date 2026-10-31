@@ -32,6 +32,8 @@
   renderer.toneMappingExposure = 0.7;
   renderer.shadowMap.enabled = true;                  // the sun's soft shadows (off in Lite: setupDetail)
   renderer.shadowMap.type = THREE.PCFShadowMap;   // soft since r181 (PCFSoftShadowMap: removed)
+  // no shader log read after each compile (~150 ms of a load; three's advice for production): ?shaders=check for a shader error
+  renderer.debug.checkShaderErrors = new URLSearchParams(location.search).has("shaders");
   renderer.localClippingEnabled = true;             // straight belt runs are cut at the moving gantry / core
   const scene = new THREE.Scene();
 
@@ -108,30 +110,54 @@
     const b0 = g.boundingBox.min, span = g.boundingBox.getSize(new THREE.Vector3());
     const bits = Math.max(...span.toArray().map((v) => Math.ceil(Math.log2(v * 200 + 3))));
     const K = 2 ** bits, num = bits * 3 <= 53;
-    const keys = new Array(nt * 3);
-    for (let v = 0; v < nt * 3; v++) {
-      const i = v * 3, x = Math.round((P[i] - b0.x) * 200), y = Math.round((P[i + 1] - b0.y) * 200), z = Math.round((P[i + 2] - b0.z) * 200);
-      keys[v] = num ? x + K * (y + K * z) : `${x},${y},${z}`;
+    // the corners at one spot as a group (gid), found with a flat hash table, then listed per group in corner order
+    // (CSR: at[from[g] .. from[g + 1]]) - typed arrays, not a Map of arrays (that was ~1.1 s of a warm reload)
+    const nv = nt * 3, gid = new Int32Array(nv);
+    let ng = 0;
+    if (num) {
+      const size = 2 ** Math.ceil(Math.log2(nv * 2 + 2)), mask = size - 1;
+      const slot = new Int32Array(size).fill(-1), gkey = new Float64Array(nv);
+      for (let v = 0; v < nv; v++) {
+        const i = v * 3, x = Math.round((P[i] - b0.x) * 200), y = Math.round((P[i + 1] - b0.y) * 200), z = Math.round((P[i + 2] - b0.z) * 200);
+        const key = x + K * (y + K * z);
+        let h = Math.imul(key >>> 0, 0x9e3779b1) ^ Math.imul(Math.floor(key / 4294967296), 0x85ebca6b);
+        h = (h ^ (h >>> 15)) & mask;
+        while (slot[h] >= 0 && gkey[slot[h]] !== key) h = (h + 1) & mask;
+        if (slot[h] < 0) { slot[h] = ng; gkey[ng++] = key; }
+        gid[v] = slot[h];
+      }
+    } else {                                          // too big a grid for one number: strings
+      const seen = new Map();
+      for (let v = 0; v < nv; v++) {
+        const i = v * 3, k = `${Math.round((P[i] - b0.x) * 200)},${Math.round((P[i + 1] - b0.y) * 200)},${Math.round((P[i + 2] - b0.z) * 200)}`;
+        let g = seen.get(k);
+        if (g === undefined) seen.set(k, g = ng++);
+        gid[v] = g;
+      }
     }
-    const key = (i) => keys[i / 3];
-    const at = new Map();
+    const from = new Int32Array(ng + 1), at = new Int32Array(nv);
+    for (let v = 0; v < nv; v++) from[gid[v] + 1]++;
+    for (let g = 0; g < ng; g++) from[g + 1] += from[g];
+    const fill = from.slice(0, ng);
+    for (let v = 0; v < nv; v++) at[fill[gid[v]]++] = (v / 3) | 0;   // the triangle of each corner
     for (let t = 0; t < nt; t++) {
       const o = t * 9;
       const ax = P[o + 3] - P[o], ay = P[o + 4] - P[o + 1], az = P[o + 5] - P[o + 2];
       const bx = P[o + 6] - P[o], by = P[o + 7] - P[o + 1], bz = P[o + 8] - P[o + 2];
       let nx = ay * bz - az * by, ny = az * bx - ax * bz, nz = ax * by - ay * bx;
-      const l = Math.hypot(nx, ny, nz) || 1;
+      const l = Math.sqrt(nx * nx + ny * ny + nz * nz) || 1;   // (not Math.hypot: slow in V8)
       fn[t * 3] = nx / l; fn[t * 3 + 1] = ny / l; fn[t * 3 + 2] = nz / l;
-      for (let k = 0; k < 3; k++) { const kk = key(o + k * 3); (at.get(kk) || at.set(kk, []).get(kk)).push(t); }
     }
     const cos = Math.cos(deg * Math.PI / 180), N = new Float32Array(P.length);
-    for (let t = 0; t < nt; t++) for (let k = 0; k < 3; k++) {
+    for (let v = 0; v < nv; v++) {
+      const t3 = ((v / 3) | 0) * 3, tx = fn[t3], ty = fn[t3 + 1], tz = fn[t3 + 2], g = gid[v];
       let sx = 0, sy = 0, sz = 0;
-      for (const f of at.get(key(t * 9 + k * 3))) {
-        if (fn[f * 3] * fn[t * 3] + fn[f * 3 + 1] * fn[t * 3 + 1] + fn[f * 3 + 2] * fn[t * 3 + 2] < cos) continue;
-        sx += fn[f * 3]; sy += fn[f * 3 + 1]; sz += fn[f * 3 + 2];
+      for (let j = from[g]; j < from[g + 1]; j++) {
+        const f3 = at[j] * 3, fx = fn[f3], fy = fn[f3 + 1], fz = fn[f3 + 2];
+        if (fx * tx + fy * ty + fz * tz < cos) continue;
+        sx += fx; sy += fy; sz += fz;
       }
-      const l = Math.hypot(sx, sy, sz) || 1, o = t * 9 + k * 3;
+      const l = Math.sqrt(sx * sx + sy * sy + sz * sz) || 1, o = v * 3;
       N[o] = sx / l; N[o + 1] = sy / l; N[o + 2] = sz / l;
     }
     g.setAttribute("normal", new THREE.BufferAttribute(N, 3));
@@ -870,9 +896,11 @@ float lr4G(float x) { float s = 2.0 * fract(x) - 1.0; return floor(x) / 3.0 + (s
     const waves = Array.from({ length: 5 }, () => [rnd() * 6 + 1, rnd() * Math.PI * 2, rnd() * (kind === "pine" ? 4.5 : 1.5)]);
     const knots = kind === "pine" ? Array.from({ length: 2 }, () => [rnd() * W, rnd() * H, 5 + rnd() * 7]) : [];
     const rings = kind === "pine" ? 0.22 : 0.4, depth = kind === "pine" ? 0.20 : 0.11;
+    // whole periods: tiles in u; each wave's term per column (x only), added in the same order as per pixel
+    const wcol = waves.map(([f, ph, a]) => Float64Array.from({ length: W }, (_, x) => a * Math.sin(x / W * Math.PI * 2 * f + ph)));
     for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
       let v = y;
-      for (const [f, ph, a] of waves) v += a * Math.sin(x / W * Math.PI * 2 * f + ph);   // whole periods: tiles in u
+      for (const w of wcol) v += w[x];
       for (const [kx, ky, r] of knots) { const dx = (x - kx) / 2.5, dy = y - ky, q = Math.hypot(dx, dy); v += r * 2.2 * Math.exp(-(q * q) / (r * r * 2)); }
       const ring = 0.5 + 0.5 * Math.sin(v * rings * Math.PI * 2 / (H * rings / Math.round(H * rings)) );
       const fine = (rnd() - 0.5) * 0.05;
@@ -1316,7 +1344,9 @@ float lr4G(float x) { float s = 2.0 * fract(x) - 1.0; return floor(x) / 3.0 + (s
     progress("Unpacking…", 1, "gzip");
     await nextFrame();
     bin = await new Response(new Blob([raw]).stream().pipeThrough(new DecompressionStream("gzip"))).arrayBuffer();
+    const dev = cfg.files && new URLSearchParams(location.search).get("parts");   // testing: fetch the files from a folder URL
     if (cfg.files) await setupFiles();
+    if (dev) await devFiles(dev);
     // the build in named stages, the popup saying which (user 2026-10-23: it sat on "Building the machine" for seconds)
     const stages = [
       ["Setting up the panels", () => { setupShow(); setupColours(); setupDetail(); }],
@@ -1337,9 +1367,6 @@ float lr4G(float x) { float s = 2.0 * fract(x) - 1.0; return floor(x) / 3.0 + (s
     building = false;
     await nextFrame();
     statusEl.hidden = true;
-    const dev = cfg.files && new URLSearchParams(location.search).get("parts");   // testing: fetch the files from a folder URL
-    if (dev) await addFiles([...needed.keys(), ...optional].map((p) => ({ name: p,
-      read: () => fetch(dev + p).then((q) => q.ok ? q.arrayBuffer() : Promise.reject(new Error(p + " " + q.status))) })));
     applyLink();
     ctlStartup();                                    // FluidNC boots on the built machine (controller.js)
   }

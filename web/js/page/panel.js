@@ -73,19 +73,32 @@
     for (const en of entries) await walk(en);
     return out;
   }
+  async function readFiles(items) {                  // identify + keep (userFiles, IndexedDB); the files kept
+    let n = 0;
+    const zip = items.some((it) => /\.zip$/i.test(it.name)) ? await loadJSZip() : null;
+    const match = LR4Files.matcher(cfg.files.files, [...needed.keys(), ...optional]);
+    const got = await LR4Files.identify(items, match, zip, (name) => progress("Reading your files…", null, `${++n}: ${name.split("/").pop()}`));
+    const keep = got.filter((g) => !(userFiles.get(g.path) && userFiles.get(g.path).ok && !g.ok));   // never trade a match for a near miss
+    for (const g of keep) userFiles.set(g.path, g);
+    if (keep.length) WELCOME.loadedSome = true;
+    try { await LR4Files.store.put(keep); } catch (e) { console.warn("IndexedDB", e); }
+    return keep;
+  }
+  // testing (?parts=<folder URL>): the files not kept yet fetched from the folder, before the build (so it builds once)
+  async function devFiles(dev) {
+    const want = [...needed.keys(), ...optional].filter((p) => !(userFiles.get(p) && userFiles.get(p).ok));
+    if (!want.length) return;
+    try {
+      await readFiles(want.map((p) => ({ name: p, read: () => fetch(dev + p).then((q) => q.ok ? q.arrayBuffer() : Promise.reject(new Error(p + " " + q.status))) })));
+    } catch (e) { console.error(e); }
+    renderFiles();
+  }
   async function addFiles(items) {
     items = items.filter((it) => LR4Files.wanted(it.name));
     if (!items.length) return;
     statusEl.hidden = false;
-    let n = 0;
     try {
-      const zip = items.some((it) => /\.zip$/i.test(it.name)) ? await loadJSZip() : null;
-      const match = LR4Files.matcher(cfg.files.files, [...needed.keys(), ...optional]);
-      const got = await LR4Files.identify(items, match, zip, (name) => progress("Reading your files…", null, `${++n}: ${name.split("/").pop()}`));
-      const keep = got.filter((g) => !(userFiles.get(g.path) && userFiles.get(g.path).ok && !g.ok));   // never trade a match for a near miss
-      for (const g of keep) userFiles.set(g.path, g);
-      if (keep.length) WELCOME.loadedSome = true;
-      try { await LR4Files.store.put(keep); } catch (e) { console.warn("IndexedDB", e); }
+      const keep = await readFiles(items);
       progress("Building the machine…", 1, `${keep.length} file(s) used`);
       await nextFrame();
       dropSrcGeometry();

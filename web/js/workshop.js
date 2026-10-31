@@ -234,7 +234,9 @@
   function build(THREE, o) {
     const grp = new THREE.Group();
     grp.name = "workshop";
-    const T = textures(THREE), r = rng(11);
+    // the drawn textures made once (~130 ms; the same every build - a load built the shop twice); only clones are used
+    if (!build.T) build.T = textures(THREE);
+    const T = build.T, r = rng(11);
     const R = o.room, X0 = R.x0, X1 = R.x1, Y0 = R.y0, Y1 = R.y1, Z0 = o.floor, HEIGHT = R.h, g = R.gaps;
     const W = X1 - X0, D = Y1 - Y0;
     const std = (p) => new THREE.MeshStandardMaterial(Object.assign({ roughness: 0.85, metalness: 0 }, p));
@@ -655,7 +657,7 @@
 
     // outside: sky dome, grass, a driveway from the garage door - something to see through the windows (no trees: user 2026-10-24)
     const OUT = 15000;                                  // inside the desktop camera's far plane (20 m)
-    const sky = new THREE.Mesh(new THREE.SphereGeometry(OUT, 32, 16), new THREE.MeshBasicMaterial({ map: T.sky, side: THREE.BackSide,
+    const sky = new THREE.Mesh(new THREE.SphereGeometry(OUT, 32, 16), new THREE.MeshBasicMaterial({ map: tex(T.sky, T.sky.repeat.x, T.sky.repeat.y), side: THREE.BackSide,
       toneMapped: false, depthWrite: false }));
     sky.rotation.x = Math.PI / 2;                       // the dome's pole up Z
     sky.position.set(cx, cy, Z0);
