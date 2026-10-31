@@ -4,25 +4,32 @@
 // end. Flat views (Side / Front / Top: a narrow lens, no orbiting) so they read like a drawing, or 3D. Every change
 // goes through the builder's own input (its data-k), so the builder's rules - the motor cap on the turned part, overall
 // = the stack + the cap - hold here too. The page's scripts share one global scope (RT, rbViewing: router*.js). ----
-  const RX = { view: "front", drag: null, edit: null, fov: null, hover: null, sel: null, ghost: null, ghostKey: "", lit: [], slide: null };
-  const RX_VIEWS = [["front", "Front"], ["right", "Right"], ["top", "Top"], ["3d", "3D"]];   // where you stand at the machine (user 2026-10-30)
-  const RX_LENS = 8;                                  // the flat views' field of view (deg): near enough to a drawing
+  const RX = { view: "front", face: "front", drag: null, edit: null, fov: null, hover: null, sel: null, ghost: null, ghostKey: "", lit: [], slide: null, anim: null, faded: new Map(), flat: false };
+  // Part 48a (user 2026-10-31: "those top, side views should just be camera in 3d view"): the views are camera snaps -
+  // orbit, pan and zoom always work, dragging away just leaves the snap. Flat = a narrow lens (near a drawing) to
+  // measure by eye. The numbers drawn are the ones facing the camera (RX.face, picked when an orbit ends).
+  const RX_VIEWS = [["front", "Front"], ["right", "Right"], ["top", "Top"], ["iso", "Iso"]];   // where you stand at the machine (user 2026-10-30)
+  const RX_LENS = 8;                                  // the Flat lens (deg)
+  try { RX.flat = MS.get("lr4-rx-flat") === "1"; } catch (e) { /* default */ }
   const rxStage = document.querySelector(".stage");
   const rxBox = document.createElement("div");
   rxBox.className = "rbx"; rxBox.id = "rbx"; rxBox.hidden = true;
-  rxBox.innerHTML = '<svg class="rbx-svg" aria-hidden="true"></svg><div class="rbx-views" id="rbx-views" role="group" aria-label="View">' +
-    RX_VIEWS.map(([v, l]) => `<button type="button" data-v="${v}" aria-pressed="false">${l}</button>`).join("") +
+  rxBox.innerHTML = '<svg class="rbx-svg" aria-hidden="true"></svg><div class="rbx-views" id="rbx-views" role="group" aria-label="Camera">' +
+    RX_VIEWS.map(([v, l]) => `<button type="button" data-v="${v}" aria-pressed="false" title="Turn the camera to the ${l === "Iso" ? "corner (3D)" : l.toLowerCase()} view">${l}</button>`).join("") +
+    '<button type="button" id="rbx-flat" class="rbx-lens" aria-pressed="false" title="Flat: a narrow lens, so sizes read like a drawing">Flat</button>' +
     '</div><div class="rbx-undo"><button type="button" data-undo="rb-undo" disabled title="Undo (Ctrl+Z)">↶</button>' +
     '<button type="button" data-undo="rb-redo" disabled title="Redo (Ctrl+Shift+Z)">↷</button>' +
-    '<button type="button" id="rbx-tc" title="Watch a bit change on this router: the bit set in Run > On the table goes in">Change bit</button></div><p class="rbx-tip" id="rbx-tip">Click a part to edit it · click a number to type it · drag a ● to pull that end</p>' +
+    '<button type="button" id="rbx-tc" title="Watch a bit change on this router: the bit set in Run > On the table goes in">Change bit</button></div><p class="rbx-tip" id="rbx-tip">Click a part to edit it · click a number to type it · drag a ● to pull that end · drag the view to turn it</p>' +
     '<div class="rbx-card" id="rbx-card" hidden></div>';
   rxStage.insertBefore(rxBox, document.getElementById("insp"));   // under Inspect's panels
   const rxSvg = rxBox.querySelector("svg");
 
   function rxRouter() { return LR4Routers.ROUTERS[RT.set.router]; }
+  // nothing picked: only the overall height, the head's size and the grip Ø (the fit); a part picked: its own
+  const RX_BASE = new Set(["overall", "cap-L", "cap-Lt", "cap-W", "cap-Wt", "cap-H", "cap-Hf", "dia-housing", "diaf-housing"]);
   function rxDims() {
-    const C = rtClamps(), all = LR4RouterDims.dims(rxRouter(), C ? C.def : null), v = RX.view === "3d" ? "front" : RX.view;
-    return all.filter((d) => d.views.includes(v) && (!RX.sel || d.g === RX.sel));   // a part picked: just its own
+    const C = rtClamps(), all = LR4RouterDims.dims(rxRouter(), C ? C.def : null);
+    return all.filter((d) => d.views.includes(RX.face) && (RX.sel ? d.g === RX.sel : RX_BASE.has(d.id)));
   }
   function rxRef(p) {                                 // body frame -> the router mesh's own (router.js's frame + the clamp drop)
     const f = RT.body && RT.body.f;
@@ -196,35 +203,86 @@
   rxBox.addEventListener("pointerup", rxDrop);
   rxBox.addEventListener("pointercancel", rxDrop);
 
-  // the views: Front = from the machine's front (the router's -y side, +x to the right), Right = from its switch end, Top
-  function rxLook(v) {
+  // the camera snaps: Front = from the machine's front (the router's -y side, +x to the right), Right = from its switch
+  // end, Top, Iso = the front-right corner from above. Animated (~0.35 s; none with reduced motion), orbiting stays on.
+  function rxDir(v) {                                 // a snap's camera direction in the scene (the router's frame turned by f.a)
+    const f = RT.body && RT.body.f, c = Math.cos(f.a), s = Math.sin(f.a);
+    return { front: [s, -c, 0.0001], right: [c, s, 0.0001], top: [s * 0.002, -c * 0.002, 1], iso: [c * 0.8 + s, s * 0.8 - c, 0.7] }[v];
+  }
+  function rxViewMark() { for (const b of rxBox.querySelectorAll(".rbx-views [data-v]")) b.setAttribute("aria-pressed", String(b.dataset.v === RX.view)); }
+  function rxLook(v, now) {
+    if (v === "3d") v = "iso";                        // (the old name)
     RX.view = v;
-    for (const b of rxBox.querySelectorAll(".rbx-views button")) b.setAttribute("aria-pressed", String(b.dataset.v === v));
+    rxViewMark();
     const f = RT.body && RT.body.f;
     if (!f || !INSPECT) return;
-    const c = Math.cos(f.a), s = Math.sin(f.a), flat = v !== "3d";
-    const dir = { front: [s, -c, 0.0001], right: [c, s, 0.0001], top: [s * 0.002, -c * 0.002, 1], "3d": [c * 0.8 + s, s * 0.8 - c, 0.7] }[v];
+    rxLens();
+    freeTurn(false);                                  // OrbitControls: Z stays up, so a snap reads square
+    controls.enableRotate = true;
+    const p0 = camera.position.clone(), t0 = controls.target.clone();
+    fitView(rxDir(v));
+    if (typeof capEditFit === "function") capEditFit();   // the room between the editor's panels
+    const p1 = camera.position.clone(), t1 = controls.target.clone();
+    RX.anim = null;
+    const quick = now || matchMedia("(prefers-reduced-motion: reduce)").matches || p0.distanceTo(p1) < 0.5;
+    if (quick) { controls.update(); rxFace(); rxDraw(); return; }
+    const o0 = p0.clone().sub(t0), o1 = p1.clone().sub(t1), d0 = o0.length(), d1 = o1.length();
+    const q = new THREE.Quaternion().setFromUnitVectors(o0.clone().normalize(), o1.clone().normalize()), I = new THREE.Quaternion();
+    const A = RX.anim = { t: performance.now() };
+    const step = (end) => {
+      if (RX.anim !== A || rxBox.hidden) return;
+      const k = end === true ? 1 : Math.min(1, (performance.now() - A.t) / 350), e = k * k * (3 - 2 * k);
+      const dir = o0.clone().normalize().applyQuaternion(I.clone().slerp(q, e));
+      controls.target.lerpVectors(t0, t1, e);
+      camera.position.copy(controls.target).addScaledVector(dir, d0 + (d1 - d0) * e);
+      controls.update();
+      if (k < 1) return requestAnimationFrame(step);
+      camera.position.copy(p1); controls.target.copy(t1); controls.update();
+      RX.anim = null;
+      rxFace(); rxDraw();
+    };
+    camera.position.copy(p0); controls.target.copy(t0);
+    requestAnimationFrame(step);
+    setTimeout(() => step(true), 400);               // lands even where frames stall (a background tab)
+  }
+  // which numbers face the camera: the router's axis nearest the view direction (back = front's, under = top's)
+  function rxFace() {
+    const f = RT.body && RT.body.f, m = rxMesh();
+    if (!f) return;
+    const d = camera.position.clone().sub(controls.target);
+    if (m) d.applyQuaternion(m.getWorldQuaternion(new THREE.Quaternion()).invert());
+    const c = Math.cos(f.a), s = Math.sin(f.a), x = Math.abs(d.x * c + d.y * s), y = Math.abs(-d.x * s + d.y * c), z = Math.abs(d.z);
+    RX.face = z >= Math.max(x, y) ? "top" : x > y ? "right" : "front";
+  }
+  // Flat: the narrow lens, the distance scaled so the router stays the same size on screen
+  function rxLens(toggle) {
     if (RX.fov === null) RX.fov = camera.fov;
-    camera.fov = flat ? RX_LENS : RX.fov;
+    if (toggle) { RX.flat = !RX.flat; try { MS.set("lr4-rx-flat", RX.flat ? "1" : "0"); } catch (e) { /* not kept */ } }
+    const want = RX.flat ? RX_LENS : RX.fov;
+    $("rbx-flat").setAttribute("aria-pressed", String(RX.flat));
+    if (camera.fov === want) return;
+    const k = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) / Math.tan(THREE.MathUtils.degToRad(want / 2));
+    camera.position.sub(controls.target).multiplyScalar(k).add(controls.target);
+    camera.fov = want;
     camera.updateProjectionMatrix();
-    freeTurn(!flat);                                  // 3D: Inspect's free turn; flat: no orbiting (pan + zoom still)
-    controls.enableRotate = !flat;
-    fitView(dir);
-    const ins = document.getElementById("insp");      // framed in the part of the view the right panels leave
-    if (document.documentElement.classList.contains("rte-on")) { if (typeof capEditFit === "function") capEditFit(); }   // the router editor: the room between its panels
-    else if (!ins.classList.contains("min")) {
-      camera.updateMatrixWorld();
-      const dist = camera.position.distanceTo(controls.target);
-      const mm = (2 * dist * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2))) / canvas.clientHeight;
-      const sh = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 0).multiplyScalar(((ins.offsetWidth + 12) / 2) * mm);
-      camera.position.add(sh); controls.target.add(sh);
-    }
     controls.update();
-    rxDraw();
   }
   rxBox.querySelector(".rbx-views").addEventListener("click", (e) => {
     const b = e.target.closest("button");
-    if (b) rxLook(b.dataset.v);
+    if (!b) return;
+    if (b.id === "rbx-flat") { rxLens(true); rxDraw(); return; }
+    rxLook(b.dataset.v);
+  });
+  // an orbit: the snap's button lets go once the camera's turned off it; the numbers re-picked when it ends
+  controls.addEventListener("start", () => { if (!rxBox.hidden) RX.anim = null; });
+  controls.addEventListener("end", () => {
+    if (rxBox.hidden) return;
+    if (RX.view && RT.body && RT.body.f) {
+      const d = camera.position.clone().sub(controls.target).normalize(), w = new THREE.Vector3(...rxDir(RX.view)).normalize();
+      if (d.dot(w) < 0.9994) { RX.view = null; rxViewMark(); }   // over ~2°
+    }
+    rxFace();
+    rxDraw();
   });
 
   // on with the Close-up (router_build.js rbViewMark), off when it ends
@@ -232,12 +290,30 @@
     const on = typeof rbViewing === "function" && rbViewing();
     if (on === !rxBox.hidden) return;
     rxBox.hidden = !on;
-    if (on) { rxLook(RX.view); rxDraw(); return; }
-    RX.drag = RX.edit = null;
+    if (on) { rxLook(RX.view || "front", true); return; }
+    RX.drag = RX.edit = RX.anim = null;
     rxPick(null);
+    rxFade();
     for (const el of [...rxBox.querySelectorAll("[data-x]")]) el.remove();
     if (RX.fov !== null) { camera.fov = RX.fov; RX.fov = null; camera.updateProjectionMatrix(); }
     controls.enableRotate = true;
+  }
+  // the mount + shoe (their bolts, the core) see-through while a part they'd hide is picked (not the mount itself, the cap or
+  // the dial: above it)
+  const RX_FADE = /^(?!Router_)./;                    // the close-up shows the router + those
+  function rxFade() {
+    const on = !rxBox.hidden && !!RX.sel && !["mount", "motor_cap", "dial"].includes(RX.sel);
+    if (!on) {
+      for (const [mat, o] of RX.faded) Object.assign(mat, o, { needsUpdate: true });
+      RX.faded.clear();
+      return;
+    }
+    for (const m of meshes) {
+      if (!m.visible || !RX_FADE.test(m.userData.name || "") || RX.faded.has(m.material)) continue;
+      const mat = m.material;
+      RX.faded.set(mat, { transparent: mat.transparent, opacity: mat.opacity, depthWrite: mat.depthWrite });
+      Object.assign(mat, { transparent: true, opacity: 0.18, depthWrite: false, needsUpdate: true });
+    }
   }
 
   // ---- a part picked (user 2026-10-29: "click and highlight each part and edit the values / sliders for the selected
@@ -267,7 +343,8 @@
     rxCardBuild();
     if (!rxBox.hidden) rxDraw(); else rxGhost();
   }
-  function rxGhost() {                                // the picked part lit
+  function rxGhost() {                                // the picked part lit (and the mount faded)
+    rxFade();
     const g = !rxBox.hidden && rxRegion(), f = RT.body && RT.body.f, sh = g && g.shape;
     // a part with a mesh of its own: a copy of it a little bigger (it hugs the real shape); the rest: a shell
     const own = g && sh && { motor_cap: "Router_MotorCap", dial: "Router_Dial", collet_nut: "Router_ColletNut", shaft_lock: "Router_ShaftLock",

@@ -3,6 +3,14 @@
 The version is the sandbox page's (`VERSION` in `web/js/page/job.js`, shown in its footer). The footer also shows
 the date the model data was built and the Printables file set it was solved for.
 
+## 0.63.0 - 2026-10-31
+- **Router editor, views as a camera:** Front / Right / Top / Iso turn the camera there (animated); you can always
+  drag to orbit, pan and zoom, and dragging away from a view just leaves it. **Flat** is a narrow lens for reading
+  sizes like a drawing. The numbers drawn are the ones that face the camera.
+- **Fewer numbers on the model:** with nothing picked, only the overall height, the motor cap's size and the motor
+  housing Ø show. Click a part to see its own numbers. While a part is picked, the mount, the dust shoe and their
+  bolts turn see-through so you can see what you're measuring.
+
 ## 0.62.0 - 2026-10-30
 - **Speed dials that look like the real ones:** the wheel sits inside the head, and a slice of its rim shows through
   a rounded slot (on the end, or on top), with the rim about flush. Round the slot there's a sunk recess (Makita) or a

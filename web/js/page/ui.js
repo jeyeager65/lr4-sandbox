@@ -616,7 +616,7 @@
     const views = { 1: "v-iso", 2: "v-front", 3: "v-top", 4: "v-side", 5: "v-back" };
     const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
     const rte = document.documentElement.classList.contains("rte-on") && typeof rxLook === "function";
-    if (rte && (views[k] || k === "f")) rxLook({ 1: "3d", 2: "front", 3: "top", 4: "right", 5: "right" }[k] || RX.view);   // the router editor's own views
+    if (rte && (views[k] || k === "f")) rxLook({ 1: "iso", 2: "front", 3: "top", 4: "right", 5: "right" }[k] || RX.view || "front");   // the router editor's own views
     else if (views[k]) click(views[k]);
     else if (k === "f") click("v-fit");
     else if (k === "m") click("v-meas");

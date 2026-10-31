@@ -980,7 +980,8 @@ body.rec-ui .rec-msg { top: calc(3.5% + 44px); font-size: clamp(15px, 2.4vh, 38p
 .rbx-views { position: absolute; left: 12px; top: 52px; display: flex; pointer-events: auto; }
 .rbx-views button { border-radius: 0; margin-left: -1px; padding: 3px 10px; }
 .rbx-views button:first-child { border-radius: 4px 0 0 4px; margin-left: 0; }
-.rbx-views button:last-child { border-radius: 0 4px 4px 0; }
+.rbx-views [data-v="iso"] { border-radius: 0 4px 4px 0; }
+.rbx-views .rbx-lens { margin-left: 8px; border-radius: 4px; }
 .rbx-views button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
 .rbx-card { position: absolute; left: 12px; bottom: 40px; width: min(330px, calc(100% - 24px)); pointer-events: auto; padding: 8px 12px 10px;
   border: 1px solid var(--accent); border-radius: 6px; background: color-mix(in srgb, var(--panel) 94%, transparent); backdrop-filter: blur(4px); font-size: 13px; }
@@ -1000,7 +1001,7 @@ body.rec-ui .rec-msg { top: calc(3.5% + 44px); font-size: clamp(15px, 2.4vh, 38p
 .rbx-opt button:last-child { border-radius: 0 4px 4px 0; }
 .rbx-opt button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
 .rbx-simple { margin-top: 6px; }
-.rbx-undo { position: absolute; left: 236px; top: 52px; display: flex; gap: 4px; pointer-events: auto; }
+.rbx-undo { position: absolute; left: 310px; top: 52px; display: flex; gap: 4px; pointer-events: auto; }
 .rbx-undo button { padding: 3px 10px; }
 .rbx-tip { position: absolute; left: 12px; top: 84px; margin: 0; font-size: 12px; color: var(--muted); }
 #rb-view[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }

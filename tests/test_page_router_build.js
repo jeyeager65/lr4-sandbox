@@ -154,17 +154,28 @@ const ok = (cond, msg) => { checks++; console.log((cond ? "  ok   " : "  FAIL ")
       ev("pointerdown", 0); ev("pointermove", -20); ev("pointermove", -40); ev("pointerup", -40);
       await T.sleep(400);
       out.rx.H = [H0, LR4Routers.ROUTERS.testbox.model.motor_cap.H];
-      document.querySelector('.rbx-views [data-v="3d"]').click(); await T.sleep(100);
-      out.rx.v3d = [camera.fov, controls.enableRotate];
+      document.querySelector('.rbx-views [data-v="iso"]').click(); await T.sleep(500);
+      out.rx.v3d = [camera.fov, controls.enableRotate, RX.face];
       document.querySelector('.rbx-views [data-v="top"]').click(); await T.sleep(100);
-      await T.sleep(300); out.rx.top = [camera.fov, !!nb("cap-Lt"), !!nb("cap-W"), [...document.querySelectorAll(".rbx-n")].map((e) => e.dataset.id).join(" ")];
-      document.querySelector('.rbx-views [data-v="front"]').click(); await T.sleep(100);
+      out.rx.mid = RX.face;                           // still turning: the numbers wait for the snap
+      await T.sleep(400); out.rx.top = [camera.fov, !!nb("cap-Lt"), !!nb("cap-W"), [...document.querySelectorAll(".rbx-n")].map((e) => e.dataset.id).join(" "), RX.face];
+      $$("rbx-flat").click(); await T.sleep(50);
+      out.rx.flat = [camera.fov, $$("rbx-flat").getAttribute("aria-pressed")];
+      $$("rbx-flat").click(); await T.sleep(50);
+      out.rx.flat.push(camera.fov);
+      // an orbit off the snap (the camera moved, then the orbit's end): the button lets go, the numbers follow the camera
+      const tv = controls.target.clone(), fa = RT.body.f.a;
+      camera.position.copy(tv).add(new THREE.Vector3(Math.cos(fa) * 300, Math.sin(fa) * 300, 60)); controls.update();
+      controls.dispatchEvent({ type: "end" }); await T.sleep(50);
+      out.rx.orbit = [RX.view, RX.face, document.querySelectorAll('.rbx-views [aria-pressed="true"]').length, controls.enableRotate];
+      document.querySelector('.rbx-views [data-v="front"]').click(); await T.sleep(450);
       // a part picked by a click on the model: the motor housing (lit, its own numbers, a card with sliders), the cap, off = none
       const clickAt = (P) => { const rc = canvas.getBoundingClientRect(), o = { clientX: rc.left + P[0], clientY: rc.top + P[1], bubbles: true, pointerId: 1 };
         canvas.dispatchEvent(new PointerEvent("pointerdown", o)); canvas.dispatchEvent(new PointerEvent("pointerup", o)); };
       clickAt(rxScreen([0, -30, 75])); await T.sleep(100);
       const cardRows = () => [...document.querySelectorAll("#rbx-card .rbx-row span")].map((e) => e.textContent).join(",");
-      out.rx.pick = [RX.sel, !!RX.ghost, cardRows(), document.querySelectorAll(".rbx-n").length, $$("pick").hidden];
+      const mOp = () => { const m = meshes.find((q) => q.visible && /^Tool_Mount_B/.test(q.userData.name || "")); return m ? m.material.opacity : -1; };
+      out.rx.pick = [RX.sel, !!RX.ghost, cardRows(), document.querySelectorAll(".rbx-n").length, $$("pick").hidden, mOp()];
       const sl = document.querySelector('#rbx-card .rbx-row[data-k="model.housing.l"] input[type=range]');
       const g0 = LR4Routers.ROUTERS.testbox.model.housing.l;
       sl.value = g0 + 10; sl.dispatchEvent(new Event("input", { bubbles: true })); await T.sleep(400);
@@ -172,18 +183,23 @@ const ok = (cond, msg) => { checks++; console.log((cond ? "  ok   " : "  FAIL ")
       clickAt(rxScreen([0, -36, LR4RouterDims.regions(LR4Routers.ROUTERS.testbox).find((g) => g.id === "motor_cap").shape.box[4] + 40])); await T.sleep(100);
       out.rx.head = [RX.sel, cardRows()];
       clickAt([20, canvas.clientHeight - 20]); await T.sleep(100);
-      out.rx.off = [RX.sel, $$("rbx-card").hidden, !!RX.ghost];
+      out.rx.off = [RX.sel, $$("rbx-card").hidden, !!RX.ghost, mOp()];
       $$("rb-reset").click(); await T.sleep(200);
-      // the dial + the shaft lock: the Kobalt
+      // the dial + the shaft lock: the Kobalt (a part's numbers show once it's picked)
       LR4Router.set({ router: "kobalt" }); await T.sleep(300);
       out.rx.lockSide = ["lock-z", "lock-d"].map((id) => !!nb(id));
-      document.querySelector('.rbx-views [data-v="top"]').click(); await T.sleep(100);
-      out.rx.lockTop = ["lock-r", "lock-a", "dial-d"].map((id) => nb(id) && nb(id).textContent);
+      rxPick("shaft_lock"); await T.sleep(50);
+      out.rx.lockSide.push(...["lock-z", "lock-d"].map((id) => !!nb(id)));
+      document.querySelector('.rbx-views [data-v="top"]').click(); await T.sleep(450);
+      out.rx.lockTop = ["lock-r", "lock-a"].map((id) => nb(id) && nb(id).textContent);
+      rxPick("dial"); await T.sleep(50);
+      out.rx.lockTop.push(nb("dial-d") && nb("dial-d").textContent);
       nb("dial-d").click(); await T.sleep(50);
       const db = nb("dial-d").querySelector("input");
       if (db) { db.value = 30; db.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true })); }
       await T.sleep(300);
       out.rx.dial = LR4Routers.ROUTERS.kobalt.model.dial.d;
+      rxPick("shaft_lock"); await T.sleep(50);
       const ld = rxFind("lock-a"), C = rxScreen(ld.c), P = rxScreen(ld.b), rc = canvas.getBoundingClientRect();
       const ah = document.querySelector('.rbx-h[data-id="lock-a"]'), a0 = LR4Routers.ROUTERS.kobalt.model.shaft_lock.a;
       const rot = (deg) => { const t = deg * Math.PI / 180, dx = P[0] - C[0], dy = P[1] - C[1];
@@ -192,7 +208,8 @@ const ok = (cond, msg) => { checks++; console.log((cond ? "  ok   " : "  FAIL ")
       pe("pointerdown", 0); pe("pointermove", 15); pe("pointermove", 30); pe("pointerup", 30);
       await T.sleep(300);
       out.rx.ang = [a0, LR4Routers.ROUTERS.kobalt.model.shaft_lock.a];
-      document.querySelector('.rbx-views [data-v="front"]').click(); await T.sleep(100);
+      rxPick(null);
+      document.querySelector('.rbx-views [data-v="front"]').click(); await T.sleep(450);
       $$("rb-reset").click(); await T.sleep(200);
       LR4Router.set({ router: "testbox" }); await T.sleep(100);
       const disp = (id) => getComputedStyle($$(id)).display;
@@ -266,17 +283,21 @@ const ok = (cond, msg) => { checks++; console.log((cond ? "  ok   " : "  FAIL ")
     ok(c[7] === 1 && c[8] === 0 && c[9] === 1 && c[10] === "false" && c[11] === true, `close-up: Show the core, then Back: everything again ${JSON.stringify(c)}`);
     ok(b.offs.join() === "0,0,1,1,1,1", `close-up: shoe top + lower mount off (bolts too), the upper mount + router stay, back on (${b.offs})`);
     const x = b.rx;
-    ok(x.n >= 12 && x.L === "78" && x.fov === 8 && !x.rot, `on the model: ${x.n} numbers (motor cap length ${x.L}), the flat side view (fov ${x.fov}, no orbit)`);
+    ok(x.n >= 3 && x.n <= 6 && x.L === "78" && x.fov === 35 && x.rot, `on the model, nothing picked: ${x.n} numbers (overall, head, grip; motor cap length ${x.L}), the usual lens, orbit on (fov ${x.fov})`);
     ok(x.box && x.L2[0] === 90 && x.L2[1] === "90", `click the cap length, type 90 + Enter: the router ${x.L2}`);
     ok(x.H[1] > x.H[0] + 5, `drag the cap height's handle up 40 px: ${x.H[0]} -> ${x.H[1]}`);
-    ok(x.v3d[0] === 35 && x.v3d[1] && x.top[0] === 8 && x.top[1] && !x.top[2], `3D: the usual lens + orbit (${x.v3d}); Top: length + its own width line (${x.top})`);
-    ok(x.lockSide.every(Boolean) && x.lockTop[0] === "28" && /°$/.test(x.lockTop[1] || "") && /^Ø/.test(x.lockTop[2] || ""), `the lock + dial on the model: side ${x.lockSide}, top ${x.lockTop}`);
+    ok(x.v3d.join() === "35,true,front" && x.mid === "front" && x.top[0] === 35 && x.top[1] && !x.top[2] && x.top[4] === "top",
+      `camera snaps: Iso (${x.v3d}: the front's numbers); Top after the turn (${x.mid} while turning): length + its own width line (${x.top})`);
+    ok(x.flat.join() === "8,true,35", `Flat: the narrow lens and back (${x.flat})`);
+    ok(x.orbit[0] === null && x.orbit[1] === "right" && x.orbit[2] === 0 && x.orbit[3], `orbited off the snap to the switch end: no snap lit, the right view's numbers (${x.orbit})`);
+    ok(!x.lockSide[0] && !x.lockSide[1] && x.lockSide[2] && x.lockSide[3], `the lock's numbers once it's picked (${x.lockSide})`);
+    ok(x.lockSide.length === 4 && x.lockTop[0] === "28" && /°$/.test(x.lockTop[1] || "") && /^Ø/.test(x.lockTop[2] || ""), `the lock + dial on the model: side ${x.lockSide}, top ${x.lockTop}`);
     ok(x.dial === 30, `dial Ø typed on the model: ${x.dial}`);
     ok(Math.abs(Math.abs(x.ang[1] - x.ang[0]) - 30) <= 1, `the lock's tip turned 30° on screen: ${x.ang[0]} -> ${x.ang[1]}`);
-    ok(x.pick[0] === "housing" && x.pick[1] && x.pick[2] === "Length,Ø,Chamfer" && x.pick[3] <= 4 && x.pick[4], `click the motor housing: picked + lit, its card (${x.pick})`);
+    ok(x.pick[0] === "housing" && x.pick[1] && x.pick[2] === "Length,Ø,Chamfer" && x.pick[3] <= 4 && x.pick[4] && x.pick[5] < 0.5, `click the motor housing: picked + lit, its card, the mount see-through (${x.pick})`);
     ok(x.slide[1] === x.slide[0] + 10 && +x.slide[2] === x.slide[1], `the housing's length slider: ${x.slide}`);
     ok(x.head[0] === "motor_cap" && /^Length,Width,Height,Top fillet/.test(x.head[1]), `click the motor cap: ${x.head}`);
-    ok(x.off[0] === null && x.off[1] && !x.off[2], `a click off the router lets it go (${x.off})`);
+    ok(x.off[0] === null && x.off[1] && !x.off[2] && x.off[3] === 1, `a click off the router lets it go, the mount solid again (${x.off})`);
     ok(x.after[0] && x.after[1] === 35 && x.after[2], `Back: the numbers gone, the lens + orbit back (${x.after})`);
     ok(b.min[0] === "none" && b.min[1] === "none" && b.min[2] !== "none" && b.min[3] !== "none", `Hide panels: tools + list folded, Back stays; Show again (${b.min})`);
     const u = b.undo;
