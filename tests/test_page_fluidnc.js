@@ -37,10 +37,11 @@ function server(mode, port) {
 }
 
 async function chromePage(cport, o = {}) {           // o.gpu: the real GPU (live help videos), not SwiftShader
-  const prof = fs.mkdtempSync(path.join(os.tmpdir(), "fluidnc_test_"));
+  const P = require("../tools/chrome_profile.js").profile("fluidnc_test_"), prof = P.dir;   // (deleted for sure, even on exit)
   const gl = o.gpu ? ["--use-angle=d3d11", "--ignore-gpu-blocklist", "--enable-gpu-rasterization"] : ["--use-angle=swiftshader", "--enable-unsafe-swiftshader"];
   const chrome = spawn(CHROME, ["--headless=new", ...gl,
     `--remote-debugging-port=${cport}`, `--user-data-dir=${prof}`, "--window-size=1500,1000", "about:blank"], { stdio: "ignore" });
+  P.own(chrome);
   let target;
   for (let i = 0; i < 50 && !target; i++) {
     await sleep(200);
@@ -66,7 +67,7 @@ async function chromePage(cport, o = {}) {           // o.gpu: the real GPU (liv
   };
   await send("Runtime.enable");
   await send("Page.enable");
-  const close = async () => { ws.close(); chrome.kill(); await sleep(500); try { fs.rmSync(prof, { recursive: true, force: true }); } catch (e) { /* held */ } };
+  const close = async () => { ws.close(); await P.drop(); };
   return { send, val, close };
 }
 

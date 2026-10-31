@@ -5,6 +5,7 @@
 // Needs Chrome (CHROME env or the usual Windows / Mac / Linux path); Node 22+ (fetch + WebSocket built in).
 "use strict";
 const { spawn } = require("child_process"), fs = require("fs"), os = require("os"), path = require("path");
+const { profile } = require("./chrome_profile.js");   // (its Chrome profile deleted for sure)
 
 const args = process.argv.slice(2);
 const url = args[0], steps = [{ shot: args[1] }];
@@ -23,13 +24,13 @@ const CHROME = process.env.CHROME || [
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 (async () => {
-  const prof = fs.mkdtempSync(path.join(os.tmpdir(), "page_shot_"));
+  const P = profile("page_shot_"), prof = P.dir;
   const port = 9300 + Math.floor(Math.random() * 500);
   const angle = gpu ? ["--use-angle=d3d11", "--ignore-gpu-blocklist", "--enable-gpu-rasterization"]
     : ["--use-angle=swiftshader", "--enable-unsafe-swiftshader"];
-  const chrome = spawn(CHROME, ["--headless=new", ...angle,
+  const chrome = P.own(spawn(CHROME, ["--headless=new", ...angle,
     `--remote-debugging-port=${port}`, `--user-data-dir=${prof}`, `--window-size=${size[0]},${size[1]}`, "about:blank"],
-  { stdio: "ignore" });
+  { stdio: "ignore" }));
   let ws, id = 0;
   const pending = new Map();
   const send = (method, params = {}) => new Promise((res, rej) => {
@@ -79,8 +80,6 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     }
   } finally {
     if (ws) ws.close();
-    chrome.kill();
-    await sleep(500);
-    try { fs.rmSync(prof, { recursive: true, force: true }); } catch (e) { /* Chrome still holds it */ }
+    await P.drop();
   }
 })().catch((e) => { console.error(e); process.exit(1); });

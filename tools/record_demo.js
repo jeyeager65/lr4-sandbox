@@ -29,6 +29,7 @@
 // Needs Chrome (CHROME env or the usual path), ffmpeg on PATH, Node 22+. Uses the page's window.LR4Director + LR4Demo.
 "use strict";
 const { spawn } = require("child_process"), fs = require("fs"), os = require("os"), path = require("path");
+const { profile } = require("./chrome_profile.js");   // (its Chrome profile deleted for sure)
 const DS = require("../web/js/demo_script.js");
 
 const args = process.argv.slice(2), opt = Object.assign({ url: "http://127.0.0.1:8767/web/index.html?parts=/parts/", gpu: true },
@@ -71,12 +72,12 @@ const CHROME = process.env.CHROME || [
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 (async () => {
-  const prof = fs.mkdtempSync(path.join(os.tmpdir(), "record_demo_"));
+  const P = profile("record_demo_"), prof = P.dir;
   const port = 9300 + Math.floor(Math.random() * 500);
   const flags = opt.gpu ? ["--use-angle=d3d11", "--ignore-gpu-blocklist", "--enable-gpu-rasterization"]
     : ["--use-angle=swiftshader", "--enable-unsafe-swiftshader"];
-  const chrome = spawn(CHROME, ["--headless=new", ...flags, "--hide-scrollbars", `--remote-debugging-port=${port}`,
-    `--user-data-dir=${prof}`, `--window-size=${opt.size[0]},${opt.size[1]}`, "about:blank"], { stdio: "ignore" });
+  const chrome = P.own(spawn(CHROME, ["--headless=new", ...flags, "--hide-scrollbars", `--remote-debugging-port=${port}`,
+    `--user-data-dir=${prof}`, `--window-size=${opt.size[0]},${opt.size[1]}`, "about:blank"], { stdio: "ignore" }));
   let ws, id = 0, ffmpeg = null;
   const pending = new Map();
   const send = (method, params = {}) => new Promise((res, rej) => {
@@ -156,8 +157,6 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     if (ffmpeg) ffmpeg.stdin.end();
   } finally {
     if (ws) ws.close();
-    chrome.kill();
-    await sleep(500);
-    try { fs.rmSync(prof, { recursive: true, force: true }); } catch (e) { /* Chrome still holds it */ }
+    await P.drop();
   }
 })();
