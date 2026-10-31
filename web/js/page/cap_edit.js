@@ -1,5 +1,5 @@
-// The motor cap's shape editor (Part 46b, user 2026-10-30): the router editor's Motor cap tab (docked on the right;
-// Shape… / ✕ show or shut it). Three views (Top, Front, Cross-section: js/cap_shape.js has the data), each its points in a table too (the same
+// The motor cap's shape editor (Part 46b, user 2026-10-30): the motor cap's Edit shape in the router editor's inspector
+// (docked on the right in its place; ✕ shuts it). Three views (Top, Front, Cross-section: js/cap_shape.js has the data), each its points in a table too (the same
 // data): drag a point, click the outline to add one, Delete removes the picked one; each point's span to the next
 // straight / arc / curve, a corner radius between two straight spans, a curve's handle dragged (Auto puts it back).
 // A photo under a view to trace: Photo, Set scale (click two points on it, type how far apart they are), Move,
@@ -446,13 +446,13 @@
   function capEditOpen(on) {
     const was = !$("ce").hidden;
     $("ce").hidden = !on;
-    $("rb-shape").setAttribute("aria-pressed", String(on));
+    for (const b of document.querySelectorAll('[data-act="shape"]')) b.setAttribute("aria-pressed", String(on));   // the motor cap's Edit shape (router_inspect.js)
     if (on && !was) { CE.cam = {}; show(CE.view); }
     if (typeof rtiShow === "function") rtiShow();   // the inspector steps aside for it (router_inspect.js)
     if (on !== was) fitRoom(); else viewRoom();
   }
   $("ce-close").addEventListener("click", () => { $("ce").dataset.shut = "1"; capEditOpen(false); });   // shut: stays shut on the tab
-  $("rb-shape").addEventListener("click", () => { const on = $("ce").hidden; if (on) delete $("ce").dataset.shut; else $("ce").dataset.shut = "1"; capEditOpen(on); });
+  window.capEditToggle = () => { const on = $("ce").hidden; if (on) delete $("ce").dataset.shut; else $("ce").dataset.shut = "1"; capEditOpen(on); };
   if (typeof ResizeObserver === "function") {
     new ResizeObserver(() => requestAnimationFrame(() => { if (!$("ce").hidden && !CE.drag) draw(); })).observe($("ce-svg"));
     new ResizeObserver(() => requestAnimationFrame(viewRoom)).observe(document.querySelector(".stage"));

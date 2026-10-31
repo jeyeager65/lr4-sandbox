@@ -2,8 +2,9 @@
 // in one inspector"). Docked on the right of the router editor: every setting of what's picked (RX.sel, router_edit.js;
 // nothing picked = the Router itself: name, kind, speeds, collets), from the one table LR4RouterSchema - sizes as a
 // slider + a number, options as buttons, its color + finish (Look). Changes go through the builder's rbSet / rbLook
-// (router_build.js), so its rules and undo hold. The page's scripts share one global scope. ----
-  const RTI = { sig: "", slide: null };
+// (router_build.js), so its rules and undo hold. Part 48c: the outline in the left column lists the parts (pick one
+// there too), "+ Add a part" / ✕ put optional ones on and take them off. The page's scripts share one global scope. ----
+  const RTI = { sig: "", slide: null, outline: "" };
   const rtiEl = $("rti"), rtiBody = $("rti-body");
   const rtiPart = () => {                              // the item shown: what's picked, if it's an item, else the Router
     const id = typeof RX !== "undefined" && RX.sel, p = LR4Routers.preset(rbCur());
@@ -15,12 +16,54 @@
     return [r.min, Math.min(r.max, Math.max(r.min + 20, Math.ceil(Math.abs(+v || 0) * 2), 60))];
   }
   const rtiEsc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  const rtiCtx = () => { const C = typeof rtClamps === "function" && rtClamps(); return { clampDef: C ? C.def : undefined }; };   // the build's clamp height
 
+  // ---- the outline (Part 48c): the parts nut up, the picked one lit; an optional one has ✕; + Add a part ----
+  function rtoShow() {
+    const S = LR4RouterSchema, m = LR4Routers.preset(rbCur()).model, sel = rtiPart();
+    const items = S.PARTS.filter((P) => S.partShown(P.id, m)).map((P) => {
+      const l = rtiEsc(S.partLabel(P.id, m));
+      return `<div class="rto-it${P.under ? " rto-sub" : ""}"><button type="button" class="rto-b" data-id="${P.id}">${l}</button>` +
+        (P.feature ? `<button type="button" class="rto-rm" data-rm="${P.feature}" aria-label="Take off: ${l}" title="Take it off">✕</button>` : "") + "</div>";
+    }).join("");
+    const adds = S.FEATURES.filter((F) => (!F.only || (F.only === "s") === (m.kind === "spindle")) && !F.has(m));
+    const menu = adds.map((F) => `<button type="button" role="menuitem" data-add="${F.id}">${rtiEsc(F.label)}</button>`).join("");
+    if (items + menu !== RTI.outline) {
+      RTI.outline = items + menu;
+      $("rto").innerHTML = items;
+      $("rto-menu").innerHTML = menu;
+    }
+    $("rto-add").hidden = !adds.length;
+    if (!adds.length) rtoMenu(false);
+    for (const b of $("rto").querySelectorAll(".rto-b")) b.toggleAttribute("aria-current", b.dataset.id === sel);
+  }
+  function rtoMenu(on) { $("rto-menu").hidden = !on; $("rto-add").setAttribute("aria-expanded", String(on)); }
+  $("rto").addEventListener("click", (e) => {
+    const rm = e.target.closest("[data-rm]"), b = e.target.closest("[data-id]");
+    if (rm) {                                         // off (undo puts it back); picked: back to the router
+      const F = LR4RouterSchema.FEATURES.find((f) => f.id === rm.dataset.rm);
+      if (F && RX.sel === F.part) rxPick(null);
+      rbFeature(rm.dataset.rm, false);
+      rbMsg(`Took off: ${F ? F.label : rm.dataset.rm}. Undo puts it back.`);
+    } else if (b) rxPick(b.dataset.id === "router" ? null : b.dataset.id);
+  });
+  $("rto-add").addEventListener("click", () => rtoMenu($("rto-menu").hidden));
+  $("rto-menu").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-add]");
+    if (!b) return;
+    const F = LR4RouterSchema.FEATURES.find((f) => f.id === b.dataset.add);
+    rtoMenu(false);
+    rbFeature(F.id, true);
+    rxPick(F.part);                                   // picked: its numbers + settings
+  });
+  document.addEventListener("pointerdown", (e) => { if (!$("rto-menu").hidden && !e.target.closest(".rto-add")) rtoMenu(false); });
+  $("rto-menu").addEventListener("keydown", (e) => { if (e.key === "Escape") { e.stopPropagation(); rtoMenu(false); $("rto-add").focus(); } });
 
   // the rows, again when the item or its set of rows changes (a choice can bring rows in: the dial's window)
   function rtiShow() {
-    const on = typeof rbViewing === "function" && rbViewing() && $("ce").hidden;   // (the shape editor docks there for now)
+    const view = typeof rbViewing === "function" && rbViewing(), on = view && $("ce").hidden;   // (the shape editor docks there for now)
     rtiEl.hidden = !on;
+    if (view) rtoShow();
     if (typeof capEditRoom === "function") capEditRoom();
     if (!on) { RTI.sig = ""; return; }
     const id = rtiPart(), p = LR4Routers.preset(rbCur()), m = p.model, S = LR4RouterSchema;
@@ -31,8 +74,8 @@
     rtiEl.dataset.part = id;
     $("rti-h").textContent = id === "router" ? p.name : S.partLabel(id, m);
     $("rti-x").hidden = id === "router";
-    const sh = S.shown(p);
-    let html = "";
+    const sh = S.shown(p, rtiCtx());
+    let html = '<div class="rti-notes" aria-live="polite"></div>';
     for (const g of S.groups(rows)) {
       html += `<h4>${rtiEsc(g)}</h4>`;
       for (const r of rows.filter((q) => q.group === g)) {
@@ -45,7 +88,7 @@
         } else if (r.kind === "choice") {
           html += `<div class="rti-opt" data-k="${k}" role="group" aria-label="${l}"${tip}><span>${l}</span>` +
             r.opts.map(([ov, ol]) => `<button type="button" data-v="${rtiEsc(ov)}" aria-pressed="false">${rtiEsc(ol)}</button>`).join("") + "</div>";
-        } else if (r.kind === "bool") {
+        } else if (r.kind === "bool" || r.kind === "has") {
           html += `<label class="check rti-bool" data-k="${k}"${tip}><input type="checkbox"> ${l}</label>`;
         } else if (r.kind === "select") {
           html += `<label class="rti-row rti-sel" data-k="${k}"${tip}><span>${l}</span><select>` +
@@ -70,8 +113,10 @@
   // the values from the router (not the one being typed / slid)
   function rtiSync() {
     if (rtiEl.hidden || !RTI.sig) return;
-    const p = LR4Routers.preset(rbCur()), sh = LR4RouterSchema.shown(p), val = (k) => LR4RouterSchema.value(p, k, sh);
+    const p = LR4Routers.preset(rbCur()), sh = LR4RouterSchema.shown(p, rtiCtx()), val = (k) => LR4RouterSchema.value(p, k, sh);
     if (rtiEl.dataset.part === "router") $("rti-h").textContent = p.name;
+    const notes = typeof rbNotes === "function" ? rbNotes(rtiEl.dataset.part) : [], nb = rtiBody.querySelector(".rti-notes");
+    if (nb) { const h = notes.map((t) => `<p class="foot">${rtiEsc(t)}</p>`).join(""); if (nb.innerHTML !== h) nb.innerHTML = h; }
     for (const el of rtiBody.querySelectorAll("[data-k]")) {
       const v = val(el.dataset.k);
       if (el.classList.contains("rti-opt")) { for (const b of el.querySelectorAll("button")) b.setAttribute("aria-pressed", String(b.dataset.v === String(v))); continue; }
@@ -117,7 +162,7 @@
   rtiBody.addEventListener("click", (e) => {
     const b = e.target.closest("button");
     if (!b) return;
-    if (b.dataset.act === "shape") { $("rb-shape").click(); return; }   // the shape editor (cap_edit.js)
+    if (b.dataset.act === "shape") { if (typeof capEditToggle === "function") capEditToggle(); return; }   // the shape editor (cap_edit.js)
     const row = b.closest(".rti-opt");
     if (row && b.dataset.v) rbSet(row.dataset.k, b.dataset.v);
   });

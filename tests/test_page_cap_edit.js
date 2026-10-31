@@ -41,11 +41,12 @@ const SHOT = process.env.CE_SHOT;                    // a folder: screenshots of
       const edit = () => (LR4RouterBuild.edits().testbox || {}).model;
       LR4Router.set({ router: "testbox" }); await T.sleep(300);
       out.box0 = cap();
-      rbTab("speed"); $$("rb-view").click(); await T.sleep(300);
+      $$("rb-view").click(); await T.sleep(300);
       out.rte = { on: document.documentElement.classList.contains("rte-on") && !$$("rte").hidden, ce: !$$("ce").hidden, panel: getComputedStyle(document.querySelector(".panel")).display,
-        insp: getComputedStyle($$("insp")).display, rti: !$$("rti").hidden, builder: $$("rte-body").contains($$("rb-tabs")), off: camera.view && camera.view.enabled ? camera.view.offsetX : 0 };
-      rbTab("head"); await T.sleep(300);
-      out.open = !$$("ce").hidden && $$("rb-shape").getAttribute("aria-pressed") === "true";
+        insp: getComputedStyle($$("insp")).display, rti: !$$("rti").hidden, builder: $$("rte-body").contains($$("rto")), off: camera.view && camera.view.enabled ? camera.view.offsetX : 0 };
+      rxPick("motor_cap"); await T.sleep(100);
+      document.querySelector('#rti [data-act="shape"]').click(); await T.sleep(300);
+      out.open = !$$("ce").hidden && $$("rti").hidden;
       const svg = $$("ce-svg");
       out.top = { pts: svg.querySelectorAll(".ce-pt").length, line: !!svg.querySelector(".ce-line"), mirror: !!svg.querySelector(".ce-mirror"), rows: $$("ce-rows").children.length };
       // drag point 3 (the front corner) out 10 mm: the width grows by 20
@@ -90,8 +91,8 @@ const SHOT = process.env.CE_SHOT;                    // a folder: screenshots of
       // start from a pear: the shape replaced, the model too; Length stretches it
       const st = $$("ce-start"); st.value = "pear"; st.dispatchEvent(new Event("change", { bubbles: true })); await T.sleep(400);
       out.pear = { n: edit().motor_cap.shape.top.length, box: cap() };
-      const Lf = $$("rb-h-L"); Lf.value = 130; Lf.dispatchEvent(new Event("input", { bubbles: true })); await T.sleep(500);
-      out.stretch = { L: edit().motor_cap.L, box: cap(), filletsHidden: $$("rb-h-top_r").closest(".field").hidden, note: !$$("rb-shapenote").hidden };
+      LR4RouterBuild.set("model.motor_cap.L", 130); await T.sleep(500);
+      out.stretch = { L: edit().motor_cap.L, box: cap(), filletsHidden: !LR4RouterSchema.rows("motor_cap", LR4RouterBuild.preset()).some((r) => r.k === "model.motor_cap.top_r"), note: LR4RouterBuild.notes("motor_cap").length > 0 };
       // undo goes back to before the stretch
       $$("rb-undo").click(); await T.sleep(400);
       out.undo = edit().motor_cap.L;
@@ -113,12 +114,12 @@ const SHOT = process.env.CE_SHOT;                    // a folder: screenshots of
       out.photoGone = !svg.querySelector("image");
       // Plain box drops the shape
       $$("ce-plain").click(); await T.sleep(400);
-      out.plain = { shaped: !!(edit() && edit().motor_cap.shape), fillets: !$$("rb-h-top_r").closest(".field").hidden };
+      out.plain = { shaped: !!(edit() && edit().motor_cap.shape), fillets: LR4RouterSchema.rows("motor_cap", LR4RouterBuild.preset()).some((r) => r.k === "model.motor_cap.top_r") };
       $$("ce-close").click(); await T.sleep(100);
-      out.closed = $$("ce").hidden;
-      rbTab("speed"); rbTab("head"); await T.sleep(100);
+      out.closed = $$("ce").hidden && !$$("rti").hidden;   // the inspector back in its place
+      rxPick(null); rxPick("motor_cap"); await T.sleep(100);
       out.staysShut = $$("ce").hidden;
-      $$("rb-shape").click(); await T.sleep(100);
+      document.querySelector('#rti [data-act="shape"]').click(); await T.sleep(100);
       out.reopen = !$$("ce").hidden;
       $$("rte-back").click(); await T.sleep(300);
       out.left = { off: !document.documentElement.classList.contains("rte-on") && $$("rte").hidden && $$("ce").hidden, panel: getComputedStyle(document.querySelector(".panel")).display, view: !!(camera.view && camera.view.enabled) };
@@ -128,7 +129,7 @@ const SHOT = process.env.CE_SHOT;                    // a folder: screenshots of
     })()`);
     ok(a.rte.on && !a.rte.ce && a.rte.panel === "none" && a.rte.insp === "none" && a.rte.rti && a.rte.builder && a.rte.off > 0,
       `Edit router: the router editor - the builder in the side panel's place, Inspect's panel away, the view centered between it and the inspector (${JSON.stringify(a.rte)})`);
-    ok(a.open, "the Motor cap tab docks the shape editor on the right");
+    ok(a.open, "the motor cap's Edit shape docks the shape editor on the right, in the inspector's place");
     ok(a.top.pts === 4 && a.top.line && a.top.mirror && a.top.rows === 4, `top view: the box's 4 points, its outline + the mirrored half, 4 table rows (${JSON.stringify(a.top)})`);
     ok(a.drag.shaped && Math.abs(a.drag.y1 - a.drag.y0 - 10) < 1 && a.drag.box[1] - a.box0[1] > 15 && a.drag.box[1] - a.box0[1] <= 20.1,
       `dragging point 3 out 10 mm: the cap is drawn now, ~20 mm wider (the corner's fillet trims it) (${a.drag.y0} -> ${a.drag.y1}; ${a.box0} -> ${a.drag.box})`);
@@ -150,7 +151,7 @@ const SHOT = process.env.CE_SHOT;                    // a folder: screenshots of
     ok(a.errs.length === 0, `no page errors (${a.errs.join("; ")})`);
     if (SHOT) {
       for (const v of ["top", "front", "section"]) {
-        await page.val(`(async () => { LR4Router.set({ router: "carbide" }); await T.sleep(200); if (!document.documentElement.classList.contains("rte-on")) document.getElementById("rb-view").click(); rbTab("head"); await T.sleep(300); if (document.getElementById("ce").hidden) capEditOpen(true);
+        await page.val(`(async () => { LR4Router.set({ router: "carbide" }); await T.sleep(200); if (!document.documentElement.classList.contains("rte-on")) document.getElementById("rb-view").click(); rxPick("motor_cap"); await T.sleep(300); if (document.getElementById("ce").hidden) capEditOpen(true);
           const st = document.getElementById("ce-start"); st.value = "pear"; st.dispatchEvent(new Event("change", { bubbles: true }));
           document.getElementById("ce-views").querySelector("[data-v=${v}]").click(); await T.sleep(300); return 1; })()`);
         await shot(v);

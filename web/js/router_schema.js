@@ -4,7 +4,8 @@
 //   PARTS: the outline's items, nut up [{ id, label, spin: its spindle name | false (routers only) | undefined (both),
 //     feature: FEATURES id (an item you add / remove), under: the item it's listed under }]
 //   ROWS: [{ k, label, part, group, kind, unit, min, max, step, help, when(m, p), opts: [[value, label]], only: "r" | "s" }]
-//     kind: len (mm) | ang (deg) | count | num | rpm | choice | bool | text | list | select | look | action
+//     kind: len (mm) | ang (deg) | count | num | rpm | choice | bool | text | list | select | look | action |
+//     has (an optional piece on / off: { of: its size's path, on: its size when turned on (or fn(m)) })
 //   FEATURES: what "+ Add" puts on (48c) [{ id, label, part, has(m), add(p), remove(p) }]
 //   rows(part, p): part's rows that apply to preset p, in group order; shown(p): p with the values as drawn filled in
 (function (root) {
@@ -68,8 +69,8 @@
   row("flats", "Size", "model.shaft.flats.z", "Up from the nut's bottom", "len", { min: 0, max: 200, step: 0.5 });
   row("flats", "Size", "model.shaft.flats.l", "Length", "len", { min: 0.5, max: 40, step: 0.5 });
   // the turned part
-  row("bearing_cap", "Size", "model.bearing_cap.l", "Length", "len", { min: 0, max: 200, step: 0.5, help: "The round cap round the bottom bearing, between the shaft and the motor housing." });
-  row("bearing_cap", "Size", "model.bearing_cap.d", "Ø", "len", { min: 0, max: 200, step: 0.5 });
+  row("bearing_cap", "Size", "model.bearing_cap.l", "Length", "len", { min: 1, max: 200, step: 0.5, help: "The round cap round the bottom bearing, between the shaft and the motor housing." });
+  row("bearing_cap", "Size", "model.bearing_cap.d", "Ø", "len", { min: 1, max: 200, step: 0.5 });
   row("housing", "Size", "model.housing.l", "Length", "len", { min: 0, max: 400, step: 0.5, help: "The round part the mount clamps." });
   row("housing", "Size", "model.housing.d", "Ø", "len", { min: 20, max: 200, step: 0.1, help: "The grip Ø: what the mount clamps (65 mm for the Makita / T1 mount, 69 for the DeWalt)." });
   row("housing", "Size", "model.housing.ch", "Bottom chamfer", "len", { min: 0, max: 20, step: 0.5, only: "r", help: "A 45° bevel round its bottom edge (the collet end), this big; 0 = square." });
@@ -80,9 +81,9 @@
   row("vent", "Size", "model.housing.vent.spokes", "Spokes", "count", { min: 0, max: 24, step: 1 });
   row("vent", "Size", "model.housing.vent.w", "Spoke width", "len", { min: 1, max: 20, step: 0.5 });
   row("vent", "Size", "model.housing.vent.inset", "Spokes set in from the rim", "len", { min: 0, max: 50, step: 0.5 });
-  row("collar", "Size", "model.collar.l", "Length", "len", { min: 0, max: 200, step: 0.5, help: "A ring on top of the motor housing (0 = none)." });
-  row("collar", "Size", "model.collar.d", "Ø", "len", { min: 0, max: 200, step: 0.5 });
-  row("transition", "Size", "model.transition.l", "Length", "len", { min: 0, max: 200, step: 0.5, help: "The part between the collar and the motor cap; the cap sits on it." });
+  row("collar", "Size", "model.collar.l", "Length", "len", { min: 1, max: 200, step: 0.5, help: "A ring on top of the motor housing." });
+  row("collar", "Size", "model.collar.d", "Ø", "len", { min: 1, max: 200, step: 0.5 });
+  row("transition", "Size", "model.transition.l", "Length", "len", { min: 1, max: 200, step: 0.5, help: "The part between the collar and the motor cap; the cap sits on it." });
   row("transition", "Shape", "model.transition.shape", "Shape", "choice", { opts: [["round", "Round"], ["cap", "To the cap's shape"]],
     help: "Round: a cone up to its top Ø. To the cap's shape: from round at the bottom to the cap's rounded box at the top." });
   row("transition", "Shape", "model.transition.d", "Top Ø", "len", { min: 1, max: 300, step: 0.5, when: (m) => !m.transition || m.transition.shape !== "cap" });
@@ -137,20 +138,38 @@
     help: "Opens the recess up through the top edge, a thumb scoop." });
   row("switch", "Place", "model.switch.down", "Below the top", "len", { min: 0, max: 300, step: 0.5,
     help: "How far the switch's center is under the top of the head (until you set one, it's placed by the dial)." });
-  // the shaft lock + brush caps
-  const lockRows = [["z", "Height", "len", 0, 300, 0.5, "Up from the nut's bottom."], ["a", "Angle", "ang", -180, 180, 1, "Round from the switch end, counter-clockwise from above (negative = clockwise)."],
-    ["r", "Reach", "len", 5, 80, 0.5, "How far the lock reaches out from the router's center."], ["button", "Button Ø", "len", 2, 30, 0.5],
-    ["out", "Button stands out", "len", 0.5, 20, 0.5], ["travel", "Press depth", "len", 0.5, 10, 0.5],
-    ["d", "Boss Ø (0 = none)", "len", 0, 40, 0.5, "A sleeve round the button; 0 = the button comes straight out of the housing."],
-    ["in", "Boss starts at", "len", 0, 80, 0.5, "Where the boss starts, out from the router's center."],
-    ["arm", "Arm width (0 = none)", "len", 0, 60, 0.5, "An arm from the boss up to the housing (a lock held below the hub on a bracket)."],
-    ["pin", "Pin Ø (0 = none)", "len", 0, 12, 0.5, "Its pin goes through a hole in the shaft, square to the flats."]];
-  for (const [k, l, kind, min, max, step, help] of lockRows) row("shaft_lock", ["d", "in", "arm", "pin"].includes(k) ? "Boss, arm, pin" : "Button", `model.shaft_lock.${k}`, l, kind, { min, max, step, help });
-  const brushRows = [["z", "Height", "len", 0, 400, 0.5, "Up from the nut's bottom."], ["a", "Angle", "ang", -180, 180, 1, "The first one's angle round from the switch end; the rest evenly round."],
-    ["n", "How many", "count", 1, 4, 1], ["d", "Ø", "len", 3, 40, 0.5], ["r", "Body surface from the axis", "len", 5, 120, 0.5, "How far out from the router's center the body's surface is there."],
-    ["out", "Stands out (no border)", "len", 0.5, 30, 0.5], ["ring", "Border", "len", 0, 15, 0.5, "A border round each in the head's color, flush with the body (0 = none)."],
-    ["inset", "Cap inset in the border", "len", -10, 10, 0.5], ["slot", "Slot angle", "ang", -180, 180, 1, "Its screwdriver slot, from upright."]];
-  for (const [k, l, kind, min, max, step, help] of brushRows) row("brushes", "Size", `model.brushes.${k}`, l, kind, { min, max, step, help });
+  // the shaft lock + brush caps. A "has:" row turns an optional piece on (its `of` set to `on`) or off (0): no more
+  // "0 = none" sizes (Part 48c)
+  const pos = (k) => (m) => { const v = path({ model: m }, k); return v > 0; };
+  const lk = (k) => `model.shaft_lock.${k}`;
+  row("shaft_lock", "Button", lk("z"), "Height", "len", { min: 0, max: 300, step: 0.5, help: "Up from the nut's bottom." });
+  row("shaft_lock", "Button", lk("a"), "Angle", "ang", { min: -180, max: 180, step: 1, help: "Round from the switch end, counter-clockwise from above (negative = clockwise)." });
+  row("shaft_lock", "Button", lk("r"), "Reach", "len", { min: 5, max: 80, step: 0.5, help: "How far the lock reaches out from the router's center." });
+  row("shaft_lock", "Button", lk("button"), "Button Ø", "len", { min: 2, max: 30, step: 0.5 });
+  row("shaft_lock", "Button", lk("out"), "Button stands out", "len", { min: 0.5, max: 20, step: 0.5 });
+  row("shaft_lock", "Button", lk("travel"), "Press depth", "len", { min: 0.5, max: 10, step: 0.5, help: "How far the button presses in." });
+  row("shaft_lock", "Boss", "has:lock.d", "A boss round the button", "has", { of: lk("d"), on: 14,
+    help: "A sleeve round the button. Without one the button comes straight out of the housing." });
+  row("shaft_lock", "Boss", lk("d"), "Boss Ø", "len", { min: 4, max: 40, step: 0.5, when: pos(lk("d")) });
+  row("shaft_lock", "Boss", lk("in"), "Boss starts", "len", { min: 0, max: 80, step: 0.5, when: pos(lk("d")), help: "Where the boss starts, out from the router's center." });
+  row("shaft_lock", "Boss", "has:lock.arm", "An arm up to the housing", "has", { of: lk("arm"), on: 6,
+    help: "An arm from the boss up to the housing: a lock held below the hub on a bracket (the Carbide's)." });
+  row("shaft_lock", "Boss", lk("arm"), "Arm width", "len", { min: 0.5, max: 60, step: 0.5, when: pos(lk("arm")) });
+  row("shaft_lock", "Boss", "has:lock.pin", "A pin into the shaft", "has", { of: lk("pin"), on: (m) => +Math.min(4, m.shaft_lock.button * 0.5).toFixed(1),
+    help: "The button's pin goes through a hole in the shaft, square to the flats; a bit change turns the shaft until it lines up." });
+  row("shaft_lock", "Boss", lk("pin"), "Pin Ø", "len", { min: 0.5, max: 12, step: 0.5, when: pos(lk("pin")) });
+  const bc = (k) => `model.brushes.${k}`;
+  row("brushes", "Size", bc("z"), "Height", "len", { min: 0, max: 400, step: 0.5, help: "Up from the nut's bottom." });
+  row("brushes", "Size", bc("a"), "Angle", "ang", { min: -180, max: 180, step: 1, help: "The first one's angle round from the switch end; the rest evenly round." });
+  row("brushes", "Size", bc("n"), "How many", "count", { min: 1, max: 4, step: 1 });
+  row("brushes", "Size", bc("d"), "Ø", "len", { min: 3, max: 40, step: 0.5 });
+  row("brushes", "Size", bc("r"), "Body surface out from the center", "len", { min: 5, max: 120, step: 0.5, help: "How far out from the router's center the body's surface is where they sit." });
+  row("brushes", "Size", bc("out"), "Stands out", "len", { min: 0.5, max: 30, step: 0.5, help: "How far a cap stands out of the body (with no border)." });
+  row("brushes", "Size", bc("slot"), "Slot angle", "ang", { min: -180, max: 180, step: 1, help: "Its screwdriver slot, from upright." });
+  row("brushes", "Border", "has:brush.ring", "A border round each", "has", { of: bc("ring"), on: 2,
+    help: "A border round each cap in the head's color, flush with the body (most sit where the head meets the transition)." });
+  row("brushes", "Border", bc("ring"), "Border width", "len", { min: 0.5, max: 15, step: 0.5, when: pos(bc("ring")) });
+  row("brushes", "Border", bc("inset"), "Cap set in", "len", { min: -10, max: 10, step: 0.5, when: pos(bc("ring")), help: "How far the cap sits in from the border." });
   // every part's color + finish (model.looks; the page: router.js rtMaterial)
   // [part, look key, label, only]; a spindle has no motor cap, so its trim, cord and strain relief are on its can
   const LOOKS = [["collet_nut", "collet_nut", "Collet nut"], ["collet_nut", "collet", "Collet"], ["shaft", "shaft", "Shaft"], ["bearing_cap", "bearing_cap", "Bearing cap"],
@@ -203,12 +222,12 @@
 
   // the values as drawn: the overall height, the switch's place and the dial's slot as used (until typed), 0 for a
   // missing section's sizes
-  function shown(p) {
+  function shown(p, ctx = {}) {                       // ctx.clampDef: the build's nut below the clamp (a router with none set)
     const m = p.model, spin = spinOf(m), ex = spin || !BODY ? null : BODY.expand(m);
     const swDown = ex ? +(ex.cap.z[1] - ex.switch.at[2]).toFixed(1) : 0;
     const O = ex && ex.dial.open, dial = O ? Object.assign({}, m.dial, { slot: O.S, set: m.dial.set ?? 0.3, surround: O.R }) : m.dial;
     return Object.assign({}, p, { model: Object.assign({}, m, { dial, overall: BODY ? BODY.overall(m) : 0, switch: { down: swDown },
-      housing: Object.assign({ ch: 0 }, m.housing), bearing_cap: m.bearing_cap || { d: 0, l: 0 }, collar: m.collar || { d: 0, l: 0 } }) });
+      housing: Object.assign({ ch: 0 }, m.housing), bearing_cap: m.bearing_cap || { d: 0, l: 0 }, collar: m.collar || { d: 0, l: 0 }, clamp: m.clamp ?? ctx.clampDef }) });
   }
   const path = (o, k) => k.split(".").reduce((a, q) => (a == null ? undefined : a[q]), o);
   function value(p, k, sh) {                          // a row's value in preset p (sh: shown(p), made if not given)
@@ -216,6 +235,7 @@
     if (k.startsWith("speeds.")) return p.speeds ? p.speeds[+k.split(".")[1]][1] : "";
     if (k === "model.collet.sizes") return p.model.collet.sizes.join(", ");
     if (k === "kind") return spinOf(p.model) ? "spindle" : "router";
+    if (k.startsWith("has:")) { const r = ROWS.find((q) => q.k === k); return !!r && path(s, r.of) > 0; }
     if (k === "model.dial.surround.kind") return (s.model.dial && s.model.dial.surround && s.model.dial.surround.kind) || "none";
     if (k === "model.dial.surround.edge") return (s.model.dial && s.model.dial.surround && s.model.dial.surround.edge) || "chamfer";
     if (k === "model.dial.surround.out") return !!(s.model.dial && s.model.dial.surround && s.model.dial.surround.out === "top");

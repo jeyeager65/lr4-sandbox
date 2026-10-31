@@ -948,18 +948,31 @@ body.rec-ui .rec-msg { top: calc(3.5% + 44px); font-size: clamp(15px, 2.4vh, 38p
 
 /* Build your router (My LR4 > Router) */
 .rb-btns { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
-.rb-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 0 10px; }
-.rb-grid .field { margin-top: 8px; }
-.rb-grid input[type="color"] { width: 100%; height: 30px; padding: 0; border: 1px solid var(--line); border-radius: 4px; background: var(--bg); }
-.rb-look select { width: 100%; margin-top: 4px; }
 /* one tab of settings at a time (user 2026-10-29: too many fields at once) */
-.rb-tabs { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; margin-top: 14px; padding-bottom: 6px; border-bottom: 1px solid var(--line); }
-.rb-tabs [role="tab"] { padding: 4px 9px; }
-.rb-tabs [role="tab"][aria-selected="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
-.rb-tabs .q { margin-left: auto; }
-.rb-sec:not(.on) { display: none; }
-.rb-show { display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: center; margin-top: 8px; font-size: 13px; }
+/* the router editor's left column (Part 48c): a toolbar, Show, the outline of the router's parts, + Add a part */
+.rte-tools { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; padding: 8px 12px 4px 16px; }
+.rte-tools button { padding: 3px 9px; }
+.rte-tools .q { margin-left: auto; }
+.rb-show { padding: 2px 16px 4px; font-size: 13px; }
+.rb-show summary { cursor: pointer; color: var(--muted); width: max-content; }
+.rb-show[open] { display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: center; }
+.rb-show[open] summary { width: 100%; }
 .rb-show .check { margin: 0; }
+.rte-msg { margin: 2px 16px; }
+.rto { display: flex; flex-direction: column; gap: 1px; margin-top: 4px; }
+.rto-it { display: flex; align-items: center; border-radius: 5px; }
+.rto-sub { margin-left: 16px; }
+.rto-b { flex: 1; min-width: 0; text-align: left; border: 0; background: none; padding: 5px 8px; border-radius: 5px; color: var(--ink); }
+.rto-b:hover { background: color-mix(in srgb, var(--ink) 9%, transparent); }
+.rto-b[aria-current] { background: var(--accent); color: var(--accent-ink); }
+.rto-rm { border: 0; background: none; padding: 2px 8px; color: var(--muted); }
+.rto-rm:hover { color: var(--ink); }
+.rto-add { margin-top: 10px; }
+.rto-menu { display: flex; flex-direction: column; margin-top: 4px; padding: 4px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); }
+.rto-menu[hidden] { display: none; }
+.rto-menu button { text-align: left; border: 0; background: none; padding: 5px 8px; border-radius: 4px; }
+.rto-menu button:hover { background: color-mix(in srgb, var(--ink) 9%, transparent); }
+.rti-notes p { margin: 8px 0 0; }
 /* the router's dimensions on the model (router_edit.js) */
 .rbx { position: absolute; inset: 0; pointer-events: none; }
 .rbx[hidden] { display: none; }
@@ -1016,8 +1029,6 @@ body.rec-ui .rec-msg { top: calc(3.5% + 44px); font-size: clamp(15px, 2.4vh, 38p
 #rb-view[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
 
 /* the motor cap's shape editor (Part 46b, js/page/cap_edit.js): over the model's left side */
-.rb-shapebar { display: flex; align-items: center; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
-.rb-shapebar .foot { margin: 0; }
 .ce { position: absolute; left: 8px; top: 8px; bottom: 8px; width: min(620px, calc(100% - 16px)); z-index: 6; display: flex;
   flex-direction: column; gap: 4px; padding: 8px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
   box-shadow: 0 6px 24px rgba(0, 0, 0, 0.25); }

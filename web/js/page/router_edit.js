@@ -1,9 +1,9 @@
 // lr4-sandbox page: Build your router on the model (user 2026-10-29: "measurements and clickable areas right on the
 // model to adjust it. All these number fields isn't working well"). In the router's Close-up (router_build.js): the
 // router's dimensions (LR4RouterDims) drawn on it, CAD style; click a number to type it, drag a ● handle to pull that
-// end. Flat views (Side / Front / Top: a narrow lens, no orbiting) so they read like a drawing, or 3D. Every change
-// goes through the builder's own input (its data-k), so the builder's rules - the motor cap on the turned part, overall
-// = the stack + the cap - hold here too. The page's scripts share one global scope (RT, rbViewing: router*.js). ----
+// end. Camera snaps (Front / Right / Top / Iso) and a Flat lens (Part 48a). Every change goes through the builder's
+// rbSet (an LR4RouterSchema key), so its rules - the motor cap on the turned part, overall = the stack + the cap - hold
+// here too. The page's scripts share one global scope (RT, rbViewing: router*.js). ----
   const RX = { view: "front", face: "front", drag: null, edit: null, fov: null, hover: null, sel: null, ghost: null, ghostKey: "", lit: [], slide: null, anim: null, faded: new Map(), flat: false };
   // Part 48a (user 2026-10-31: "those top, side views should just be camera in 3d view"): the views are camera snaps -
   // orbit, pan and zoom always work, dragging away just leaves the snap. Flat = a narrow lens (near a drawing) to
@@ -113,13 +113,10 @@
     for (const el of [...rxBox.querySelectorAll("[data-x]")]) if (!keep.has(el.dataset.x) && !(RX.edit && RX.edit.el === el)) el.remove();
   }
 
-  // a change: into the builder's input, as if typed there (its handler saves, rebuilds, keeps the rules)
-  const rxInput = (d) => d.k && document.querySelector(`#rte input[data-k="${d.k}"]`);
+  // a change: into the builder (rbSet: it saves, rebuilds, keeps the rules)
   function rxSet(d, v) {
-    const el = rxInput(d);
-    if (!el || !Number.isFinite(v)) return;
-    el.value = +(d.kind === "ang" ? v : Math.max(0, v)).toFixed(1);   // an angle may be negative (clockwise)
-    el.dispatchEvent(new Event("input", { bubbles: true }));
+    if (!d.k || !Number.isFinite(v)) return;
+    rbSet(d.k, +(d.kind === "ang" ? v : Math.max(0, v)).toFixed(1));   // an angle may be negative (clockwise)
     rxDraw();                                         // now, not on the next frame
   }
   const rxFind = (id) => rxDims().find((d) => d.id === id);

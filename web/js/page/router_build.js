@@ -1,7 +1,8 @@
 // lr4-sandbox page: Build your router (My LR4 > Router, user 2026-10-29). Pick the router (the same setting as Run's
-// list), edit any of its numbers - the router in the view follows as you type - New / Reset / Delete, Export / Import
-// a .router.json to share. Edits per machine (LR4Routers.EDITS_KEY via MS: { id: preset }); LR4Routers.define puts
-// them in. The page's scripts share one global scope (rtSet / rtSwap / rtLook: router.js). ----
+// list); Edit router opens the router editor (its outline + inspector: router_inspect.js, the numbers on the model:
+// router_edit.js) - the router in the view follows as you type - New / Reset / Delete, Export / Import a .router.json.
+// Edits per machine (LR4Routers.EDITS_KEY via MS: { id: preset }); LR4Routers.define puts them in. The page's scripts
+// share one global scope (rtSet / rtSwap / rtLook: router.js). ----
   const RB = { edits: {}, timer: 0, undo: [], redo: [], replay: false, cut: false };
   try { RB.edits = JSON.parse(MS.get(LR4Routers.EDITS_KEY) || "{}") || {}; } catch (e) { /* none */ }
   function rbSave() { try { MS.set(LR4Routers.EDITS_KEY, JSON.stringify(RB.edits)); } catch (e) { /* not kept */ } }
@@ -9,100 +10,6 @@
   const rbRgb = (h) => [1, 3, 5].map((i) => +(parseInt(h.slice(i, i + 2), 16) / 255).toFixed(3));
   const rbDark = (h) => rbHex(rbRgb(h).map((v) => v * 0.6));
 
-  // the inputs: [data-k (a path in the preset), label, unit, which kind: r = routers only, s = spindles only, "" = both]
-  const STACK = [["model.collet_nut.af", "Collet nut across flats", "mm", ""], ["model.collet_nut.h", "Collet nut height", "mm", ""],
-    ["model.shaft.d", "Exposed shaft Ø", "mm", ""], ["model.shaft.exposed", "Exposed shaft length", "mm", ""],
-    ["model.bearing_cap.d", "Bearing cap Ø", "mm", ""], ["model.bearing_cap.l", "Bearing cap length", "mm", ""],
-    ["model.housing.d", "Motor housing Ø", "mm", "r"], ["model.housing.l", "Motor housing length", "mm", "r"],
-    ["model.housing.ch", "Motor housing chamfer", "mm", "r"], ["model.housing.vent.depth", "Vent depth (0 = closed end)", "mm", "r"],
-    ["model.housing.vent.wall", "Vent wall", "mm", "r"], ["model.housing.vent.spokes", "Vent spokes", "", "r"], ["model.housing.vent.w", "Spoke width", "mm", "r"],
-    ["model.housing.vent.inset", "Spokes in from the rim", "mm", "r"],
-    ["model.housing.d", "Can Ø", "mm", "s"], ["model.housing.l", "Can length", "mm", "s"],
-    ["model.collar.d", "Collar Ø", "mm", "r"], ["model.collar.l", "Collar length", "mm", "r"], ["model.overall", "Overall height", "mm", "r"]];
-  const BITEND = [["model.collet_nut.below", "Nut face below the shaft end", "mm"], ["model.collet.l", "Collet length", "mm"],
-    ["model.collet.d", "Collet Ø (nut end)", "mm"], ["model.shaft.thread.d", "Thread Ø", "mm"], ["model.shaft.thread.pitch", "Thread pitch", "mm"],
-    ["model.shaft.thread.length", "Thread length", "mm"]];
-  const FLATS = [["model.shaft.flats.af", "Flats across", "mm"], ["model.shaft.flats.z", "Flats from the nut bottom", "mm"], ["model.shaft.flats.l", "Flats length", "mm"]];
-  const CAP = [["L", "Length"], ["W", "Width"], ["H", "Height"], ["top_r", "Top fillet"], ["front_r", "Front fillet"],
-    ["back_r", "Back fillet"], ["bot_r", "Under fillet"]];
-  // every part's color + finish (model.looks; the page: router.js rtMaterial); r / s: routers / spindles only
-  const LOOKS = [["motor_cap", "Motor cap", ""], ["housing", "Motor housing", "r"], ["housing", "Can", "s"], ["collar", "Collar", "r"],
-    ["transition", "Transition", "r"], ["bearing_cap", "Bearing cap", ""], ["shaft", "Shaft", ""], ["collet_nut", "Collet nut", ""],
-    ["collet", "Collet", ""], ["dial", "Dial", "r"], ["switch", "Switch rocker", "r"], ["shaft_lock", "Shaft lock button", "r"], ["lock_boss", "Shaft lock boss", "r"], ["brush_cap", "Brush caps", "r"], ["brush_ring", "Brush cap border", "r"],
-    ["strain_relief", "Strain relief", ""], ["cord", "Cord", ""], ["trim", "Trim (bezels, grille)", ""]];
-  const FINISHES = [["metal", "Metal"], ["plastic", "Plastic"], ["rubber", "Rubber"]];
-  function rbField(box, id, label, type, unit) {
-    const f = document.createElement("div");
-    f.className = "field";
-    f.innerHTML = type === "color" ? `<label for="${id}">${label}</label><input id="${id}" type="color">` : type === "text" ?
-      `<label for="${id}">${label}</label><div class="unit-input"><input id="${id}" type="text"><span>${unit}</span></div>` :
-      `<label for="${id}">${label}</label><div class="unit-input"><input id="${id}" type="number" step="any"><span>${unit}</span></div>`;
-    (typeof box === "string" ? $(box) : box).append(f);
-    return f.querySelector("input");
-  }
-  const rbKind = (el, k) => { if (k) el.closest(".field").classList.add(k === "r" ? "rb-router" : "rb-spin"); };
-  function rbBuild() {                               // the inputs, once
-    for (let i = 0; i < 6; i++) rbField("rb-dial", `rb-d${i}`, `Dial ${i + 1}`, "num", "RPM").dataset.k = `speeds.${i}`;
-    rbField("rb-s", "rb-s0", "Lowest accurate", "num", "RPM").dataset.k = "s.0";
-    rbField("rb-s", "rb-s1", "Top speed", "num", "RPM").dataset.k = "s.1";
-    STACK.forEach(([k, l, u, kind], i) => { const el = rbField("rb-stack", `rb-st${i}`, l, "num", u); el.dataset.k = k; rbKind(el, kind); });
-    $("rb-st8").title = "A 45° bevel round the housing's bottom edge (the collet end), this big";
-    const tr = document.createElement("div");      // the transition up to the motor cap + the shaft lock
-    tr.className = "rb-router"; tr.id = "rb-trans-box";
-    tr.innerHTML = '<div class="variant" id="rb-tshape"><span>Transition to the motor cap</span><button type="button" data-v="round" aria-pressed="true">Round</button>' +
-      '<button type="button" data-v="cap" aria-pressed="false">To the cap\'s shape</button></div><div class="rb-grid" id="rb-trans"></div>' +
-      '<div class="variant" id="rb-tedge"><span>Where it meets the cap</span><button type="button" data-v="none" aria-pressed="true">Plain</button>' +
-      '<button type="button" data-v="fillet" aria-pressed="false">Fillet</button><button type="button" data-v="chamfer" aria-pressed="false">Chamfer</button></div>' +
-      '<div class="rb-grid" id="rb-trans-e"></div><p class="foot" id="rb-t-emax" hidden></p>' +
-      '<label class="check"><input type="checkbox" id="rb-lock-on"> Shaft lock button</label><div class="rb-grid" id="rb-lock"></div>' +
-      '<label class="check"><input type="checkbox" id="rb-brush-on"> Brush caps</label><div class="rb-grid" id="rb-brush"></div>';
-    $("rb-stack").after(tr);
-    rbField("rb-trans", "rb-t-l", "Transition length", "num", "mm").dataset.k = "model.transition.l";
-    rbField("rb-trans", "rb-t-d", "Top Ø", "num", "mm").dataset.k = "model.transition.d";
-    rbField("rb-trans-e", "rb-t-e", "Fillet size", "num", "mm").dataset.k = "model.transition.e";
-    for (const [k, l, u] of [["z", "Lock height", "mm"], ["a", "Lock angle", "°"], ["d", "Boss Ø (0 = none)", "mm"], ["in", "Boss starts at", "mm"], ["arm", "Arm width (0 = none)", "mm"], ["r", "Lock reach", "mm"], ["button", "Button Ø", "mm"], ["pin", "Pin Ø (0 = none)", "mm"], ["out", "Button stands out", "mm"], ["travel", "Press depth", "mm"]])
-      rbField("rb-lock", `rb-lock-${k}`, l, "num", u).dataset.k = `model.shaft_lock.${k}`;
-    for (const [k, l, u] of [["z", "Brush cap height", "mm"], ["a", "Brush cap angle", "°"], ["n", "How many", ""], ["d", "Brush cap Ø", "mm"], ["r", "Body surface from the axis", "mm"], ["out", "Stands out (no border)", "mm"], ["ring", "Border (head color)", "mm"], ["inset", "Cap inset (in a border)", "mm"], ["slot", "Slot angle", "°"]])
-      rbField("rb-brush", `rb-brush-${k}`, l, "num", u).dataset.k = `model.brushes.${k}`;
-    const cool = document.createElement("div");
-    cool.className = "variant rb-spin"; cool.id = "rb-cooling";
-    cool.innerHTML = '<span>Cooling</span><button type="button" data-v="air" aria-pressed="true">Air (fan)</button><button type="button" data-v="water" aria-pressed="false">Water</button>';
-    tr.after(cool);
-    // the bit end (user 2026-10-29: for the bit change): collet, nut, thread, the shaft's wrench flats
-    rbField("rb-bitend", "rb-csizes", "Collet sizes", "text", "mm").dataset.list = "model.collet.sizes";
-    $("rb-csizes").title = "Every shank the collets take, in mm, comma apart (1/8\" = 3.175, 1/4\" = 6.35); a bit change swaps the collet when the shank changes";
-    BITEND.forEach(([k, l, u], i) => { rbField("rb-bitend", `rb-be${i}`, l, "num", u).dataset.k = k; });
-    const fl = document.createElement("div");
-    fl.innerHTML = '<label class="check"><input type="checkbox" id="rb-flats-on"> Wrench flats on the shaft (no shaft lock: 2 wrenches)</label><div class="rb-grid" id="rb-flats"></div>';
-    $("rb-bitend").after(fl);
-    FLATS.forEach(([k, l, u], i) => { rbField("rb-flats", `rb-fl${i}`, l, "num", u).dataset.k = k; });
-    const cb = document.createElement("div");       // height in the mount (router.js rtFrame)
-    cb.id = "rb-clampbox";
-    cb.innerHTML = '<div class="rb-grid" id="rb-clampgrid"></div><p class="foot" id="rb-clampnote" hidden></p>';
-    $("rb-mount").closest(".field").after(cb);
-    rbField("rb-clampgrid", "rb-clamp", "Nut below the clamp", "num", "mm").dataset.k = "model.clamp";
-    $("rb-clamp").title = "mm from the bottom of the collet nut up to the bottom of the mount's lower clamp: more = the router (and bit) sits lower";
-    for (const [k, l] of CAP) rbField("rb-head", `rb-h-${k}`, l, "num", "mm").dataset.k = `model.motor_cap.${k}`;
-    rbField("rb-head", "rb-h-dd", "Dial Ø", "num", "mm").dataset.k = "model.dial.d";
-    rbField("rb-head", "rb-h-dt", "Dial thickness", "num", "mm").dataset.k = "model.dial.t";
-    rbField("rb-head", "rb-h-sw", "Switch below the top", "num", "mm").dataset.k = "model.switch.down";
-    for (const [k, l] of [["in", "Rim in from the end"], ["drop", "Below the top"], ["win.l", "Window length"], ["win.w", "Window width"], ["win.bevel", "Window bevel"]])
-      rbField("rb-dialwin-g", `rb-dw-${k.replace(".", "-")}`, l, "num", "mm").dataset.k = `model.dial.${k}`;
-    rbField("rb-dome-g", "rb-dome-top", "Flat top", "num", "x r").dataset.k = "model.dial.dome.top";   // (Part 46d: the dial's slot + surround)
-    for (const [k, l] of [["slot.w", "Slot width"], ["slot.h", "Slot height"], ["slot.r", "Slot corner"], ["set", "Rim in from the slot"]])
-      rbField("rb-dialslot-g", `rb-ds-${k.replace(".", "-")}`, l, "num", "mm").dataset.k = `model.dial.${k}`;
-    for (const [k, l] of [["depth", "Depth"], ["margin", "Margin"], ["r", "Corner"], ["e", "Edge"]])
-      rbField("rb-sur-g", `rb-su-${k}`, l, "num", "mm").dataset.k = `model.dial.surround.${k}`;
-    LOOKS.forEach(([k, l, kind], i) => {             // a color + a finish each
-      const el = rbField("rb-colors", `rb-lk${i}`, l, "color"), f = el.closest(".field"), sel = document.createElement("select");
-      el.dataset.look = k;
-      sel.id = `rb-lf${i}`; sel.dataset.lookf = k; sel.setAttribute("aria-label", `${l} finish`);
-      for (const [v, t] of FINISHES) sel.add(new Option(t, v));
-      f.classList.add("rb-look");
-      rbKind(el, kind);
-      f.append(sel);
-    });
-  }
   const rbPath = (o, k) => k.split(".").reduce((a, p) => (a == null ? undefined : a[p]), o);
   function rbPut(o, k, v) {
     const cs = /^model\.motor_cap\.(L|W|H)$/.exec(k), cap = o.model && o.model.motor_cap;
@@ -118,91 +25,43 @@
     if (!m.transition) m.transition = { l: 15, d: (m.collar || m.housing).d, shape: "round", edge: "none", e: 3 };
     return m.transition;
   }
-  function rbTransShow(m) {                          // the transition's buttons + which of its sizes apply
-    const T = m.transition || { shape: "round", edge: "none" };
-    for (const btn of $("rb-tshape").querySelectorAll("button")) btn.setAttribute("aria-pressed", String(btn.dataset.v === T.shape));
-    for (const btn of $("rb-tedge").querySelectorAll("button")) btn.setAttribute("aria-pressed", String(btn.dataset.v === T.edge));
-    $("rb-t-d").closest(".field").hidden = T.shape === "cap";
-    $("rb-trans-e").hidden = T.edge === "none";
-    $("rb-t-e").closest(".field").querySelector("label").textContent = T.edge === "chamfer" ? "Chamfer size" : "Fillet size";
-    const mx = m.transition ? LR4RouterBody.transitionEdgeMax(m) : 0, note = $("rb-t-emax");
-    note.textContent = T.edge !== "none" && (T.e || 0) > mx ? `Only ${mx} mm fits here (the cap's size / the transition's length): drawn at ${mx}.` : "";
-    note.hidden = !note.textContent;
-    $("rb-t-e").title = `Up to ${mx} mm here`;
-    if (!m.transition && document.activeElement !== $("rb-t-l")) $("rb-t-l").value = 0;
-  }
-  function rbShow() {                                // the inputs from the current router
-    const id = rbCur(), r = LR4Routers.ROUTERS[id], p = LR4Routers.preset(id), m = p.model, spin = m.kind === "spindle";
-    for (const btn of $("rb-kind").querySelectorAll("button")) btn.setAttribute("aria-pressed", String(btn.dataset.v === (spin ? "spindle" : "router")));
-    for (const el of document.querySelectorAll("#rte .rb-router")) el.hidden = spin;
-    for (const el of document.querySelectorAll("#rte .rb-spin")) el.hidden = !spin;
-    if (spin) for (const btn of $("rb-cooling").querySelectorAll("button")) btn.setAttribute("aria-pressed", String(btn.dataset.v === m.cooling));
+  function rbShow() {                                // the page from the current router: the lists, the toolbar, the editor
+    const id = rbCur(), r = LR4Routers.ROUTERS[id];
     const pick = $("rb-pick");
     pick.length = 0;
     for (const [k, q] of Object.entries(LR4Routers.ROUTERS)) pick.add(new Option(q.name + (q.edited && !q.custom ? " (edited)" : ""), k));
     pick.value = id;
-    $("rb-name").value = p.name;
-    const man = p.source === "manual";
-    for (const btn of $("rb-source").querySelectorAll("button")) btn.setAttribute("aria-pressed", String(btn.dataset.v === p.source));
-    $("rb-dial").hidden = !man; $("rb-s").hidden = man;
-    $("rb-mount").value = p.mount;
-    const mrec = cfg && cfg.parts && cfg.parts.find((q) => q.key === "Tool_Mount_B_Kobalt"), alt = mrec && mrec.src && mrec.src.alt && mrec.src.alt[p.mount];
-    const mnote = $("rb-mountnote"), msrc = cfg && cfg.files && alt && cfg.files.sources[alt.file.split("/")[0]];
-    mnote.textContent = alt && !userFiles.has(alt.file) ? `The ${msrc ? msrc.title : p.mount} files aren't added yet (Parts): drawn as the Kobalt set for now.` : "";
-    mnote.hidden = !mnote.textContent;   // (Part 45c: scene.js mountAlt)
-    const ex = spin ? null : LR4RouterBody.expand(m);   // the switch's height as placed (until one's typed)
-    const swDown = ex ? +(ex.cap.z[1] - ex.switch.at[2]).toFixed(1) : 0;
-    const O = ex && ex.dial.open, dialShown = O ? Object.assign({}, m.dial, { slot: O.S, set: m.dial.set ?? 0.3, surround: O.R }) : m.dial;   // (the slot's sizes as used)
-    const shown = Object.assign({}, p, { model: Object.assign({}, m, { dial: dialShown, overall: LR4RouterBody.overall(m), switch: { down: swDown }, housing: Object.assign({ ch: 0 }, m.housing),
-      bearing_cap: m.bearing_cap || { d: 0, l: 0 }, collar: m.collar || { d: 0, l: 0 } }) });
-    for (const el of document.querySelectorAll("#rte input[data-k]")) {
-      const k = el.dataset.k, v = k.startsWith("speeds.") ? (p.speeds ? p.speeds[+k.split(".")[1]][1] : "") : rbPath(shown, k);
-      if (document.activeElement !== el) el.value = v === undefined || v === null ? "" : v;
-    }
-    if (document.activeElement !== $("rb-csizes")) $("rb-csizes").value = m.collet.sizes.join(", ");
-    $("rb-flats-on").checked = !!m.shaft.flats; $("rb-flats").hidden = !m.shaft.flats;
-    if (!spin) rbTransShow(m);
-    const C = rtClamps(), clamp = m.clamp ?? (C ? C.def : 0);
-    $("rb-clampbox").hidden = p.mount === "none" || !C;
-    if (document.activeElement !== $("rb-clamp")) $("rb-clamp").value = clamp;
-    const note = $("rb-clampnote"), off = [];
-    if (C) {                                         // both clamps on the motor housing (a spindle: its can)?
-      const g0 = m.collet_nut.h + m.shaft.exposed + (m.bearing_cap ? m.bearing_cap.l : 0), g1 = g0 + m.housing.l;
-      for (const [nm, [z0, z1]] of [["lower", C.lo], ["upper", C.hi]]) if (clamp + z0 < g0 - 0.5 || clamp + z1 > g1 + 0.5) off.push(nm);
-      const where = spin ? "can" : "motor housing";
-      note.textContent = off.length ? `The ${off.join(" and ")} clamp${off.length > 1 ? "s are" : " is"} off the ${where} ` +
-        `(it runs ${g0.toFixed(0)} - ${g1.toFixed(0)} mm up from the nut; the clamps ${(clamp + C.lo[0]).toFixed(0)} - ${(clamp + C.lo[1]).toFixed(0)} ` +
-        `and ${(clamp + C.hi[0]).toFixed(0)} - ${(clamp + C.hi[1]).toFixed(0)}).` : "";
-    }
-    note.hidden = !off.length || $("rb-clampbox").hidden;
-    $("rb-lock-on").checked = !!m.shaft_lock; $("rb-lock").hidden = !m.shaft_lock;
-    $("rb-brush-on").checked = !!m.brushes; $("rb-brush").hidden = !m.brushes;
-    if (!spin) for (const btn of $("rb-dialplace").querySelectorAll("button")) btn.setAttribute("aria-pressed", String(btn.dataset.v === m.dial.place));
-    $("rb-dialwin").hidden = spin || m.dial.place !== "window";
-    if (!spin && m.dial.place === "window") $("rb-win-open").checked = m.dial.win.open;
-    const Su = (!spin && m.dial.surround) || { kind: "none" };
-    if (!spin) {
-      for (const btn of $("rb-dialstyle").querySelectorAll("button")) btn.setAttribute("aria-pressed", String(btn.dataset.v === m.dial.style));
-      for (const btn of $("rb-surkind").querySelectorAll("button")) btn.setAttribute("aria-pressed", String(btn.dataset.v === Su.kind));
-      for (const btn of $("rb-suredge").querySelectorAll("button")) btn.setAttribute("aria-pressed", String(btn.dataset.v === (Su.edge || "chamfer")));
-      $("rb-sur-top").checked = Su.out === "top";
-    }
-    $("rb-dialstyle").hidden = spin;
-    $("rb-dome").hidden = spin || m.dial.style !== "dome";
-    $("rb-dialslot").hidden = spin || m.dial.place === "window" || !(window.LR4Csg && LR4Csg.ready());
-    $("rb-sur").hidden = Su.kind === "none";
-    $("rb-sur-topbox").hidden = spin || Su.kind !== "sunk" || m.dial.place !== "end";
-    const shaped = !spin && !!(m.motor_cap && m.motor_cap.shape);   // drawn in the shape editor: no fillets
-    for (const [k] of CAP.slice(3)) $(`rb-h-${k}`).closest(".field").hidden = shaped;
-    $("rb-shapenote").hidden = !shaped;
-    if (typeof capEditShow === "function") capEditShow();
-    LOOKS.forEach(([k], i) => { const L = m.looks[k]; $(`rb-lk${i}`).value = rbHex(L.c); $(`rb-lf${i}`).value = L.f; });
     $("rb-reset").textContent = r.custom ? "Delete" : "Reset";
     $("rb-reset").disabled = !r.custom && !r.edited;
+    $("rb-reset").title = r.custom ? "Remove this router you made" : r.edited ? "Put this router back the way it came" : "Nothing changed yet: Reset puts it back once you do";
     $("sum-rt").textContent = r.name; $("rte-h").textContent = r.name;
-    rbTab(RB.tab);
+    if (typeof capEditShow === "function") capEditShow();
     if (typeof rxTick === "function") rxTick();     // the numbers on the model, now
-    if (typeof rtiShow === "function") rtiShow();   // the inspector (router_inspect.js)
+    if (typeof rtiShow === "function") rtiShow();   // the outline + inspector (router_inspect.js)
+  }
+  // notes for an inspector item (router_inspect.js): what the numbers alone don't say
+  function rbNotes(part) {
+    const p = LR4Routers.preset(rbCur()), m = p.model, spin = m.kind === "spindle", out = [];
+    if (part === "mount") {
+      const mrec = cfg && cfg.parts && cfg.parts.find((q) => q.key === "Tool_Mount_B_Kobalt"), alt = mrec && mrec.src && mrec.src.alt && mrec.src.alt[p.mount];
+      const msrc = cfg && cfg.files && alt && cfg.files.sources[alt.file.split("/")[0]];
+      if (alt && !userFiles.has(alt.file)) out.push(`The ${msrc ? msrc.title : p.mount} files aren't added yet (Parts): drawn as the Kobalt set for now.`);   // (Part 45c: scene.js mountAlt)
+      const C = rtClamps(), clamp = m.clamp ?? (C ? C.def : 0), off = [];
+      if (C && p.mount !== "none") {                 // both clamps on the motor housing (a spindle: its can)?
+        const g0 = m.collet_nut.h + m.shaft.exposed + (m.bearing_cap ? m.bearing_cap.l : 0), g1 = g0 + m.housing.l;
+        for (const [nm, [z0, z1]] of [["lower", C.lo], ["upper", C.hi]]) if (clamp + z0 < g0 - 0.5 || clamp + z1 > g1 + 0.5) off.push(nm);
+        if (off.length) out.push(`The ${off.join(" and ")} clamp${off.length > 1 ? "s are" : " is"} off the ${spin ? "can" : "motor housing"} ` +
+          `(it runs ${g0.toFixed(0)} - ${g1.toFixed(0)} mm up from the nut; the clamps ${(clamp + C.lo[0]).toFixed(0)} - ${(clamp + C.lo[1]).toFixed(0)} ` +
+          `and ${(clamp + C.hi[0]).toFixed(0)} - ${(clamp + C.hi[1]).toFixed(0)}).`);
+      }
+    }
+    if (part === "transition" && m.transition && m.transition.edge !== "none") {
+      const mx = LR4RouterBody.transitionEdgeMax(m);
+      if ((m.transition.e || 0) > mx) out.push(`Only ${mx} mm fits here (the cap's size / the transition's length): drawn at ${mx}.`);
+    }
+    if (part === "dial" && !spin && m.dial.place !== "window" && !(window.LR4Csg && LR4Csg.ready())) out.push("The slot's settings need the geometry booleans, which haven't loaded.");
+    if (part === "motor_cap" && m.motor_cap && m.motor_cap.shape) out.push("Drawn in the shape editor: Length / Width / Height stretch the drawing.");
+    return out;
   }
   function rbLists() {                               // Run's router list + the job's speed-table list, from ROUTERS again
     $("rt-router").length = 0;                       // (rtLook fills it)
@@ -272,6 +131,12 @@
   // builder's rules - the cap sits on the turned part (overall = its top + H), a section / transition set before
   // there's one is made, router <-> spindle swaps the model. A number rebuilds when typing pauses, a choice now.
   function rbSet(k, v) {
+    const step = typeof v !== "number" && k !== "name";   // a choice: an undo step of its own (typing, sliding: merged)
+    if (step) RB.cut = true;
+    rbSetKey(k, v);
+    if (step) RB.cut = true;
+  }
+  function rbSetKey(k, v) {
     const now = typeof v !== "number";
     if (k === "kind") return rbKindSet(v);
     if (k === "name") return rbEdit((p) => { p.name = String(v).slice(0, 40) || "My router"; });
@@ -287,6 +152,11 @@
       return rbEdit((p) => { p.model.dial.surround = Object.assign({ kind: "none" }, p.model.dial.surround, { [f]: f === "out" ? (v ? "top" : "none") : v }); }, now);
     }
     if (k === "model.dial.win.open") return rbEdit((p) => { p.model.dial.win = Object.assign({}, p.model.dial.win, { open: !!v }); }, true);
+    if (k.startsWith("has:")) {                      // an optional piece on (its size) / off (0)
+      const r = LR4RouterSchema.ROWS.find((q) => q.k === k);
+      if (r) rbEdit((p) => rbPut(p, r.of, v ? (typeof r.on === "function" ? r.on(p.model) : r.on) : 0), true);
+      return;
+    }
     rbEdit((p) => {
       const m = p.model;
       if (k === "model.overall") { if (m.motor_cap) rbPut(p, "model.motor_cap.H", v - LR4RouterBody.stackTop(m)); return; }
@@ -316,30 +186,12 @@
   }
   function rbFeature(id, on) {                       // a part added / taken off (LR4RouterSchema.FEATURES)
     const F = LR4RouterSchema.FEATURES.find((f) => f.id === id);
-    if (F) rbEdit((p) => { if (on && !F.has(p.model)) F.add(p); else if (!on && F.has(p.model)) F.remove(p); }, true);
+    if (!F) return;
+    RB.cut = true;                                    // its own undo step
+    rbEdit((p) => { if (on && !F.has(p.model)) F.add(p); else if (!on && F.has(p.model)) F.remove(p); }, true);
+    RB.cut = true;
   }
 
-  rbBuild();
-  // one tab of settings at a time (user 2026-10-29); the tab bar's ? = that tab's help
-  const RB_HELP = { speed: "help-rb-speed", mount: "help-rb-mount", stack: "help-rb-stack", bitend: "help-rb-bitend", head: "help-rb-head", colors: "help-rb-colors" };
-  RB.tab = kvGet("lr4-rb-tab");
-  if (!RB_HELP[RB.tab]) RB.tab = "speed";
-  function rbTab(t) {
-    if (t === "head" && LR4Routers.preset(rbCur()).model.kind === "spindle") t = "stack";   // a spindle has no motor cap tab
-    RB.tab = t;
-    for (const b of $("rb-tabs").querySelectorAll("[role=tab]")) b.setAttribute("aria-selected", String(b.dataset.v === t));
-    for (const s of document.querySelectorAll("#rte .rb-sec")) s.classList.toggle("on", s.dataset.sec === t);
-    if (rbViewing() && typeof capEditOpen === "function") capEditOpen(t === "head" && !$("ce").dataset.shut);   // the shape editor: the Motor cap tab's
-    const q = $("rb-tab-q");
-    q.hidden = !RB_HELP[t];
-    if (RB_HELP[t]) q.dataset.help = RB_HELP[t];
-  }
-  $("rb-tabs").addEventListener("click", (e) => {
-    const b = e.target.closest("[role=tab]");
-    if (!b) return;
-    rbTab(b.dataset.v);
-    kvSet("lr4-rb-tab", RB.tab);
-  });
   // Close-up: Inspect's router row, less the shoe's bottom (skirt + bristles) and the cord's run to the hose; its Show
   // boxes take out the shoe top / each mount (with their own bolts) and add the core
   const RB_VIEW_OFF = [["rb-shoe", "Dust_Shoe"], ["rb-mb", "Tool_Mount_B"], ["rb-mt", "Tool_Mount_T"]];
@@ -347,14 +199,14 @@
     ...RB_VIEW_OFF.filter(([id]) => !$(id).checked).map(([, n]) => n)].join("|") + ")");
   const rbViewing = () => !!(INSPECT && INSPECT.as === "router");
   // the router editor (Part 46b, user 2026-10-30: "it's just grown too much to have in the side panel"): the close-up
-  // with the builder in the side panel's place (#rte), the shape editor docked on the right on the
-  // Motor cap tab; Back / Esc leaves. Not on a phone (user 2026-10-30): the button is hidden there.
+  // with the outline in the side panel's place (#rte), the inspector on the right (Part 48b / c); Back / Esc leaves.
+  // Not on a phone (user 2026-10-30): the button is hidden there.
   function rbViewMark() {
     const on = rbViewing();
     $("rb-view").setAttribute("aria-pressed", String(on));
     document.documentElement.classList.toggle("rte-on", on);
     $("rte").hidden = !on;
-    if (typeof capEditOpen === "function") capEditOpen(on && RB.tab === "head" && !$("ce").dataset.shut);
+    if (!on && typeof capEditOpen === "function") capEditOpen(false);   // the shape editor: when the motor cap's Edit shape asks
     if (on && typeof capEditFit === "function") requestAnimationFrame(capEditFit);   // framed in the room between the columns
     $("rb-core-box").hidden = !on;
     if (typeof rxMark === "function") rxMark();     // the dimensions on the model (router_edit.js)
@@ -374,28 +226,6 @@
     applyVisibility();
   });
   $("rb-pick").addEventListener("change", (e) => { rbMsg(""); rtSet({ router: e.target.value }); rbShow(); });
-  $("rb-name").addEventListener("input", (e) => rbSet("name", e.target.value));
-  $("rb-mount").addEventListener("change", (e) => rbSet("mount", e.target.value));
-  const rbBtn = (id, k) => $(id).addEventListener("click", (e) => { const v = e.target.dataset && e.target.dataset.v; if (v) rbSet(k, v); });
-  for (const [id, k] of [["rb-source", "source"], ["rb-kind", "kind"], ["rb-tshape", "model.transition.shape"], ["rb-tedge", "model.transition.edge"],
-    ["rb-cooling", "model.cooling"], ["rb-dialplace", "model.dial.place"], ["rb-dialstyle", "model.dial.style"], ["rb-surkind", "model.dial.surround.kind"],
-    ["rb-suredge", "model.dial.surround.edge"]]) rbBtn(id, k);
-  $("rte").addEventListener("change", (e) => {     // a part's finish; the collet sizes when typed out
-    const k = e.target.dataset && e.target.dataset.lookf;
-    if (k) rbLook(k, { f: e.target.value });
-    if (e.target.dataset && e.target.dataset.list) rbSet("model.collet.sizes", e.target.value);
-  });
-  for (const [id, f] of [["rb-lock-on", "shaft_lock"], ["rb-brush-on", "brushes"], ["rb-flats-on", "flats"]]) $(id).addEventListener("change", (e) => rbFeature(f, e.target.checked));
-  $("rb-win-open").addEventListener("change", (e) => rbSet("model.dial.win.open", e.target.checked));
-  $("rb-sur-top").addEventListener("change", (e) => rbSet("model.dial.surround.out", e.target.checked));
-  $("rte").addEventListener("input", (e) => {
-    const el = e.target, k = el.dataset.k;
-    if (el.dataset.lookf || el.dataset.list) return;   // (their change events)
-    if (el.dataset.look) return rbLook(el.dataset.look, { c: el.value });
-    if (!k) return;
-    const v = el.value.trim() === "" ? undefined : Number(el.value);
-    if (v !== undefined && Number.isFinite(v)) rbSet(k, v);
-  });
   $("rb-new").addEventListener("click", () => {
     const p = LR4Routers.preset(rbCur());
     p.name = ("My " + p.name.replace(/^My /, "")).slice(0, 40);
@@ -403,7 +233,7 @@
     rbApply(id, p, true);
     rtSet({ router: id });
     rbShow();
-    rbMsg(`Made "${p.name}" - shape it below.`);
+    rbMsg(`Made "${p.name}": pick a part to shape it.`);
   });
   $("rb-reset").addEventListener("click", () => {
     const id = rbCur(), r = LR4Routers.ROUTERS[id];
@@ -456,4 +286,5 @@
   });
   rbShow();
   // tests: the current preset, edit it (fn(p)), the stored edits
-  window.LR4RouterBuild = { preset: () => LR4Routers.preset(rbCur()), edit: (fn) => rbEdit(fn, true), edits: () => JSON.parse(JSON.stringify(RB.edits)) };
+  window.LR4RouterBuild = { preset: () => LR4Routers.preset(rbCur()), edit: (fn) => rbEdit(fn, true), edits: () => JSON.parse(JSON.stringify(RB.edits)),
+    set: (k, v) => rbSet(k, v), look: (k, o) => rbLook(k, o), feature: (id, on) => rbFeature(id, on), notes: (part) => rbNotes(part) };

@@ -81,9 +81,12 @@ Delete, and **Export** / **Import** as a `.lr4.json` file. A shared link opens a
 
 **Your router** (My LR4 > Router > **Edit router…**) opens the router editor: the router (with its mount) on its own,
 to shape it to match yours. **Front / Right / Top / Iso** turn the camera (you can always drag to orbit; **Flat** is a
-narrow lens to read sizes like a drawing). Click a part to pick it: its sizes show on the model (click a number to
-type it, drag a ● to pull that end), the mount turns see-through, and the **inspector** on the right shows every
-setting of that part (sizes, options, color + finish). Nothing picked: the router itself (name, speeds, collets).
+narrow lens to read sizes like a drawing). Pick a part on the model or in the **list of its parts** on the left: its
+sizes show on the model (click a number to type it, drag a ● to pull that end), the mount turns see-through, and the
+**inspector** on the right shows every setting of that part (sizes, options, color + finish). **Router** at the top
+of the list is the router itself (name, speeds, collets). **+ Add a part** puts on a shaft lock, brush caps, wrench
+flats and the like; ✕ takes one off. The toolbar has Undo / Redo, New, Reset, Export / Import (a `.router.json` to
+share). The motor cap's **Edit shape** draws its shape from three views.
 
 **As built** is off (Ideal) by default. **Real-world** gives the machine a real build's faults: the Y and Z switches
 not quite in line (homing leaves the gantry racked or the beam off level by that much), motors that let go at power-up

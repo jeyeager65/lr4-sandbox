@@ -14,6 +14,14 @@ the date the model data was built and the Printables file set it was solved for.
   (sizes as a slider + a number, its options as buttons, its color and finish under Look), not just its sizes.
   With nothing picked it shows the router itself: name, router / spindle, speeds and collet sizes. The switch is a
   part of its own (its height under the top). The "?" lists what each setting means. The old click card is gone.
+- **A list of the router's parts instead of the tabs:** the editor's left side lists the router's parts from the
+  collet nut up (Router and Mount first); click one to pick it, as on the model. The tabs and their wall of number
+  fields, and the Colors tab, are gone: everything is in the inspector. **+ Add a part** puts on what the router
+  doesn't have (wrench flats, a shaft lock, brush caps, an open vent end, a bearing cap, a collar, a transition);
+  ✕ next to one takes it off (Undo puts it back). No more "0 = none" sizes: the shaft lock's boss, arm and pin and
+  the brush caps' border are switched on and off. Undo, Redo, New, Reset, Export and Import are a toolbar at the
+  top; Show folds away. Clearer names (for example "Shaft end up inside" the nut, "Switch-end corners").
+- The motor cap's shape editor opens from **Edit shape** in the motor cap's settings.
 
 ## 0.62.0 - 2026-10-30
 - **Speed dials that look like the real ones:** the wheel sits inside the head, and a slice of its rim shows through

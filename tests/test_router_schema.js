@@ -46,7 +46,7 @@ const all = new Set(["kobalt:window", "kobalt:end", "carbide:top"].flatMap((s) =
 for (const k of leaves(R.clean(Object.assign(R.preset("spindle65"), { source: "gcode", s: [8000, 24000] }))).map(keyOf)) all.add(k);
 for (const k of leaves(R.preset("kobalt")).map(keyOf)) all.add(k);
 const SPECIAL = new Set(["kind", "model.overall", "shape", "model.collet.sizes", "s.0", "s.1"]);
-const stray = S.ROWS.map((r) => r.k).filter((k) => !SPECIAL.has(k) && !all.has(k));
+const stray = S.ROWS.map((r) => (r.kind === "has" ? r.of : r.k)).filter((k) => !SPECIAL.has(k) && !all.has(k));
 ok(!stray.length, `every row is a setting clean() keeps (stray: ${stray.join(", ")})`);
 ok(S.ROWS.every((r) => S.PARTS.some((P) => P.id === r.part)), "every row's part is an outline item");
 ok(S.ROWS.every((r) => r.kind !== "choice" && r.kind !== "select" || (r.opts && r.opts.length >= 2)), "every choice has its options");
@@ -80,6 +80,15 @@ for (const F of S.FEATURES) {
   const on = R.clean(p);
   ok(!F.has(off.model) && on && F.has(on.model) && S.partShown(F.part, on.model) && !S.partShown(F.part, off.model), `feature ${F.id}: added, kept by clean(), removed`);
 }
+
+// "has:" rows: an optional piece on / off (no "0 = none" sizes)
+const lk = clone(kb), lockKeys = () => S.rows("shaft_lock", lk).map((r) => r.k);
+ok(S.value(lk, "has:lock.d") === (lk.model.shaft_lock.d > 0) && lockKeys().includes("has:lock.d"), "the boss's toggle reads the boss");
+lk.model.shaft_lock.d = 0; lk.model.shaft_lock.arm = 0;
+ok(!S.value(lk, "has:lock.d") && !lockKeys().includes("model.shaft_lock.d") && !lockKeys().includes("model.shaft_lock.in") && !lockKeys().includes("model.shaft_lock.arm"),
+  "no boss / arm: their sizes hidden, the toggles stay");
+ok(S.ROWS.filter((r) => r.kind === "has").every((r) => S.ROWS.some((q) => q.k === r.of)) && !S.ROWS.some((r) => /0 = none/.test(S.labelOf(r, kb.model))),
+  "every toggle has its size row; no label says 0 = none");
 
 // values as drawn
 const sh = S.shown(kb);

@@ -36,8 +36,8 @@ const ok = (cond, msg) => { checks++; console.log((cond ? "  ok   " : "  FAIL ")
       LR4Router.set({ router: "testbox" });
       await T.sleep(100);
       out.pick = $$("rb-pick").value; out.n = $$("rb-pick").options.length;
-      out.L = $$("rb-h-L").value; out.x0 = headX();
-      const el = $$("rb-h-L"); el.value = 120; el.dispatchEvent(new Event("input", { bubbles: true }));
+      out.L = String(LR4RouterSchema.value(LR4RouterBuild.preset(), "model.motor_cap.L")); out.x0 = headX();
+      LR4RouterBuild.set("model.motor_cap.L", 120);
       await T.sleep(400);
       out.x1 = headX(); out.kept = LR4RouterBuild.edits().testbox && LR4RouterBuild.edits().testbox.model.motor_cap.L;
       out.label = $$("rb-pick").selectedOptions[0].textContent; out.reset = !$$("rb-reset").disabled;
@@ -63,20 +63,20 @@ const ok = (cond, msg) => { checks++; console.log((cond ? "  ok   " : "  FAIL ")
       $$("rb-reset").click(); await T.sleep(100);
       out.L2 = LR4Routers.ROUTERS.testbox.model.motor_cap.L; out.edits = Object.keys(LR4RouterBuild.edits());
       LR4Router.set({ router: "kobalt" }); await T.sleep(100);
-      out.head = LR4Routers.ROUTERS.kobalt.model.motor_cap; out.headShown = !$$("rb-head").hidden;
+      out.head = LR4Routers.ROUTERS.kobalt.model.motor_cap; out.headShown = LR4RouterSchema.partShown("motor_cap", LR4Routers.ROUTERS.kobalt.model);
       const kb = LR4Routers.ROUTERS.kobalt.model;
-      out.kLock = kb.shaft_lock; out.lockOn = $$("rb-lock-on").checked;
+      out.kLock = kb.shaft_lock; out.lockOn = LR4RouterSchema.partShown("shaft_lock", kb);
       // the Carbide's transition; shaped to the cap, a fillet; the housing chamfer; a part's look (its own material)
       LR4Router.set({ router: "carbide" }); await T.sleep(100);
-      const put = async (id, v) => { const el = $$(id); el.value = v; el.dispatchEvent(new Event("input", { bubbles: true })); await T.sleep(400); };
+      const put = async (k, v) => { LR4RouterBuild.set(k, v); await T.sleep(400); }, rowsOf = (part) => LR4RouterSchema.rows(part, LR4RouterBuild.preset()).map((r) => r.k);
       const cb = () => LR4Routers.ROUTERS.carbide.model;
-      out.tr = { l: $$("rb-t-l").value, dShown: !$$("rb-t-d").closest(".field").hidden };
-      document.querySelector('#rb-tshape [data-v="cap"]').click(); await T.sleep(150);
-      document.querySelector('#rb-tedge [data-v="fillet"]').click(); await T.sleep(150);
-      await put("rb-t-e", 5); await put("rb-st8", 2);
-      out.tr.after = [cb().transition.shape, cb().transition.edge, cb().transition.e, cb().housing.ch, $$("rb-t-d").closest(".field").hidden, !$$("rb-trans-e").hidden];
-      const sel = $$("rb-lf1"); sel.value = "rubber"; sel.dispatchEvent(new Event("change", { bubbles: true })); await T.sleep(300);
-      await put("rb-lk3", "#1f5fbf");
+      out.tr = { l: String(LR4RouterSchema.value(LR4RouterBuild.preset(), "model.transition.l")), dShown: rowsOf("transition").includes("model.transition.d") };
+      LR4RouterBuild.set("model.transition.shape", "cap"); await T.sleep(150);
+      LR4RouterBuild.set("model.transition.edge", "fillet"); await T.sleep(150);
+      await put("model.transition.e", 5); await put("model.housing.ch", 2);
+      out.tr.after = [cb().transition.shape, cb().transition.edge, cb().transition.e, cb().housing.ch, !rowsOf("transition").includes("model.transition.d"), rowsOf("transition").includes("model.transition.e")];
+      LR4RouterBuild.look("housing", { f: "rubber" }); await T.sleep(300);
+      LR4RouterBuild.look("collar", { c: "#1f5fbf" }); await T.sleep(400);
       const mOf = (n) => meshes.find((m) => m.userData.name === n), hm = mOf("Router_Housing"), cm = mOf("Router_Collar");
       out.tr.look = [cb().looks.housing.f, +hm.material.roughness.toFixed(2), hm.material.metalness, cm.material.color.b > 0.3 && cm.material.color.r < 0.05];
       $$("rb-reset").click(); await T.sleep(100);
@@ -92,17 +92,17 @@ const ok = (cond, msg) => { checks++; console.log((cond ? "  ok   " : "  FAIL ")
       bm.geometry.computeBoundingBox();
       const bb = bm.geometry.boundingBox;
       out.spin = { ring: !!(dm && dm.userData.ring), dialTris: dm && dm.geometry.index ? dm.geometry.index.count : 0, body: PWR.body,
-        d: +(bb.max.x - bb.min.x).toFixed(1), canShown: ![...document.querySelectorAll(".rb-spin [data-k='model.housing.d']")].some((e) => e.closest(".field").hidden), gripHidden: [...document.querySelectorAll(".rb-router [data-k='model.housing.d']")].every((e) => e.closest(".field").hidden) };
+        d: +(bb.max.x - bb.min.x).toFixed(1), canShown: LR4RouterSchema.partLabel("housing", LR4Routers.ROUTERS.spindle65.model) === "Can", gripHidden: !LR4RouterSchema.rows("housing", LR4Routers.preset("spindle65")).some((r) => r.k === "model.housing.ch") };
       LR4Router.set({ router: "testbox" }); await T.sleep(100);
-      document.querySelector('#rb-kind button[data-v="spindle"]').click(); await T.sleep(100);
+      LR4RouterBuild.set("kind", "spindle"); await T.sleep(100);
       out.toSpin = [LR4Routers.ROUTERS.testbox.model.kind, LR4Routers.ROUTERS.testbox.source];
-      document.querySelector('#rb-kind button[data-v="router"]').click(); await T.sleep(100);
+      LR4RouterBuild.set("kind", "router"); await T.sleep(100);
       out.toRouter = LR4Routers.ROUTERS.testbox.model.motor_cap && LR4Routers.ROUTERS.testbox.model.motor_cap.L;
       $$("rb-reset").click(); await T.sleep(100);
       // mount None: no dust shoe or hose (shown again with a mount)
       const vis = (re) => meshes.filter((m) => re.test(m.userData.name || "")).map((m) => m.visible);
       out.shoe0 = [vis(/^Dust_Shoe/), vis(/^Vacuum_Hose/)].map((v) => v.length > 0 && v.every(Boolean));
-      const mt = $$("rb-mount"); mt.value = "none"; mt.dispatchEvent(new Event("change")); await T.sleep(200);
+      LR4RouterBuild.set("mount", "none"); await T.sleep(200);
       out.shoe1 = [vis(/^Dust_Shoe/), vis(/^Vacuum_Hose/), vis(/^Tool_Mount_/)].map((v) => v.length > 0 && v.every(Boolean));
       out.optHose = $$("opt-hose").disabled;
       $$("rb-reset").click(); await T.sleep(200);
@@ -111,21 +111,15 @@ const ok = (cond, msg) => { checks++; console.log((cond ? "  ok   " : "  FAIL ")
       LR4Router.set({ router: "testbox" }); await T.sleep(100);
       const zOf = (n) => { const m = meshes.find((q) => q.userData.name === n); m.updateMatrixWorld(); return new THREE.Box3().setFromObject(m).min.z; };
       const tip0 = bitTip(meshes.find((m) => m.userData.name === "Router_Bit")).z, nut0 = zOf("Router_ColletNut");
-      out.clampDef = $$("rb-clamp").value;
-      const cl = $$("rb-clamp"); cl.value = 25; cl.dispatchEvent(new Event("input", { bubbles: true })); await T.sleep(400);
+      out.clampDef = String(LR4RouterSchema.value(LR4RouterBuild.preset(), "model.clamp", LR4RouterSchema.shown(LR4RouterBuild.preset(), { clampDef: rtClamps().def })));
+      LR4RouterBuild.set("model.clamp", 25); await T.sleep(400);
       out.dTip = +(bitTip(meshes.find((m) => m.userData.name === "Router_Bit")).z - tip0).toFixed(2);
       out.dNut = +(zOf("Router_ColletNut") - nut0).toFixed(2);
-      out.note0 = $$("rb-clampnote").hidden;
-      cl.value = 140; cl.dispatchEvent(new Event("input", { bubbles: true })); await T.sleep(400);
-      out.note1 = !$$("rb-clampnote").hidden && $$("rb-clampnote").textContent;
+      out.note0 = LR4RouterBuild.notes("mount").length === 0;
+      LR4RouterBuild.set("model.clamp", 140); await T.sleep(400);
+      out.note1 = LR4RouterBuild.notes("mount").join(" ");
       $$("rb-reset").click(); await T.sleep(200);
       out.dBack = +(bitTip(meshes.find((m) => m.userData.name === "Router_Bit")).z - tip0).toFixed(2);
-      // tabs: one section at a time; the ? follows the tab
-      const onSecs = () => [...document.querySelectorAll("#rte .rb-sec")].filter((s) => getComputedStyle(s).display !== "none").map((s) => s.dataset.sec);
-      document.querySelector('#rb-tabs [data-v="head"]').click();
-      out.tabs = [onSecs().join(), $$("rb-tab-q").dataset.help];
-      document.querySelector('#rb-tabs [data-v="colors"]').click();
-      out.tabs.push(onSecs().join(), $$("rb-tab-q").hidden ? "" : $$("rb-tab-q").dataset.help);
       // Close-up: router + mount + shoe top, no skirt / bristles / core; the core on its checkbox; Back = all again
       const shown = (re) => { const v = meshes.filter((m) => re.test(m.userData.name || "")).map((m) => m.visible); return v.length ? (v.every(Boolean) ? 1 : v.some(Boolean) ? 0.5 : 0) : -1; };
       out.coreN = meshes.filter((m) => m.userData.group === "Core" && !/^(Router_|Tool_Mount_|Dust_)/.test(m.userData.name || "")).map((m) => m.userData.name).slice(0, 3);
@@ -226,6 +220,24 @@ const ok = (cond, msg) => { checks++; console.log((cond ? "  ok   " : "  FAIL ")
       nm.value = "Kobalt test"; nm.dispatchEvent(new Event("input", { bubbles: true })); await T.sleep(400);
       ti.name = [LR4Routers.ROUTERS.kobalt.name, $$("rti-h").textContent];
       out.rti = ti;
+      const it = () => [...document.querySelectorAll("#rto .rto-b")].map((b) => b.dataset.id), to = { items: it().join() };
+      document.querySelector('#rto [data-id="housing"]').click(); await T.sleep(50);
+      to.pick = [RX.sel, LR4RouterInspect.part(), (document.querySelector("#rto [aria-current]") || {}).dataset.id];
+      $$("rto-add").click(); await T.sleep(50);
+      to.menu = [!$$("rto-menu").hidden, [...document.querySelectorAll("#rto-menu [data-add]")].map((b) => b.dataset.add).join()];
+      document.querySelector('#rto-menu [data-add="brushes"]').click(); await T.sleep(300);
+      to.added = [!!kbm().brushes, RX.sel, LR4RouterInspect.part(), it().includes("brushes"), $$("rto-menu").hidden];
+      document.querySelector('#rto [data-rm="brushes"]').click(); await T.sleep(300);
+      to.rm = [!!kbm().brushes, RX.sel, it().includes("brushes")];
+      $$("rb-undo").click(); await T.sleep(300);
+      to.rm.push(!!kbm().brushes, it().includes("brushes"));
+      rxPick("shaft_lock"); await T.sleep(50);
+      const boss = () => document.querySelector('#rti .rti-bool[data-k="has:lock.d"] input');
+      boss().checked = false; boss().dispatchEvent(new Event("change", { bubbles: true })); await T.sleep(300);
+      to.boss = [kbm().shaft_lock.d, rows().includes("model.shaft_lock.d")];
+      boss().checked = true; boss().dispatchEvent(new Event("change", { bubbles: true })); await T.sleep(300);
+      to.boss.push(kbm().shaft_lock.d, rows().includes("model.shaft_lock.d"));
+      out.outline = to;
       rxPick(null);
       document.querySelector('.rbx-views [data-v="front"]').click(); await T.sleep(450);
       $$("rb-reset").click(); await T.sleep(200);
@@ -242,7 +254,7 @@ const ok = (cond, msg) => { checks++; console.log((cond ? "  ok   " : "  FAIL ")
       $$("rb-core").checked = false;
       // undo / redo: steps (quick changes = one), the keys, New + Delete undone
       LR4Router.set({ router: "testbox" }); await T.sleep(100);
-      const hL = () => LR4Routers.ROUTERS.testbox.model.motor_cap.L, type = async (v, ms) => { const el = $$("rb-h-L"); el.value = v; el.dispatchEvent(new Event("input", { bubbles: true })); await T.sleep(ms); };
+      const hL = () => LR4Routers.ROUTERS.testbox.model.motor_cap.L, type = async (v, ms) => { LR4RouterBuild.set("model.motor_cap.L", v); await T.sleep(ms); };
       await type(100, 50); await type(110, 50); await type(120, 900); await type(130, 300);
       const u = { L: [hL()] };
       $$("rb-undo").click(); await T.sleep(100); u.L.push(hL());
@@ -287,14 +299,14 @@ const ok = (cond, msg) => { checks++; console.log((cond ? "  ok   " : "  FAIL ")
     ok(b.tr.look[0] === "rubber" && b.tr.look[1] === 0.88 && b.tr.look[2] === 0 && b.tr.look[3], `a look per part: a rubber housing, a blue collar (${JSON.stringify(b.tr.look)})`);
     const s = b.spin;
     ok(!s.ring && s.dialTris === 0 && s.body && Math.abs(s.d - 65) < 16, `the 65 mm spindle: no dial ring, its switch on, can ${s.d} across (with the plug) ${JSON.stringify(s)}`);
-    ok(s.canShown && s.gripHidden, "spindle inputs: the can shown, the motor housing hidden");
+    ok(s.canShown && s.gripHidden, "spindle: its housing is the can (no bottom chamfer)");
     ok(b.toSpin[0] === "spindle" && b.toSpin[1] === "gcode" && b.toRouter === 78, `Router -> Spindle (${b.toSpin}) -> Router (motor cap ${b.toRouter})`);
     ok(b.shoe0.every(Boolean) && !b.shoe1[0] && !b.shoe1[1] && b.shoe1[2] && b.optHose && b.shoe2,
       `mount None: shoe + hose hidden, the tool mount stays, the hose option off (${JSON.stringify([b.shoe0, b.shoe1, b.optHose, b.shoe2])})`);
     ok(b.clampDef === "36.5" && b.dTip === 11.5 && b.dNut === 11.5 && b.note0 && b.dBack === 0,
       `nut below the clamp 36.5 (the default: level with the core's bottom) -> 25: router + bit 11.5 higher, both clamps on the housing (${b.dNut}, ${b.dTip}), Reset back (${b.dBack})`);
     ok(/upper clamp is off the motor housing|clamps are off the motor housing/.test(b.note1 || ""), `clamp off the housing noted: ${b.note1}`);
-    ok(b.tabs.join() === "head,help-rb-head,colors,help-rb-colors", `tabs: one section shown, the ? follows (${b.tabs})`);
+
     const c = b.cu;
     ok(c[0] === 1 && c[1] === 1 && c[2] === 1 && c[3] === 0 && c[4] === 0 && c[5] === "true" && c[6] === false,
       `close-up: router, mount, shoe top; no skirt / bristles / core (${b.coreN}) ${JSON.stringify(c)}`);
@@ -316,7 +328,13 @@ const ok = (cond, msg) => { checks++; console.log((cond ? "  ok   " : "  FAIL ")
     ok(x.slide[1] === x.slide[0] + 10 && +x.slide[2] === x.slide[1], `the housing's length slider: ${x.slide}`);
     ok(x.head[0] === "motor_cap" && /^Length,Width,Height,Overall height,Top edges,/.test(x.head[1]), `click the motor cap: ${x.head}`);
     ok(x.off[0] === null && x.off[1] && !x.off[2] && x.off[3] === 1, `a click off the router lets it go (the inspector: the router), the mount solid again (${x.off})`);
-    const t = b.rti;
+    const t = b.rti, o = b.outline;
+    ok(/^router,mount,collet_nut,shaft,flats,bearing_cap,housing,vent,collar,motor_cap,dial,switch,shaft_lock/.test(o.items), `the outline: the Kobalt's parts nut up (${o.items})`);
+    ok(o.pick.join() === "housing,housing,housing", `picked from the outline: lit there, on the model, in the inspector (${o.pick})`);
+    ok(o.menu[0] && /brushes/.test(o.menu[1]) && !/shaft_lock/.test(o.menu[1]), `+ Add a part: what it hasn't got (${o.menu[1]})`);
+    ok(o.added.join() === "true,brushes,brushes,true,true", `brush caps added: on the router, picked (${o.added})`);
+    ok(o.rm.join() === "false,,false,true,true", `✕ takes them off (back to the router); Undo puts them back (${o.rm})`);
+    ok(o.boss[0] === 0 && !o.boss[1] && o.boss[2] > 0 && o.boss[3], `the lock's boss turned off (no "0 = none") and on (${o.boss})`);
     ok(t.win && t.end[0] === "end" && t.end[1] && t.end[2], `inspector: the window dial's rows; On the end there: the slot's instead (${JSON.stringify(t.end)})`);
     ok(t.look > 0.7, `inspector: the dial's color (blue ${t.look})`);
     ok(t.sw[0] === "switch" && t.sw[1] === "model.switch.down,looks.switch", `the switch is a part of its own (${t.sw})`);
