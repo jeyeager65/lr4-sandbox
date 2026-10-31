@@ -121,7 +121,7 @@
       }
       if (part === "dial") {                         // the wheel's centre, axis and the rim that shows (ref frame)
         const d = B.b.dial;
-        ud.dial = d && { c: LR4RouterBody.placeV(d.c, B.f), axis: LR4RouterBody.placeV(d.axis, B.f, true), out: LR4RouterBody.placeV(d.out, B.f, true), r: d.r, t: d.t, dome: d.dome, bevel: d.bevel };
+        ud.dial = d && { c: LR4RouterBody.placeV(d.c, B.f), axis: LR4RouterBody.placeV(d.axis, B.f, true), out: LR4RouterBody.placeV(d.out, B.f, true), r: d.r, t: d.t, ribs: d.ribs, dome: d.dome, bevel: d.bevel };
       }
       if (part === "shaft_lock" && B.b.z.lock) ud.lockDir = LR4RouterBody.placeV(B.b.z.lock.dir, B.f, true);
       out.push([dress(geo, null, false), rtMaterial(L), ud]);
@@ -168,18 +168,21 @@
     if (typeof renderBom === "function") renderBom();   // the BOM's router + mount rows (hose_bom.js)
   }
   const ringTheta = (d) => 90 + (d - LR4Routers.DIAL[0]) * LR4Routers.DIAL_STEP;   // deg round the cylinder (u x 360)
-  function ringLand(deg) {                           // on a number's land: |deg - its centre| < RING.land
+  // a dial's ridge pattern: n ridges between two numbers (dial.ribs, user 2026-10-31), the land round each number the
+  // old share of the pitch (n 7 = RING's pitch + land)
+  const ringPat = (n) => { const p = LR4Routers.DIAL_STEP / ((n ?? 7) + 1); return { pitch: p, land: p * RING.land / RING.pitch }; };
+  function ringLand(deg, P = RING) {                 // on a number's land: |deg - its centre| < P.land
     const D = LR4Routers.DIAL;
-    for (let d = D[0]; d <= D[1]; d++) { const k = Math.abs((((deg - ringTheta(d)) % 360) + 540) % 360 - 180); if (k < RING.land) return true; }
+    for (let d = D[0]; d <= D[1]; d++) { const k = Math.abs((((deg - ringTheta(d)) % 360) + 540) % 360 - 180); if (k < P.land) return true; }
     return false;
   }
   // radius out from the wheel at deg: lands flush with the ridge tops, grooves down to the wheel's own radius
-  const ringRise = (deg) => ringLand(deg) ? RING.rise * 0.8 : RING.rise * (1 - Math.abs(Math.sin(Math.PI * (deg - ringTheta(1)) / RING.pitch)));   // sharp crests
-  function rtRingGeo(r, h) {
+  const ringRise = (deg, P = RING) => ringLand(deg, P) ? RING.rise * 0.8 : RING.rise * (1 - Math.abs(Math.sin(Math.PI * (deg - ringTheta(1)) / P.pitch)));   // sharp crests
+  function rtRingGeo(r, h, P = RING) {
     const geo = new THREE.CylinderGeometry(r, r, h, 720, 16, true), p = geo.attributes.position, uv = geo.attributes.uv;
     for (let i = 0; i < p.count; i++) {              // (its top + bottom edges rounded over RING.round)
       const y = uv.getY(i) * h, q = Math.max(0, 1 - Math.min(y, h - y) / RING.round);
-      const th = uv.getX(i) * 2 * Math.PI, R = r + ringRise(uv.getX(i) * 360) * (1 - q) - RING.round * (1 - Math.sqrt(1 - q * q));
+      const th = uv.getX(i) * 2 * Math.PI, R = r + ringRise(uv.getX(i) * 360, P) * (1 - q) - RING.round * (1 - Math.sqrt(1 - q * q));
       p.setX(i, R * Math.sin(th)); p.setZ(i, R * Math.cos(th));
     }
     geo.computeVertexNormals();
@@ -190,12 +193,12 @@
   // numbers on it (geometry.userData.v = how far up the band). Same frame as rtRingGeo: axis z, centred, u = deg / 360.
   // A beveled one (the Makita's): the ridges run up the bevel too, the numbers flat on it, halfway up
   function rtDomeRingGeo(D) {
-    const prof = LR4RouterBody.dialProfile({ d: D.r * 2 + 0.1, t: D.t, dome: D.dome, bevel: D.bevel }, 16).slice(0, -1);
+    const prof = LR4RouterBody.dialProfile({ d: D.r * 2 + 0.1, t: D.t, dome: D.dome, bevel: D.bevel }, 16).slice(0, -1), P = ringPat(D.ribs);
     const s = [0];
     for (let j = 1; j < prof.length; j++) s.push(s[j - 1] + Math.hypot(prof[j][0] - prof[j - 1][0], prof[j][1] - prof[j - 1][1]));
     const N = 720, M = prof.length, pos = [], uv = [], idx = [];
     for (let j = 0; j < M; j++) for (let i = 0; i <= N; i++) {
-      const u = i / N, th = u * 2 * Math.PI, [r, h] = prof[j], R = r + ((D.bevel || h <= D.t / 2 + 1e-6) && h > 0 ? ringRise(u * 360) : 0);   // ridged rim (+ bevel), smooth dome
+      const u = i / N, th = u * 2 * Math.PI, [r, h] = prof[j], R = r + ((D.bevel || h <= D.t / 2 + 1e-6) && h > 0 ? ringRise(u * 360, P) : 0);   // ridged rim (+ bevel), smooth dome
       pos.push(R * Math.sin(th), -R * Math.cos(th), h - D.t / 2);
       uv.push(u, s[j] / s[M - 1]);
     }
@@ -215,22 +218,23 @@
     geo.userData.mm = { band: s[M - 1], circ: 2 * Math.PI * (j > 0 ? prof[j - 1][0] + f * (prof[j][0] - prof[j - 1][0]) : prof[0][0]), h: 2.6 };   // (the numbers' size)
     return geo;
   }
-  function rtRingTex(col, v, vRim, mm) {             // v: the numbers' height up the band (0 bottom .. 1 top); none = a plain rim;
+  function rtRingTex(col, v, vRim, mm, P = RING) {             // v: the numbers' height up the band (0 bottom .. 1 top); none = a plain rim;
     // mm: { band, circ, h } the band's length up + its circumference there (mm), the numbers' height: drawn true to size
     const c = document.createElement("canvas"), W = 2048, H = v ? 192 : 96, g = c.getContext("2d");
     c.width = W; c.height = H;
     g.fillStyle = col[0]; g.fillRect(0, 0, W, H);
     g.fillStyle = col[1];                            // the groove bottoms a little darker
-    for (let deg = ringTheta(1) + RING.pitch / 2 - 360; deg < 360; deg += RING.pitch) {
+    for (let deg = ringTheta(1) + P.pitch / 2 - 360; deg < 360; deg += P.pitch) {
       const x = ((deg % 360) + 360) % 360 / 360 * W;
-      if (!ringLand(deg)) g.fillRect(x - 3, vRim ? H * (1 - vRim) : 0, 6, H);   // (a domed band: on its rim only)
+      if (!ringLand(deg, P)) g.fillRect(x - 3, vRim ? H * (1 - vRim) : 0, 6, H);   // (a domed band: on its rim only)
     }
     const D = LR4Routers.DIAL;
     const px = W / mm.circ, sy = (H / mm.band) / px;   // canvas px per mm across; the band's px per mm up, relative
-    g.fillStyle = "#f4f4f4"; g.textAlign = "center"; g.textBaseline = "middle"; g.font = `bold ${Math.round(mm.h * px / 0.72)}px sans-serif`;
+    g.fillStyle = "#f4f4f4"; g.textAlign = "center"; g.textBaseline = "middle"; const nh = mm.h * Math.min(1.5, Math.sqrt(P.land / RING.land));   // (fewer ridges, a wider land: bigger numbers; 7 = as before)
+    g.font = `bold ${Math.round(nh * px / 0.72)}px sans-serif`;
     for (let d = D[0]; d <= D[1]; d++) {
       g.save(); g.translate(ringTheta(d) / 360 * W, v ? H * (1 - v) : H / 2); g.scale(1, sy);
-      g.fillText(String(d), 0, 0.04 * mm.h * px);
+      g.fillText(String(d), 0, 0.04 * nh * px);
       g.restore();
     }
     const t = new THREE.CanvasTexture(c);
@@ -271,16 +275,16 @@
         const pivot = new THREE.Object3D();          // x = the rim that shows, z = the wheel's axis
         pivot.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(ox, ax.clone().cross(ox), ax));
         pivot.position.set(...D.c);
-        ring = new THREE.Mesh(D.dome || D.bevel ? rtDomeRingGeo(D) : rtRingGeo(D.r + 0.05, D.t * 0.96), new THREE.MeshStandardMaterial({ roughness: 0.5, metalness: 0 }));
+        ring = new THREE.Mesh(D.dome || D.bevel ? rtDomeRingGeo(D) : rtRingGeo(D.r + 0.05, D.t * 0.96, ringPat(D.ribs)), new THREE.MeshStandardMaterial({ roughness: 0.5, metalness: 0 }));
         ring.castShadow = false;
         pivot.add(ring);
         dm.add(pivot);
         dm.userData.ring = ring;
       }
       ring.rotation.z = -LR4Routers.dialDeg(RT.set.dial) * Math.PI / 180;
-      const col = ringColor(RT.set.router), gv = ring.geometry.userData, key = [col.join(), gv.v, gv.vRim, gv.mm.band.toFixed(2), gv.mm.circ.toFixed(2)].join("|");   // one texture per look + size, kept
+      const col = ringColor(RT.set.router), gv = ring.geometry.userData, key = [col.join(), gv.v, gv.vRim, gv.mm.band.toFixed(2), gv.mm.circ.toFixed(2), D.ribs ?? 7].join("|");   // one texture per look + size, kept
       RT.texs = RT.texs || {};
-      if (!RT.texs[key]) RT.texs[key] = rtRingTex(col, gv.v, gv.vRim, gv.mm);
+      if (!RT.texs[key]) RT.texs[key] = rtRingTex(col, gv.v, gv.vRim, gv.mm, ringPat(D.ribs));
       if (ring.material.map !== RT.texs[key]) { ring.material.map = RT.texs[key]; ring.material.needsUpdate = true; }
     }
     const sel = $("rt-router"), man = LR4Routers.manual(RT.set.router);

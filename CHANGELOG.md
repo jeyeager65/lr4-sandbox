@@ -37,7 +37,10 @@ the date the model data was built and the Printables file set it was solved for.
   between sections **+ Section here** adds one there, shaped like the cut (the cap doesn't change until you edit it).
 - **Makita RT0701C:** its speed dial now sits in a window like the real one - a wheel lying flat in the cap, up near
   the top, showing through a U-shaped notch at the end (was a slot in the end face), with a beveled edge: the numbers
-  flat on the bevel, the grip ridges running up it to a flat top.
+  flat on the bevel, the grip ridges running up it to a flat top; square-edged window (no bevel), 4 ridges between
+  numbers with bigger numbers.
+- **Ridges between numbers:** a dial setting (default 7, as before); fewer ridges leave more room round each number,
+  and the numbers grow to fit.
 - **Beveled dial:** a new Numbers style for any dial - a straight bevel from the rim up to a flat top (Flat top sets
   how far in it runs), ridged all the way up, the numbers on the bevel.
 - **Window corner:** a dial in a window can have its corners rounded as seen from above (the bevel follows).

@@ -188,7 +188,7 @@
       : dp.place === "top" ? z0 + H / 2 : Math.min(z0 + H * 0.4, dial.at[2] - t / 2 - sh / 2 - 3);
     return Object.assign({}, m, {
       cap: Object.assign({ at, L: h.L, W: h.W, r: [rb, rf], z: [z0, z1], top_r: e, bot_r: Math.min(h.bot_r ?? 2, H / 2 - e) }, h.shape ? { shape: h.shape } : {}),
-      dial: Object.assign(dial, dp.at ? { at: dp.at } : {}, { ring: dp.ring, dome: dp.style === "dome" ? { top: Math.min(dp.dome ? dp.dome.top ?? 0.45 : 0.45, 0.95) } : null,
+      dial: Object.assign(dial, dp.at ? { at: dp.at } : {}, { ring: dp.ring, ribs: dp.ribs ?? 7, dome: dp.style === "dome" ? { top: Math.min(dp.dome ? dp.dome.top ?? 0.45 : 0.45, 0.95) } : null,
         bevel: dp.style === "bevel" ? { top: Math.min(dp.bevel ? dp.bevel.top ?? 0.6 : 0.6, 0.95) } : null }),
       switch: Object.assign({ at: [(h.shape ? (CS.ends(h.shape, swz - z0) || [0, x1])[1] : x1) + 0.75, at[1], swz], size: [1.5, sw, sh], rocker: [3.0, sw * 0.7, sh * 0.65] }, m.switch),
       strain_relief: Object.assign({ at: [h.shape ? (CS.ends(h.shape, H * 0.6) || [at[0] - h.L / 2])[0] : at[0] - h.L / 2, at[1], z0 + H * 0.6], l: 40.0, d: 12.0, bend: 45.0 }, m.strain_relief),
@@ -441,7 +441,7 @@
       const cutter = band && CSG.union(opening, band);
       if (cutter) return CSG.subtract(capM, cutter);
     }
-    let r = CSG.subtract(capM, heightSolid(xs, ys, zb, zl));
+    let r = bv > 0 ? CSG.subtract(capM, heightSolid(xs, ys, zb, zl)) : capM;   // (no bevel: just the opening - the sampled top left slivers)
     if (r) r = CSG.subtract(r, opening);
     return r;
   }
@@ -669,7 +669,7 @@
       }
     }
     const { cord } = cordParts(P, m.strain_relief, m.cord);
-    return { parts: P, dial: { c: D.at, axis: ax, out, r: D.d / 2, t: D.t, ring: D.ring || null, dome: D.dome, bevel: D.bevel || null }, cord, rocker, top, z: Z };
+    return { parts: P, dial: { c: D.at, axis: ax, out, r: D.d / 2, t: D.t, ring: D.ring || null, ribs: D.ribs ?? 7, dome: D.dome, bevel: D.bevel || null }, cord, rocker, top, z: Z };
   }
   // a spindle (user 2026-10-29: some run a 65 mm spindle instead of a router): the nut, shaft, bearing cap and the
   // can (housing) up to the top, a dark end cap (motor_cap) on it; air-cooled: a fan grille on top, water-cooled: two

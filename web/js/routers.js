@@ -160,6 +160,7 @@
       // share of the radius); the slot it shows through + the surround round that (Part 46d: end / top; js/router_body.js)
       m.dial.style = ["dome", "bevel"].includes(D.style) ? D.style : "rim";
       if (m.dial.style === "dome") m.dial.dome = { top: num(obj(D.dome) && D.dome.top, 0, 0.95, 0.45) };
+      m.dial.ribs = Math.round(num(D.ribs, 1, 12, 7));   // ridges between two numbers (the land round each number grows with their spacing)
       if (m.dial.style === "bevel") m.dial.bevel = { top: num(obj(D.bevel) && D.bevel.top, 0, 0.95, 0.6) };   // (the Makita's: a straight bevel, user 2026-10-31)
       if (m.dial.place !== "window") {
         const Sl = obj(D.slot), Su = obj(D.surround) || {}, kind = ["sunk", "raised"].includes(Su.kind) ? Su.kind : "none";

@@ -120,6 +120,8 @@
   row("dial", "Window", "model.dial.win.open", "Open at the end (a notch)", "bool", { when: win });
   row("dial", "Numbers", "model.dial.style", "Numbers", "choice", { opts: [["rim", "On the rim"], ["dome", "On a domed top"], ["bevel", "On a beveled edge"]],
     help: "On the rim (between its ridges), on a domed top (the wheel's upper half rounds up to a flat top), or on a beveled edge (a straight slope up to a flat top, the ridges running up it - the Makita's). Domed and beveled dials show best in a window." });
+  row("dial", "Numbers", "model.dial.ribs", "Ridges between numbers", "count", { min: 1, max: 12, step: 1,
+    help: "The grip ridges between two numbers. Fewer = wider ridges and more room round each number." });
   row("dial", "Numbers", "model.dial.bevel.top", "Flat top", "num", { unit: "x r", min: 0, max: 0.95, step: 0.05, when: (m) => m.dial && m.dial.style === "bevel",
     help: "The flat top's share of the radius: the bevel runs from the rim in to it." });
   row("dial", "Numbers", "model.dial.dome.top", "Flat top", "num", { unit: "x r", min: 0, max: 0.95, step: 0.05, when: (m) => m.dial && m.dial.style === "dome",
