@@ -1,6 +1,6 @@
-# LowRider4 - export the built assembly for the browser viewer (exports/web/), headless:
+# LowRider4 - export the built assembly as browser data (exports/web/), headless:
 #   python tools/run.py freecad/export_web.py
-# Writes, for the viewer (LowRider4_local.html, served by tools/serve.py viewer), geo/<part>.bin (per part float32
+# Writes geo/<part>.bin (per part float32
 # positions [+ uv] + uint16/uint32 triangle indices) + lr4_local.json (names, groups, colours, motion, travel limits).
 # STL meshes go in at full resolution, solids tessellated.
 
@@ -318,7 +318,5 @@ for pt in parts:
     open(os.path.join(out_dir, fn), "wb").write(blob[a:b])
     loc_parts.append(rebased(pt, a, file=fn, bytes=b - a))
 json.dump(dict(meta, parts=loc_parts, triangles=ntris(loc_parts)), open(os.path.join(out_dir, "lr4_local.json"), "w"), indent=0)
-# the page: web/viewer.html, copied next to its data (served by tools/serve.py viewer)
-shutil.copyfile(os.path.join(ROOT, "web", "viewer.html"), os.path.join(out_dir, "LowRider4_local.html"))
 print(f"{len(loc_parts)} parts, {ntris(loc_parts)} triangles, {len(blob) / 1e6:.1f} MB in geo/ -> {out_dir}")
 print(f"[time] variants + write: {time.time() - t_out:.1f} s")

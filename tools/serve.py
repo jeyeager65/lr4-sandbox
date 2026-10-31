@@ -5,9 +5,6 @@
 #   (--no-open: serve only, e.g. for tools/record_demo.js)
 #   (--lan: also to other computers on the network; private/ and dotfiles are refused. Plain http from another
 #    machine is not a secure context, so FluidNC in the browser needs that origin allowed in the browser's flags)
-#   python tools/serve.py viewer               exports/web on http://127.0.0.1:8765 (full detail; refresh it with
-#                                              freecad/export_web.py)
-# The viewer's page comes from export_web (web/viewer.html copied next to its data).
 # Both send COOP / COEP (credentialless, so the CDN scripts still load): the page is cross-origin isolated, which
 # FluidNC in the browser needs (SharedArrayBuffer). A plain static host gets the same from web/coi-serviceworker.js.
 import functools
@@ -40,8 +37,7 @@ class Isolated(http.server.SimpleHTTPRequestHandler):
 LAN = "--lan" in sys.argv
 
 
-PAGES = {"sandbox": (ROOT, 8767, "web/index.html"),
-         "viewer": (os.path.join(ROOT, "exports", "web"), 8765, "LowRider4_local.html")}
+PAGES = {"sandbox": (ROOT, 8767, "web/index.html")}
 
 
 if __name__ == "__main__":
@@ -50,10 +46,10 @@ if __name__ == "__main__":
     which = args[0] if args else ""
     which = {"configurator": "sandbox"}.get(which, which)   # the page's old name
     if which not in PAGES:
-        sys.exit("usage: python tools/serve.py sandbox [WxH] | viewer")
+        sys.exit("usage: python tools/serve.py sandbox [WxH]")
     folder, port, page = PAGES[which]
     if not os.path.exists(os.path.join(folder, page)):
-        sys.exit(f"{os.path.join(folder, page)} not found - run: python tools/run.py freecad/export_web.py")
+        sys.exit(f"{os.path.join(folder, page)} not found")
     url = f"http://127.0.0.1:{port}/{page}" + ("?parts=/parts/" if which == "sandbox" else "") + (f"#{args[1]}" if len(args) > 1 else "")
     handler = functools.partial(Isolated, directory=folder)
     server = http.server.ThreadingHTTPServer(("0.0.0.0" if LAN else "127.0.0.1", port), handler)

@@ -2,7 +2,7 @@
 # public; user 2026-10-30: "a current dev version, not the one on
 # GitHub Pages ... direct from here, not a GitHub Action"). Builds the site from the WORKING TREE's web/ (uncommitted
 # changes and new files too - but only files git tracks or would track: nothing ignored, no part / CAD file), the same
-# way pages.yml does (viewer.html out, stamped for cache busting), plus Cloudflare's _headers (the cross-origin
+# way pages.yml does (stamped for cache busting), plus Cloudflare's _headers (the cross-origin
 # isolation FluidNC's threads need, sent for real; noindex) and uploads it with wrangler (the first deploy makes the
 # Worker; signed in once with npx wrangler login).
 #   python tools/deploy_dev.py --dry        build build/dev-site only (look before you send)
@@ -41,7 +41,7 @@ def build():
         shutil.rmtree(OUT)
     n = 0
     for f in files:
-        if f == "web/viewer.html" or not os.path.isfile(os.path.join(ROOT, f)):   # (a tracked file deleted here: left out)
+        if not os.path.isfile(os.path.join(ROOT, f)):   # (a tracked file deleted here: left out)
             continue
         dst = os.path.join(OUT, os.path.relpath(f, "web"))
         os.makedirs(os.path.dirname(dst), exist_ok=True)

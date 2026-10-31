@@ -2,7 +2,7 @@
 // The page's scripts share one global scope (js/page/*.js, loaded in order by index.html): names declared
 // at the top level here are seen by the later files.
   // ---- version + feedback: the issue link carries the size, data date and the loaded files' checksums ----
-  const VERSION = "0.63.0";
+  const VERSION = "0.64.0";
   function setupAbout() {
     const bits = [`lr4-sandbox ${VERSION}`];
     if (cfg.built) bits.push(`model data built ${cfg.built}`);
@@ -424,7 +424,7 @@
       const l = Math.hypot(gx, gy, 1);
       n[3 * k] = -gx / l; n[3 * k + 1] = -gy / l; n[3 * k + 2] = 1 / l;
     }
-    for (const a of [P, N]) { a.updateRange = { offset: j0 * vx * 3, count: (j1 - j0 + 1) * vx * 3 }; a.needsUpdate = true; }
+    for (const a of [P, N]) { a.clearUpdateRanges(); a.addUpdateRange(j0 * vx * 3, (j1 - j0 + 1) * vx * 3); a.needsUpdate = true; }
     sim.clearDirty();
   }
   function jobMoves(tl, at) {                        // every move as a line: faint ahead, solid once done (drawRange)

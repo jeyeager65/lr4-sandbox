@@ -238,7 +238,7 @@
       g.restore();
     }
     const t = new THREE.CanvasTexture(c);
-    t.encoding = THREE.sRGBEncoding;
+    t.colorSpace = THREE.SRGBColorSpace;
     t.anisotropy = 4;
     return t;
   }
@@ -254,7 +254,7 @@
       g.beginPath(); g.arc(W * 0.3, H / 2, H * 0.12, 0, 2 * Math.PI); g.stroke();   // O (off) on the -y half, I (on) on the +y
       g.fillRect(W * 0.7 - H * 0.0225, H * 0.37, H * 0.045, H * 0.26);
       const t = new THREE.CanvasTexture(c);
-      t.encoding = THREE.sRGBEncoding;
+      t.colorSpace = THREE.SRGBColorSpace;
       p = m.userData.faceObj = new THREE.Mesh(new THREE.PlaneGeometry(R.size[1], R.size[2]),
         new THREE.MeshStandardMaterial({ map: t, transparent: true, roughness: 0.6, polygonOffset: true, polygonOffsetFactor: -2 }));
       p.castShadow = false;

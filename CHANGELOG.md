@@ -3,6 +3,12 @@
 The version is the sandbox page's (`VERSION` in `web/js/page/job.js`, shown in its footer). The footer also shows
 the date the model data was built and the Printables file set it was solved for.
 
+## 0.64.0 - 2026-10-31
+- **three.js r187** (was r147), shipped with the page instead of fetched from a CDN. The first visit's "Compiling
+  shaders" step is much shorter (about 1 s, was about 7 s), and the page stays responsive while it runs.
+- Metals, wood and the workshop look as before; shadows and shiny parts differ slightly. The plain background
+  behind the machine (Inspect, the router editor) is now the theme's color as designed; it used to be drawn darker.
+
 ## 0.63.0 - 2026-10-31
 - **Router editor, views as a camera:** Front / Right / Top / Iso turn the camera there (animated); you can always
   drag to orbit, pan and zoom, and dragging away from a view just leaves it. **Flat** is a narrow lens for reading

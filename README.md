@@ -322,8 +322,7 @@ Needs FreeCAD 1.1 or newer and Python 3.
 
 ```sh
 python tools/run.py freecad/build.py         # build the machine (~1.5 min with warm caches, ~4 min cold)
-python tools/run.py freecad/export_web.py    # web viewer data from the last build
-python tools/serve.py viewer                 # look at it in the browser
+python tools/run.py freecad/export_web.py    # browser data (exports/web) from the last build
 ```
 
 `tools/run.py` finds `freecadcmd` on Windows, macOS and Linux (or set `FREECAD_CMD`). Set the cutting area at the
@@ -413,7 +412,7 @@ Where to buy column. What changed per version: [CHANGELOG.md](CHANGELOG.md).
 ```
 freecad/    the model: build.py, lr4.py (measured placements), hardware.py, bom.py, checks, export, CAM
   fclib/    shared FreeCAD helpers (vendored copy)
-web/        the page (index.html), the viewer (viewer.html), js/
+web/        the page (index.html), js/
   data/     the page's data from the pipeline (placements and our own hardware meshes; no V1E geometry)
   fluidnc/  FluidNC built for the browser (GPL-3.0)
 pipeline/   FreeCAD builds -> the page's data

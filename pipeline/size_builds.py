@@ -66,8 +66,6 @@ def make_copy(tag, cx, cy, temp=False):
                     ignore=shutil.ignore_patterns("__pycache__"))
     shutil.copytree(os.path.join(PROJ, "build", "cache"), os.path.join(dst, "build", "cache"))
     os.makedirs(os.path.join(dst, "exports", "web"))
-    os.makedirs(os.path.join(dst, "web"))
-    shutil.copy(os.path.join(PROJ, "web", "viewer.html"), os.path.join(dst, "web"))
     parts = os.path.join(PROJ, "parts").replace("\\", "/")
     patch(os.path.join(dst, "freecad", "lr4.py"), [(r'^PARTS = .*$', f'PARTS = r"{parts}"')])
     patch(os.path.join(dst, "freecad", "build.py"), [(r'^CUT_X_IN = [0-9.]+', f"CUT_X_IN = {cx}"),

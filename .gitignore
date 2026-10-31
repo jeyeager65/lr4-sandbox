@@ -12,7 +12,7 @@ tests/node_modules/
 parts/*
 !parts/manifest.json
 # V1E calculator JS + Vector76's SCAD - not ours to redistribute
-vendor/
+/vendor/
 # OpenSCAD golden outputs (local-only tests)
 tests/golden/
 *.stl

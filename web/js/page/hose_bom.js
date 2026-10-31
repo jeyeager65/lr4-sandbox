@@ -97,7 +97,7 @@
     for (const o of [-64, 0, 64]) { g.beginPath(); g.moveTo(o, 0); g.lineTo(o + 64, 64); g.stroke(); }
     hoseWire = new THREE.CanvasTexture(c);
     hoseWire.wrapS = hoseWire.wrapT = THREE.RepeatWrapping;
-    hoseWire.encoding = THREE.sRGBEncoding;
+    hoseWire.colorSpace = THREE.SRGBColorSpace;
     const mat = new THREE.MeshStandardMaterial({ map: hoseWire, transparent: true, depthWrite: false,
       roughness: 0.25, metalness: 0.1, side: THREE.DoubleSide });
     hoseMesh = new THREE.Mesh(new THREE.BufferGeometry(), mat);

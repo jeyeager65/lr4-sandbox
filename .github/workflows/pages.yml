@@ -2,8 +2,7 @@
 # Pages turned on in the repo settings (Source: GitHub Actions).
 # The site is web/ as committed: index.html, js/, data/ (the share data: no V1E geometry - visitors load their own
 # part files), fluidnc/ + fluidtouch/ (the firmware builds, with their licenses), models/ (the pendant meshes) and
-# coi-serviceworker.js (cross-origin isolation for FluidNC's threads; Pages can't send the headers). viewer.html is
-# left out: it's the FreeCAD model's viewer and needs local exports.
+# coi-serviceworker.js (cross-origin isolation for FluidNC's threads; Pages can't send the headers).
 name: Pages
 
 on:
@@ -38,7 +37,6 @@ jobs:
         run: |
           mkdir -p _site
           cp -r web/. _site/
-          rm -f _site/viewer.html
           # cache busting: Pages serves everything with max-age=600; ?v=<commit> on the page's files and loads
           python tools/stamp_build.py _site/index.html "${GITHUB_SHA::7}"
 

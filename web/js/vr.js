@@ -145,7 +145,7 @@
       const c = document.createElement("canvas");
       c.width = w; c.height = h;
       const tex = new THREE.CanvasTexture(c);
-      tex.encoding = THREE.sRGBEncoding;
+      tex.colorSpace = THREE.SRGBColorSpace;
       const mesh = new THREE.Mesh(new THREE.PlaneGeometry(1, h / w),
         new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthTest: false, toneMapped: false }));
       return { c, g: c.getContext("2d"), tex, mesh, w, h, lay: { buttons: [], texts: [] } };

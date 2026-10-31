@@ -25,19 +25,19 @@
   const statusEl = document.getElementById("status");
   const css = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: true });
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: true, stencil: true });   // stencil: Inspect's section caps (off by default since r163)
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-  renderer.outputEncoding = THREE.sRGBEncoding;
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;   // filmic: highlights roll off instead of clipping
   renderer.toneMappingExposure = 0.7;
   renderer.shadowMap.enabled = true;                  // the sun's soft shadows (off in Lite: setupDetail)
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.shadowMap.type = THREE.PCFShadowMap;   // soft since r181 (PCFSoftShadowMap: removed)
   renderer.localClippingEnabled = true;             // straight belt runs are cut at the moving gantry / core
   const scene = new THREE.Scene();
 
   // ---- metals: they only look like metal when they have something to reflect, so the metal parts get a soft
   // studio environment (RoomEnvironment) as their envMap; the XZ plates also get a fine brushed grain ----
-  const envMap = new THREE.PMREMGenerator(renderer).fromScene(new THREE.RoomEnvironment(), 0.04).texture;
+  const envMap = new THREE.PMREMGenerator(renderer).fromScene(new THREE.RoomEnvironment(renderer), 0.04).texture;
   // the EMT (galvanized): a soft studio instead - a smooth bright-top / dark-floor gradient + one broad glow, Z up.
   // RoomEnvironment is a box room (Y up): a cylinder mirrors its walls as flat bands with hard steps, so the tubes read
   // as rounded squares (user 2026-10-25)
@@ -83,7 +83,7 @@
     }
     const t = new THREE.CanvasTexture(c);
     t.wrapS = t.wrapT = THREE.RepeatWrapping;
-    t.encoding = THREE.sRGBEncoding;
+    t.colorSpace = THREE.SRGBColorSpace;
     return t;
   })();
   const FINISH = {                                    // colour (sRGB), roughness; fully metallic unless m
@@ -150,7 +150,7 @@
     g.putImageData(img, 0, 0);
     const t = new THREE.CanvasTexture(c);
     t.wrapS = t.wrapT = THREE.RepeatWrapping;
-    t.encoding = THREE.sRGBEncoding;
+    t.colorSpace = THREE.SRGBColorSpace;
     return t;
   })();
   const threadV = (() => {                            // per-part UVs from export_web: u = along / pitch, v = starts x turns
@@ -166,7 +166,7 @@
     g.putImageData(img, 0, 0);
     const t = new THREE.CanvasTexture(c);
     t.wrapS = t.wrapT = THREE.RepeatWrapping;
-    t.encoding = THREE.sRGBEncoding;
+    t.colorSpace = THREE.SRGBColorSpace;
     return t;
   })();
   function threadUV(g, lead) {                        // u = axial / lead, v = turns round the longest axis
@@ -231,18 +231,20 @@
     if (camera.near !== near || camera.far !== far) { camera.near = near; camera.far = far; camera.updateProjectionMatrix(); }
   }
   // light: the studio environment lights every surface (soft, directional ambient), a weak sky / ground fill, and a
-  // sun that casts soft shadows (fitted to the table in updateShop)
+  // sun that casts soft shadows (fitted to the table in updateShop). Intensities in three's physical units since r155:
+  // LIGHT_PI x the r147 (legacy) numbers below keeps the look (the RectAreaLights were never scaled)
+  const LIGHT_PI = Math.PI;
   scene.environment = envMap;
-  const hemi = new THREE.HemisphereLight(0xffffff, 0x6b6157, 0.3);
+  const hemi = new THREE.HemisphereLight(0xffffff, 0x6b6157, 0.3 * LIGHT_PI);
   scene.add(hemi);
-  const sun = new THREE.DirectionalLight(0xfff4e6, 1.1);
+  const sun = new THREE.DirectionalLight(0xfff4e6, 1.1 * LIGHT_PI);
   sun.position.set(-900, -1400, 1500);
   sun.castShadow = true;
   Object.assign(sun.shadow, { bias: -0.0002, normalBias: 1.2 });   // mm: no acne on the double-sided parts
   sun.shadow.mapSize.set(4096, 4096);
   scene.add(sun, sun.target);
   const SUN_DIR = new THREE.Vector3(-900, -1400, 1500).normalize();   // lower than straight overhead: shadows you can see
-  const fill = new THREE.DirectionalLight(0xffffff, 0.25);
+  const fill = new THREE.DirectionalLight(0xffffff, 0.25 * LIGHT_PI);
   fill.position.set(1600, 2000, 600);
   scene.add(fill);
 
@@ -255,6 +257,9 @@
   const LIGHT = { mode: "", shop: null, rig: new THREE.Group(), saved: null };
   scene.add(LIGHT.rig);
   const lightQ = () => LIGHT.saved || (lite ? "simple" : "real");
+  // the studio environment at 0.3 (the plain parts, the shop): since r163 envMapIntensity only scales a material's own
+  // envMap, so these carry scene.environment as theirs (userData.envLow), and lighting() keeps it in step (off in Simple)
+  function envLow(mat) { Object.assign(mat, { envMap: scene.environment, envMapIntensity: 0.3 }); mat.userData.envLow = true; return mat; }
   function lighting() {
     const real = lightQ() === "real", inShop = real && !!(shop && shop.visible && shop.userData.lamps);
     const mode = real ? (inShop ? "shop" : "studio") : "simple";
@@ -262,12 +267,13 @@
     Object.assign(LIGHT, { mode, shop: inShop ? shop : null, lite });
     for (const l of [...LIGHT.rig.children]) { LIGHT.rig.remove(l); if (l.dispose) l.dispose(); }
     scene.environment = real ? envMap : null;
+    scene.traverse((o) => { const m = o.material; if (m && m.userData && m.userData.envLow && m.envMap !== scene.environment) { m.envMap = scene.environment; m.needsUpdate = true; } });
     renderer.toneMapping = real ? THREE.ACESFilmicToneMapping : THREE.NoToneMapping;
     renderer.toneMappingExposure = real ? 0.7 : 1.0;
     sun.visible = fill.visible = !inShop;
-    sun.intensity = real ? 1.1 : 0.75;
+    sun.intensity = (real ? 1.1 : 0.75) * LIGHT_PI;
     sun.castShadow = real && !inShop && !lite;
-    hemi.intensity = !real ? 0.85 : inShop ? 0.18 : 0.3;
+    hemi.intensity = (!real ? 0.85 : inShop ? 0.18 : 0.3) * LIGHT_PI;
     if (!inShop) return;
     const ud = shop.userData, LED = 0xfff6ea;           // ~4000 K strips
     for (const L of ud.lamps) {                       // soft light from each strip's lens, facing down
@@ -278,7 +284,7 @@
     }
     const ms = ud.lamps.filter((L) => L.machine);
     const x = ms.reduce((t, L) => t + L.x, 0) / ms.length, y = ms.reduce((t, L) => t + L.y, 0) / ms.length, z = ms[0].z - 10;
-    const spot = new THREE.SpotLight(LED, 0.55, 0, Math.PI / 2.4, 0.95, 0);   // the shadows: from between the machine's strips
+    const spot = new THREE.SpotLight(LED, 0.55 * LIGHT_PI, 0, Math.PI / 2.4, 0.95, 0);   // the shadows: from between the machine's strips
     spot.position.set(x, y, z);
     spot.target.position.set(x, y, ud.garage.z);
     spot.castShadow = !lite;
@@ -286,7 +292,7 @@
     spot.shadow.mapSize.set(4096, 4096);
     Object.assign(spot.shadow.camera, { near: 150, far: z - ud.garage.z + 200 });
     LIGHT.rig.add(spot, spot.target);
-    const day = new THREE.DirectionalLight(0xdfe9ff, 0.35);   // daylight through the open garage door
+    const day = new THREE.DirectionalLight(0xdfe9ff, 0.35 * LIGHT_PI);   // daylight through the open garage door
     day.position.set(x, ud.garage.y + 6000, ud.garage.z + 1800);
     day.target.position.set(x, y, ud.garage.z);
     LIGHT.rig.add(day, day.target);
@@ -323,7 +329,7 @@
     grad.addColorStop(1, css("--scene-bottom") || "#f1f2f3");
     g.fillStyle = grad; g.fillRect(0, 0, 2, 256);
     const tex = new THREE.CanvasTexture(c);
-    tex.encoding = THREE.sRGBEncoding;
+    tex.colorSpace = THREE.SRGBColorSpace;
     scene.background = tex;
   }
   paintBackground();
@@ -584,7 +590,8 @@
     }
     const mat = new THREE.MeshStandardMaterial({
       color: new THREE.Color().setRGB(...color).convertSRGBToLinear(),
-      roughness: 0.6, metalness: 0.0, envMapIntensity: 0.3, side: THREE.DoubleSide});
+      roughness: 0.6, metalness: 0.0, envMap: scene.environment, envMapIntensity: 0.3, side: THREE.DoubleSide});
+    mat.userData.envLow = true;                     // (lighting(): its envMap follows scene.environment)
     if (grain) Object.assign(mat, { map: woodTex(grain), bumpMap: woodTex(grain), bumpScale: 0.25, roughness: 0.75 });
     return mat;
   }
@@ -875,7 +882,7 @@ float lr4G(float x) { float s = 2.0 * fract(x) - 1.0; return floor(x) / 3.0 + (s
     ctx.putImageData(img, 0, 0);
     const tex = new THREE.CanvasTexture(cv);
     tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-    tex.encoding = THREE.sRGBEncoding;
+    tex.colorSpace = THREE.SRGBColorSpace;
     tex.anisotropy = 8;
     return (woodTexs[kind] = tex);
   }
@@ -983,7 +990,7 @@ float lr4G(float x) { float s = 2.0 * fract(x) - 1.0; return floor(x) / 3.0 + (s
       const canvas = document.createElement("canvas");
       [canvas.width, canvas.height] = info.screen.px;
       const tex = new THREE.CanvasTexture(canvas);
-      tex.encoding = THREE.sRGBEncoding;
+      tex.colorSpace = THREE.SRGBColorSpace;
       tex.anisotropy = 4;
       pendant = { info, geos, screen: { geo: sg, canvas, tex, key: "" } };
       if (meta) rebuild();
@@ -1122,7 +1129,7 @@ float lr4G(float x) { float s = 2.0 * fract(x) - 1.0; return floor(x) / 3.0 + (s
     g.font = `${3.6 * k}px sans-serif`;
     for (const x of [SWP.router, SWP.vac]) { g.fillText("I", X(x), Z(21)); g.fillText("O", X(x), Z(-20.5)); }
     const tex = new THREE.CanvasTexture(c);
-    tex.encoding = THREE.sRGBEncoding;
+    tex.colorSpace = THREE.SRGBColorSpace;
     tex.anisotropy = 4;
     return tex;
   }
@@ -1251,7 +1258,7 @@ float lr4G(float x) { float s = 2.0 * fract(x) - 1.0; return floor(x) / 3.0 + (s
     shopRoom = R;
     if (shopVR) {
       shop = LR4Shop.build(THREE, { room: R, table, machine, floor, empty: scenery === "empty" });   // Empty shop: no furniture
-      shop.traverse((o) => { if (o.isMesh) { o.receiveShadow = true; if (o.material.isMeshStandardMaterial) o.material.envMapIntensity = 0.3; } });
+      shop.traverse((o) => { if (o.isMesh) { o.receiveShadow = true; if (o.material.isMeshStandardMaterial) envLow(o.material); } });
       scene.add(shop); shop.visible = !INSPECT;
     }
     const c = tb.getCenter(new THREE.Vector3()), r = Math.max(tb.getSize(new THREE.Vector3()).length(), mb.getSize(new THREE.Vector3()).length()) * 0.6;
@@ -1317,11 +1324,14 @@ float lr4G(float x) { float s = 2.0 * fract(x) - 1.0; return floor(x) / 3.0 + (s
       [`Placing the ${cfg.parts.length} parts`, setupSize],
       ["Bill of materials", () => { setupVariants(); setupBristles(); setupBom(); setupAbout(); }],
       ["Workshop and lights", () => { setupScenery(); setupLighting(); updateShop(); fitView([1, -1.15, 0.85]); }],
-      ["Compiling shaders (first frame)", () => { lighting(); renderer.compile(scene, camera); renderer.render(scene, camera); }]];
+      ["Compiling shaders (first frame)", async () => { lighting(); await renderer.compileAsync(scene, camera); renderer.render(scene, camera); }]];   // compileAsync: the programs in parallel (KHR_parallel_shader_compile), the page not frozen meanwhile
+    const times = window.LR4LoadTimes = [["Download + unpack", performance.now()]];   // ms per stage (tools/three_shots.js)
     for (const [i, [what, run]] of stages.entries()) {
       progress("Building the machine…", i / stages.length, what);
       await nextFrame();
+      const t = performance.now();
       await run((f, detail) => progress("Building the machine…", (i + f) / stages.length, detail));
+      times.push([what, performance.now() - t]);
     }
     progress("Building the machine…", 1, "Done");
     building = false;

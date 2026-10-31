@@ -43,7 +43,7 @@
     c.width = w; c.height = h;
     draw(c.getContext("2d"), w, h);
     const t = new THREE.CanvasTexture(c);
-    t.encoding = THREE.sRGBEncoding;
+    t.colorSpace = THREE.SRGBColorSpace;
     t.wrapS = t.wrapT = THREE.RepeatWrapping;
     t.anisotropy = 4;
     if (repeat) t.repeat.set(...repeat);

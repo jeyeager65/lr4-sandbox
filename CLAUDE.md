@@ -43,8 +43,7 @@ across many FreeCAD builds. See README.md for the layout. FreeCAD 1.1, Python 3,
 - After a model change that the sandbox page shows: `python pipeline/size_builds.py` (~55 min) ->
   `python pipeline/fit_config.py` -> `node tests/test_config_model.js` (must print "all N sizes match";
   it fails when there are no size builds to compare).
-- Pages: `python tools/serve.py sandbox` / `python tools/serve.py viewer`. Edit the viewer in
-  `web/viewer.html` (export_web copies it into exports/web).
+- Page: `python tools/serve.py sandbox`.
 - Page tests: `tests/test_page_*.js` drive headless Chrome (several need `parts/`; the FluidNC ones take minutes).
   Screenshots: `node tools/page_shot.js <url> <out.png> [--eval js --shot out2.png]...`.
 - Videos: `python tools/serve.py sandbox --no-open`, then `node tools/record_demo.js <file.gcode> [out.mp4]` in the
