@@ -202,6 +202,7 @@
     $("sum-rt").textContent = r.name; $("rte-h").textContent = r.name;
     rbTab(RB.tab);
     if (typeof rxTick === "function") rxTick();     // the numbers on the model, now
+    if (typeof rtiShow === "function") rtiShow();   // the inspector (router_inspect.js)
   }
   function rbLists() {                               // Run's router list + the job's speed-table list, from ROUTERS again
     $("rt-router").length = 0;                       // (rtLook fills it)
@@ -267,6 +268,56 @@
     rbApply(id, p, now);
   }
   function rbMsg(t) { const el = $("rb-msg"); el.textContent = t; el.hidden = !t; }
+  // one setting changed (Part 48b: the inspector and the fields both come here; k = an LR4RouterSchema row's): the
+  // builder's rules - the cap sits on the turned part (overall = its top + H), a section / transition set before
+  // there's one is made, router <-> spindle swaps the model. A number rebuilds when typing pauses, a choice now.
+  function rbSet(k, v) {
+    const now = typeof v !== "number";
+    if (k === "kind") return rbKindSet(v);
+    if (k === "name") return rbEdit((p) => { p.name = String(v).slice(0, 40) || "My router"; });
+    if (k === "mount") return rbEdit((p) => { p.mount = v; }, true);
+    if (k === "source") return rbEdit((p) => { p.source = v; if (v === "gcode" && !p.s) p.s = [10000, 30000]; }, true);
+    if (k === "model.collet.sizes") {
+      const a = String(v).split(/[,;\s]+/).map(Number).filter((x) => x > 0);
+      if (a.length) rbEdit((p) => { p.model.collet.sizes = a; }, true);
+      return;
+    }
+    if (k.startsWith("model.dial.surround.")) {
+      const f = k.slice(20);
+      return rbEdit((p) => { p.model.dial.surround = Object.assign({ kind: "none" }, p.model.dial.surround, { [f]: f === "out" ? (v ? "top" : "none") : v }); }, now);
+    }
+    if (k === "model.dial.win.open") return rbEdit((p) => { p.model.dial.win = Object.assign({}, p.model.dial.win, { open: !!v }); }, true);
+    rbEdit((p) => {
+      const m = p.model;
+      if (k === "model.overall") { if (m.motor_cap) rbPut(p, "model.motor_cap.H", v - LR4RouterBody.stackTop(m)); return; }
+      if (k.startsWith("model.transition.")) { const T = rbTrans(m); if (k === "model.transition.edge" && !(T.e > 0)) T.e = 3; }   // set before there's one: made
+      const sec = /^model\.(bearing_cap|collar)\./.exec(k);   // ... these too (a section needs both sizes)
+      if (sec && !m[sec[1]]) m[sec[1]] = { d: m.housing.d * (sec[1] === "collar" ? 1 : 0.5), l: 8 };
+      rbPut(p, k, v);
+    }, now);
+  }
+  function rbLook(lk, o) {                           // a part's look: o.c (#hex) and / or o.f (finish)
+    rbEdit((p) => {
+      const L = p.model.looks[lk];
+      p.model.looks[lk] = { c: o.c ? rbRgb(o.c) : L.c, f: o.f || L.f };
+      if (o.c && lk === "dial") p.model.dial.ring = [o.c, rbDark(o.c)];
+    }, !!o.f);
+  }
+  function rbKindSet(v) {                            // router <-> spindle: the other kind's model, the bit end + looks kept
+    rbEdit((p) => {
+      const was = p.model.kind === "spindle" ? "spindle" : "router";
+      if (v === was) return;
+      const orig = LR4Routers.ROUTERS[rbCur()].custom ? null : LR4RouterData.routers[rbCur()];
+      const tmpl = v === "spindle" ? LR4RouterData.routers.spindle65 : orig && orig.model.kind !== "spindle" ? orig : LR4RouterData.routers.makita;
+      const keep = { collet_nut: p.model.collet_nut, collet: p.model.collet, shaft: p.model.shaft, looks: p.model.looks };
+      p.model = Object.assign(JSON.parse(JSON.stringify(tmpl.model)), keep);
+      if (v === "spindle") { p.source = "gcode"; p.s = p.s || tmpl.s.slice(); p.mount = "makita"; }
+    }, true);
+  }
+  function rbFeature(id, on) {                       // a part added / taken off (LR4RouterSchema.FEATURES)
+    const F = LR4RouterSchema.FEATURES.find((f) => f.id === id);
+    if (F) rbEdit((p) => { if (on && !F.has(p.model)) F.add(p); else if (!on && F.has(p.model)) F.remove(p); }, true);
+  }
 
   rbBuild();
   // one tab of settings at a time (user 2026-10-29); the tab bar's ? = that tab's help
@@ -307,6 +358,7 @@
     if (on && typeof capEditFit === "function") requestAnimationFrame(capEditFit);   // framed in the room between the columns
     $("rb-core-box").hidden = !on;
     if (typeof rxMark === "function") rxMark();     // the dimensions on the model (router_edit.js)
+    if (typeof rtiShow === "function") rtiShow();
   }
   $("rb-view").addEventListener("click", () => {
     if (rbViewing()) return inspectEnd();
@@ -322,78 +374,27 @@
     applyVisibility();
   });
   $("rb-pick").addEventListener("change", (e) => { rbMsg(""); rtSet({ router: e.target.value }); rbShow(); });
-  $("rb-name").addEventListener("input", (e) => rbEdit((p) => { p.name = e.target.value || "My router"; }));
-  $("rb-mount").addEventListener("change", (e) => rbEdit((p) => { p.mount = e.target.value; }, true));
-  $("rb-source").addEventListener("click", (e) => {
-    const v = e.target.dataset && e.target.dataset.v;
-    if (v) rbEdit((p) => { p.source = v; if (v === "gcode" && !p.s) p.s = [10000, 30000]; }, true);
-  });
-  $("rb-kind").addEventListener("click", (e) => {    // router <-> spindle: the other kind's model, the bit end + looks kept
-    const v = e.target.dataset && e.target.dataset.v;
-    if (!v) return;
-    rbEdit((p) => {
-      const was = p.model.kind === "spindle" ? "spindle" : "router";
-      if (v === was) return;
-      const orig = LR4Routers.ROUTERS[rbCur()].custom ? null : LR4RouterData.routers[rbCur()];
-      const tmpl = v === "spindle" ? LR4RouterData.routers.spindle65 : orig && orig.model.kind !== "spindle" ? orig : LR4RouterData.routers.makita;
-      const keep = { collet_nut: p.model.collet_nut, collet: p.model.collet, shaft: p.model.shaft, looks: p.model.looks };
-      p.model = Object.assign(JSON.parse(JSON.stringify(tmpl.model)), keep);
-      if (v === "spindle") { p.source = "gcode"; p.s = p.s || tmpl.s.slice(); p.mount = "makita"; }
-    }, true);
-  });
-  $("rb-tshape").addEventListener("click", (e) => { const v = e.target.dataset && e.target.dataset.v; if (v) rbEdit((p) => { rbTrans(p.model).shape = v; }, true); });
-  $("rb-tedge").addEventListener("click", (e) => { const v = e.target.dataset && e.target.dataset.v; if (v) rbEdit((p) => { const T = rbTrans(p.model); T.edge = v; if (!(T.e > 0)) T.e = 3; }, true); });
+  $("rb-name").addEventListener("input", (e) => rbSet("name", e.target.value));
+  $("rb-mount").addEventListener("change", (e) => rbSet("mount", e.target.value));
+  const rbBtn = (id, k) => $(id).addEventListener("click", (e) => { const v = e.target.dataset && e.target.dataset.v; if (v) rbSet(k, v); });
+  for (const [id, k] of [["rb-source", "source"], ["rb-kind", "kind"], ["rb-tshape", "model.transition.shape"], ["rb-tedge", "model.transition.edge"],
+    ["rb-cooling", "model.cooling"], ["rb-dialplace", "model.dial.place"], ["rb-dialstyle", "model.dial.style"], ["rb-surkind", "model.dial.surround.kind"],
+    ["rb-suredge", "model.dial.surround.edge"]]) rbBtn(id, k);
   $("rte").addEventListener("change", (e) => {     // a part's finish; the collet sizes when typed out
     const k = e.target.dataset && e.target.dataset.lookf;
-    if (k) rbEdit((p) => { p.model.looks[k] = { c: p.model.looks[k].c, f: e.target.value }; }, true);
-    if (e.target.dataset && e.target.dataset.list) {
-      const v = e.target.value.split(/[,;\s]+/).map(Number).filter((x) => x > 0);
-      if (v.length) rbEdit((p) => { p.model.collet.sizes = v; }, true);
-    }
+    if (k) rbLook(k, { f: e.target.value });
+    if (e.target.dataset && e.target.dataset.list) rbSet("model.collet.sizes", e.target.value);
   });
-  $("rb-lock-on").addEventListener("change", (e) => rbEdit((p) => {
-    const m = p.model;
-    if (!e.target.checked) { delete m.shaft_lock; return; }
-    m.shaft_lock = { z: +(m.collet_nut.h + m.shaft.exposed + (m.bearing_cap ? m.bearing_cap.l : 0) + 10).toFixed(1), a: -50, d: 14, r: +(m.housing.d / 2 + 3).toFixed(1), travel: 3, button: 10, out: 4 };
-  }, true));
-  $("rb-brush-on").addEventListener("change", (e) => rbEdit((p) => {   // two, either side, at the housing's top (where most sit)
-    const m = p.model;
-    if (!e.target.checked) { delete m.brushes; return; }
-    const top = m.collet_nut.h + m.shaft.exposed + (m.bearing_cap ? m.bearing_cap.l : 0) + m.housing.l;
-    m.brushes = { n: 2, z: +(top - 8).toFixed(1), a: 90, d: 12, r: +(m.housing.d / 2 - 1).toFixed(1), out: 5, ring: 2, inset: 1, slot: 15 };
-  }, true));
-  $("rb-flats-on").addEventListener("change", (e) => rbEdit((p) => {
-    const S = p.model.shaft;
-    if (!e.target.checked) { delete S.flats; return; }
-    S.flats = { af: +(S.d * 0.8).toFixed(1), z: +(p.model.collet_nut.h + 0.2).toFixed(1), l: Math.max(1, Math.min(3, S.exposed - 0.4)) };
-  }, true));
-  $("rb-cooling").addEventListener("click", (e) => { const v = e.target.dataset && e.target.dataset.v; if (v) rbEdit((p) => { p.model.cooling = v; }, true); });
-  $("rb-dialplace").addEventListener("click", (e) => { const v = e.target.dataset && e.target.dataset.v; if (v) rbEdit((p) => { p.model.dial.place = v; }, true); });
-  $("rb-win-open").addEventListener("change", (e) => rbEdit((p) => { p.model.dial.win = Object.assign({}, p.model.dial.win, { open: e.target.checked }); }, true));
-  $("rb-dialstyle").addEventListener("click", (e) => { const v = e.target.dataset && e.target.dataset.v; if (v) rbEdit((p) => { p.model.dial.style = v; }, true); });
-  const rbSur = (o) => rbEdit((p) => { p.model.dial.surround = Object.assign({ kind: "none" }, p.model.dial.surround, o); }, true);
-  $("rb-surkind").addEventListener("click", (e) => { const v = e.target.dataset && e.target.dataset.v; if (v) rbSur({ kind: v }); });
-  $("rb-suredge").addEventListener("click", (e) => { const v = e.target.dataset && e.target.dataset.v; if (v) rbSur({ edge: v }); });
-  $("rb-sur-top").addEventListener("change", (e) => rbSur({ out: e.target.checked ? "top" : "none" }));
+  for (const [id, f] of [["rb-lock-on", "shaft_lock"], ["rb-brush-on", "brushes"], ["rb-flats-on", "flats"]]) $(id).addEventListener("change", (e) => rbFeature(f, e.target.checked));
+  $("rb-win-open").addEventListener("change", (e) => rbSet("model.dial.win.open", e.target.checked));
+  $("rb-sur-top").addEventListener("change", (e) => rbSet("model.dial.surround.out", e.target.checked));
   $("rte").addEventListener("input", (e) => {
     const el = e.target, k = el.dataset.k;
     if (el.dataset.lookf || el.dataset.list) return;   // (their change events)
-    if (el.dataset.look) {
-      const lk = el.dataset.look;
-      rbEdit((p) => { p.model.looks[lk] = { c: rbRgb(el.value), f: p.model.looks[lk].f }; if (lk === "dial") p.model.dial.ring = [el.value, rbDark(el.value)]; });
-      return;
-    }
+    if (el.dataset.look) return rbLook(el.dataset.look, { c: el.value });
     if (!k) return;
     const v = el.value.trim() === "" ? undefined : Number(el.value);
-    if (v === undefined || !Number.isFinite(v)) return;
-    rbEdit((p) => {
-      const m = p.model;
-      if (k === "model.overall") { if (m.motor_cap) rbPut(p, "model.motor_cap.H", v - LR4RouterBody.stackTop(m)); return; }   // the cap sits on the turned part: overall = its top + H
-      if (k.startsWith("model.transition.")) rbTrans(m);   // typed into before there's one: made
-      const sec = /^model\.(bearing_cap|collar)\./.exec(k);   // ... these too (a section needs both sizes)
-      if (sec && !m[sec[1]]) m[sec[1]] = { d: m.housing.d * (sec[1] === "collar" ? 1 : 0.5), l: 8 };
-      rbPut(p, k, v);
-    });
+    if (v !== undefined && Number.isFinite(v)) rbSet(k, v);
   });
   $("rb-new").addEventListener("click", () => {
     const p = LR4Routers.preset(rbCur());

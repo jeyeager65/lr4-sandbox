@@ -10,7 +10,7 @@
   "use strict";
   const BODY = root.LR4RouterBody || (typeof require === "function" ? require("./router_body.js") : null);   // the dial's place
   const LABEL = { collet_nut: "Collet nut", shaft: "Exposed shaft", bearing_cap: "Bearing cap", housing: "Motor housing",
-    collar: "Collar", transition: "Transition", motor_cap: "Motor cap", dial: "Dial", shaft_lock: "Shaft lock", brushes: "Brush caps", mount: "Mount" };
+    collar: "Collar", transition: "Transition", motor_cap: "Motor cap", dial: "Speed dial", switch: "Switch", shaft_lock: "Shaft lock", brushes: "Brush caps", mount: "Mount" };
 
   // the turned part, nut up: [label, d, length, z0, key]; the transition's d = its top Ø (round) or the collar's (shaped
   // to the cap: no Ø of its own); a spindle's housing is its can
@@ -95,6 +95,10 @@
         }
       }
     }
+    G = "switch";                                     // the switch: its center under the head's top, at the switch end
+    const SW = h && BODY && BODY.expand(m).switch;
+    if (SW) add({ id: "switch-down", label: "Switch below the top", v: z1 - SW.at[2], kind: "len", a: [SW.at[0], SW.at[1], z1], b: [SW.at[0], SW.at[1], SW.at[2]],
+      off: [10, 0, 0], k: "model.switch.down", views: ["front", "right"] });
     G = spin ? "housing" : "motor_cap";
     const xo = h ? at[0] + h.L / 2 : R;
     if (spin) add({ id: "overall", label: "Overall height", v: top, kind: "len", a: [R, 0, 0], b: [R, 0, top], off: [16, 0, 0], k: null, f: 0 });
@@ -148,6 +152,8 @@
       out.push({ id: "motor_cap", label: LABEL.motor_cap, shape: { box: [at[0] - h.L / 2, at[0] + h.L / 2, at[1] - h.W / 2, at[1] + h.W / 2, top, top + h.H] } });
       const D = BODY && BODY.expand(m).dial;
       if (D && D.d > 0) out.push({ id: "dial", label: LABEL.dial, shape: { cyl: { c: D.at, axis: D.axis === "z" ? [0, 0, 1] : [0, 1, 0], d: D.d, l: D.t } } });
+      const SW = BODY && BODY.expand(m).switch;
+      if (SW) { const [x, y, z] = SW.at, [a, b, c] = SW.size; out.push({ id: "switch", label: LABEL.switch, shape: { box: [x - a / 2 - 1, x + a / 2 + 2, y - b / 2, y + b / 2, z - c / 2, z + c / 2] } }); }
     }
     const L = m.shaft_lock;
     if (L && L.r > 0) {
@@ -173,7 +179,8 @@
     if (part === "brush_cap" || part === "brush_ring") return "brushes";
     if (part === "dial") return "dial";
     if (part === "collet_nut" || part === "collet" || part === "thread") return "collet_nut";
-    if (/^(motor_cap|switch|switch_off|strain_relief|cord|trim)$/.test(part)) return spin ? "housing" : "motor_cap";
+    if (part === "switch" || part === "switch_off") return spin ? "housing" : "switch";
+    if (/^(motor_cap|strain_relief|cord|trim)$/.test(part)) return spin ? "housing" : "motor_cap";
     const secs = sections(m), hit = secs.filter(([, , len, z0]) => len > 0 && p[2] >= z0 - 0.01 && p[2] <= z0 + len + 0.01);
     return hit.length ? hit[hit.length - 1][4] : part;
   }

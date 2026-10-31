@@ -101,7 +101,7 @@ ok(Math.abs(hb(hs) - B.stackTop(hs.model)) < 0.5 && B.stackTop(hs.model) === 12 
 const sp = dm("spindle65");
 ok(sp["len-housing"].k === "model.housing.l" && sp.overall.k === null && !sp["cap-L"], "dims: a spindle's can; its overall shown only, no motor cap");
 ok(!dm("makita", null).clamp && DM.dims(Object.assign({}, R.ROUTERS.makita, { mount: "none" }), 36.5).every((d) => d.id !== "clamp"), "dims: no clamp line without a mount");
-ok(DM.pick(R.ROUTERS.kobalt, "housing", [0, 0, 60]) === "housing" && DM.pick(R.ROUTERS.kobalt, "switch", [0, 0, 0]) === "motor_cap" && DM.pick(R.ROUTERS.kobalt, null, [0, 0, 0], "Tool_Mount_B_Kobalt") === "mount",
+ok(DM.pick(R.ROUTERS.kobalt, "housing", [0, 0, 60]) === "housing" && DM.pick(R.ROUTERS.kobalt, "switch", [0, 0, 0]) === "switch" && DM.pick(R.ROUTERS.kobalt, "trim", [0, 0, 0]) === "motor_cap" && DM.pick(R.ROUTERS.kobalt, null, [0, 0, 0], "Tool_Mount_B_Kobalt") === "mount",
   "pick: a part's mesh -> its region");
 // an old page's stored edit (0.60 schema: dial + body) of a data-file router: dropped, the router keeps its own preset (user 2026-10-30: the page wouldn't load)
 const kob = JSON.stringify(R.ROUTERS.kobalt.model), left = R.loadEdits({ get: () => JSON.stringify({ kobalt: { name: "Kobalt", dial: [[1, 10000]], body: { nut: {} } } }) });

@@ -20,7 +20,7 @@
     '</div><div class="rbx-undo"><button type="button" data-undo="rb-undo" disabled title="Undo (Ctrl+Z)">↶</button>' +
     '<button type="button" data-undo="rb-redo" disabled title="Redo (Ctrl+Shift+Z)">↷</button>' +
     '<button type="button" id="rbx-tc" title="Watch a bit change on this router: the bit set in Run > On the table goes in">Change bit</button></div><p class="rbx-tip" id="rbx-tip">Click a part to edit it · click a number to type it · drag a ● to pull that end · drag the view to turn it</p>' +
-    '<div class="rbx-card" id="rbx-card" hidden></div>';
+    '';
   rxStage.insertBefore(rxBox, document.getElementById("insp"));   // under Inspect's panels
   const rxSvg = rxBox.querySelector("svg");
 
@@ -55,9 +55,9 @@
   // the drawing: each frame while it's on (the camera moves, the router changes under it); scripting.js's tick
   function rxTick() { if (!rxBox.hidden) rxDraw(); }
   function rxDraw() {
+    if (RX.sel && !rxValid(RX.sel)) return rxPick(null);   // the part's gone (the lock taken off, now a spindle)
     const W = canvas.clientWidth, H = canvas.clientHeight;
     rxGhost();
-    rxCardSync();
     rxSvg.setAttribute("viewBox", `0 0 ${W} ${H}`);
     let svg = "";
     const labels = [];
@@ -319,11 +319,8 @@
   // ---- a part picked (user 2026-10-29: "click and highlight each part and edit the values / sliders for the selected
   // part"): a click on the router in the close-up picks a region (LR4RouterDims.regions / pick: the mesh's part, a
   // turned section by the height you click, the motor cap, dial, shaft lock, mount); it's lit (a see-through shell, or the mount's own glow),
-  // only its numbers are drawn, and a card shows a slider + a number for each of its sizes (and its options). A click
-  // off the router (or ✕) lets it go. hose_bom.js's click calls rxClick first. ----
-  const rxCard = document.getElementById("rbx-card");
-  // a region's options: the builder's own button groups, mirrored in the card
-  const RX_OPTS = { dial: [["rb-dialplace", "Dial"], ["rb-dialstyle", "Numbers"], ["rb-surkind", "Round the slot"]], housing: [["rb-cooling", "Cooling"]] };
+  // only its numbers are drawn, and the inspector (router_inspect.js, Part 48b) shows all its settings. A click off the
+  // router (or ✕) lets it go: the inspector shows the router itself. hose_bom.js's click calls rxClick first. ----
   function rxRegion() { return RX.sel && LR4RouterDims.regions(rxRouter()).find((g) => g.id === RX.sel); }
   function rxClick(hit) {                             // true: the close-up took the click
     if (typeof rbViewing !== "function" || !rbViewing()) return false;
@@ -337,10 +334,14 @@
     rxPick(id);
     return !!id;
   }
+  function rxValid(id) {                              // a region on the model, or any item of the outline (the flats, the vent)
+    const r = rxRouter(), S = LR4RouterSchema;
+    return !!r && id !== "router" && (LR4RouterDims.regions(r).some((g) => g.id === id) || (S.PARTS.some((P) => P.id === id) && S.partShown(id, r.model)));
+  }
   function rxPick(id) {
-    RX.sel = id && LR4RouterDims.regions(rxRouter()).some((g) => g.id === id) ? id : null;
+    RX.sel = id && rxValid(id) ? id : null;
     if (RX.sel && typeof select === "function") select(null);   // not the part chip as well
-    rxCardBuild();
+    if (typeof rtiShow === "function") rtiShow();
     if (!rxBox.hidden) rxDraw(); else rxGhost();
   }
   function rxGhost() {                                // the picked part lit (and the mount faded)
@@ -396,93 +397,3 @@
     RX.ghost.raycast = () => {};                     // never picked
     host.add(RX.ghost);                               // in the router's frame: it follows the machine's pose
   }
-  // the card: one row per size (a size drawn in two views is one row)
-  function rxCardDims() {
-    const C = rtClamps(), seen = new Set();
-    return LR4RouterDims.dims(rxRouter(), C ? C.def : null).filter((d) => {
-      const k = d.k;
-      if (d.g !== RX.sel || !k || seen.has(k)) return false;
-      seen.add(k);
-      return true;
-    });
-  }
-  function rxRange(d) {                               // the slider's travel [min, max, step], fixed while the card is up
-    if (d.kind === "ang") return [-180, 180, 1];
-    if (d.kind === "rad" || d.kind === "ch") return [0, Math.max(20, Math.ceil(d.v * 2)), 0.5];
-    if (d.kind === "dia") return [4, Math.max(120, Math.ceil(d.v * 1.5)), 0.5];
-    return [0, Math.min(300, Math.max(60, Math.ceil(d.v * 2))), 0.5];
-  }
-  function rxCardBuild() {
-    const g = !rxBox.hidden && rxRegion();
-    rxCard.hidden = !g;
-    rxCard.textContent = "";
-    if (!g) return;
-    const h = document.createElement("div");
-    h.className = "rbx-card-h";
-    h.innerHTML = '<strong></strong><button type="button" class="rbx-x" aria-label="Done with this part" title="Done (or click off the router)">✕</button>';
-    h.querySelector("strong").textContent = g.label;
-    rxCard.append(h);
-    for (const d of rxCardDims()) {
-      const [lo, hi, st] = rxRange(d), row = document.createElement("label"), u = d.kind === "ang" ? "°" : "mm";
-      row.className = "rbx-row"; row.dataset.k = d.k;
-      row.innerHTML = `<span></span><input type="range" min="${lo}" max="${hi}" step="${st}"><input type="number" step="any"><em>${u}</em>`;
-      const short = d.label.toLowerCase().startsWith(g.label.toLowerCase() + " ") ? d.label.slice(g.label.length + 1) : d.label;
-      row.querySelector("span").textContent = short.charAt(0).toUpperCase() + short.slice(1);
-      for (const el of row.querySelectorAll("input")) { el.value = d.v; el.setAttribute("aria-label", d.label); }
-      rxCard.append(row);
-    }
-    for (const [src, label] of RX_OPTS[g.id] || []) {   // its options: the builder's buttons, mirrored
-      const o = document.createElement("div");
-      o.className = "rbx-opt"; o.dataset.src = src;
-      o.innerHTML = `<span>${label}</span>`;
-      for (const b of document.querySelectorAll(`#${src} button`)) {
-        const c = document.createElement("button");
-        c.type = "button"; c.dataset.v = b.dataset.v; c.textContent = b.textContent;
-        o.append(c);
-      }
-      rxCard.append(o);
-    }
-    if (g.id === "mount") {                           // which mount (None: no shoe, no clamp)
-      const o = document.createElement("label");
-      o.className = "rbx-row rbx-sel";
-      o.innerHTML = "<span>Mount</span>";
-      const sel = $("rb-mount").cloneNode(true);
-      sel.removeAttribute("id"); sel.value = $("rb-mount").value;
-      sel.addEventListener("change", () => { $("rb-mount").value = sel.value; $("rb-mount").dispatchEvent(new Event("change")); });
-      o.append(sel);
-      rxCard.append(o);
-    }
-  }
-  function rxCardSync() {                             // the card's values from the router (not the one being moved)
-    if (rxCard.hidden) return;
-    if (!rxRegion()) return rxPick(null);             // the part's gone (the lock off, now a spindle)
-    const cur = new Map(rxCardDims().map((d) => [d.k, d]));
-    for (const row of rxCard.querySelectorAll(".rbx-row[data-k]")) {
-      const d = cur.get(row.dataset.k);
-      if (!d) continue;
-      for (const el of row.querySelectorAll("input")) if (document.activeElement !== el && RX.slide !== el) el.value = d.v;
-    }
-    for (const o of rxCard.querySelectorAll(".rbx-opt")) {
-      const on = document.querySelector(`#${o.dataset.src} button[aria-pressed="true"]`);
-      for (const b of o.querySelectorAll("button")) b.setAttribute("aria-pressed", String(!!on && b.dataset.v === on.dataset.v));
-    }
-  }
-  rxCard.addEventListener("input", (e) => {
-    const row = e.target.closest(".rbx-row[data-k]");
-    if (!row || (e.target.type === "number" && e.target.value === "")) return;
-    const d = rxCardDims().find((q) => q.k === row.dataset.k);
-    if (!d) return;
-    const v = Number(e.target.value);
-    for (const el of row.querySelectorAll("input")) if (el !== e.target) el.value = v;   // the slider + the number together
-    RX.slide = e.target.type === "range" ? e.target : null;
-    rxSet(d, v);
-  });
-  rxCard.addEventListener("change", () => { RX.slide = null; });
-  rxCard.addEventListener("click", (e) => {
-    if (e.target.closest(".rbx-x")) return rxPick(null);
-    const b = e.target.closest(".rbx-opt button");
-    if (!b) return;
-    const src = document.querySelector(`#${b.closest(".rbx-opt").dataset.src} button[data-v="${b.dataset.v}"]`);
-    if (src) src.click();
-    rxDraw();
-  });

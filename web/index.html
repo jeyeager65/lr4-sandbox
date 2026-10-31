@@ -701,6 +701,13 @@
 <main class="stage">
   <canvas id="c" aria-label="3D model of the LowRider 4 assembly"></canvas>
   <div class="meas-tip" id="meas-tip" hidden></div>
+  <section class="rti" id="rti" aria-labelledby="rti-h" hidden>
+    <div class="rti-top"><b id="rti-h">Router</b>
+      <button type="button" class="q" id="rti-q" data-help="help-rti" aria-label="About these settings" title="About these settings">?</button>
+      <button type="button" class="rti-x" id="rti-x" aria-label="Done with this part" title="Done: back to the router (or click off it)" hidden>✕</button></div>
+    <div class="rti-body" id="rti-body"></div>
+  </section>
+  <div class="help" id="help-rti" hidden></div>
   <section class="ce" id="ce" aria-label="Motor cap shape" hidden>
     <div class="ce-bar">
       <b>Motor cap shape</b>
@@ -1269,6 +1276,7 @@
 <script src="js/csg.js"></script>
 <script src="js/router_body.js"></script>
 <script src="js/router_dims.js"></script>
+<script src="js/router_schema.js"></script>
 <script src="js/plate_design.js"></script>
 <script src="js/lib/cnc-gcode-tools/gcode-expander.js"></script>
 <script src="js/lib/cnc-gcode-tools/stock-sim.js"></script>
@@ -1311,6 +1319,7 @@
 <script src="js/page/router_build.js"></script>
 <script src="js/page/cap_edit.js"></script>
 <script src="js/page/router_edit.js"></script>
+<script src="js/page/router_inspect.js"></script>
 <script src="js/page/tool_change.js"></script>
 <script src="js/page/ui.js"></script>
 <script src="js/page/scripting.js"></script>

@@ -43,7 +43,7 @@ const SHOT = process.env.CE_SHOT;                    // a folder: screenshots of
       out.box0 = cap();
       rbTab("speed"); $$("rb-view").click(); await T.sleep(300);
       out.rte = { on: document.documentElement.classList.contains("rte-on") && !$$("rte").hidden, ce: !$$("ce").hidden, panel: getComputedStyle(document.querySelector(".panel")).display,
-        insp: getComputedStyle($$("insp")).display, builder: $$("rte-body").contains($$("rb-tabs")), off: camera.view && camera.view.enabled ? camera.view.offsetX : 0 };
+        insp: getComputedStyle($$("insp")).display, rti: !$$("rti").hidden, builder: $$("rte-body").contains($$("rb-tabs")), off: camera.view && camera.view.enabled ? camera.view.offsetX : 0 };
       rbTab("head"); await T.sleep(300);
       out.open = !$$("ce").hidden && $$("rb-shape").getAttribute("aria-pressed") === "true";
       const svg = $$("ce-svg");
@@ -126,8 +126,8 @@ const SHOT = process.env.CE_SHOT;                    // a folder: screenshots of
       out.errs = errs;
       return out;
     })()`);
-    ok(a.rte.on && !a.rte.ce && a.rte.panel === "none" && a.rte.insp === "none" && a.rte.builder && a.rte.off === 0,
-      `Edit router: the router editor - the builder in the side panel's place, Inspect's panel away, the view unshifted till the shape editor opens (${JSON.stringify(a.rte)})`);
+    ok(a.rte.on && !a.rte.ce && a.rte.panel === "none" && a.rte.insp === "none" && a.rte.rti && a.rte.builder && a.rte.off > 0,
+      `Edit router: the router editor - the builder in the side panel's place, Inspect's panel away, the view centered between it and the inspector (${JSON.stringify(a.rte)})`);
     ok(a.open, "the Motor cap tab docks the shape editor on the right");
     ok(a.top.pts === 4 && a.top.line && a.top.mirror && a.top.rows === 4, `top view: the box's 4 points, its outline + the mirrored half, 4 table rows (${JSON.stringify(a.top)})`);
     ok(a.drag.shaped && Math.abs(a.drag.y1 - a.drag.y0 - 10) < 1 && a.drag.box[1] - a.box0[1] > 15 && a.drag.box[1] - a.box0[1] <= 20.1,

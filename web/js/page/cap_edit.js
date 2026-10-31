@@ -430,7 +430,7 @@
     if (typeof camera === "undefined") return;
     const st = document.querySelector(".stage").getBoundingClientRect(), W = Math.max(st.width, 1), H = Math.max(st.height, 1);
     const box = (id) => { const e = $(id); return e && !e.hidden ? e.getBoundingClientRect() : null; };
-    const l = box("rte"), r = box("ce"), x0 = l ? l.right - st.left : 0, x1 = r ? r.left - st.left : W;
+    const l = box("rte"), r = box("ce") || box("rti"), x0 = l ? l.right - st.left : 0, x1 = r ? r.left - st.left : W;
     if ((l || r) && x1 - x0 > 200) camera.setViewOffset(W, H, W / 2 - (x0 + x1) / 2, 0, W, H); else camera.clearViewOffset();
     camera.updateProjectionMatrix();
     return [Math.max(x1 - x0, 200), H];
@@ -448,6 +448,7 @@
     $("ce").hidden = !on;
     $("rb-shape").setAttribute("aria-pressed", String(on));
     if (on && !was) { CE.cam = {}; show(CE.view); }
+    if (typeof rtiShow === "function") rtiShow();   // the inspector steps aside for it (router_inspect.js)
     if (on !== was) fitRoom(); else viewRoom();
   }
   $("ce-close").addEventListener("click", () => { $("ce").dataset.shut = "1"; capEditOpen(false); });   // shut: stays shut on the tab

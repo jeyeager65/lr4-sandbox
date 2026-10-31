@@ -10,6 +10,10 @@ the date the model data was built and the Printables file set it was solved for.
 - **Fewer numbers on the model:** with nothing picked, only the overall height, the motor cap's size and the motor
   housing Ø show. Click a part to see its own numbers. While a part is picked, the mount, the dust shoe and their
   bolts turn see-through so you can see what you're measuring.
+- **One inspector for every setting:** the router editor's right side shows everything about the part you picked
+  (sizes as a slider + a number, its options as buttons, its color and finish under Look), not just its sizes.
+  With nothing picked it shows the router itself: name, router / spindle, speeds and collet sizes. The switch is a
+  part of its own (its height under the top). The "?" lists what each setting means. The old click card is gone.
 
 ## 0.62.0 - 2026-10-30
 - **Speed dials that look like the real ones:** the wheel sits inside the head, and a slice of its rim shows through

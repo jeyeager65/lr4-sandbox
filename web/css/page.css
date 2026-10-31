@@ -983,24 +983,33 @@ body.rec-ui .rec-msg { top: calc(3.5% + 44px); font-size: clamp(15px, 2.4vh, 38p
 .rbx-views [data-v="iso"] { border-radius: 0 4px 4px 0; }
 .rbx-views .rbx-lens { margin-left: 8px; border-radius: 4px; }
 .rbx-views button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
-.rbx-card { position: absolute; left: 12px; bottom: 40px; width: min(330px, calc(100% - 24px)); pointer-events: auto; padding: 8px 12px 10px;
-  border: 1px solid var(--accent); border-radius: 6px; background: color-mix(in srgb, var(--panel) 94%, transparent); backdrop-filter: blur(4px); font-size: 13px; }
-.rbx-card[hidden] { display: none; }
-.rbx-card-h { display: flex; align-items: center; margin-bottom: 4px; }
-.rbx-card-h strong { flex: 1; font-family: var(--font-display); font-weight: 600; font-size: 15px; }
-.rbx-x { border: 0; background: none; padding: 2px 6px; color: var(--muted); }
-.rbx-row { display: grid; grid-template-columns: 6.5em 1fr 4.8em 2em; gap: 6px; align-items: center; margin-top: 4px; }
-.rbx-row input[type=range] { width: 100%; accent-color: var(--accent); }
-.rbx-row input[type=number] { width: 100%; padding: 2px 4px; font: 12px var(--font-data); }
-.rbx-row em { font-style: normal; color: var(--muted); font-size: 12px; }
-.rbx-row.rbx-sel { grid-template-columns: 6.5em 1fr; }
-.rbx-opt { display: flex; align-items: center; margin-top: 8px; }
-.rbx-opt span { width: 6.5em; flex: none; }
-.rbx-opt button { border-radius: 0; margin-left: -1px; padding: 2px 9px; }
-.rbx-opt span + button { border-radius: 4px 0 0 4px; margin-left: 0; }
-.rbx-opt button:last-child { border-radius: 0 4px 4px 0; }
-.rbx-opt button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
-.rbx-simple { margin-top: 6px; }
+/* the router editor's inspector (Part 48b): docked on the right, every setting of what's picked */
+.rti { position: absolute; right: 8px; top: 52px; bottom: 30px; width: min(340px, calc(100% - 16px)); z-index: 6; display: flex;
+  flex-direction: column; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 6px 24px rgba(0, 0, 0, 0.25); font-size: 13px; }
+.rti[hidden] { display: none; }
+.rti-top { display: flex; align-items: center; gap: 6px; padding: 8px 10px 6px 14px; border-bottom: 1px solid var(--line); }
+.rti-top b { flex: 1; min-width: 0; font-family: var(--font-display); font-weight: 600; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rti-x { border: 0; background: none; padding: 2px 6px; color: var(--muted); }
+.rti-body { flex: 1 1 auto; overflow-y: auto; padding: 2px 14px 14px; }
+.rti-body h4 { margin: 12px 0 2px; font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.rti-row { display: grid; grid-template-columns: 8.2em 1fr 4.6em 2.2em; gap: 6px; align-items: center; margin-top: 5px; }
+.rti-row span, .rti-opt span { overflow: hidden; text-overflow: ellipsis; }
+.rti-row input[type=range] { width: 100%; accent-color: var(--accent); }
+.rti-row input[type=number], .rti-row input[type=text], .rti-row select { width: 100%; padding: 2px 4px; font: 12px var(--font-data); }
+.rti-row em { font-style: normal; color: var(--muted); font-size: 12px; }
+.rti-row.rti-ns { grid-template-columns: 8.2em 1fr 2.6em; }
+.rti-row.rti-sel { grid-template-columns: 8.2em 1fr; }
+.rti-row.rti-text { grid-template-columns: 8.2em 1fr auto; }
+.rti-row.rti-look { grid-template-columns: 8.2em 3.2em 1fr; }
+.rti-look input[type=color] { width: 100%; height: 24px; padding: 0 2px; }
+.rti-opt { display: flex; flex-wrap: wrap; align-items: center; margin-top: 6px; row-gap: 4px; }
+.rti-opt span { width: 8.2em; flex: none; margin-right: 6px; }
+.rti-opt button { border-radius: 0; margin-left: -1px; padding: 2px 9px; }
+.rti-opt span + button { border-radius: 4px 0 0 4px; margin-left: 0; }
+.rti-opt button:last-child { border-radius: 0 4px 4px 0; }
+.rti-opt button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.rti-bool { display: flex; margin-top: 6px; }
+.rti-act { margin-top: 6px; }
 .rbx-undo { position: absolute; left: 310px; top: 52px; display: flex; gap: 4px; pointer-events: auto; }
 .rbx-undo button { padding: 3px 10px; }
 .rbx-tip { position: absolute; left: 12px; top: 84px; margin: 0; font-size: 12px; color: var(--muted); }
