@@ -13,11 +13,15 @@
 //   from the hub (the bearing cap) to the wall) / collar { d, l },
 //   stacked up from the nut; transition { l, d: top Ø, shape: round | cap (lofted to the motor cap's plan), edge:
 //   none | fillet | chamfer, e } up to the motor cap { L (x), W (y), H (z), top_r, front_r (+x end), back_r (-x end),
-//   bot_r, at: [x, y] }; dial { place: end | top, d, t, ring: [wheel, groove] colors }; switch { at, size, rocker };
+//   bot_r, at: [x, y], shape: { top, side, end } (drawn in the builder's shape editor, js/cap_shape.js: then L / W / H /
+//   at are the shape's size and the fillets don't apply) }; dial { place: end | top | window, d, t, ring: [wheel, groove] colors; window: in (its rim from the end), drop
+//   (its top under the cap's top), win { l, w, open: a notch through the end too } }; switch { at, size, rocker };
 //   shaft_lock { z, a: deg from +x (counter-clockwise from above), d: its boss's Ø (0 = none), in: where the boss starts out from the axis,
 //   arm: a bracket that wide from the boss up to the housing (0 = none), pin: Ø of the button's pin into the shaft's
 //   hole (square to the flats; 0 = none), r: reach from the axis (the boss's end),
 //   travel: press depth, button: Ø, out: how far the button stands out (defaults 0.7 d, travel + 1) };
+//   brushes { n, z, a, d, r: its base out from the axis, out (no border), ring: a border in the head's color flush with
+//   the body (r = its surface), inset: the cap in it } (the brush caps);
 //   strain_relief { at, l, d: at the cap, bend: deg toward +y }; cord { d, out: the stub drawn past the relief };
 //   looks { part: { c: sRGB 0..1, f: metal | plastic | rubber } } for every part (js/routers.js LOOK_PARTS).
 //   A spindle: { kind: "spindle", collet_nut, collet, shaft, bearing_cap, housing (the can), cooling: air | water }.
@@ -71,18 +75,28 @@
       "speeds_source": "Makita RT0701C instruction manual, speed adjusting dial table",
       "mount": "makita",
       "model": {
-        "label": "Makita RT0701C (GUESS: published sizes, not measured)",
-        "collet_nut": {"type": "Makita", "af": 22.0, "h": 14.0, "below": 1.5},
-        "collet": {"type": "Makita cone", "sizes": [6.35, 9.525], "l": 20.0, "d": 14.0, "taper": 8},
-        "shaft": {"d": 12.0, "exposed": 4.0, "thread": {"d": 16.0, "pitch": 1.0, "length": 9.0}},
-        "housing": {"d": 65.0, "l": 95.0},
-        "collar": {"d": 65.0, "l": 8.0},
-        "motor_cap": {"L": 78.0, "W": 72.0, "H": 84.0, "top_r": 8.0, "front_r": 14.0, "back_r": 14.0, "bot_r": 4.0},
-        "dial": {"place": "end", "d": 24.0, "t": 6.0, "ring": ["#c8322b", "#8e1f1a"]},
-        "shaft_lock": {"z": 24.0, "a": -50.0, "d": 12.0, "r": 35.5, "travel": 3.0},
+        "label": "Makita RT0701C (measured from a STEP model, 2022; collets: its 1/4, the V1E store's 1/8)",
+        "collet_nut": {"type": "Makita", "af": 22, "h": 12, "below": 5.9},
+        "collet": {"type": "Makita", "sizes": [6.35, 3.175], "l": 20, "d": 14, "taper": 8},
+        "shaft": {"d": 17, "exposed": 19.4, "thread": {"d": 17, "pitch": 1, "length": 6}},
+        "bearing_cap": {"d": 43.4, "l": 6.5},
+        "housing": {"d": 64, "l": 90, "ch": 1, "vent": {"depth": 10, "wall": 1.5, "spokes": 12, "w": 2.2, "inset": 2}},
+        "transition": {"l": 26, "shape": "cap", "edge": "none", "d": 64, "e": 0},
+        "motor_cap": {"L": 103.6, "W": 75.2, "H": 46, "at": [-10.2, 0], "bot_r": 2, "shape": {
+          "top": [{"x": -62, "y": 0, "s": "line"}, {"x": -62, "y": 14, "s": "line"}, {"x": -54, "y": 14, "s": "line"}, {"x": -36, "y": 28, "s": "curve"}, {"x": -26, "y": 34.5, "s": "curve"}, {"x": 0, "y": 37.6, "s": "curve"}, {"x": 24, "y": 34.5, "s": "curve"}, {"x": 34, "y": 31, "s": "curve"}, {"x": 38.5, "y": 22, "s": "curve"}, {"x": 41.6, "y": 0, "s": "line"}],
+          "front": [{"x": -62, "y": 6, "s": "line"}, {"x": -50, "y": 6, "s": "line"}, {"x": -50, "y": 0, "s": "line"}, {"x": 41.6, "y": 0, "s": "line", "r": 1}, {"x": 41.6, "y": 24, "s": "curve"}, {"x": 40, "y": 31, "s": "curve"}, {"x": 36, "y": 38, "s": "curve"}, {"x": 31, "y": 43.8, "s": "curve"}, {"x": 25, "y": 46, "s": "line"}, {"x": -25, "y": 46, "s": "curve"}, {"x": -33, "y": 43, "s": "curve"}, {"x": -37, "y": 40, "s": "line"}, {"x": -52, "y": 40, "s": "line", "r": 3}, {"x": -56, "y": 34, "s": "line"}, {"x": -62, "y": 34, "s": "line", "r": 2}],
+          "section": [{"x": 0, "y": 46, "s": "line"}, {"x": 37.6, "y": 46, "s": "line", "r": 12}, {"x": 37.6, "y": 0, "s": "line", "r": 1}, {"x": 0, "y": 0, "s": "line"}]}},
+        "dial": {"place": "end", "d": 30, "t": 8, "ring": ["#c8322b", "#8e1f1a"]},
+        "shaft_lock": {"z": 25.72, "a": -55, "d": 14, "in": 14, "arm": 15, "pin": 7, "r": 24, "travel": 3, "button": 12, "out": 5.5},
+        "brushes": {"n": 2, "z": 153.87, "a": 90, "d": 12, "r": 37.6, "out": 2.5, "ring": 2, "inset": 1},
+        "strain_relief": {"l": 73, "d": 20, "bend": 0, "at": [-62, 0, 173.87]},
+        "cord": {"d": 7.6, "out": 15},
         "looks": {
-          "motor_cap": {"c": [0.067, 0.6, 0.63], "f": "plastic"},
-          "dial": {"c": [0.78, 0.2, 0.17], "f": "plastic"}
+          "motor_cap": {"c": [0, 0.51, 0.565], "f": "plastic"},
+          "transition": {"c": [0.74, 0.75, 0.77], "f": "plastic"},
+          "collet_nut": {"c": [0.55, 0.56, 0.58], "f": "metal"},
+          "dial": {"c": [0.75, 0.12, 0.1], "f": "plastic"},
+          "shaft_lock": {"c": [0.75, 0.1, 0.1], "f": "plastic"}
         }
       }
     },

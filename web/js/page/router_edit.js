@@ -4,8 +4,8 @@
 // end. Flat views (Side / Front / Top: a narrow lens, no orbiting) so they read like a drawing, or 3D. Every change
 // goes through the builder's own input (its data-k), so the builder's rules - the motor cap on the turned part, overall
 // = the stack + the cap - hold here too. The page's scripts share one global scope (RT, rbViewing: router*.js). ----
-  const RX = { view: "side", drag: null, edit: null, fov: null, hover: null, sel: null, ghost: null, ghostKey: "", lit: [], slide: null };
-  const RX_VIEWS = [["side", "Side"], ["front", "Front"], ["top", "Top"], ["3d", "3D"]];
+  const RX = { view: "front", drag: null, edit: null, fov: null, hover: null, sel: null, ghost: null, ghostKey: "", lit: [], slide: null };
+  const RX_VIEWS = [["front", "Front"], ["right", "Right"], ["top", "Top"], ["3d", "3D"]];   // where you stand at the machine (user 2026-10-30)
   const RX_LENS = 8;                                  // the flat views' field of view (deg): near enough to a drawing
   const rxStage = document.querySelector(".stage");
   const rxBox = document.createElement("div");
@@ -21,7 +21,7 @@
 
   function rxRouter() { return LR4Routers.ROUTERS[RT.set.router]; }
   function rxDims() {
-    const C = rtClamps(), all = LR4RouterDims.dims(rxRouter(), C ? C.def : null), v = RX.view === "3d" ? "side" : RX.view;
+    const C = rtClamps(), all = LR4RouterDims.dims(rxRouter(), C ? C.def : null), v = RX.view === "3d" ? "front" : RX.view;
     return all.filter((d) => d.views.includes(v) && (!RX.sel || d.g === RX.sel));   // a part picked: just its own
   }
   function rxRef(p) {                                 // body frame -> the router mesh's own (router.js's frame + the clamp drop)
@@ -107,7 +107,7 @@
   }
 
   // a change: into the builder's input, as if typed there (its handler saves, rebuilds, keeps the rules)
-  const rxInput = (d) => d.k && document.querySelector(`#st-rt input[data-k="${d.k}"]`);
+  const rxInput = (d) => d.k && document.querySelector(`#rte input[data-k="${d.k}"]`);
   function rxSet(d, v) {
     const el = rxInput(d);
     if (!el || !Number.isFinite(v)) return;
@@ -196,14 +196,14 @@
   rxBox.addEventListener("pointerup", rxDrop);
   rxBox.addEventListener("pointercancel", rxDrop);
 
-  // the views: Side = from the front of the router's -y side (+x to the right), Front = from its switch end, Top
+  // the views: Front = from the machine's front (the router's -y side, +x to the right), Right = from its switch end, Top
   function rxLook(v) {
     RX.view = v;
     for (const b of rxBox.querySelectorAll(".rbx-views button")) b.setAttribute("aria-pressed", String(b.dataset.v === v));
     const f = RT.body && RT.body.f;
     if (!f || !INSPECT) return;
     const c = Math.cos(f.a), s = Math.sin(f.a), flat = v !== "3d";
-    const dir = { side: [s, -c, 0.0001], front: [c, s, 0.0001], top: [s * 0.002, -c * 0.002, 1], "3d": [c * 0.8 + s, s * 0.8 - c, 0.7] }[v];
+    const dir = { front: [s, -c, 0.0001], right: [c, s, 0.0001], top: [s * 0.002, -c * 0.002, 1], "3d": [c * 0.8 + s, s * 0.8 - c, 0.7] }[v];
     if (RX.fov === null) RX.fov = camera.fov;
     camera.fov = flat ? RX_LENS : RX.fov;
     camera.updateProjectionMatrix();
@@ -211,7 +211,8 @@
     controls.enableRotate = !flat;
     fitView(dir);
     const ins = document.getElementById("insp");      // framed in the part of the view the right panels leave
-    if (!ins.classList.contains("min")) {
+    if (document.documentElement.classList.contains("rte-on")) { if (typeof capEditFit === "function") capEditFit(); }   // the router editor: the room between its panels
+    else if (!ins.classList.contains("min")) {
       camera.updateMatrixWorld();
       const dist = camera.position.distanceTo(controls.target);
       const mm = (2 * dist * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2))) / canvas.clientHeight;

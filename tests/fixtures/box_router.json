@@ -1,0 +1,114 @@
+{
+  "_about": "A router only the tests use: a plain box motor cap (the Makita preset as of 7a1fb2d), so the tests do not follow the real presets. Page tests add it as the built-in testbox (tests/fixtures/fixture.js), node tests through the data module.",
+  "router": {
+    "name": "Test box router",
+    "source": "manual",
+    "speeds": [
+      [
+        1,
+        10000
+      ],
+      [
+        2,
+        12000
+      ],
+      [
+        3,
+        17000
+      ],
+      [
+        4,
+        22000
+      ],
+      [
+        5,
+        27000
+      ],
+      [
+        6,
+        30000
+      ]
+    ],
+    "speeds_source": "test fixture (the Makita preset as of 7a1fb2d)",
+    "mount": "makita",
+    "model": {
+      "label": "Test fixture: a plain box motor cap - its sizes fixed, whatever the real presets become",
+      "collet_nut": {
+        "type": "Makita",
+        "af": 22,
+        "h": 14,
+        "below": 1.5
+      },
+      "collet": {
+        "type": "Makita cone",
+        "sizes": [
+          6.35,
+          9.525
+        ],
+        "l": 20,
+        "d": 14,
+        "taper": 8
+      },
+      "shaft": {
+        "d": 12,
+        "exposed": 4,
+        "thread": {
+          "d": 16,
+          "pitch": 1,
+          "length": 9
+        }
+      },
+      "housing": {
+        "d": 65,
+        "l": 95
+      },
+      "collar": {
+        "d": 65,
+        "l": 8
+      },
+      "motor_cap": {
+        "L": 78,
+        "W": 72,
+        "H": 84,
+        "top_r": 8,
+        "front_r": 14,
+        "back_r": 14,
+        "bot_r": 4
+      },
+      "dial": {
+        "place": "end",
+        "d": 24,
+        "t": 6,
+        "ring": [
+          "#c8322b",
+          "#8e1f1a"
+        ]
+      },
+      "shaft_lock": {
+        "z": 24,
+        "a": -50,
+        "d": 12,
+        "r": 35.5,
+        "travel": 3
+      },
+      "looks": {
+        "motor_cap": {
+          "c": [
+            0.067,
+            0.6,
+            0.63
+          ],
+          "f": "plastic"
+        },
+        "dial": {
+          "c": [
+            0.78,
+            0.2,
+            0.17
+          ],
+          "f": "plastic"
+        }
+      }
+    }
+  }
+}

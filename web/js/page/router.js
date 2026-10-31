@@ -46,7 +46,7 @@
   const RT_MESH = { collet_nut: ["Router_ColletNut", "Collet nut"], collet: ["Router_Collet", "Collet"], thread: ["Router_Thread", "Shaft thread"],
     shaft: ["Router_Shaft", "Shaft"], bearing_cap: ["Router_BearingCap", "Bearing cap"], housing: ["Router_Housing", "Motor housing"],
     collar: ["Router_Collar", "Collar"], transition: ["Router_Transition", "Transition"], motor_cap: ["Router_MotorCap", "Motor cap"],
-    dial: ["Router_Dial", "Speed dial"], switch: ["Router_Switch", "Switch"], shaft_lock: ["Router_ShaftLock", "Shaft lock"], lock_boss: ["Router_LockBoss", "Shaft lock boss"],
+    dial: ["Router_Dial", "Speed dial"], switch: ["Router_Switch", "Switch"], shaft_lock: ["Router_ShaftLock", "Shaft lock"], lock_boss: ["Router_LockBoss", "Shaft lock boss"], brush_cap: ["Router_BrushCap", "Brush caps"], brush_ring: ["Router_BrushRing", "Brush cap borders"],
     strain_relief: ["Router_StrainRelief", "Strain relief"], cord: ["Router_Cord", "Cord"], trim: ["Router_Trim", "Trim"] };
   const RT_OWN = /^Router_(?!Cord_Run$)/;                          // the page's router meshes (+ the bit)
   // the model bit (a 1/8" 2-flute end mill 20 mm out of the nut, as the size build's): GUESS until the bit settings say

@@ -285,122 +285,17 @@
           <p><b>New</b> makes a copy of this router to shape. <b>Reset</b> puts a built-in router back the way it came;
           <b>Delete</b> removes one you made. <b>Export</b> saves it as a file to share; <b>Import</b> loads one someone
           shared (it's added to the list).</p>
-          <p><b>Close-up</b> shows just the router, its mount and the top of the dust shoe (no skirt or bristles), framed,
-          with its sizes drawn on it: click a part of the router to light it up and get sliders for just that part, click a number to type a new one (Enter), or drag a dot to pull that end. Side,
-          Front and Top are flat like a drawing (scroll to zoom, right-drag to pan); 3D turns any way. Its <b>Show</b> boxes take out the shoe top or either mount, or add the core to see
-          how the router fits in it. Back or Esc puts the
-          machine back.</p>
+          <p><b>Edit router</b> opens the router editor: its settings on the left, the router close up (just the router, its
+          mount and the top of the dust shoe, no skirt or bristles), framed, with its sizes drawn on it: click a part of the router to light it up and get sliders for just that part, click a number to type a new one (Enter), or drag a dot to pull that end. Front,
+          Right and Top are flat like a drawing (scroll to zoom, right-drag to pan); 3D turns any way. Its <b>Show</b> boxes take out the shoe top or either mount, or add the core to see
+          how the router fits in it. On the Motor cap tab the cap's shape editor opens on the right. Back to the
+          machine (or Esc) leaves.</p>
           <p>Sizes are mm, measured with the router standing up: z from the bottom of the collet nut, x toward the switch
           and dial end of the head, the cord out of the other end.</p></div>
         <div class="rb-btns">
-          <button type="button" id="rb-view" aria-pressed="false" title="Just the router, its mount and the top of the shoe, close up (Back or Esc to leave)">⤢ Close-up</button>
-          <button type="button" id="rb-undo" disabled title="Undo the last change to a router (Ctrl+Z)">↶ Undo</button>
-          <button type="button" id="rb-redo" disabled title="Redo (Ctrl+Shift+Z)">↷ Redo</button>
-          <button type="button" id="rb-new" title="A copy of this router to shape">New</button>
-          <button type="button" id="rb-reset" title="Put this router back the way it came / remove one you made">Reset</button>
-          <button type="button" id="rb-export" title="Save this router as a file to share">Export</button>
-          <button type="button" id="rb-import" title="Load a router file someone shared">Import</button>
-          <input type="file" id="rb-file" accept=".json,application/json" hidden>
+          <button type="button" id="rb-view" aria-pressed="false" title="The router editor: every size, the motor cap's shape, colors - the router close up (Back or Esc to leave)">✎ Edit router…</button>
         </div>
-        <div class="rb-show" id="rb-core-box" hidden><span>Show</span>
-          <label class="check"><input type="checkbox" id="rb-shoe" checked> Shoe top</label>
-          <label class="check"><input type="checkbox" id="rb-mb" checked> Lower mount</label>
-          <label class="check"><input type="checkbox" id="rb-mt" checked> Upper mount</label>
-          <label class="check" title="To see how the router fits in the core"><input type="checkbox" id="rb-core"> Core</label></div>
-        <p class="foot" id="rb-msg" hidden></p>
-        <div class="field"><label for="rb-name">Name</label><input id="rb-name" type="text" maxlength="40"></div>
-        <div class="variant" id="rb-kind"><span>It's a</span>
-          <button type="button" data-v="router" aria-pressed="true">Router</button>
-          <button type="button" data-v="spindle" aria-pressed="false">Spindle</button></div>
-        <div class="rb-tabs" id="rb-tabs" role="tablist" aria-label="Router settings">
-          <button type="button" role="tab" data-v="speed" aria-selected="true">Speed</button>
-          <button type="button" role="tab" data-v="mount" aria-selected="false">Mount</button>
-          <button type="button" role="tab" data-v="stack" aria-selected="false">Turned part</button>
-          <button type="button" role="tab" data-v="bitend" aria-selected="false">Bit end</button>
-          <button type="button" role="tab" data-v="head" aria-selected="false" class="rb-router">Motor cap</button>
-          <button type="button" role="tab" data-v="colors" aria-selected="false">Colors</button>
-          <button type="button" class="q" id="rb-tab-q" data-help="help-rb-speed" aria-label="About these settings" title="About these settings">?</button></div>
-        <div class="rb-sec" data-sec="speed">
-        <div class="help" id="help-rb-speed" hidden><p><b>Speed dial:</b> a trim router you turn on by hand; the G-code's S does
-          nothing, the dial sets the speed. Put in the RPM at each number of the dial (the manual's table).</p>
-          <p><b>G-code S:</b> the controller sets the speed (a PWM router like the AutoSpin T1, or a spindle). Put in its
-          lowest accurate and its top speed.</p></div>
-        <div class="help" id="help-rb-mount" hidden>
-          <p><b>Mount:</b> which V1E tool mount + dust shoe set it fits: Kobalt, Makita 701 / AutoSpin T1 (also the
-          Carbide Compact Router and a 65 mm spindle) or DeWalt 611. Their files come from V1 Engineering on Printables:
-          add the set's zip under Parts, or it's drawn as the Kobalt set until you do. <b>None:</b> no V1E dust shoe, so no shoe or vacuum hose is drawn (or in the BOM).</p>
-          <p><b>Nut below the clamp:</b> where you clamp it - mm from the bottom of the collet nut up to the bottom of the
-          mount's lower clamp. More = the router and its bit sit lower (further out under the shoe). Kept with the router; a
-          note shows if a clamp ends up off the motor housing.</p></div>
-        <div class="variant" id="rb-source"><span>Speed comes from</span>
-          <button type="button" data-v="manual" aria-pressed="true">Speed dial</button>
-          <button type="button" data-v="gcode" aria-pressed="false">G-code S</button></div>
-        <div class="rb-grid" id="rb-dial"></div>
-        <div class="rb-grid" id="rb-s"></div>
-        </div>
-        <div class="rb-sec" data-sec="mount">
-        <div class="field"><label for="rb-mount">Mount</label>
-          <select id="rb-mount"><option value="kobalt">Kobalt</option><option value="makita">Makita 701 / T1 (65 mm)</option><option value="dewalt">DeWalt 611 (69 mm)</option><option value="none">None</option></select></div>
-        <p class="foot" id="rb-mountnote" hidden></p>
-        </div>
-        <div class="rb-sec" data-sec="stack">
-        <div class="help" id="help-rb-stack" hidden><p>The round part, stacked up from the collet nut: the nut, the
-          <b>exposed shaft</b> (the gap between the nut's top and the bearing cap), the <b>bearing cap</b>, the <b>motor
-          housing</b> (the part the mount clamps) and the <b>collar</b> on top of it. A part with a 0 size is left out.</p>
-          <p><b>Overall height:</b> nut bottom to the top of the motor cap.</p>
-          <p><b>Motor housing chamfer:</b> the 45° bevel round its bottom edge, at the collet end (0 = square).</p>
-          <p><b>Vent:</b> most routers are open at the collet end so the fan can blow out: a thin wall down to the rim,
-          and inside it spokes from the hub (the bearing cap) out to the wall. <b>Vent depth</b>: how deep the openings
-          between the spokes go (0 = a closed end), <b>Vent wall</b>: the wall's thickness, <b>Vent spokes</b>: how many,
-          <b>Spoke width</b>, <b>Spokes in from the rim</b>: how far the spokes' face sits inside the rim.</p>
-          <p><b>Transition to the motor cap:</b> the part between the collar and the cap (length 0 = none). <b>Round</b>: a cone
-          from the collar to its top Ø. <b>To the cap's shape</b>: it changes from round at the collar to the cap's rounded
-          box under it. <b>Where it meets the cap</b>: plain, or a fillet / chamfer of that size blending it into the cap's
-          underside. The cap sits on it.</p>
-          <p><b>Shaft lock button:</b> the button you press to hold the shaft while you change bits - its height up from
-          the nut's bottom, its angle round from the switch end (counter-clockwise from above, negative = clockwise), the
-          boss it sits on (a sleeve round the button; its Ø, 0 = no boss: the button comes straight out of the housing), where
-          the boss starts out from the router's center, an arm up from it to the housing (its width, 0 = none: a lock held
-          below the hub on a bracket), how far the lock reaches out from the center, the button's Ø, its pin's Ø (it goes
-          through a hole in the shaft, square to the flats; 0 = none), how far the button stands out and how far it presses
-          in. The boss has its own color (Colors). A bit change can also hold the shaft with a second wrench on its flats (Bit end) -
-          a router with no lock always does.</p>
-          <p><b>A spindle:</b> the nut, the exposed shaft, the bearing cap and the can - its diameter (65 mm for the
-          V1E mount) and length up to the top. Air-cooled has a fan on top, water-cooled two hose barbs.</p>
-          <p>Each part's color and finish (metal, plastic, rubber) are under Colors.</p></div>
-        <div class="rb-grid" id="rb-stack"></div>
-        </div>
-        <div class="rb-sec" data-sec="bitend">
-        <div class="help" id="help-rb-bitend" hidden><p>What a bit change takes apart. <b>Collet sizes:</b> every shank the
-          router's collets take (mm, comma apart: 1/8" = 3.175, 1/4" = 6.35); a bit with another shank swaps the collet, a
-          shank no collet takes can't go in. The <b>collet</b> sits in the nut, its wide end down.</p>
-          <p><b>Nut face below the shaft end:</b> how far the shaft's end sits up inside the nut. The <b>thread</b> (Ø, pitch,
-          length) is what the nut spins off: one turn per pitch.</p>
-          <p><b>Wrench flats:</b> two flats on the exposed shaft (across, height from the nut's bottom, length) for a
-          second wrench to hold it while the first turns the nut - for a router with no shaft lock.</p>
-          <p>The Kobalt and the Carbide take ER11 collets (1/8" + 1/4") with an ER11A nut on an M13 x 0.75 thread; the
-          rest of these sizes are guesses until measured.</p></div>
-        <div class="rb-grid" id="rb-bitend"></div>
-        </div>
-        <div class="rb-sec" data-sec="head">
-        <div class="help" id="help-rb-head" hidden><p>The motor cap: a rounded box sitting on the turned part - length along the
-          switch end, width across, height up from the turned part (it always sits right on it: Overall height = the turned
-          part + this, and changing either one changes the other).</p>
-          <p><b>Fillets:</b> top = the top edges, front = the upright corners at the switch end, back = at the cord end,
-          under = the bottom edges.</p>
-          <p><b>Dial:</b> on the end = lying flat, its rim out of the switch end; on top = standing across the cap, its rim
-          up through the top.</p></div>
-        <div class="rb-grid" id="rb-head"></div>
-        <div class="variant" id="rb-dialplace"><span>Dial</span>
-          <button type="button" data-v="end" aria-pressed="true">On the end</button>
-          <button type="button" data-v="top" aria-pressed="false">On top</button></div>
-        </div>
-        <div class="rb-sec" data-sec="colors">
-        <div class="help" id="help-rb-colors" hidden><p>Each part's color and finish: <b>metal</b> reflects the shop (the
-          housing, the shaft, the collet nut), <b>plastic</b> is satin (the motor cap, the dial), <b>rubber</b> is matte (the
-          cord). The dial's color sets its numbered ring too.</p></div>
-        <div class="rb-grid" id="rb-colors"></div>
-        </div>
+        <p class="foot rb-phone">Editing a router needs a bigger screen than a phone's.</p>
       </div>
     </details>
     <details class="step" id="st-look">
@@ -629,7 +524,7 @@
 <dialog class="about" id="keys-dlg" aria-labelledby="keys-h">
   <h2 id="keys-h">Keyboard shortcuts</h2>
   <dl class="keys">
-    <dt>1 – 5</dt><dd>Iso, Front, Top, Side, Back</dd>
+    <dt>1 – 5</dt><dd>Iso, Front, Top, Side, Back (editing a router: 3D, Front, Top, Right)</dd>
     <dt>F</dt><dd>Fit all</dd>
     <dt>M</dt><dd>Measure (Esc ends it)</dd>
     <dt>P</dt><dd>Save the view as a picture</dd>
@@ -649,9 +544,190 @@
   <div class="bom-body" id="bom-body"></div>
 </dialog>
 
+  <section class="rte" id="rte" aria-label="Edit your router" hidden>
+    <div class="rte-top"><b id="rte-h">Your router</b><button type="button" id="rte-back">← Back to the machine</button></div>
+    <div class="rte-body" id="rte-body">
+    <div class="rb-btns">
+      <button type="button" id="rb-undo" disabled title="Undo the last change to a router (Ctrl+Z)">↶ Undo</button>
+      <button type="button" id="rb-redo" disabled title="Redo (Ctrl+Shift+Z)">↷ Redo</button>
+      <button type="button" id="rb-new" title="A copy of this router to shape">New</button>
+      <button type="button" id="rb-reset" title="Put this router back the way it came / remove one you made">Reset</button>
+      <button type="button" id="rb-export" title="Save this router as a file to share">Export</button>
+      <button type="button" id="rb-import" title="Load a router file someone shared">Import</button>
+      <input type="file" id="rb-file" accept=".json,application/json" hidden>
+    </div>
+    <div class="rb-show" id="rb-core-box" hidden><span>Show</span>
+      <label class="check"><input type="checkbox" id="rb-shoe" checked> Shoe top</label>
+      <label class="check"><input type="checkbox" id="rb-mb" checked> Lower mount</label>
+      <label class="check"><input type="checkbox" id="rb-mt" checked> Upper mount</label>
+      <label class="check" title="To see how the router fits in the core"><input type="checkbox" id="rb-core"> Core</label></div>
+    <p class="foot" id="rb-msg" hidden></p>
+    <div class="field"><label for="rb-name">Name</label><input id="rb-name" type="text" maxlength="40"></div>
+    <div class="variant" id="rb-kind"><span>It's a</span>
+      <button type="button" data-v="router" aria-pressed="true">Router</button>
+      <button type="button" data-v="spindle" aria-pressed="false">Spindle</button></div>
+    <div class="rb-tabs" id="rb-tabs" role="tablist" aria-label="Router settings">
+      <button type="button" role="tab" data-v="speed" aria-selected="true">Speed</button>
+      <button type="button" role="tab" data-v="mount" aria-selected="false">Mount</button>
+      <button type="button" role="tab" data-v="stack" aria-selected="false">Turned part</button>
+      <button type="button" role="tab" data-v="bitend" aria-selected="false">Bit end</button>
+      <button type="button" role="tab" data-v="head" aria-selected="false" class="rb-router">Motor cap</button>
+      <button type="button" role="tab" data-v="colors" aria-selected="false">Colors</button>
+      <button type="button" class="q" id="rb-tab-q" data-help="help-rb-speed" aria-label="About these settings" title="About these settings">?</button></div>
+    <div class="rb-sec" data-sec="speed">
+    <div class="help" id="help-rb-speed" hidden><p><b>Speed dial:</b> a trim router you turn on by hand; the G-code's S does
+      nothing, the dial sets the speed. Put in the RPM at each number of the dial (the manual's table).</p>
+      <p><b>G-code S:</b> the controller sets the speed (a PWM router like the AutoSpin T1, or a spindle). Put in its
+      lowest accurate and its top speed.</p></div>
+    <div class="help" id="help-rb-mount" hidden>
+      <p><b>Mount:</b> which V1E tool mount + dust shoe set it fits: Kobalt, Makita 701 / AutoSpin T1 (also the
+      Carbide Compact Router and a 65 mm spindle) or DeWalt 611. Their files come from V1 Engineering on Printables:
+      add the set's zip under Parts, or it's drawn as the Kobalt set until you do. <b>None:</b> no V1E dust shoe, so no shoe or vacuum hose is drawn (or in the BOM).</p>
+      <p><b>Nut below the clamp:</b> where you clamp it - mm from the bottom of the collet nut up to the bottom of the
+      mount's lower clamp. More = the router and its bit sit lower (further out under the shoe). Kept with the router; a
+      note shows if a clamp ends up off the motor housing.</p></div>
+    <div class="variant" id="rb-source"><span>Speed comes from</span>
+      <button type="button" data-v="manual" aria-pressed="true">Speed dial</button>
+      <button type="button" data-v="gcode" aria-pressed="false">G-code S</button></div>
+    <div class="rb-grid" id="rb-dial"></div>
+    <div class="rb-grid" id="rb-s"></div>
+    </div>
+    <div class="rb-sec" data-sec="mount">
+    <div class="field"><label for="rb-mount">Mount</label>
+      <select id="rb-mount"><option value="kobalt">Kobalt</option><option value="makita">Makita 701 / T1 (65 mm)</option><option value="dewalt">DeWalt 611 (69 mm)</option><option value="none">None</option></select></div>
+    <p class="foot" id="rb-mountnote" hidden></p>
+    </div>
+    <div class="rb-sec" data-sec="stack">
+    <div class="help" id="help-rb-stack" hidden><p>The round part, stacked up from the collet nut: the nut, the
+      <b>exposed shaft</b> (the gap between the nut's top and the bearing cap), the <b>bearing cap</b>, the <b>motor
+      housing</b> (the part the mount clamps) and the <b>collar</b> on top of it. A part with a 0 size is left out.</p>
+      <p><b>Overall height:</b> nut bottom to the top of the motor cap.</p>
+      <p><b>Motor housing chamfer:</b> the 45° bevel round its bottom edge, at the collet end (0 = square).</p>
+      <p><b>Vent:</b> most routers are open at the collet end so the fan can blow out: a thin wall down to the rim,
+      and inside it spokes from the hub (the bearing cap) out to the wall. <b>Vent depth</b>: how deep the openings
+      between the spokes go (0 = a closed end), <b>Vent wall</b>: the wall's thickness, <b>Vent spokes</b>: how many,
+      <b>Spoke width</b>, <b>Spokes in from the rim</b>: how far the spokes' face sits inside the rim.</p>
+      <p><b>Transition to the motor cap:</b> the part between the collar and the cap (length 0 = none). <b>Round</b>: a cone
+      from the collar to its top Ø. <b>To the cap's shape</b>: it changes from round at the collar to the cap's rounded
+      box under it. <b>Where it meets the cap</b>: plain, or a fillet / chamfer of that size blending it into the cap's
+      underside. The cap sits on it.</p>
+      <p><b>Shaft lock button:</b> the button you press to hold the shaft while you change bits - its height up from
+      the nut's bottom, its angle round from the switch end (counter-clockwise from above, negative = clockwise), the
+      boss it sits on (a sleeve round the button; its Ø, 0 = no boss: the button comes straight out of the housing), where
+      the boss starts out from the router's center, an arm up from it to the housing (its width, 0 = none: a lock held
+      below the hub on a bracket), how far the lock reaches out from the center, the button's Ø, its pin's Ø (it goes
+      through a hole in the shaft, square to the flats; 0 = none), how far the button stands out and how far it presses
+      in. The boss has its own color (Colors). A bit change can also hold the shaft with a second wrench on its flats (Bit
+      end) - a router with no lock always does.</p>
+      <p><b>Brush caps:</b> the round caps over the motor's brushes (most trim routers have two, either side): their height
+      up from the nut's bottom, the angle of the first (the rest evenly round), how many, their Ø, how far out from the
+      router's center the body's surface is there, how far they stand out (with no border), a border round each in the
+      head's color, flush with the body (0 = none; most sit where the head meets the transition) and how far the cap sits
+      in from the border (Cap inset), and the angle of its screwdriver slot (from upright). Dark gray unless you change it
+      (Colors).</p>
+      <p><b>A spindle:</b> the nut, the exposed shaft, the bearing cap and the can - its diameter (65 mm for the
+      V1E mount) and length up to the top. Air-cooled has a fan on top, water-cooled two hose barbs.</p>
+      <p>Each part's color and finish (metal, plastic, rubber) are under Colors.</p></div>
+    <div class="rb-grid" id="rb-stack"></div>
+    </div>
+    <div class="rb-sec" data-sec="bitend">
+    <div class="help" id="help-rb-bitend" hidden><p>What a bit change takes apart. <b>Collet sizes:</b> every shank the
+      router's collets take (mm, comma apart: 1/8" = 3.175, 1/4" = 6.35); a bit with another shank swaps the collet, a
+      shank no collet takes can't go in. The <b>collet</b> sits in the nut, its wide end down.</p>
+      <p><b>Nut face below the shaft end:</b> how far the shaft's end sits up inside the nut. The <b>thread</b> (Ø, pitch,
+      length) is what the nut spins off: one turn per pitch.</p>
+      <p><b>Wrench flats:</b> two flats on the exposed shaft (across, height from the nut's bottom, length) for a
+      second wrench to hold it while the first turns the nut - for a router with no shaft lock.</p>
+      <p>The Kobalt and the Carbide take ER11 collets (1/8" + 1/4") with an ER11A nut on an M13 x 0.75 thread; the
+      rest of these sizes are guesses until measured.</p></div>
+    <div class="rb-grid" id="rb-bitend"></div>
+    </div>
+    <div class="rb-sec" data-sec="head">
+    <div class="help" id="help-rb-head" hidden><p>The motor cap: a rounded box sitting on the turned part - length along the
+      switch end, width across, height up from the turned part (it always sits right on it: Overall height = the turned
+      part + this, and changing either one changes the other).</p>
+      <p><b>Shape:</b> draw the cap from above, the side and the end instead of a box (the shape editor opens over the
+      model). Once it has a shape, Length / Width / Height stretch the shape and the fillets don't apply; <b>Plain box</b>
+      in the editor goes back to the box.</p>
+      <p><b>Fillets:</b> top = the top edges, front = the upright corners at the switch end, back = at the cord end,
+      under = the bottom edges.</p>
+      <p><b>Switch below the top:</b> how far the switch's center is under the top of the head (until you type one, it's
+      placed by the dial).</p>
+      <p><b>Dial:</b> on the end = lying flat, its rim out of the switch end; on top = standing across the cap, its rim
+      up through the top; in a window = lying flat inside the cap, its rim seen through a window in the top (the Kobalt's,
+      most trim routers'): <b>Rim in from the end</b> and <b>Below the top</b> place the wheel, <b>Window length</b> (from
+      the rim inward) and <b>width</b> size the opening, <b>Window bevel</b> the 45° edge down into it, <b>Open at the end</b>
+      makes it a notch through the end too.</p></div>
+    <div class="rb-shapebar"><button type="button" id="rb-shape" aria-pressed="false" aria-controls="ce">✎ Shape…</button>
+      <span class="foot" id="rb-shapenote" hidden>Drawn in the shape editor.</span></div>
+    <div class="rb-grid" id="rb-head"></div>
+    <div class="variant" id="rb-dialplace"><span>Dial</span>
+      <button type="button" data-v="end" aria-pressed="true">On the end</button>
+      <button type="button" data-v="top" aria-pressed="false">On top</button>
+      <button type="button" data-v="window" aria-pressed="false" hidden>In a window</button></div>
+        <div id="rb-dialwin" hidden><div class="rb-grid" id="rb-dialwin-g"></div>
+      <label class="check"><input type="checkbox" id="rb-win-open"> Window open at the end (a notch)</label></div>
+    </div>
+    <div class="rb-sec" data-sec="colors">
+    <div class="help" id="help-rb-colors" hidden><p>Each part's color and finish: <b>metal</b> reflects the shop (the
+      housing, the shaft, the collet nut), <b>plastic</b> is satin (the motor cap, the dial), <b>rubber</b> is matte (the
+      cord). The dial's color sets its numbered ring too.</p></div>
+    <div class="rb-grid" id="rb-colors"></div>
+    </div>
+    </div>
+  </section>
 <main class="stage">
   <canvas id="c" aria-label="3D model of the LowRider 4 assembly"></canvas>
   <div class="meas-tip" id="meas-tip" hidden></div>
+  <section class="ce" id="ce" aria-label="Motor cap shape" hidden>
+    <div class="ce-bar">
+      <b>Motor cap shape</b>
+      <span class="ce-seg" id="ce-views" role="group" aria-label="View"><button type="button" data-v="top" aria-pressed="true">Top</button><button type="button" data-v="front" aria-pressed="false">Front</button><button type="button" data-v="section" aria-pressed="false">Cross-section</button></span>
+      <select id="ce-start" aria-label="Start from a shape" title="Start again from one of these, at the cap's size"><option value="" selected>Start from…</option><option value="box">Box</option><option value="can">Round can</option><option value="dome">Dome</option><option value="pear">Pear</option></select>
+      <button type="button" id="ce-plain" title="Drop the shape: the cap is the box from its sizes again">Plain box</button>
+      <button type="button" class="q" data-help="help-ce" aria-label="About the shape editor" title="About the shape editor">?</button>
+      <button type="button" id="ce-close" aria-label="Close the shape editor" title="Close">✕</button>
+    </div>
+    <div class="ce-bar ce-pbar">
+      <button type="button" id="ce-photo" title="A photo under this view to trace">Photo…</button>
+      <input type="file" id="ce-pfile" accept="image/*" hidden>
+      <button type="button" id="ce-scale" aria-pressed="false" disabled title="Click two points on the photo, then type how far apart they are">Set scale</button>
+      <button type="button" id="ce-move" aria-pressed="false" disabled title="Drag the photo to line it up">Move</button>
+      <label class="ce-num">Turn <input type="number" id="ce-rot" step="0.5" value="0" disabled aria-label="Turn the photo, degrees"> °</label>
+      <input type="range" id="ce-op" min="0.1" max="1" step="0.05" value="0.6" disabled aria-label="How see-through the photo is" title="See-through">
+      <button type="button" id="ce-pdel" disabled title="Remove this view's photo">Remove</button>
+      <button type="button" id="ce-fit" title="Fit the drawing to the window">Fit</button>
+    </div>
+    <div class="ce-bar" id="ce-scalebox" hidden><label class="ce-num">Distance between the two points <input type="number" id="ce-dist" step="0.1" min="0" aria-label="Distance between the two points, mm"> mm</label><button type="button" id="ce-scale-ok">Set</button></div>
+    <p class="foot ce-msg" id="ce-msg" aria-live="polite"></p><p class="foot" id="ce-pnote" hidden></p>
+    <div class="ce-draw">
+      <svg class="ce-svg" id="ce-svg" role="img" aria-label="The view's outline: drag a point, click the line to add one"></svg>
+      <div class="ce-pop" id="ce-pop" hidden><label><span id="ce-pop-l">Round</span> <input type="number" id="ce-pop-v" step="0.5" min="0" aria-label="Round this corner, mm"> mm</label>
+        <button type="button" id="ce-pop-flip" class="ce-flip" title="Bulge the arc the other way" aria-label="Bulge the arc the other way" hidden>⇄</button></div>
+    </div>
+    <p class="foot ce-note" id="ce-note"></p>
+    <div class="ce-bar" id="ce-secs" hidden><label class="ce-num">Section <select id="ce-sec" aria-label="Section"></select></label>
+      <span class="field"><label class="ce-num">at X = <input type="number" id="ce-sec-at" step="1" aria-label="Where this section is, left–right"> mm</label></span>
+      <button type="button" id="ce-sec-add" title="Another section further along: the cap blends between them">+ Section</button>
+      <button type="button" id="ce-sec-del" title="Remove this section">Remove</button></div>
+    <div class="ce-tbl"><table><thead><tr><th>#</th><th id="ce-hx"></th><th id="ce-hy"></th><th>To the next point</th><th>Round this corner</th><th>Curve here</th></tr></thead><tbody id="ce-rows"></tbody></table></div>
+  </section>
+  <div class="help" id="help-ce" hidden><p><b>The motor cap from three views,</b> named by where you stand at the machine.
+    <b>Top</b>: its outline from above, one half - the other half mirrors it front to back; the left and right ends can
+    differ. <b>Front</b>: from the machine's front, all the way round - its top and bottom from the left end to the
+    right. <b>Cross-section</b>: a slice across the cap seen from the right, one half (mirrored); every slice is this
+    shape stretched to the width (Top) and height (Front) there. Sizes in mm: left–right from the router's axis (0), up
+    from the cap's bottom (the top of the turned part).</p>
+    <p><b>Points:</b> drag one (snaps to 0.5 mm; hold Alt for finer), click the line to add one, Delete removes the picked
+    one; or type the numbers in the table. <b>To the next point</b>: a Straight line, an Arc (part of a circle: its radius;
+    ⇄ bulges it the other way) or a Curve (smooth through the points). <b>Round this corner</b>: on a point where two
+    straight lines meet, how much to round it (blank = sharp). <b>Curve here</b>: on a point a curve runs through - drag
+    the little squares either side of the picked point to bend it; Reset makes it smooth again.</p>
+    <p><b>Photo:</b> put a photo under the view and trace it. Set scale: click two points on it you know the distance
+    between (e.g. across the housing) and type it. Move lines it up; Turn straightens it. Each view keeps its own photo
+    in this browser.</p>
+    <p><b>Start from</b> a box, round can, dome or pear at the cap's size. <b>Cross-section</b>: + Section adds another
+    slice at X = (e.g. a rounder left end) - the cap blends between them. <b>Plain box</b> drops the shape.</p></div>
   <div class="status" id="status" role="status" aria-live="polite"><div id="status-title">Loading model…</div><div class="bar"><div id="status-bar"></div></div><div class="detail" id="status-detail">&nbsp;</div></div>
   <div class="toolbar" role="toolbar" aria-label="View">
     <button id="v-layers" type="button" aria-expanded="false" aria-controls="layers-pop" title="Layers: what the view shows (L)">Layers</button>
@@ -1166,6 +1242,7 @@
 <script src="js/strut_plate.js"></script>
 <script src="data/routers.js"></script>
 <script src="js/strut_cam.js"></script>
+<script src="js/cap_shape.js"></script>
 <script src="js/routers.js"></script>
 <script src="js/router_body.js"></script>
 <script src="js/router_dims.js"></script>
@@ -1209,6 +1286,7 @@
 <script src="js/page/power.js"></script>
 <script src="js/page/router.js"></script>
 <script src="js/page/router_build.js"></script>
+<script src="js/page/cap_edit.js"></script>
 <script src="js/page/router_edit.js"></script>
 <script src="js/page/tool_change.js"></script>
 <script src="js/page/ui.js"></script>

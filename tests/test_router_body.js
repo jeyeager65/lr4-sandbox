@@ -91,5 +91,30 @@ const g = B.expand({ collet_nut: { af: 20, h: 10, below: 1 }, shaft: { d: 12, ex
 ok(g.cap.z[0] === 100 && g.cap.z[1] === 160 && g.cap.r[0] === 8 && g.cap.r[1] === 20 && g.cap.top_r === 5 && g.cap.bot_r === 3,
   `motor cap: on the stack, back / front corner fillets, top / underneath ${JSON.stringify(g.cap)}`);
 
+// a shaped motor cap (Part 46b): drawn from its three views, closed + out, the size the shape says; the dial, switch
+// and strain relief on it; the cap's plan + top follow the shape (the transition to it, a dial on top)
+{
+  const CS = require("../web/js/cap_shape.js"), km = M("kobalt"), c0 = km.motor_cap;
+  const shape = CS.STARTS.pear({ L: 100, W: 76, H: 58, at: 0, top_r: 10 });
+  const sm = R.clean({ name: "shaped", source: "manual", speeds: R.ROUTERS.kobalt.speeds, mount: "kobalt", model: Object.assign({}, km, { motor_cap: Object.assign({}, c0, { shape }) }) }).model;
+  const sb = B.build(sm), mc = sb.parts.motor_cap, [lo, hi] = bbox(mc), z = CS.size(sm.motor_cap.shape), z0 = B.stackTop(sm);
+  ok(!!sm.motor_cap.shape && sm.motor_cap.L === z.L && sm.motor_cap.H === z.H, `shaped cap: kept by clean(), its size from the shape (${sm.motor_cap.L} x ${sm.motor_cap.W} x ${sm.motor_cap.H})`);
+  ok(volume(mc) > 0 && Math.abs(hi[0] - lo[0] - z.L) < 0.2 && Math.abs(hi[1] - lo[1] - z.W) < 0.2 && Math.abs(lo[2] - z0) < 0.2 && Math.abs(hi[2] - z0 - z.H) < 0.4,   // (a window dial's strip: 0.3 proud)
+    `shaped cap: faces out, ${f(lo)} .. ${f(hi)} (on the stack at ${z0})`);
+  const ex = B.expand(sm);
+  ok(ex.switch.at[0] > hi[0] - 3 && ex.switch.at[0] < hi[0] + 2 && ex.strain_relief.at[0] < lo[0] + 3, `shaped cap: the switch on its front (${ex.switch.at[0].toFixed(1)}), the relief at its back (${ex.strain_relief.at[0].toFixed(1)})`);
+  const top = Object.assign({}, sm, { dial: Object.assign({}, sm.dial, { place: "top" }), transition: { l: 20, d: 70, shape: "cap", edge: "fillet", e: 3 } });
+  const tb = B.build(top), [dlo] = bbox(tb.parts.dial), [, thi] = bbox(tb.parts.transition);
+  ok(dlo[2] > z0 + 20 && thi[2] <= B.stackTop(top) + 0.01 && tb.parts.trim.idx.length > 0, `shaped cap: a dial on top sits in it (${dlo[2].toFixed(1)}), the transition lofts up to its plan`);
+}
+
+// the Makita collet (user's photo 2026-10-30): a cone nose, a barrel, a ring at the far end, 3 slits from the nose
+{
+  const mc = B.colletPart(M("makita"), 3.175);
+  let zlo = Infinity, zhi = -Infinity, rmax = 0;
+  for (let i = 0; i < mc.pos.length; i += 3) { zlo = Math.min(zlo, mc.pos[i + 2]); zhi = Math.max(zhi, mc.pos[i + 2]); rmax = Math.max(rmax, Math.hypot(mc.pos[i], mc.pos[i + 1])); }
+  ok(volume(mc) > 0 && Math.abs(zhi - zlo - 20) < 0.01 && Math.abs(rmax - 7) < 0.01, `Makita collet: closed + out, 20 long, Ø14 at the cone (${(zhi - zlo).toFixed(2)}, ${(2 * rmax).toFixed(2)})`);
+}
+
 console.log(fails ? `${fails} of ${checks} failed` : `${checks}/${checks} checks passed`);
 process.exit(fails ? 1 : 0);

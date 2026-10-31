@@ -3,6 +3,7 @@
 // on screen, the dial's angle; sounds.js routerPlan keeps the file's dial.
 //   node tests/test_routers.js
 "use strict";
+require("./fixtures/fixture.js").addToData();         // the tests' own box router (testbox): fixed sizes, whatever the presets become
 const R = require("../web/js/routers.js");
 const S = require("../web/js/sounds.js");
 
@@ -67,11 +68,11 @@ ok(id === "custom-mine" && R.ROUTERS[id].custom && !R.manual(id) && R.rpm({ rout
 mine.source = "manual"; R.define(id, mine);
 ok(SC.ROUTERS[id] && R.dialRpm(1, id) === R.ROUTERS.kobalt.speeds[0][1] && R.newId("Mine") === "custom-mine-2", "define: manual without a table -> the Kobalt's; ids stay unique");
 R.define(id, null);
-ok(!R.ROUTERS[id] && !SC.ROUTERS[id] && R.define("makita", null).model.motor_cap.L === 78, "define(null): a custom one gone, a preset back to its data");
+ok(!R.ROUTERS[id] && !SC.ROUTERS[id] && R.define("testbox", null).model.motor_cap.L === 78, "define(null): a custom one gone, a preset back to its data");
 
 // the motor cap always sits on the turned part; a longer housing lifts it; it covers the turned part
 const hb = (p) => { const m = B.build(p.model).parts.motor_cap; let z = Infinity; for (let i = 2; i < m.pos.length; i += 3) z = Math.min(z, m.pos[i]); return z; };
-const gap = R.preset("makita");
+const gap = R.preset("testbox");                 // the tests' own box router (tests/fixtures)
 gap.model.motor_cap.H = 20;
 const g1 = R.clean(gap);
 ok(Math.abs(hb(g1) - B.stackTop(g1.model)) < 0.5 && B.overall(g1.model) === B.stackTop(g1.model) + 20, `H 20: on the housing, overall ${B.overall(g1.model)}`);
@@ -85,9 +86,9 @@ ok(g3.W === 65 && g3.L === 65, `a cap narrower than the housing -> the housing's
 // the dimensions on the model (router_dims.js): every editable one names a builder input; read-only where it's derived
 const DM = require("../web/js/router_dims.js");
 const dm = (id, c = 36.5) => Object.fromEntries(DM.dims(R.ROUTERS[id], c).map((d) => [d.id, d]));
-const mk = dm("makita");
+const mk = dm("testbox");
 ok(mk["cap-L"].v === 78 && mk["cap-L"].k === "model.motor_cap.L" && mk["cap-L"].f === 2 && mk.overall.v === 205 && mk.overall.k === "model.overall" && mk.clamp.v === 36.5,
-  "dims: the Makita's motor cap length (centered: drag x2), overall, nut below the clamp");
+  "dims: the test router's motor cap length (centered: drag x2), overall, nut below the clamp");
 ok(Object.values(mk).every((d) => d.views.length && Number.isFinite(d.v) && [d.a, d.b, d.off].every((p) => p.length === 3 && p.every(Number.isFinite))), "dims: all placed, in a view");
 ok(mk["len-shaft"].k === "model.shaft.exposed" && mk["len-collet_nut"].k === "model.collet_nut.h" && mk["dia-collet_nut"].k === "model.collet_nut.af", "dims: the exposed shaft + the collet nut");
 const cb = dm("carbide");

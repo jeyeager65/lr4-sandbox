@@ -18,6 +18,18 @@ the date the model data was built and the Printables file set it was solved for.
 - The collet nut is a hollow hex with beveled corners; the collet shows through its end. The round nut is gone.
 - Build your router: the shaft lock gets a boss Ø, where the boss starts, an arm, the button's Ø, its pin and how far
   it stands out; the motor housing gets a vent (depth, wall, spokes, spoke width, spokes in from the rim).
+- **Router editor:** the router builder moved out of the side panel into its own view. The Router step keeps the
+  router list and **Edit router…**, which opens the router close up with its sizes on it, the settings in a column on
+  the left and (on the Motor cap tab) the shape editor on the right. Back to the machine or Esc leaves. Not on phones.
+- **Motor cap shape editor** (Edit router > Motor cap): draw the cap from the top, the side and the end
+  instead of a box. Points you drag or type, each span to the next straight, an arc or a curve, corner radii, curve
+  handles; the top and end are drawn as one half and mirrored; a second end section blends along the cap. Start from a
+  box, round can, dome or pear. Put a photo under a view, set its scale from two points and trace it. Length / Width /
+  Height stretch a drawn cap; Plain box goes back to the box.
+- **Makita RT0701C remodeled** from a STEP model: a drawn head (#008290), its vent end, the lock in a bracket, brush caps,
+  a Makita-style collet (1/4", plus the V1E store's 1/8"). **Brush caps** for any router (Motor cap tab): Ø, height,
+  angle, a border in the head's color, the cap inset, its screwdriver slot. **Switch below the top** sets the switch's
+  height.
 - A router sits in its mount with the collet nut's bottom level with the core's bottom unless its preset or your
   edit sets a height (the other routers' guessed heights are gone).
 - Fixed: the page wouldn't load ("Cannot read properties of undefined (reading 'source')") when this browser had an

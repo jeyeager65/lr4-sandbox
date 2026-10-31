@@ -8,6 +8,7 @@
   "use strict";
   const SC = root.StrutCam || (typeof require === "function" ? require("./strut_cam.js") : null);
   const RD = root.LR4RouterData || (typeof require === "function" ? require("../data/routers.js") : null);
+  const CS = root.LR4CapShape || (typeof require === "function" ? require("./cap_shape.js") : null);   // the motor cap's shape (Part 46b)
   // Sienci AutoSpin T1 (Makita-size body, fits the V1E Makita 701 mount + shoe): the controller's 5 V PWM sets the
   // speed, 0-100 % = 0-31250 RPM; Sienci: under 10000 isn't accurate. Its own dial (standalone use) is ignored
   // while the controller drives it. GUESS: S = RPM straight (FluidNC speed_map 0=0% 31250=100%).
@@ -74,6 +75,7 @@
     bearing_cap: { c: SILVER, f: "metal" }, housing: { c: SILVER, f: "metal" }, collar: { c: SILVER, f: "metal" },
     transition: { c: SILVER, f: "metal" }, motor_cap: { c: [0.30, 0.30, 0.32], f: "plastic" }, dial: { c: DARK, f: "plastic" },
     switch: { c: [0.17, 0.17, 0.18], f: "plastic" }, shaft_lock: { c: [0.12, 0.12, 0.13], f: "plastic" }, lock_boss: { c: SILVER, f: "metal" },
+    brush_cap: { c: [0.16, 0.16, 0.17], f: "plastic" }, brush_ring: { c: [0.5, 0.5, 0.5], f: "plastic" },
     strain_relief: { c: DARK, f: "rubber" }, cord: { c: DARK, f: "rubber" }, trim: { c: DARK, f: "plastic" } };
   const LOOK_PARTS = Object.keys(LOOKS);
   function looks(m) {                                // the preset's looks, every part filled in
@@ -83,6 +85,7 @@
       out[k] = { c: c || LOOKS[k].c.slice(), f: L && FINISHES.includes(L.f) ? L.f : LOOKS[k].f };
     }
     if (!obj(m.looks && m.looks.lock_boss)) out.lock_boss = { c: out.housing.c.slice(), f: out.housing.f };   // the boss: as the housing, unless set
+    if (!obj(m.looks && m.looks.brush_ring)) out.brush_ring = { c: out.motor_cap.c.slice(), f: out.motor_cap.f };   // the brush caps' border: as the head
     return out;
   }
   const section = (v, d, lo, hi) => { const s = obj(v); return s ? { d: num(s.d, lo, hi, d.d), l: num(s.l, 0, 500, d.l) } : null; };
@@ -138,12 +141,29 @@
       for (const [k, lo, hi, d] of [["L", 20, 300, 80], ["W", 20, 300, 72], ["H", 10, 300, 80], ["top_r", 0, 100, 8], ["front_r", 0, 150, 14],
         ["back_r", 0, 150, 14], ["bot_r", 0, 100, 4]]) H[k] = num(h[k], lo, hi, d);
       if (Array.isArray(h.at)) H.at = [num(h.at[0], -200, 200, 0), num(h.at[1], -200, 200, 0)];
-      const wide = Math.max(...["bearing_cap", "housing", "collar"].map((k) => (m[k] ? m[k].d : 0)), m.transition && m.transition.shape === "round" ? m.transition.d : 0);
-      H.L = Math.max(H.L, wide); H.W = Math.max(H.W, wide);   // the cap covers the turned part
+      const sh = CS && h.shape ? CS.clean(h.shape) : null;   // drawn in the shape editor: its size is the shape's
+      if (sh) { const z = CS.size(sh); Object.assign(H, { shape: sh, L: z.L, W: z.W, H: z.H, at: [z.at[0], 0] }); }
+      else {
+        const wide = Math.max(...["bearing_cap", "housing", "collar"].map((k) => (m[k] ? m[k].d : 0)), m.transition && m.transition.shape === "round" ? m.transition.d : 0);
+        H.L = Math.max(H.L, wide); H.W = Math.max(H.W, wide);   // the cap covers the turned part
+      }
       m.motor_cap = H;
       const D = obj(b.dial) || {};
-      m.dial = { place: D.place === "top" ? "top" : "end", d: num(D.d, 8, 80, 24), t: num(D.t, 2, 30, 6) };
+      m.dial = { place: ["top", "window"].includes(D.place) ? D.place : "end", d: num(D.d, 8, 80, 24), t: num(D.t, 2, 30, 6) };
+      if (m.dial.place === "window") {               // lying flat inside the cap, its rim seen through a window (the Kobalt's, user 2026-10-30)
+        const Wn = obj(D.win) || {}, dd = m.dial.d;
+        Object.assign(m.dial, { in: num(D.in, -20, 60, 1), drop: num(D.drop, 0, 60, 2),
+          win: { l: num(Wn.l, 2, 120, +(dd * 0.35).toFixed(1)), w: num(Wn.w, 2, 120, +(dd * 0.8).toFixed(1)), open: Wn.open !== false,
+          bevel: num(Wn.bevel, 0, 10, 2) } });   // bevel: the 45 deg edge from the top into the window
+      }
       if (Array.isArray(D.ring) && D.ring.length === 2 && D.ring.every((v) => /^#[0-9a-f]{6}$/i.test(v))) m.dial.ring = D.ring.slice();
+      const Sw = obj(b.switch);                      // the switch: its centre `down` under the head's top (else placed by the dial)
+      if (Sw && Number.isFinite(+Sw.down)) m.switch = { down: num(Sw.down, 0, 300, 20) };
+      const Bc = obj(b.brushes);                     // the motor's brush caps (user 2026-10-30: "pretty much all of these trim routers"):
+      if (Bc) m.brushes = { n: Math.round(num(Bc.n, 1, 4, 2)), z: num(Bc.z, 0, 400, 100), a: num(Bc.a, -360, 360, 90), d: num(Bc.d, 3, 40, 12),
+        r: num(Bc.r, 5, 120, 30), out: num(Bc.out, 0.5, 30, 5), ring: num(Bc.ring, 0, 15, 0), inset: num(Bc.inset, -10, 10, 1), slot: num(Bc.slot, -180, 180, 15) };   // slot: its screwdriver slot, deg from upright   // n round the axis from a deg, each d across, its base r out,
+      // standing out (no border); ring: a border that wide round each in the head's color, flush with the body - r then = the
+      // body's surface (user 2026-10-30: most cross into the transition; "shouldn't stick out"), the cap `inset` in it
       const L = obj(b.shaft_lock);
       if (L) {                                       // d: the boss's Ø (0 = none: the button straight out of the turned part); in: where it starts out from the axis;
         // arm: a bracket that wide from the boss up to the housing (0 = none); pin: the Ø of the button's pin into the shaft's hole (0 = none);

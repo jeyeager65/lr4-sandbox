@@ -30,3 +30,6 @@ tests/golden/
 
 # Private: logs, notes, the user's board files, size builds, STEP export, private publish steps
 private/
+
+# wrangler (tools/deploy_dev.py): its local cache
+.wrangler/

@@ -18,7 +18,7 @@ if (!r) { console.error(`unknown router ${id}`); process.exit(1); }
 // the page's mesh names (js/page/router.js RT_MESH)
 const NAMES = { collet_nut: "Router_ColletNut", shaft: "Router_Shaft", bearing_cap: "Router_BearingCap", housing: "Router_Housing",
   collar: "Router_Collar", transition: "Router_Transition", motor_cap: "Router_MotorCap", dial: "Router_Dial", switch: "Router_Switch",
-  shaft_lock: "Router_ShaftLock", lock_boss: "Router_LockBoss", strain_relief: "Router_StrainRelief", cord: "Router_Cord", trim: "Router_Trim" };
+  shaft_lock: "Router_ShaftLock", lock_boss: "Router_LockBoss", brush_cap: "Router_BrushCap", brush_ring: "Router_BrushRing", strain_relief: "Router_StrainRelief", cord: "Router_Cord", trim: "Router_Trim" };
 
 function stl(m) {                                    // binary STL, normals from the winding
   const n = m.idx.length / 3, buf = Buffer.alloc(84 + n * 50);

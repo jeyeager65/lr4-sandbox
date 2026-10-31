@@ -1,7 +1,8 @@
 // A router's model from its preset (Part 45b, user 2026-10-28; names 2026-10-29): web/data/routers.js `model` ->
 // triangle meshes in the router's own frame (mm, z up from the collet nut's bottom, +x = the motor cap's switch / dial
 // end; see the data file's header). One closed mesh per part, so each takes its own look (js/routers.js LOOK_PARTS):
-// the turned stack (shaft, bearing cap, motor housing, collar, transition), the motor cap (a box with rounded edges),
+// the turned stack (shaft, bearing cap, motor housing, collar, transition), the motor cap (a box with rounded edges,
+// or drawn in three views: js/cap_shape.js),
 // the dial wheel, switch (+ its rocker both ways), shaft lock, strain relief + cord stub, trim (small dark details),
 // and the parts a bit change shows (js/page/tool_change.js): the collet nut, the collet and the shaft's threaded end.
 // No booleans: pieces overlap. Plain JS, no THREE (tests/test_router_body.js); the page wraps the arrays.
@@ -10,6 +11,7 @@
 //   place(mesh, frame) -> a copy moved into frame { o: [x, y, z], a: rad about z }
 (function (root) {
   "use strict";
+  const CS = root.LR4CapShape || (typeof require === "function" ? require("./cap_shape.js") : null);   // a shaped motor cap (Part 46b)
   const N = 96;                                      // points round a turned piece / the motor cap
   const add = (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]], mul = (a, k) => [a[0] * k, a[1] * k, a[2] * k];
   const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
@@ -51,6 +53,7 @@
   // ---- the motor cap: a box with its own corner radius per end, top edges rounded, bottom edges rounded ----
   function planSd(s) {
     if (s.plan) return s.plan;
+    if (s.shape) { const sd = CS.footSd(s.shape), at = s.at || [0, 0]; s.plan = (x, y) => sd(x + at[0], y + at[1]); return s.plan; }   // (the transition lofts to its footprint)
     const rn = s.r ? s.r[0] : 0, rp = s.r ? s.r[1] : 0, bx = s.L / 2, by = s.W / 2;
     s.plan = (x, y) => {                             // iq's rounded box, corner r per end
       const r = Math.min(x > 0 ? rp : rn, bx, by), qx = Math.abs(x) - bx + r, qy = Math.abs(y) - by + r;
@@ -60,6 +63,7 @@
   }
   const half = (s) => [s.L / 2, s.W / 2];
   function topAt(s, x, y) {                          // the slab's top at a plan point (slab frame): its edge rounding
+    if (s.shape) { const at = s.at || [0, 0], t = CS.topAt(s.shape, x + at[0], y + at[1]); return t === null ? null : s.z[0] + t; }
     const d = -planSd(s)(x, y), top = s.z[1], rt = s.top_r || 0;
     if (d < 0) return null;
     const z = rt > 0 && d < rt ? top - rt + Math.sqrt(Math.max(rt * rt - (rt - d) * (rt - d), 0)) : top;
@@ -132,19 +136,26 @@
   function expand(m) {
     if (m.kind === "spindle") return m;
     const h = m.motor_cap, at = h.at || [0, 0], z0 = stackTop(m), H = h.H, z1 = z0 + H, x1 = at[0] + h.L / 2;
+    const topX = (x) => (h.shape ? z0 + (CS.topAt(h.shape, x, 0) ?? H) : z1);   // the top along the middle (a shape's isn't level)
     const fit = (v, dflt) => Math.min(v ?? dflt, h.W / 2, h.L / 2);
     const rf = fit(h.front_r, 10), rb = fit(h.back_r, 10), e = Math.min(h.top_r ?? 6, H / 2);
     const dp = Object.assign({ place: "end" }, m.dial), d = dp.d || 24, t = dp.t || 6;
-    const dial = dp.place === "top"
-      ? { axis: "y", at: [x1 - d / 2 - Math.max(e, 8), at[1], z1 - d / 2 + 5], d, t, out: 90, slot: [d + 4, t + 3] }
-      : { axis: "z", at: [x1 - d / 2 + 5, at[1], z1 - e - t / 2 - 1], d, t, out: 0 };
+    let dial;
+    if (dp.place === "top") dial = { axis: "y", at: [x1 - d / 2 - Math.max(e, 8), at[1], topX(x1 - d / 2 - Math.max(e, 8)) - d / 2 + 5], d, t, out: 90, slot: [d + 4, t + 3] };
+    else if (dp.place === "window") {                // flat inside the cap, rim `in` from the end, its top `drop` under the cap's top; the window
+      const W = dp.win || {}, cx = x1 - (dp.in ?? 1) - d / 2, wl = W.l || d * 0.35, ww = W.w || d * 0.8;   // over its rim (open at the end: a notch)
+      const cz = topX(cx + d / 2 - 2) - (dp.drop ?? 2) - t / 2;
+      dial = { axis: "z", at: [cx, at[1], cz], d, t, out: 0,
+        win: { x: [cx + d / 2 - wl, W.open === false ? cx + d / 2 + 1.5 : x1 + 5], y: [at[1] - ww / 2, at[1] + ww / 2], z: cz - t / 2 - 0.6, bevel: W.bevel ?? 2 } };
+    } else dial = { axis: "z", at: [x1 - d / 2 + 5, at[1], topX(x1 - d / 2) - e - t / 2 - 1], d, t, out: 0 };
     const sw = Math.max(Math.min(20, h.W - 2 * rf - 2), 6), sh = Math.min(14, H * 0.4);   // on the flat of the +x end
-    const swz = dp.place === "top" ? z0 + H / 2 : Math.min(z0 + H * 0.4, dial.at[2] - t / 2 - sh / 2 - 3);
+    const swz = m.switch && Number.isFinite(m.switch.down) ? z1 - m.switch.down   // switch.down: its centre under the head's top (user 2026-10-30)
+      : dp.place === "top" ? z0 + H / 2 : Math.min(z0 + H * 0.4, dial.at[2] - t / 2 - sh / 2 - 3);
     return Object.assign({}, m, {
-      cap: { at, L: h.L, W: h.W, r: [rb, rf], z: [z0, z1], top_r: e, bot_r: Math.min(h.bot_r ?? 2, H / 2 - e) },
+      cap: Object.assign({ at, L: h.L, W: h.W, r: [rb, rf], z: [z0, z1], top_r: e, bot_r: Math.min(h.bot_r ?? 2, H / 2 - e) }, h.shape ? { shape: h.shape } : {}),
       dial: Object.assign(dial, dp.at ? { at: dp.at } : {}, { ring: dp.ring }),
-      switch: Object.assign({ at: [x1 + 0.75, at[1], swz], size: [1.5, sw, sh], rocker: [3.0, sw * 0.7, sh * 0.65] }, m.switch),
-      strain_relief: Object.assign({ at: [at[0] - h.L / 2, at[1], z0 + H * 0.6], l: 40.0, d: 12.0, bend: 45.0 }, m.strain_relief),
+      switch: Object.assign({ at: [(h.shape ? (CS.ends(h.shape, swz - z0) || [0, x1])[1] : x1) + 0.75, at[1], swz], size: [1.5, sw, sh], rocker: [3.0, sw * 0.7, sh * 0.65] }, m.switch),
+      strain_relief: Object.assign({ at: [h.shape ? (CS.ends(h.shape, H * 0.6) || [at[0] - h.L / 2])[0] : at[0] - h.L / 2, at[1], z0 + H * 0.6], l: 40.0, d: 12.0, bend: 45.0 }, m.strain_relief),
       cord: Object.assign({ d: 7.4, out: 15.0 }, m.cord),
     });
   }
@@ -181,37 +192,36 @@
     return { shaft, thread: turned(tp, [0, 0, 0], [0, 0, 1], 48), shaftEnd: z0 };
   }
   // the collet: its nut end (wide, 30 deg nose) down at the nut's face, tapering `taper` deg up into the shaft; a bore
-  // for the shank `bore` mm (else the biggest it takes). An ER collet (type ER...) is slit: erCollet
+  // for the shank `bore` mm (else the biggest it takes). Slit by type: ER... (erCollet), Makita... (makitaCollet)
   function colletPart(m, bore) {
     const C = m.collet || { d: 11.5, l: 18, taper: 8, sizes: [6.35] }, z0 = 0.6, R = C.d / 2, top = R - C.l * Math.tan((C.taper || 8) * Math.PI / 180);
     const rb = (bore > 0 ? bore : Math.max(...(C.sizes || [6.35]))) / 2, nose = Math.min(2.5, C.l / 6);
     if (/^ER/i.test(C.type || "")) return erCollet(C, rb, z0);
+    if (/^Makita/i.test(C.type || "")) return makitaCollet(C, rb, z0);
     return turned([[rb, z0], [R - nose * 0.58, z0], [R, z0 + nose], [Math.max(top, rb + 0.6), z0 + C.l], [rb, z0 + C.l], [rb, z0]], [0, 0, 0], [0, 0, 1], 48);
   }
-  // an ER collet: the nose, then the groove the nut's eccentric ring snaps into, a short band and the taper; ER_SLITS
-  // slits cut in turn from each end, each to ER_LAND short of the other (GUESS: 8 slits 0.7 wide, from photos). Built
-  // as cells round x along the axis: a slit cell is open over its slit's length, its faces close every open side
-  const ER_SLITS = 8, ER_SLIT = 0.7, ER_LAND = 2.5;
-  function erCollet(C, rb, z0) {
-    const R = C.d / 2, L = C.l, nose = Math.min(2.5, L / 6), t = Math.tan((C.taper || 8) * Math.PI / 180), zt = z0 + nose + 2;
-    const top = Math.max(R - (z0 + L - zt) * t, rb + 0.6);
-    const prof = [[z0, R - nose * 0.58], [z0 + nose, R], [z0 + nose + 0.2, R - 0.6], [z0 + nose + 1.2, R - 0.6], [z0 + nose + 1.4, R], [zt, R], [z0 + L, top]];
+  // a slit collet: its outside prof [[z, r]...] from the nose (z0) up, bored rb, n slits w wide evenly round (between
+  // them, so +x is solid: the widest point), slit k open over open(k) = [za, zb]. Built as cells round it along the
+  // axis: a slit cell is open over its slit's length, its faces close every open side
+  function slitCollet(prof, rb, n, w, open) {
+    const R = Math.max(...prof.map((p) => p[1])), zEnd = prof[prof.length - 1][0];
     const ro = (z) => {
       for (let k = 1; k < prof.length; k++) if (z <= prof[k][0] + 1e-9) { const [za, ra] = prof[k - 1], [zb, rz] = prof[k]; return ra + (rz - ra) * (z - za) / (zb - za); }
-      return top;
+      return prof[prof.length - 1][1];
     };
-    const zs = [...new Set(prof.map((p) => +p[0].toFixed(6)).concat([z0 + ER_LAND, z0 + L - ER_LAND]))].sort((a, b) => a - b);
-    const n = ER_SLITS, da = ER_SLIT / 2 / ((R + rb) / 2), cells = [];   // [a0, a1, slit: 0 solid | 1 from the nut end | 2 from the shaft end]
+    const ranges = Array.from({ length: n }, (_, k) => open(k));
+    const zs = [...new Set(prof.map((p) => +p[0].toFixed(6)).concat(ranges.flat().filter((z) => z > prof[0][0] && z < zEnd)))].sort((a, b) => a - b);
+    const da = w / 2 / ((R + rb) / 2), cells = [];   // [a0, a1, slit: -1 solid | k]
     for (let k = 0; k < n; k++) {
-      const c = 2 * Math.PI * (k + 0.5) / n, g0 = c - 2 * Math.PI / n + da, g1 = c - da;   // slits between, so +x is solid (the widest point)
-      for (let s = 0; s < 6; s++) cells.push([g0 + (g1 - g0) * s / 6, g0 + (g1 - g0) * (s + 1) / 6, 0]);
-      cells.push([g1, c + da, k % 2 ? 2 : 1]);
+      const c = 2 * Math.PI * (k + 0.5) / n, g0 = c - 2 * Math.PI / n + da, g1 = c - da;
+      for (let s = 0; s < 6; s++) cells.push([g0 + (g1 - g0) * s / 6, g0 + (g1 - g0) * (s + 1) / 6, -1]);
+      cells.push([g1, c + da, k]);
     }
     const nz = zs.length - 1, nc = cells.length;
     const solid = (i, j) => {
       if (j < 0 || j >= nz) return false;
-      const [, , s] = cells[(i + nc) % nc], zm = (zs[j] + zs[j + 1]) / 2;
-      return s === 0 || (s === 1 ? zm > z0 + L - ER_LAND : zm < z0 + ER_LAND);
+      const [, , k] = cells[(i + nc) % nc], zm = (zs[j] + zs[j + 1]) / 2;
+      return k < 0 || zm < ranges[k][0] || zm > ranges[k][1];
     };
     const m = mesh(), P = (a, r, z) => [r * Math.cos(a), r * Math.sin(a), z];
     const quad = (...q) => { const k = m.pos.length / 3; for (const p of q) m.pos.push(...p); m.idx.push(k, k + 1, k + 2, k, k + 2, k + 3); };
@@ -226,6 +236,23 @@
       if (!solid(i, j + 1)) quad(P(a0, rb, z2), P(a0, r2, z2), P(a1, r2, z2), P(a1, rb, z2));
     }
     return m;
+  }
+  // an ER collet: the nose, then the groove the nut's eccentric ring snaps into, a short band and the taper; ER_SLITS
+  // slits cut in turn from each end, each to ER_LAND short of the other (GUESS: 8 slits 0.7 wide, from photos)
+  const ER_SLITS = 8, ER_SLIT = 0.7, ER_LAND = 2.5;
+  function erCollet(C, rb, z0) {
+    const R = C.d / 2, L = C.l, nose = Math.min(2.5, L / 6), t = Math.tan((C.taper || 8) * Math.PI / 180), zt = z0 + nose + 2;
+    const top = Math.max(R - (z0 + L - zt) * t, rb + 0.6);
+    const prof = [[z0, R - nose * 0.58], [z0 + nose, R], [z0 + nose + 0.2, R - 0.6], [z0 + nose + 1.2, R - 0.6], [z0 + nose + 1.4, R], [zt, R], [z0 + L, top]];
+    return slitCollet(prof, rb, ER_SLITS, ER_SLIT, (k) => (k % 2 ? [z0 + ER_LAND, z0 + L] : [z0, z0 + L - ER_LAND]));
+  }
+  // a Makita collet (user's photo 2026-10-30): a cone nose (the nut's end, d its widest), stepped down to a plain barrel,
+  // a ring round its far end; MK_SLITS slits from the nose through the cone and most of the barrel (GUESS proportions)
+  const MK_SLITS = 3, MK_SLIT = 0.8;
+  function makitaCollet(C, rb, z0) {
+    const R = C.d / 2, L = C.l, hl = L * 0.32, fl = L * 0.1, rbar = Math.max(R * 0.78, rb + 0.8), rf = Math.max(R * 0.86, rbar + 0.3);
+    const prof = [[z0, Math.max(R * 0.8, rb + 0.8)], [z0 + hl, R], [z0 + hl + 0.3, rbar], [z0 + L - fl, rbar], [z0 + L - fl + 0.3, rf], [z0 + L, rf]];
+    return slitCollet(prof, rb, MK_SLITS, MK_SLIT, () => [z0, z0 + L * 0.72]);
   }
 
   // the turned part above the shaft: bearing cap, the motor housing (its collet end chamfered ch at 45 deg), the collar,
@@ -282,7 +309,7 @@
   // round (radius r at z0) up to the cap's plan (inset by its under-fillet + the edge) at z1, then the edge out into
   // the cap's underside (fillet: a concave quarter round; chamfer: 45 deg)
   function transitionLoft(H, r, z0, z1, T, emax) {
-    const ray = rayOf(H), at = H.at || [0, 0], bot = H.bot_r || 0;
+    const ray = rayOf(H), at = H.at || [0, 0], bot = H.shape ? 0 : H.bot_r || 0;   // a drawn cap's footprint is its bottom edge already
     const e = T.edge === "fillet" || T.edge === "chamfer" ? Math.min(T.e || 0, emax) : 0;
     const m0 = bot + e, K = 12, th = Array.from({ length: N }, (_, i) => 2 * Math.PI * i / N);
     const out = (ins) => th.map((t) => { const [x, y] = ray(t, ins); return [x + at[0], y + at[1]]; });
@@ -299,8 +326,80 @@
     rings.push(th.map(() => [at[0], at[1], z1]));
     return sweep(rings);
   }
+  // a window in the cap for a dial lying inside it (dial.win: the box x [a, b], y [a, b], above z; bevel): the cap's faces
+  // round it taken out; in the head's color a bevel (45 deg, `bevel` wide) from the cap's top down into the opening, a
+  // strip on the top round that (it hides the cut's ragged edge: whole faces came out) and a pocket below (floor + walls)
+  // so the hollow cap doesn't show (user 2026-10-30: "usually the window is beveled", all of it the head's color)
+  function dialWindow(capM, B, s) {
+    const bv = B.bevel ?? 2, G = 3, xCap = s.at[0] + s.L / 2, open = B.x[1] > xCap, xEnd = Math.min(B.x[1], xCap);
+    const E = { x: [B.x[0] - bv, open ? B.x[1] : B.x[1] + bv], y: [B.y[0] - bv, B.y[1] + bv] };   // the opening at the top
+    const topOf = (x, y) => topAt(s, x - s.at[0], y - s.at[1]);
+    const p = capM.pos, keep = [], inE = (x, y, z) => {   // in the opening's box - and on the top's skin there (a closed window: not the
+      if (x < E.x[0] || x > E.x[1] || y < E.y[0] || y > E.y[1] || z < B.z) return false;   // end's face below it; an open one cuts through)
+      if (open && x >= B.x[0]) return true;
+      const tz = topOf(x, y);
+      return tz !== null && z >= tz - bv - 1.5;
+    };
+    for (let t = 0; t < capM.idx.length; t += 3) {
+      const [a, b, c] = [capM.idx[t] * 3, capM.idx[t + 1] * 3, capM.idx[t + 2] * 3];
+      if (![a, b, c].some((i) => inE(p[i], p[i + 1], p[i + 2]))) keep.push(capM.idx[t], capM.idx[t + 1], capM.idx[t + 2]);   // any corner in: out (no slivers in it)
+    }
+    capM.idx = keep;
+    const top = (x, y) => { const z = topAt(s, x - s.at[0], y - s.at[1]); return z === null || z < B.z + 1 ? null : z; };   // (not down the end below it)
+    const mid = [(B.x[0] + xEnd) / 2, (B.y[0] + B.y[1]) / 2];
+    const wall = (q) => {                            // the pocket: the head's color too (user 2026-10-30), facing into it (walls: to its
+      const k = capM.pos.length / 3, c = [0, 1, 2].map((i) => (q[0][i] + q[2][i]) / 2);   // middle, the floor: up)
+      const u = [0, 1, 2].map((i) => q[1][i] - q[0][i]), v = [0, 1, 2].map((i) => q[3][i] - q[0][i]);
+      const nrm = [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]];
+      const want = Math.abs(nrm[2]) > Math.hypot(nrm[0], nrm[1]) ? [0, 0, 1] : [mid[0] - c[0], mid[1] - c[1], 0];
+      for (const w of q) capM.pos.push(...w);
+      if (nrm[0] * want[0] + nrm[1] * want[1] + nrm[2] * want[2] >= 0) capM.idx.push(k, k + 1, k + 2, k, k + 2, k + 3); else capM.idx.push(k, k + 2, k + 1, k, k + 3, k + 2);
+    };
+    const head = (q) => {                            // facing up (the bevel + the strip: the head's own faces)
+      const k = capM.pos.length / 3, u = [q[1][0] - q[0][0], q[1][1] - q[0][1], q[1][2] - q[0][2]], v = [q[3][0] - q[0][0], q[3][1] - q[0][1], q[3][2] - q[0][2]];
+      for (const w of q) capM.pos.push(...w);
+      if (u[0] * v[1] - u[1] * v[0] > 0) capM.idx.push(k, k + 1, k + 2, k, k + 2, k + 3); else capM.idx.push(k, k + 2, k + 1, k, k + 3, k + 2);
+    };
+    // the three (four) edges as mitred bands: inner -> outer, each sampled along; at depth h under the top (inner) / on it
+    const at = (x, y, h) => {                        // h > 0: that far under the top; < 0: -h proud of it, along its normal (steep
+      const z = top(x, y);                           // spots too: a straight-up lift there barely clears the head)
+      if (z === null) return null;
+      if (h >= 0) return [x, y, z - h];
+      const slope = (dx, dy) => { const f = top(x + dx, y + dy); if (f !== null) return (f - z) / 0.2; const g = top(x - dx, y - dy); return g === null ? 0 : (z - g) / 0.2; };
+      const gx = slope(0.2, 0), gy = slope(0, 0.2), l = Math.hypot(gx, gy, 1);   // (at an edge: the slope behind)
+      return [x - h * -gx / l, y - h * -gy / l, z - h / l];
+    };
+    const band = (inner, outer, hi, ho, fn) => {
+      for (let i = 0; i + 1 < inner.length; i++) {
+        const q = [at(...inner[i], hi), at(...inner[i + 1], hi), at(...outer[i + 1], ho), at(...outer[i], ho)];
+        if (q.every(Boolean)) fn(q);
+      }
+    };
+    const n = Math.max(2, Math.ceil((xEnd - B.x[0]) / 1)), lin = (a, b, k) => Array.from({ length: k + 1 }, (_, i) => a + (b - a) * i / k);
+    const sides = [[B.y[0], -1], [B.y[1], 1]];
+    for (const [y, sg] of sides) {                   // along the sides: the bevel, then the strip
+      const xi = lin(B.x[0], xEnd, n), xo = lin(B.x[0] - bv, open ? xEnd : xEnd + bv, n), xs = lin(B.x[0] - bv - G, open ? xEnd : xEnd + bv + G, n);
+      band(xi.map((x) => [x, y]), xo.map((x) => [x, y + sg * bv]), bv, -0.3, head);
+      band(xo.map((x) => [x, y + sg * bv]), xs.map((x) => [x, y + sg * (bv + G)]), -0.3, -0.3, head);
+      for (let i = 0; i < n; i++) {                 // the wall under the bevel, down to the floor
+        const a = at(xi[i], y, bv), b = at(xi[i + 1], y, bv);
+        if (a && b && a[2] > B.z && b[2] > B.z) wall([[xi[i], y, B.z], [xi[i + 1], y, B.z], b, a]);
+      }
+    }
+    for (const [x, sg] of open ? [[B.x[0], -1]] : [[B.x[0], -1], [B.x[1], 1]]) {   // across the back (+ the front: a closed window)
+      const yi = lin(B.y[0], B.y[1], 8), yo = lin(B.y[0] - bv, B.y[1] + bv, 8), ys = lin(B.y[0] - bv - G, B.y[1] + bv + G, 8);
+      band(yi.map((y) => [x, y]), yo.map((y) => [x + sg * bv, y]), bv, -0.3, head);
+      band(yo.map((y) => [x + sg * bv, y]), ys.map((y) => [x + sg * (bv + G), y]), -0.3, -0.3, head);
+      for (let j = 0; j < 8; j++) {
+        const a = at(x, yi[j], bv), b = at(x, yi[j + 1], bv);
+        if (a && b) wall([[x, yi[j], B.z], [x, yi[j + 1], B.z], b, a]);
+      }
+    }
+    const xf = open ? xEnd - 1 : xEnd;               // the floor (open: short of the cap's end, its rounding there)
+    wall([[B.x[0], B.y[0], B.z], [xf, B.y[0], B.z], [xf, B.y[1], B.z], [B.x[0], B.y[1], B.z]]);
+  }
   const PARTS = ["shaft", "thread", "collet", "collet_nut", "bearing_cap", "housing", "collar", "transition", "motor_cap",
-    "dial", "switch", "switch_off", "shaft_lock", "lock_boss", "strain_relief", "cord", "trim"];
+    "dial", "switch", "switch_off", "shaft_lock", "lock_boss", "brush_cap", "brush_ring", "strain_relief", "cord", "trim"];
   function build(m) {
     const P = Object.fromEntries(PARTS.map((k) => [k, mesh()])), nut = m.collet_nut;
     append(P.collet_nut, colletNut(m));
@@ -310,7 +409,41 @@
     if (m.kind === "spindle") return spindle(m, P, Z);
     m = expand(m);
     const top = stack(m, P);
-    append(P.motor_cap, slab(m.cap));
+    const capM = m.cap.shape ? CS.mesh(m.cap.shape, m.cap.z[0]) : slab(m.cap);
+    if (m.dial && m.dial.win) dialWindow(capM, m.dial.win, m.cap);
+    append(P.motor_cap, capM);
+    if (m.brushes) {                                 // the brush caps: n round the axis from a, each a disc from r out `out`
+      const Bc = m.brushes;
+      for (let i = 0; i < Bc.n; i++) {
+        const a = (Bc.a + 360 * i / Bc.n) * Math.PI / 180, dir = [Math.cos(a), Math.sin(a), 0];
+        // its screwdriver slot (user 2026-10-30: "they all have one"): a dark bar on its face, `slot` deg from upright
+        const face = Bc.ring > 0 ? Bc.r - (Bc.inset ?? 1) : Bc.r + Bc.out, sl = (Bc.slot ?? 15) * Math.PI / 180, tv = [-dir[1], dir[0], 0];
+        const along = [tv[0] * Math.sin(sl), tv[1] * Math.sin(sl), Math.cos(sl)], across = [tv[0] * Math.cos(sl), tv[1] * Math.cos(sl), -Math.sin(sl)];
+        const sb = box([0, 0, 0], [Bc.d * 0.6, Math.max(0.8, Bc.d * 0.08), 0.3]);
+        for (let j = 0; j < sb.pos.length; j += 3) {
+          const [x, y, zz] = [sb.pos[j], sb.pos[j + 1], sb.pos[j + 2]], rr = face + zz - 0.1;
+          sb.pos[j] = dir[0] * rr + along[0] * x + across[0] * y; sb.pos[j + 1] = dir[1] * rr + along[1] * x + across[1] * y; sb.pos[j + 2] = Bc.z + along[2] * x + across[2] * y;
+        }
+        append(P.trim, sb);
+        const r0 = Bc.r - 4, at = [dir[0] * r0, dir[1] * r0, Bc.z];
+        if (Bc.ring > 0) {                           // a border: a boss in the head's color reaching well back into the body, its face flush with it
+          const ri = Bc.d / 2 + 0.05, ro = ri + Bc.ring, l = 4.15, bk = 6;   // (r = the surface; a hair proud), the cap `inset` in it
+          const bat = [dir[0] * (r0 - bk), dir[1] * (r0 - bk), Bc.z];
+          append(P.brush_ring, turned([[ri, 0], [ro, 0], [ro, l + bk], [ri, l + bk], [ri, 0]], bat, dir, 36));
+          append(P.brush_cap, cyl(at, dir, Bc.d, Math.max(4 - (Bc.inset ?? 1), 0.5), 36));
+        } else append(P.brush_cap, cyl([dir[0] * Bc.r, dir[1] * Bc.r, Bc.z], dir, Bc.d, Bc.out, 36));   // no border: standing out `out`
+        if (Bc.ring > 0) for (const M of [P.motor_cap, P.transition]) {   // a bordered cap: the head's + transition's faces under the boss
+          const ri = Bc.d / 2 + 0.05, ro = ri + Bc.ring, p = M.pos, keep = [];   // come out (it hides their edge; the cap shows in it) -
+          const q = (v) => { const k = v * 3, al = p[k] * dir[0] + p[k + 1] * dir[1], side = -p[k] * dir[1] + p[k + 1] * dir[0];   // nothing
+            return al > Bc.r - 15 ? Math.hypot(side, p[k + 2] - Bc.z) : Infinity; };   // moved, no blend (user 2026-10-30): its face must be
+          for (let t = 0; t < M.idx.length; t += 3) {   // at or proud of the body's surface (r)
+            const qs = [M.idx[t], M.idx[t + 1], M.idx[t + 2]].map(q);
+            if (!(qs.every((v) => v < ro) || (qs[0] + qs[1] + qs[2]) / 3 < ri)) keep.push(M.idx[t], M.idx[t + 1], M.idx[t + 2]);
+          }
+          M.idx = keep;
+        }
+    }
+    }
     if (m.shaft_lock) {                              // a boss from `in` out to r, the button on its end: pressed in `travel` (tool_change.js);
       // arm: a bracket from the boss up to the housing's bottom (the spokes' face on a vented one), e.g. the Carbide's U
       const L = m.shaft_lock, a = L.a * Math.PI / 180, dir = [Math.cos(a), Math.sin(a), 0], tr = L.travel || 3, rb = L.r - tr, r0 = L.in || 0;
