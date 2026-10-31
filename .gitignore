@@ -1,5 +1,5 @@
-# Generated output
-build/
+# Generated output (/build/: the root's only - web/vendor/three/r<N>/build/ is three.js itself)
+/build/
 exports/
 __pycache__/
 *.pyc
