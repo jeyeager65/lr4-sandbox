@@ -79,6 +79,18 @@ const ok = (cond, msg) => { checks++; console.log((cond ? "  ok   " : "  FAIL ")
     await page.val(`document.getElementById("t-design").click()`);
     await sleep(800);
     ok(!(await st()).on && await snap() === before, "leaving Learn stops it, all back");
+    // "Watch how" (47.3): the touch plate's "?" links to its clip in Learn; a topic with no clip has no link
+    await page.val(`document.querySelector('.q[data-help="help-plate"]').click()`);
+    ok(await until(`!!document.querySelector("#help-pop .watch button")`, 5), `the touch plate's "?" has a Watch how link: ${await page.val(`document.querySelector("#help-pop .watch")?.textContent || ""`)}`);
+    await page.val(`document.querySelector("#help-pop .watch button").click()`);
+    ok(await until(`document.documentElement.dataset.mode === "learn" && document.querySelector("#ln-list .hv-row.lit")?.dataset.id === "touch_plate" && document.getElementById("help-pop").hidden`, 5),
+      "Watch how: Learn, the clip's row lit, the popover closed");
+    await page.val(`document.querySelector('.q[data-help="help-sd"]').click()`);
+    await sleep(500);
+    ok(await page.val(`!document.getElementById("help-pop").hidden && !document.querySelector("#help-pop .watch")`), "no link where there's no clip (the SD card)");
+    const bad = await page.val(`Object.entries(LR4Help.topics).filter(([t, id]) => !document.getElementById(t) || !LR4Help.list || false).map(([t]) => t)`);
+    const ids = await page.val(`LR4Help.list().then((l) => Object.values(LR4Help.topics).filter((id) => !l.some((v) => v.id === id)))`);
+    ok(!bad.length && !ids.length, `every topic's help and clip exist${bad.length || ids.length ? ": " + bad.concat(ids).join(", ") : ""}`);
   } catch (e) {
     ok(false, "error: " + e.message);
   } finally {

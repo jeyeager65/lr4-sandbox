@@ -194,6 +194,25 @@
     $("ln-next").addEventListener("click", () => { const nx = MINE.v && learnNext(MINE.v); mineClose(); if (nx) learnPlay(nx); });
     LR4OnMode((m) => { if (m !== "learn") mineClose(); });
   }
+  // ---- "Watch how" (Part 47.3): a "?" popover whose topic has a clip ends with a link to it in Learn. The one table,
+  // topic (the help div's id, data-help) -> clip id; the "?" popovers stay the page's help, Learn is the library ----
+  const LEARN_TOPICS = {
+    "help-ab": "asbuilt", "help-ab-home": "why_home", "help-ab-ls": "safety", "help-ab-heat": "safety",
+    "help-bit": "bit_change", "help-job-bit": "bit_change", "help-plate": "touch_plate", "help-pd": "front_plate",
+    "help-ctl": "tour",
+  };
+  async function watchLink(pop, topic, close) {
+    const id = LEARN_TOPICS[topic], v = id && (await helpIndex()).find((x) => x.id === id);
+    if (!v || pop.hidden || pop.dataset.topic !== topic || pop.querySelector(".watch")) return;   // (another popover by now)
+    const p = document.createElement("p"), b = document.createElement("button");
+    p.className = "watch";
+    b.type = "button"; b.className = "link";
+    b.textContent = `▶ Watch how: ${v.title}`;
+    b.title = `Open it in Learn (${v.type === "mine" ? "plays on your machine, changes nothing" : "a demo on a temporary machine"})`;
+    b.addEventListener("click", () => { close(); $("t-learn").click(); learnShow(id); });
+    p.append(b);
+    pop.append(p);
+  }
   async function learnShow(id) {                     // Learn, that clip's row lit and focused
     LR4ShowMode("learn");
     await learnList();
@@ -303,6 +322,7 @@
     if (helpId()) helpStart();
   }
   window.LR4Help = { list: helpIndex, go: helpGo, exit: helpExit, pause: helpPause, follow: helpFollow, learn: learnShow, groups: LEARN_GROUPS,
+    topics: LEARN_TOPICS, watchLink,
     mine: { play: (id) => helpIndex().then((l) => mineGo(l.find((v) => v.id === id))), stop: mineClose,
       state: () => ({ on: !!MINE.on, id: MINE.v ? MINE.v.id : null, k: MINE.on ? MINE.on.at() : -1, msg: $("ln-msg").textContent,
         steps: [...$("ln-steps").querySelectorAll("button")].map((b) => b.textContent), lit: $("ln-steps").querySelector("button.on")?.textContent || null }) },

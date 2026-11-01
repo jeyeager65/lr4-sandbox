@@ -271,6 +271,8 @@
       pop.hidden = !b;
       if (!b) return;
       pop.innerHTML = $(b.dataset.help).innerHTML;
+      pop.dataset.topic = b.dataset.help;
+      if (window.LR4Help) LR4Help.watchLink(pop, b.dataset.help, () => help(null));   // a clip on this in Learn (help.js)
       pop.setAttribute("aria-label", b.getAttribute("aria-label"));
       b.setAttribute("aria-expanded", "true");
       const r = b.getBoundingClientRect(), w = pop.offsetWidth, h = pop.offsetHeight;

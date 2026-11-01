@@ -931,6 +931,7 @@ button:disabled { opacity: 0.42; cursor: default; }
 .ln-steps button:hover { color: var(--ink); }
 .ln-steps button.on { color: var(--ink); font-weight: 600; background: color-mix(in srgb, var(--accent) 18%, transparent); }
 .ln-now .buttons { display: flex; gap: 6px; flex-wrap: wrap; }
+#help-pop .watch { margin-top: 8px; padding-top: 6px; border-top: 1px solid var(--line); }
 .m-ic { display: none; }
 .wc-tour { margin: 0; font-size: 13px; }
 .hv-start { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 9; width: min(420px, calc(100% - 24px));
