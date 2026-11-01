@@ -131,7 +131,8 @@
     this machine, listed as imported with ✕ to delete. Each file's header names it, one key per line before the first
     move: <code>(Video Learn: NAME=...)</code>, <code>GROUP=</code> (none: My clips), <code>KIND=demo</code> or
     <code>mine</code>, and <code>DESC=</code> lines for its one line. A file with an error isn't added; the errors are
-    listed.</p>
+    listed. ⤓ saves a clip (any of them) as its file, a group's ⤓ the group as a .zip, Save mine all of yours; New
+    clip downloads a starter to write your own in.</p>
     <p><b>What a clip can do:</b> only G-code and <code>(Video ...)</code> lines. A demo runs on the temporary help
     machine's FluidNC (in this page), a <i>mine</i> clip only its one <code>(Video BitChange:)</code> or
     <code>(Video TouchPlate:)</code> line on yours. Nothing in a clip runs code or fetches from the internet (a
@@ -145,7 +146,7 @@
   <input type="search" class="ln-filter" id="ln-filter" placeholder="Filter the clips" aria-label="Filter the clips" hidden>
   <div class="ln-list" id="ln-list"></div>
   <div class="ln-own">
-    <div class="buttons"><label class="btn" title="Your own clips: .gcode / .nc files with (Video ...) lines, or a .zip of them - kept in this browser for this machine">Import…<input type="file" id="ln-file" accept=".gcode,.nc,.ngc,.txt,.zip" multiple hidden></label></div>
+    <div class="buttons"><label class="btn" title="Your own clips: .gcode / .nc files with (Video ...) lines, or a .zip of them - kept in this browser for this machine">Import…<input type="file" id="ln-file" accept=".gcode,.nc,.ngc,.txt,.zip" multiple hidden></label><button type="button" id="ln-save" title="Save your imported clips: a .gcode for one, a .zip for more (a clip's ⤓ saves just it, a group's ⤓ that group)">Save mine</button><button type="button" id="ln-new" title="A starter file to write your own clip in: the header and a few lines">New clip</button></div>
     <div class="foot" id="ln-imp-msg" role="status"></div>
   </div>
   <p class="foot" id="ln-parts" hidden>Load your part files for the full picture (without them the parts show as grey

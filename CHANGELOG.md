@@ -3,6 +3,17 @@
 The version is the sandbox page's (`VERSION` in `web/js/page/job.js`, shown in its footer). The footer also shows
 the date the model data was built and the Printables file set it was solved for.
 
+## 0.66.0 - 2026-11-01
+- **Your own Learn clips:** every clip is a G-code file, the built-in ones too. Learn > **Import…** takes .gcode / .nc
+  files or a .zip of them and keeps them in this browser for this machine (they go with the machine's export), listed
+  in their group as imported with ✕ to delete. A file with an error isn't added; Learn lists what's wrong.
+- A clip names itself in its header, one line each before the first move: `(Video Learn: NAME=...)`, `GROUP=`,
+  `KIND=demo` or `mine`, and `DESC=` lines. A *mine* clip plays one `(Video BitChange: BIT=1/8 HOLD=wrenches)` or
+  `(Video TouchPlate: HOLD=2)` on your own machine; a demo can hold them too.
+- **Export:** ⤓ on any clip saves its file, ⤓ on a group saves the group as a .zip, **Save mine** all of yours;
+  **New clip** downloads a starter to write your own in.
+- A clip can only hold G-code and `(Video ...)` lines: nothing in one runs code or fetches from the internet.
+
 ## 0.65.0 - 2026-11-01
 - **Learn:** a third mode next to Configure and Run, with short clips that play live in the page, listed by group
   (Getting started, Setting up, Running a job, Bits and collets, Probing / zero). It replaces the Help menu.

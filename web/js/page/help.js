@@ -81,13 +81,15 @@
     b.title = v.type === "mine" ? `Play "${v.title}" on your machine (it puts back what it moves)`
       : `Play "${v.title}" in this page (on a temporary machine: yours stays as it is)`;
     b.addEventListener("click", () => learnPlay(v));
-    if (!v.imported) return b;
-    const w = document.createElement("div"), x = document.createElement("button");   // yours: the row + its Delete
-    w.className = "ln-imp"; w.setAttribute("role", "listitem"); b.removeAttribute("role");
-    x.type = "button"; x.className = "ln-del"; x.textContent = "✕"; x.title = `Delete "${v.title}" (your imported clip)`;
-    x.setAttribute("aria-label", x.title);
-    x.addEventListener("click", () => learnDelete(v));
-    w.append(b, x);
+    const w = document.createElement("div"), act = (cls, t, title, fn) => {   // the row + ⤓ export (+ ✕ delete: yours)
+      const x = document.createElement("button");
+      x.type = "button"; x.className = cls; x.textContent = t; x.title = title; x.setAttribute("aria-label", title);
+      x.addEventListener("click", fn);
+      return x;
+    };
+    w.className = "ln-item" + (v.imported ? " ln-imp" : ""); w.setAttribute("role", "listitem"); b.removeAttribute("role");
+    w.append(b, act("ln-exp", "⤓", `Save "${v.title}" as a file (${v.file})`, () => learnSave(v.file, v.text)));
+    if (v.imported) w.append(act("ln-del", "✕", `Delete "${v.title}" (your imported clip)`, () => learnDelete(v)));
     return w;
   }
   // ---- your own clips (Part 47b.2): .gcode / .nc files or a .zip of them, kept in this browser per machine
@@ -150,8 +152,11 @@
       if (!items.length) return null;
       const sec = document.createElement("section");
       sec.className = "ln-group";
-      sec.innerHTML = `<h2></h2><div class="hv-list" role="list"></div>`;
-      sec.firstChild.textContent = g;
+      sec.innerHTML = `<h2><span></span><button type="button" class="ln-exp"></button></h2><div class="hv-list" role="list"></div>`;
+      sec.firstChild.firstChild.textContent = g;
+      const gx = sec.firstChild.lastChild;
+      gx.textContent = "⤓"; gx.title = `Save the clips in ${g} as a .zip`; gx.setAttribute("aria-label", gx.title);
+      gx.addEventListener("click", () => learnZip(g.replace(/[^\w]+/g, "_").replace(/^_|_$/g, "") + ".zip", items));
       sec.lastChild.setAttribute("aria-label", g);
       sec.lastChild.append(...items.map(learnRow));
       return sec;
@@ -303,6 +308,35 @@
     p.append(b);
     pop.append(p);
   }
+  // ---- export + a starter (Part 47b.3): a clip as its file, a group or all of yours as a .zip; New clip = a template
+  // with the header one key per line and a few lines to start from ----
+  function learnSave(name, data) {
+    const blob = data instanceof Blob ? data : new Blob([data], { type: "text/plain" });
+    if (learnSave.hook) return learnSave.hook(name, blob);   // (tests)
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob); a.download = name;
+    document.body.append(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  }
+  async function learnZip(name, clips) {
+    const Z = await loadJSZip(), z = new Z();
+    for (const c of clips) z.file(c.file, c.text);
+    learnSave(name, await z.generateAsync({ type: "blob" }));
+  }
+  const LEARN_TEMPLATE = ["(Video Learn: NAME=My clip)", "(Video Learn: GROUP=My clips)", "(Video Learn: KIND=demo)",
+    "(Video Learn: DESC=One line about what it shows. More DESC lines add on to it.)",
+    "(The header above: one key per line, before the first move; no closing bracket inside a value.)",
+    "(KIND=mine plays on your own machine instead: just one BitChange or TouchPlate line, no moves.)",
+    "(All the Video lines: the top of js/demo_script.js. Keep every line under 127 characters.)",
+    "(Video: MACHINE=26x50)", "(Video Home:)", "(Video Title: TIME=3 TEXT=My clip|What it shows)",
+    "(Video Text: TIME=4 TEXT=A caption over what comes next)", "G21 G90", "G0 X50 Y50",
+    "(Video Text: TIME=3 TEXT=Another caption, mid-move)", "G0 X120", "G0 X50", ""].join("\n");
+  async function learnExportMine() {
+    const mine = (await learnAll()).filter((c) => c.imported);
+    if (!mine.length) return learnSay({ added: [], errors: [], note: "No clips of yours to save yet: Import… or New clip first." });
+    if (mine.length === 1) learnSave(mine[0].file, mine[0].text);
+    else await learnZip("my_clips.zip", mine);
+  }
   function learnSay(r) {                             // an import's outcome under the buttons
     const m = $("ln-imp-msg");
     m.replaceChildren();
@@ -313,7 +347,7 @@
       for (const t of r.errors) { const li = document.createElement("li"); li.textContent = t; ul.append(li); }
       m.append(r.added.length ? " Not added:" : "Not added:", ul);
     }
-    if (!r.added.length && !r.errors.length) m.textContent = "Nothing to add.";
+    if (!r.added.length && !r.errors.length) m.textContent = r.note || "Nothing to add.";
   }
   async function learnShow(id) {                     // Learn, that clip's row lit and focused
     LR4ShowMode("learn");
@@ -329,6 +363,8 @@
     LR4OnMode((m) => { if (m === "learn") learnList(); });
     if (document.documentElement.dataset.mode === "learn") learnList();
     $("ln-filter").addEventListener("input", learnList);
+    $("ln-new").addEventListener("click", () => learnSave("my_clip.gcode", LEARN_TEMPLATE));
+    $("ln-save").addEventListener("click", learnExportMine);
     $("ln-file").addEventListener("change", async (e) => {
       const files = [...e.target.files];
       e.target.value = "";
@@ -446,4 +482,5 @@
         steps: [...$("ln-steps").querySelectorAll("button")].map((b) => b.textContent), lit: $("ln-steps").querySelector("button.on")?.textContent || null }) },
     state: () => ({ id: HELP.id, playing: !!HELP.clock && !HELP.done, paused: HELP.paused, done: HELP.done, free: !!(HELP.clock && HELP.clock.free) }),
     playFile: (name, text) => helpFile(name, text),
-    import: async (files) => { const r = await learnImport(files); await learnList(); return r; }, del: learnDelete, all: learnAll };
+    import: async (files) => { const r = await learnImport(files); await learnList(); return r; }, del: learnDelete, all: learnAll,
+    template: LEARN_TEMPLATE, save: learnSave, exportMine: learnExportMine };

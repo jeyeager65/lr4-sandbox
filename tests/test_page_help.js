@@ -46,7 +46,7 @@ const ok = (cond, msg) => { checks++; console.log((cond ? "  ok   " : "  FAIL ")
       return [...document.querySelectorAll("#ln-list .hv-row")].map((b) => b.querySelector("b").textContent + " | " + b.querySelector("em").textContent); })()`);
     ok(rows.length >= 1 && rows.some((r) => /^Why home\? \| about/.test(r)), `Learn list: ${rows.join("; ")}`);
     const L = await page.val(`({ mode: document.documentElement.dataset.mode, shown: getComputedStyle(document.getElementById("learn")).display !== "none",
-      panel: getComputedStyle(document.querySelector(".panel")).display, groups: [...document.querySelectorAll("#ln-list .ln-group h2")].map((h) => h.textContent),
+      panel: getComputedStyle(document.querySelector(".panel")).display, groups: [...document.querySelectorAll("#ln-list .ln-group h2 span")].map((h) => h.textContent),
       filter: document.getElementById("ln-filter").hidden, pressed: document.getElementById("t-learn").getAttribute("aria-pressed") })`);
     ok(L.mode === "learn" && L.shown && L.panel === "none" && L.pressed === "true", `Learn mode shown, Configure's panel hidden: ${JSON.stringify(L)}`);
     ok(L.groups[0] === "Getting started" && L.groups.includes("Setting up") && !L.groups.includes("Maintenance") && L.filter,
