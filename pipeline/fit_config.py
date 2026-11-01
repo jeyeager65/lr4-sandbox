@@ -332,8 +332,16 @@ def bom_fits(tags, suffix, infos, report):
     nclips = {t: sum(1 for q in json.load(open(os.path.join(SIZES_DIR, t + suffix, "summary.json")))
                      if re.match(r"^Y_Clip_\d+$", q)) for t in tags}
     # only builds whose fastener check is clean: a flagged joint changes the counts (a nut with no seat isn't counted)
-    flagged = {t: [r[2] for r in next(q for q in boms[t] if q["title"] == "Hardware: where every fastener goes")["rows"]
-                   if str(r[6]).startswith("CHECK")] for t in tags}
+    # (a head or nut only running into the router doesn't change a count: the router is the page's preset - its own
+    # clashes are the router's to fix, reported, not a reason to drop every build; 2026-11-01, the untraced Kobalt
+    # motor cap over a core axle's head)
+    rows = {t: next(q for q in boms[t] if q["title"] == "Hardware: where every fastener goes")["rows"] for t in tags}
+    router_only = lambda c: bool(re.fullmatch(r"CHECK: (?:(?:head|nut|bolt|tip) runs [\d.]+ mm into Router_\w+(?:; )?)+", c.strip()))
+    for t in tags:
+        for r in rows[t]:
+            if str(r[6]).startswith("CHECK") and router_only(str(r[6])) and t == tags[0]:
+                report.append(f"ROUTER CLASH (counted anyway; the router preset's to fix): {r[2]}: {r[6]}")
+    flagged = {t: [r[2] for r in rows[t] if str(r[6]).startswith("CHECK") and not router_only(str(r[6]))] for t in tags}
     for t, f in flagged.items():
         if f:
             report.append(f"FLAGGED build {t + suffix} (pitch {infos[t]['pitch']:.1f} mm, left out of the BOM fit): "

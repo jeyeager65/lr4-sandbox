@@ -57,9 +57,11 @@ const bit = rec("Router_Bit"), nutR = rec("Router_ColletNut") || rec("Router_Nut
 const o = [(bit.lo_ref[0] + bit.hi_ref[0]) / 2, (bit.lo_ref[1] + bit.hi_ref[1]) / 2, nutR.lo_ref[2]];
 const K = B.build(M("kobalt"));
 ok(near(K.cord.dir, [-Math.SQRT1_2, Math.SQRT1_2, 0], 1e-6), "Kobalt cord leaves bent 45 deg toward +y");
-// js/page/router.js RT_BUILD_TIP = the page data's cord tip (the size builds' router; after the next refresh: the
-// default preset's, tools/router_export.js cord.tip - update RT_BUILD_TIP then, this check says so)
-const tipW = cfg.hose.cord.tip, BUILD_TIP = [-108.1, 27.4, 196.0];
+// js/page/router.js RT_BUILD_TIP = the page data's cord tip (the size builds' router: the default preset's,
+// tools/router_export.js cord.tip since the 2026-11-01 refresh) - read from router.js itself
+const BUILD_TIP = JSON.parse(/const RT_BUILD_TIP = (\[[^\]]+\])/.exec(require("fs").readFileSync(require("path").join(__dirname, "../web/js/page/router.js"), "utf8"))[1]);
+const tipW = cfg.hose.cord.tip;
+ok(near(K.cord.tip, BUILD_TIP, 0.05), `RT_BUILD_TIP = the default preset's cord tip (${f(BUILD_TIP)} vs ${f(K.cord.tip)})`);
 ok(near(BUILD_TIP.map((v, i) => v + o[i]), tipW, 1.0), `RT_BUILD_TIP = lr4's cord_tip (${f(BUILD_TIP.map((v, i) => v + o[i]))} vs ${f(tipW)})`);
 // the page's mount frame (router.js RT_MOUNTS.kobalt) = the build's bit axis + nut bottom
 const mb = rec("Tool_Mount_B_Kobalt"), fo = [mb.lo_ref[0] + 49.4, mb.lo_ref[1] + 44.35, mb.lo_ref[2] - 36.5];

@@ -227,7 +227,7 @@
       cancelAnimationFrame(run);
       const t1 = performance.now();
       (function step() {
-        const u = Math.min(1, (performance.now() - t1) / (secs * 1000)), k = u * u * (3 - 2 * u);
+        const u = secs > 0 ? Math.min(1, (performance.now() - t1) / (secs * 1000)) : 1, k = u * u * (3 - 2 * u);   // (0 s: at once - not NaN)
         camera.position.lerpVectors(a, b, k); controls.target.lerpVectors(c, d, k); controls.update();
         if (u < 1) run = requestAnimationFrame(step);
       })();

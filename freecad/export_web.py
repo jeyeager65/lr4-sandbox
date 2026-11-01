@@ -148,7 +148,9 @@ for o in doc.Objects:
         if DECIMATE_ABOVE and m.CountFacets > DECIMATE_ABOVE:
             m.decimate(0.2, 0.85)
         pts, facets = m.Topology
-        source = "printed"
+        # the router's meshes (Part 45b: tools/router_export.js, our own geometry - the page draws its own over them)
+        # are hardware like the old router solids, not V1E prints (share_data would refuse them)
+        source = "hardware" if o.Name.startswith("Router_") else "printed"
     elif o.TypeId == "Part::Feature":
         clip = None
         if o.Name in run_by:                      # straight belt run: full reach, clipped live by the page

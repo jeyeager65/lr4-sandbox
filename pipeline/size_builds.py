@@ -67,8 +67,10 @@ def make_copy(tag, cx, cy, temp=False):
     shutil.copytree(os.path.join(PROJ, "build", "cache"), os.path.join(dst, "build", "cache"))
     os.makedirs(os.path.join(dst, "exports", "web"))
     parts = os.path.join(PROJ, "parts").replace("\\", "/")
+    rt_export = os.path.join(PROJ, "tools", "router_export.js").replace("\\", "/")   # (node: the real web/js + data)
     patch(os.path.join(dst, "freecad", "lr4.py"), [(r'^PARTS = .*$', f'PARTS = r"{parts}"')])
-    patch(os.path.join(dst, "freecad", "build.py"), [(r'^CUT_X_IN = [0-9.]+', f"CUT_X_IN = {cx}"),
+    patch(os.path.join(dst, "freecad", "build.py"), [(r'os\.path\.join\(ROOT, "tools", "router_export\.js"\)', f'r"{rt_export}"'),
+                                          (r'^CUT_X_IN = [0-9.]+', f"CUT_X_IN = {cx}"),
                                           (r'^CUT_Y_IN = [0-9.]+', f"CUT_Y_IN = {cy}"),
                                           (r'^JP3_BOARD = True', "JP3_BOARD = False")]
           + ([(r'^STRUTS = "mdf"', 'STRUTS = "temp"')] if temp else []))

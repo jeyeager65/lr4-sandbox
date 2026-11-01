@@ -63,11 +63,21 @@ async function run(mode) {
     if (!iso) return;
     await page.val(HELPERS);
 
-    // the UIs onto the card / Flash (kept in this browser), then FluidNC mode boots with them
-    const a = await page.val(`(async () => {
+    // the UIs onto the card / Flash (kept in this browser), then a reload: FluidNC boots with them (it boots with the
+    // page, and since the 0.64.1 load speed-up it can be up before files written now - its card is copied at boot)
+    await page.val(`(async () => {
       const gz = new Uint8Array(await new Response(new Blob([${JSON.stringify(TINY)}]).stream().pipeThrough(new CompressionStream("gzip"))).arrayBuffer());
       await SdCard.store.put("/tinyui.html.gz", gz);
       await SdCard.flash.store.put("/index.html", ${JSON.stringify(FLASH_UI)});
+      return true; })()`);
+    try { await page.send("Page.reload", {}); } catch (e) { /* reloading */ }
+    iso = false;
+    for (let i = 0; i < 120 && !iso; i++) {
+      await sleep(500);
+      try { iso = await page.val("window.crossOriginIsolated === true && !!window.LR4Ctl && !!LR4Ctl.travel() && document.getElementById('status').hidden"); } catch (e) { /* reloading */ }
+    }
+    await page.val(HELPERS);
+    const a = await page.val(`(async () => {
       document.getElementById("t-run").click();
       const sim = await T.booted(null);
       if (!sim) return { err: "FluidNC didn't boot" };

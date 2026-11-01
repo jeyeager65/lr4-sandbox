@@ -130,8 +130,9 @@
     return out;
   }
   // the cord leaves where this router's does: the build's tip moved by (this router's - the build's). RT_BUILD_TIP = the
-  // FreeCAD Kobalt's stub end (hw.kobalt_k7tr03: 14 below the top, bent 45 deg) in the router frame
-  const RT_BUILD_TIP = [-108.1, 27.4, 196.0];
+  // size build's cord tip in the router frame: tools/router_export.js's default (Kobalt) preset, build/router/router.json
+  // cord.tip (full size refresh 2026-11-01; was the old hw.kobalt_k7tr03 stub, -108.1, 27.4, 196)
+  const RT_BUILD_TIP = [-103.62, 27.39, 185.0];
   function rtHose(h) {
     const B = rtBody(), M = rtMountOf(LR4Routers.ROUTERS[RT.set.router]), r = LR4Routers.ROUTERS[RT.set.router];
     if (!B || !h.cord || !h.cord.tip) return;

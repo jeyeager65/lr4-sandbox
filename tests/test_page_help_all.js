@@ -11,7 +11,10 @@ const ok = (cond, msg) => { checks++; console.log((cond ? "  ok   " : "  FAIL ")
 
 (async () => {
   if (!CHROME) { console.log("Chrome not found (set CHROME)"); process.exit(1); }
-  const index = JSON.parse(fs.readFileSync(path.join(__dirname, "../web/help/index.json"), "utf8")).videos;
+  // (Part 47b: index.json lists files; the demos are the ones with secs - a mine clip plays on your machine, not here)
+  const index = JSON.parse(fs.readFileSync(path.join(__dirname, "../web/help/index.json"), "utf8")).files
+    .filter((v) => v.secs).map((v) => Object.assign({ id: v.file.replace(/\.[^.]+$/, ""),   // kind: the file's (Video: KIND=ui)
+      kind: /\(\s*Video:[^)\n]*\bKIND\s*=\s*ui\b/i.test(fs.readFileSync(path.join(__dirname, "../web/help", v.file), "utf8")) ? "ui" : "machine" }, v));
   const want = process.argv.slice(2), list = want.length ? index.filter((v) => want.includes(v.id)) : index;
   const port = 9190 + Math.floor(Math.random() * 100), srv = server("headers", port);
   const page = await chromePage(9800 + Math.floor(Math.random() * 100), { gpu: true });
