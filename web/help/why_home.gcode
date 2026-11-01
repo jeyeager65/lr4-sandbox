@@ -1,5 +1,5 @@
 (Why home? A LowRider 4 isn't square until it homes - LR4 Sandbox video)
-(Record: node tools/record_demo.js web/help/why_home.gcode - the page plays it live: Help > Why home?)
+(Record: node tools/record_demo.js web/help/why_home.gcode - the page plays it live: Learn > Why home?)
 (Serve the repo first: python tools/serve.py sandbox --no-open)
 (FluidNC keeps lines short: keep every line here under ~90 characters)
 (Rack 8 mm, beam 5 mm off: big, so it shows at 1x; cuts are true)

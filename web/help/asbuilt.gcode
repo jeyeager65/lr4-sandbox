@@ -1,5 +1,5 @@
 (As built + tram: a racked gantry, a router out of tram, a warped spoilboard - Help video, Part 43)
-(The page plays it live: Help > As built. YouTube: node tools/record_demo.js web/help/asbuilt.gcode)
+(The page plays it live: Learn > As built. YouTube: node tools/record_demo.js web/help/asbuilt.gcode)
 (KIND=ui: the whole page on screen. Keep every line under 127 bytes: FluidNC stops on longer ones)
 (The rectangle: node tools/help_jobs.js square - 500 x 300 mm and both diagonals, 1 mm deep)
 (CNCSIM 1 UNITS=mm)

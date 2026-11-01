@@ -72,13 +72,13 @@
 //   (Video Speed: X=62 | FIT=75 | FOR=8 REAL=5 BADGE=on)   the job's pace: X times, or fit its moves into FIT s of
 //       video; FOR = only for that many s of video, then back; REAL = s at 1x at each section's first cut (after a
 //       message or an M0), then easing up (0 = off); BADGE = the speed badge
-//   ui videos (KIND=ui) only - an element id of the page (e.g. t-run, st-size, home, home-x, zero-all, job-play, hv-btn):
+//   ui videos (KIND=ui) only - an element id of the page (e.g. t-run, st-size, home, home-x, zero-all, job-play, t-learn):
 //   (Video Point: ID=home TIME=3 TEXT=This is Home)   a ring round that control, and TEXT as a caption, for TIME s (the
 //       intro waits; mid-job it shows while the job goes on)
 //   (Video Click: ID=home TIME=0.8)   a pointer moves there over TIME s and clicks it: the page does what a user's click
 //       does (Home homes, ▶ runs the job - the intro ends when a click starts the job)
 //   (Video Step: ID=st-ab TIME=0.8)   the same, but only opens: a Design step (st-size ...), a tab (t-run) or a menu
-//       (hv-btn) already open is just pointed at. Mid-job, Click / Step hold the job while the pointer moves
+//       (pw-btn) already open is just pointed at. Mid-job, Click / Step hold the job while the pointer moves
 //   (Video Design: EXAMPLE=on | FILE=help/plate.svg)   the front plate design (Configure > 6 Get the files, Part 41), as if
 //       uploaded: EXAMPLE = the template's own Example layer for this machine's plate; FILE = an SVG next to the page
 //       (made for this MACHINE='s plate length). The 3D plate and the strut plate job follow it

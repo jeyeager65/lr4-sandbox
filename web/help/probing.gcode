@@ -1,5 +1,5 @@
 (Probing + zero: X and Y from homing, Z from the touch plate - Help video, Part 43)
-(The page plays it live: Help > Probing and zero. YouTube: node tools/record_demo.js web/help/probing.gcode)
+(The page plays it live: Learn > Probing and zero. YouTube: node tools/record_demo.js web/help/probing.gcode)
 (KIND=ui: the whole page on screen. Keep every line under 127 bytes: FluidNC stops on longer ones)
 (CNCSIM 1 UNITS=mm)
 (Stock: XMIN=0 XMAX=160 YMIN=0 YMAX=100 ZMIN=-12.7 ZMAX=0)

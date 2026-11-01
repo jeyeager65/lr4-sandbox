@@ -1,17 +1,17 @@
 {
-  "about": "Help videos (Part 43): each is a (Video ...) G-code script the page plays live (js/page/help.js) and tools/record_demo.js records for YouTube. secs = about how long it plays live. kind: machine = the 3D view, ui = the whole page.",
+  "about": "Help videos (Part 43): each is a (Video ...) G-code script the page plays live (js/page/help.js) and tools/record_demo.js records for YouTube. secs = about how long it plays live. kind: machine = the 3D view, ui = the whole page. Learn (Part 47): group = its heading in the Learn list (js/page/help.js LEARN_GROUPS), type: demo = on a temporary machine, mine = on your own (puts back what it moves).",
   "videos": [
-    { "id": "tour", "file": "tour.gcode", "kind": "ui", "secs": 125, "title": "Tour + first job",
+    { "id": "tour", "group": "Getting started", "type": "demo", "file": "tour.gcode", "kind": "ui", "secs": 125, "title": "Tour + first job",
       "blurb": "The Configure steps, then Run: Home, Zero and a name plate engraved on the page's own FluidNC." },
-    { "id": "why_home", "file": "why_home.gcode", "kind": "machine", "secs": 80, "title": "Why home?",
+    { "id": "why_home", "group": "Setting up", "type": "demo", "file": "why_home.gcode", "kind": "machine", "secs": 80, "title": "Why home?",
       "blurb": "Switched on, the gantry is racked and the beam off level: $H squares it, each side to its own switch." },
-    { "id": "probing", "file": "probing.gcode", "kind": "ui", "secs": 85, "title": "Probing and zero",
+    { "id": "probing", "group": "Probing / zero", "type": "demo", "file": "probing.gcode", "kind": "ui", "secs": 85, "title": "Probing and zero",
       "blurb": "Work zero per axis, and the touch plate with its clip on the collet nut finding the stock's top." },
-    { "id": "asbuilt", "file": "asbuilt.gcode", "kind": "ui", "secs": 130, "title": "As built + tram",
+    { "id": "asbuilt", "group": "Setting up", "type": "demo", "file": "asbuilt.gcode", "kind": "ui", "secs": 130, "title": "As built + tram",
       "blurb": "A racked gantry, a router out of tram and a warped spoilboard, and the squareness test that finds them." },
-    { "id": "front_plate", "file": "front_plate.gcode", "kind": "ui", "secs": 100, "title": "Your own front plate",
+    { "id": "front_plate", "group": "Running a job", "type": "demo", "file": "front_plate.gcode", "kind": "ui", "secs": 100, "title": "Your own front plate",
       "blurb": "The template, your SVG uploaded and checked, the plate in 3D, and the job's V-bit and bit change." },
-    { "id": "safety", "file": "safety.gcode", "kind": "machine", "secs": 190, "title": "Safety: lost steps + fire",
+    { "id": "safety", "group": "Running a job", "type": "demo", "file": "safety.gcode", "kind": "machine", "secs": 190, "title": "Safety: lost steps + fire",
       "blurb": "A knot makes X skip steps; Z losing a few steps on each lift ends in a jammed bit, smoke and a fire. Never leave it running." }
   ]
 }

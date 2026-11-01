@@ -1,14 +1,16 @@
-// lr4-sandbox page, part 14 of 14: Help videos (Part 43b), replayed live in the page - no MP4s, no YouTube links. Each one
-// is a (Video ...) G-code script in help/ (help/index.json: id, title, secs, blurb), the same file record_demo.js turns
-// into the YouTube video. Offered from the top bar's Help menu and the welcome card. Playing one reloads the page as
+// lr4-sandbox page, part 14 of 14: Learn (Part 47; was the Help videos, Part 43b) - short clips replayed live in the
+// page, no MP4s, no YouTube links. Each one is a (Video ...) G-code script in help/ (help/index.json: id, title, secs,
+// blurb, group, type), the same file record_demo.js turns into the YouTube video. Listed in the Learn mode (top bar
+// Configure | Run | Learn) by group; the welcome card's tour link opens it there. Two types: "demo" reloads the page as
 // the temporary machine "Help: <title>" (#help=<id>, machines.js: fresh each time, its own settings / SD card /
-// spoilboard), so your machine is never touched; Exit reloads back to yours. The video runs on the script's own
-// settings (MACHINE=, TABLE=, ...): the same for every viewer.
+// spoilboard), so your machine is never touched; Exit reloads back to yours, in Learn (#learn). "mine" plays on your
+// own machine and puts back what it moved (Part 47.2). A demo runs on the script's own settings (MACHINE=, TABLE=,
+// ...): the same for every viewer.
 // The player: a start card (its click turns the sound on - browsers only allow sound after a click on the page), then
 // a bar over the view: ⏸ / ▶, Follow (after a drag took the camera; the next Shot hands it back too), ✕ Exit. A
 // click on the view pauses (look round), ▶ goes on. Live replays run at most 5x (FluidNC's own pace; a script asking
 // more runs at 5x). An SD card file with (Video ...) lines gets "▶ Play as a video" (Run > SD card): the same, from
-// your file (kept in this browser till it plays).
+// your file (kept in this browser till it plays; its Exit goes back to the mode you were in, not Learn).
   const HELP = { list: null, id: null, entry: null, text: null, clock: null, paused: false, done: false };
   const HELP_FILE = "lr4-help-file";                 // per browser: an SD card file to play as a video (name + text)
   const helpId = () => { const m = /^#help=([\w.-]+)/.exec(location.hash); return m ? decodeURIComponent(m[1]) : null; };
@@ -23,29 +25,68 @@
     location.hash = "help=" + encodeURIComponent(id);
     location.reload();
   }
-  function helpExit() { location.replace(location.href.split("#")[0]); }   // back to your machine, as it was
-  async function helpMenu() {
-    const list = await helpIndex(), host = $("hv-list");
-    host.replaceChildren(...list.map((v) => {
-      const b = document.createElement("button");
-      b.type = "button"; b.setAttribute("role", "listitem"); b.className = "hv-row";
-      b.innerHTML = `<b></b><em></em><span></span>`;
-      b.children[0].textContent = v.title; b.children[1].textContent = helpSecs(v.secs); b.children[2].textContent = v.blurb;
-      b.title = `Play "${v.title}" in this page (on a temporary machine: yours stays as it is)`;
-      b.addEventListener("click", () => helpGo(v.id));
-      return b;
-    }));
-    if (!list.length) host.textContent = "No help videos found.";
-    const missing = $("parts-chip").classList.contains("missing");
-    $("hv-parts").hidden = !missing;
+  // back to your machine, as it was (a Demo: in Learn - #learn, which ui.js drops; a hash-only replace() wouldn't reload)
+  function helpExit() {
+    const base = location.href.split("#")[0];
+    if (!HELP.id || HELP.id === "file") return location.replace(base);
+    history.replaceState(null, "", base + "#learn");
+    location.reload();
+  }
+
+  // ---- the Learn mode's list (Part 47.1): the clips by group, empty groups hidden; a filter box from 20 clips ----
+  const LEARN_GROUPS = ["Getting started", "Setting up", "Running a job", "Bits and collets", "Probing / zero", "Maintenance", "My clips"];
+  const LEARN_FILTER_AT = 20;
+  const LEARN_TYPES = { demo: "Demo", mine: "On your machine" };
+  const learnGroup = (v) => v.group || "My clips";
+  const learnPlay = (v) => (v.type === "mine" && window.LR4Learn && LR4Learn.mine ? LR4Learn.mine(v.id) : helpGo(v.id));
+  function learnRow(v) {
+    const b = document.createElement("button");
+    b.type = "button"; b.setAttribute("role", "listitem"); b.className = "hv-row"; b.dataset.id = v.id;
+    b.innerHTML = `<b></b><em></em><span></span><i></i>`;
+    b.children[0].textContent = v.title; b.children[1].textContent = v.secs ? helpSecs(v.secs) : "";
+    b.children[2].textContent = v.blurb;
+    b.children[3].textContent = LEARN_TYPES[v.type] || LEARN_TYPES.demo;
+    b.title = v.type === "mine" ? `Play "${v.title}" on your machine (it puts back what it moves)`
+      : `Play "${v.title}" in this page (on a temporary machine: yours stays as it is)`;
+    b.addEventListener("click", () => learnPlay(v));
+    return b;
+  }
+  async function learnList() {
+    const list = await helpIndex(), host = $("ln-list"), f = $("ln-filter");
+    f.hidden = list.length < LEARN_FILTER_AT;
+    const q = f.hidden ? "" : f.value.trim().toLowerCase();
+    const shown = list.filter((v) => !q || `${v.title} ${v.blurb} ${learnGroup(v)}`.toLowerCase().includes(q));
+    const groups = [...LEARN_GROUPS, ...new Set(shown.map(learnGroup).filter((g) => !LEARN_GROUPS.includes(g)))];
+    host.replaceChildren(...groups.map((g) => {
+      const items = shown.filter((v) => learnGroup(v) === g);
+      if (!items.length) return null;
+      const sec = document.createElement("section");
+      sec.className = "ln-group";
+      sec.innerHTML = `<h2></h2><div class="hv-list" role="list"></div>`;
+      sec.firstChild.textContent = g;
+      sec.lastChild.setAttribute("aria-label", g);
+      sec.lastChild.append(...items.map(learnRow));
+      return sec;
+    }).filter(Boolean));
+    if (!shown.length) host.textContent = list.length ? "No clip matches." : "No clips found.";
+    $("ln-parts").hidden = !$("parts-chip").classList.contains("missing");
+  }
+  async function learnShow(id) {                     // Learn, that clip's row lit and focused
+    LR4ShowMode("learn");
+    await learnList();
+    const row = id && $("ln-list").querySelector(`.hv-row[data-id="${CSS.escape(id)}"]`);
+    if (!row) return;
+    row.scrollIntoView({ block: "nearest" });
+    row.classList.add("lit");
+    setTimeout(() => row.classList.remove("lit"), 2500);
+    row.focus();
   }
   {
-    const btn = $("hv-btn"), pop = $("hv-pop");
-    btn.addEventListener("click", () => { helpMenu(); popToggle(btn, pop); });
-    document.addEventListener("pointerdown", (e) => { if (!pop.hidden && !e.target.closest("#hv-pop, #hv-btn, #help-pop")) popToggle(btn, pop, false); });
-    document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !pop.hidden) popToggle(btn, pop, false); });
-    $("hv-parts-btn").addEventListener("click", () => { popToggle(btn, pop, false); welcome(true); });
-    $("wc-tour").addEventListener("click", () => helpGo("tour"));
+    LR4OnMode((m) => { if (m === "learn") learnList(); });
+    if (document.documentElement.dataset.mode === "learn") learnList();
+    $("ln-filter").addEventListener("input", learnList);
+    $("ln-parts-btn").addEventListener("click", () => welcome(true));
+    $("wc-tour").addEventListener("click", () => { welcome(false); $("t-learn").click(); learnShow("tour"); });
   }
 
   // ---- playing one (the help machine) ----
@@ -138,6 +179,6 @@
     });
     if (helpId()) helpStart();
   }
-  window.LR4Help = { list: helpIndex, go: helpGo, exit: helpExit, pause: helpPause, follow: helpFollow,
+  window.LR4Help = { list: helpIndex, go: helpGo, exit: helpExit, pause: helpPause, follow: helpFollow, learn: learnShow, groups: LEARN_GROUPS,
     state: () => ({ id: HELP.id, playing: !!HELP.clock && !HELP.done, paused: HELP.paused, done: HELP.done, free: !!(HELP.clock && HELP.clock.free) }),
     playFile(name, text) { MS.set(HELP_FILE, JSON.stringify({ name, text })); helpGo("file"); } };

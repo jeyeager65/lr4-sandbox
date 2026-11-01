@@ -113,16 +113,23 @@
     const root = document.documentElement;
     const kv = { get: (k) => { try { return MS.get(k); } catch (e) { return null; } },
                  set: (k, v) => { try { MS.set(k, v); } catch (e) { /* not kept */ } } };
-    const modeBtns = { design: $("t-design"), run: $("t-run") };
+    const modeBtns = { design: $("t-design"), run: $("t-run"), learn: $("t-learn") };
+    const modeHooks = [];                            // (new mode, old mode) => ...: Learn stops an On your machine clip
     function setMode(m, save = true) {
+      const was = root.dataset.mode;
       root.dataset.mode = m;
       for (const [k, b] of Object.entries(modeBtns)) b.setAttribute("aria-pressed", String(k === m));
       if (save) kv.set("lr4-mode", m);
+      if (was !== m) for (const f of modeHooks) f(m, was);
     }
     for (const [k, b] of Object.entries(modeBtns)) b.addEventListener("click", () => setMode(k));
     window.LR4ShowMode = (m) => setMode(m, false);   // help videos: shown, not saved (the mode is shared with your machines)
-    if (kv.get("lr4-mode") === null && kv.get("lr4-tab") === "t-run") setMode("run");   // the old Run tab
-    else setMode(root.dataset.mode === "run" ? "run" : "design", false);
+    window.LR4OnMode = (f) => modeHooks.push(f);
+    if (/^#learn\b/.test(location.hash)) {          // a Demo's Exit comes back to Learn (help.js): shown, the hash dropped
+      history.replaceState(null, "", location.href.split("#")[0]);
+      setMode("learn", false);
+    } else if (kv.get("lr4-mode") === null && kv.get("lr4-tab") === "t-run") setMode("run");   // the old Run tab
+    else setMode(["run", "learn"].includes(root.dataset.mode) ? root.dataset.mode : "design", false);
     $("tb-files").addEventListener("click", () => {   // unfolds the panel (its « button) at step 6
       setMode("design");
       if (root.classList.contains("p-off")) $("col-p").click();

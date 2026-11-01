@@ -1,7 +1,7 @@
-// Part 43b in headless Chrome: Help videos. The Help menu lists help/index.json; a video reloads the page as the
+// Part 43b / 47 in headless Chrome: Learn. The Learn mode lists help/index.json by group; a Demo reloads the page as the
 // temporary machine "Help: <title>" (fresh, yours untouched), the start card's ▶ plays it live on FluidNC: a title
 // shows, homing ends, ⏸ holds the director and FluidNC, a drag takes the camera (Follow gives it back), it plays to
-// the end; Exit reloads back to your machine byte for byte as it was (settings, SD card).
+// the end; Exit reloads back to your machine byte for byte as it was (settings, SD card), in Learn.
 //   node tests/test_page_help.js   (not in npm test: needs Chrome + Python + parts/; ~3-4 min)
 "use strict";
 const { CHROME, sleep, server, chromePage } = require("./test_page_fluidnc.js");
@@ -39,19 +39,27 @@ const ok = (cond, msg) => { checks++; console.log((cond ? "  ok   " : "  FAIL ")
     await page.send("Page.navigate", { url: "about:blank" }); await sleep(300);   // what a plain reload writes is in "before" too
     await page.send("Page.navigate", { url: base });
     await loaded(); await sleep(1500);
+    // Learn: the clips by group (the mode is saved before "before": Exit must come back to it unchanged)
+    await page.val(`document.getElementById("t-learn").click()`);
+    const rows = await page.val(`(async () => {
+      for (let i = 0; i < 40 && !document.querySelector("#ln-list .hv-row"); i++) await new Promise((r) => setTimeout(r, 100));
+      return [...document.querySelectorAll("#ln-list .hv-row")].map((b) => b.querySelector("b").textContent + " | " + b.querySelector("em").textContent); })()`);
+    ok(rows.length >= 1 && rows.some((r) => /^Why home\? \| about/.test(r)), `Learn list: ${rows.join("; ")}`);
+    const L = await page.val(`({ mode: document.documentElement.dataset.mode, shown: getComputedStyle(document.getElementById("learn")).display !== "none",
+      panel: getComputedStyle(document.querySelector(".panel")).display, groups: [...document.querySelectorAll("#ln-list .ln-group h2")].map((h) => h.textContent),
+      filter: document.getElementById("ln-filter").hidden, pressed: document.getElementById("t-learn").getAttribute("aria-pressed") })`);
+    ok(L.mode === "learn" && L.shown && L.panel === "none" && L.pressed === "true", `Learn mode shown, Configure's panel hidden: ${JSON.stringify(L)}`);
+    ok(L.groups[0] === "Getting started" && L.groups.includes("Setting up") && !L.groups.includes("Maintenance") && L.filter,
+      `groups in order, empty ones hidden, no filter under 20 clips: ${L.groups.join(", ")}`);
+    ok(await page.val(`!document.getElementById("hv-btn") && !document.getElementById("hv-pop")`), "the old Help menu is gone");
+    await sleep(300);
     const before = await mine();
-    // the Help menu
-    const rows = await page.val(`(async () => { document.getElementById("hv-btn").click();
-      for (let i = 0; i < 40 && !document.querySelector("#hv-list .hv-row"); i++) await new Promise((r) => setTimeout(r, 100));
-      return [...document.querySelectorAll("#hv-list .hv-row")].map((b) => b.querySelector("b").textContent + " | " + b.querySelector("em").textContent); })()`);
-    ok(rows.length >= 1 && rows.some((r) => /^Why home\? \| about/.test(r)), `Help menu: ${rows.join("; ")}`);
-    ok(await page.val(`!document.getElementById("hv-pop").hidden`), "the menu opens");
     // the SD card file with (Video ...) lines: "▶ Play as a video" in its menu
     ok(await page.val(`(async () => { await sdRefresh(); const row = [...document.querySelectorAll("#sd-list .sd-row")].find((r) => /mine/.test(r.textContent));
       row.querySelector(".sd-more").click(); const t = document.getElementById("row-menu").textContent; document.getElementById("row-menu").hidden = true; return /Play as a video/.test(t); })()`),
       "an SD file with (Video ...) lines offers ▶ Play as a video");
     // play one: the page reloads as the help machine
-    try { await page.val(`[...document.querySelectorAll("#hv-list .hv-row")].find((b) => /Why home/.test(b.textContent)).click()`); } catch (e) { /* reloading */ }
+    try { await page.val(`[...document.querySelectorAll("#ln-list .hv-row")].find((b) => /Why home/.test(b.textContent)).click()`); } catch (e) { /* reloading */ }
     ok(await loaded(), "reloaded");
     const h = await page.val(`({ id: MS.id, help: MS.help, hash: location.hash, btn: document.getElementById("mc-btn").textContent,
       router: document.getElementById("opt-router").checked, banner: !document.getElementById("mc-banner").hidden })`);
@@ -116,7 +124,14 @@ const ok = (cond, msg) => { checks++; console.log((cond ? "  ok   " : "  FAIL ")
         console.log(`    SD ${p} differs at byte ${i}: "${String.fromCharCode(...x.slice(Math.max(0, i - 40), i + 40))}" -> "${String.fromCharCode(...y.slice(Math.max(0, i - 40), i + 40))}"`); } }
       if (A.id !== B.id) console.log(`    id ${A.id} -> ${B.id}`);
     }
-    ok(await page.val(`location.hash === "" && !MS.temp && !document.getElementById("opt-router").checked`), "back on yours (router still off)");
+    const back = await page.val(`({ hash: location.hash, temp: MS.temp, router: document.getElementById("opt-router").checked })`);
+    ok(back.hash === "" && !back.temp && !back.router, `back on yours (router still off): ${JSON.stringify(back)}`);
+    ok(await page.val(`document.documentElement.dataset.mode === "learn" && !!document.querySelector("#ln-list .hv-row")`), "Exit comes back to Learn");
+    // the welcome card's tour link: Learn, the tour's row lit
+    await page.val(`(async () => { document.getElementById("t-design").click(); welcome(true); document.getElementById("wc-tour").click();
+      for (let i = 0; i < 30 && !document.querySelector("#ln-list .hv-row.lit"); i++) await new Promise((r) => setTimeout(r, 100)); })()`);
+    ok(await page.val(`document.documentElement.dataset.mode === "learn" && document.querySelector("#ln-list .hv-row.lit")?.dataset.id === "tour" && document.getElementById("welcome").hidden`),
+      "the welcome card's tour link opens Learn on the tour");
   } catch (e) {
     ok(false, "error: " + e.message);
   } finally {

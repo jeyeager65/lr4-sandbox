@@ -54,8 +54,10 @@ body {
 .side-l { grid-area: left; }
 .side-r { grid-area: right; }
 .console { grid-area: con; }
-.side, .console, .mini-dro { display: none; }
-:root[data-mode="run"] .panel { display: none; }
+.side, .console, .mini-dro, .learn { display: none; }
+.learn { grid-area: panel; }
+:root[data-mode="learn"] .learn { display: flex; }
+:root[data-mode="run"] .panel, :root[data-mode="learn"] .panel { display: none; }
 :root[data-mode="run"] .side { display: flex; }
 :root[data-mode="run"] .console { display: grid; }
 :root[data-mode="run"].l-off .mini-dro { display: flex; }
@@ -778,6 +780,9 @@ button:disabled { opacity: 0.42; cursor: default; }
   .tb-icon { display: none; }                                                       /* room for the machine's name */
   .mc-btn { padding: 3px 7px; font-size: 12px; }
   .modes button { padding: 4px 9px; }
+  .modes .m-nm { display: none; }
+  .modes .m-ic { display: inline; }
+  .learn { border-right: 0; border-top: 1px solid var(--line); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
   .mc-pop { max-height: 80dvh; }
   .mc-list button { padding: 9px 8px; font-size: 14px; }                          /* finger-sized rows */
   .mc-banner { top: calc(var(--top-h) + 4px); font-size: 12px; }
@@ -900,7 +905,6 @@ button:disabled { opacity: 0.42; cursor: default; }
 .cam.ab .check { margin-top: 10px; }
 
 /* Help videos (Part 43b, js/page/help.js): the top bar's Help menu, the start card and the player bar over the view */
-.hv-pop { right: 230px; }
 .hv-list { display: flex; flex-direction: column; gap: 2px; margin-top: 6px; }
 .hv-row { display: grid; grid-template-columns: 1fr auto; gap: 1px 10px; text-align: left; border: 1px solid transparent; border-radius: 5px;
   padding: 6px 8px; background: none; color: var(--ink); font-size: 13px; }
@@ -908,7 +912,17 @@ button:disabled { opacity: 0.42; cursor: default; }
 .hv-row b { font-weight: 600; }
 .hv-row em { font-style: normal; color: var(--muted); font-size: 12px; white-space: nowrap; }
 .hv-row span { grid-column: 1 / -1; color: var(--muted); font-size: 12px; line-height: 1.4; }
-.hv-pop .foot { margin: 8px 0 0; }
+.hv-row i { grid-column: 1 / -1; font-style: normal; font-size: 11px; color: var(--muted); letter-spacing: 0.04em; }
+.hv-row.lit { border-color: var(--accent); }
+/* Learn (Part 47, js/page/help.js): the mode's left column, the clips by group */
+.learn { background: var(--panel); border-right: 1px solid var(--line); overflow-y: auto; min-width: 0;
+  flex-direction: column; gap: 14px; padding: 18px 16px 24px max(16px, env(safe-area-inset-left, 0px)); }
+.ln-head { display: flex; align-items: center; gap: 6px; }
+.ln-list { display: flex; flex-direction: column; gap: 16px; }
+.ln-group h2 { margin: 0 0 2px; }
+.ln-filter { width: 100%; }
+.learn .foot { margin: 0; }
+.m-ic { display: none; }
 .wc-tour { margin: 0; font-size: 13px; }
 .hv-start { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 9; width: min(420px, calc(100% - 24px));
   padding: 14px 16px; background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-left: 3px solid var(--accent);

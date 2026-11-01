@@ -1,5 +1,5 @@
 (Your own front plate: the template, an upload, the checks, the painted plate, the job's bit change - Help video, Part 43)
-(The page plays it live: Help > Your own front plate. YouTube: node tools/record_demo.js web/help/front_plate.gcode)
+(The page plays it live: Learn > Your own front plate. YouTube: node tools/record_demo.js web/help/front_plate.gcode)
 (KIND=ui: the whole page. The design = the template's own Example layer: Video Design EXAMPLE=on)
 (The sample job: LR4 engraved with a V-bit, a bit change, then a pocket with the 1/8in flat - as the strut job does)
 (CNCSIM 1 UNITS=mm)

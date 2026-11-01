@@ -1,5 +1,5 @@
 (Safety: lost steps and a fire - LR4 Sandbox video, Part 44e)
-(Record: node tools/record_demo.js web/help/safety.gcode - the page plays it live: Help > Safety)
+(Record: node tools/record_demo.js web/help/safety.gcode - the page plays it live: Learn > Safety)
 (Serve the repo first: python tools/serve.py sandbox --no-open)
 (FluidNC: every line under 127 bytes, Video lines too, and no parens in a comment - ALARM 17)
 (From the try videos knot_square + zdrift_fire. The Z slips are scripted - NOW= after each lift;)
