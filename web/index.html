@@ -126,7 +126,16 @@
     <p>While one plays: drag the view to look round (Follow gives the camera back), click the view or press Space to
     pause, ▶ to go on. The sound comes on for a Demo. Jobs play at up to 5× real time.</p>
     <p>Any G-code file with <code>(Video ...)</code> comments on the SD card can be played the same way (Run > SD
-    card > ▶ Play as a video).</p></div>
+    card > ▶ Play as a video).</p>
+    <p><b>Your own clips:</b> Import… takes .gcode / .nc files (or a .zip of them) and keeps them in this browser for
+    this machine, listed as imported with ✕ to delete. Each file's header names it, one key per line before the first
+    move: <code>(Video Learn: NAME=...)</code>, <code>GROUP=</code> (none: My clips), <code>KIND=demo</code> or
+    <code>mine</code>, and <code>DESC=</code> lines for its one line. A file with an error isn't added; the errors are
+    listed.</p>
+    <p><b>What a clip can do:</b> only G-code and <code>(Video ...)</code> lines. A demo runs on the temporary help
+    machine's FluidNC (in this page), a <i>mine</i> clip only its one <code>(Video BitChange:)</code> or
+    <code>(Video TouchPlate:)</code> line on yours. Nothing in a clip runs code or fetches from the internet (a
+    Design <code>FILE=</code> is an .svg next to this page).</p></div>
   <div class="ln-now" id="ln-now" role="region" aria-label="Playing on your machine" hidden>
     <div class="ln-now-h"><b id="ln-now-t"></b><i>On your machine</i></div>
     <ol class="ln-steps" id="ln-steps" aria-label="Steps (click one to jump there)"></ol>
@@ -135,6 +144,10 @@
   </div>
   <input type="search" class="ln-filter" id="ln-filter" placeholder="Filter the clips" aria-label="Filter the clips" hidden>
   <div class="ln-list" id="ln-list"></div>
+  <div class="ln-own">
+    <div class="buttons"><label class="btn" title="Your own clips: .gcode / .nc files with (Video ...) lines, or a .zip of them - kept in this browser for this machine">Import…<input type="file" id="ln-file" accept=".gcode,.nc,.ngc,.txt,.zip" multiple hidden></label></div>
+    <div class="foot" id="ln-imp-msg" role="status"></div>
+  </div>
   <p class="foot" id="ln-parts" hidden>Load your part files for the full picture (without them the parts show as grey
     boxes): <button type="button" class="link" id="ln-parts-btn">Parts</button></p>
 </aside>

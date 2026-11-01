@@ -15,7 +15,7 @@
   "use strict";
   const MACHINE_KEY = /^(lr4-(asbuilt|cam|config-size|design|filaments|fil-presets|hand|jobdef:.*|lighting|opts|pendant|room|router|scenery|table-top|sd-sel)|detail|peter-style|peter-style-files|print-main|print-accent)$/;
   const LIST = "lr4-machines", ACTIVE = "lr4-machine", SHARED = "shared", HELP = "help", FIRST = "My LR4";
-  const DBS = ["lr4-sandbox-sd", "lr4-sandbox-flash", "lr4-sandbox-design"];   // design: the front plate's SVG (Part 41)
+  const DBS = ["lr4-sandbox-sd", "lr4-sandbox-flash", "lr4-sandbox-design", "lr4-sandbox-learn"];   // design: the front plate's SVG (Part 41); learn: your Learn clips (Part 47b)
   const isMachineKey = (k) => MACHINE_KEY.test(k);
   const prefix = (id) => `lr4@${id}/`;
   const dbOf = (id, name) => `${name}@${id}`;
@@ -122,10 +122,10 @@
     return v;
   }
   const FORMAT = "lr4-sandbox-machine";
-  // { name, settings, sd?, flash?, design? } -> the file's object (records packed)
+  // { name, settings, sd?, flash?, design?, learn? } -> the file's object (records packed; learn: your Learn clips, Part 47b)
   function exportOf(m) {
     const o = { format: FORMAT, version: 1, name: m.name, exported: new Date().toISOString(), settings: m.settings || {} };
-    for (const k of ["sd", "flash", "design"]) if (m[k]) o[k] = pack(m[k]);
+    for (const k of ["sd", "flash", "design", "learn"]) if (m[k]) o[k] = pack(m[k]);
     return o;
   }
   // a parsed file -> { name, settings, sd, flash, design } or throws (not a machine file)
@@ -134,7 +134,8 @@
     const settings = {};
     for (const [k, v] of Object.entries(o.settings)) if (isMachineKey(k) && typeof v === "string") settings[k] = v;
     return { name: String(o.name || "Imported machine"), settings,
-      sd: o.sd ? unpack(o.sd) : null, flash: o.flash ? unpack(o.flash) : null, design: o.design ? unpack(o.design) : null };
+      sd: o.sd ? unpack(o.sd) : null, flash: o.flash ? unpack(o.flash) : null, design: o.design ? unpack(o.design) : null,
+      learn: o.learn ? unpack(o.learn) : null };
   }
   const fileName = (name) => (String(name).replace(/[^A-Za-z0-9 _()-]+/g, "").trim().replace(/\s+/g, "_") || "machine") + ".lr4.json";
 

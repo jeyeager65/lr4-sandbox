@@ -931,6 +931,11 @@ button:disabled { opacity: 0.42; cursor: default; }
 .ln-steps button:hover { color: var(--ink); }
 .ln-steps button.on { color: var(--ink); font-weight: 600; background: color-mix(in srgb, var(--accent) 18%, transparent); }
 .ln-now .buttons { display: flex; gap: 6px; flex-wrap: wrap; }
+.ln-imp { display: grid; grid-template-columns: 1fr auto; align-items: start; }
+.ln-del { border: 0; background: none; color: var(--muted); padding: 6px 8px; }
+.ln-del:hover { color: var(--accent); }
+.ln-own { display: flex; flex-direction: column; gap: 6px; }
+.ln-errs { margin: 4px 0 0; padding-left: 18px; color: var(--accent); }
 #help-pop .watch { margin-top: 8px; padding-top: 6px; border-top: 1px solid var(--line); }
 .m-ic { display: none; }
 .wc-tour { margin: 0; font-size: 13px; }

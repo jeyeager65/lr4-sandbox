@@ -48,7 +48,7 @@
   // back to your machine, as it was (a Demo: in Learn - #learn, which ui.js drops; a hash-only replace() wouldn't reload)
   function helpExit() {
     const base = location.href.split("#")[0];
-    if (!HELP.id || HELP.id === "file") return location.replace(base);
+    if (!HELP.id || (HELP.id === "file" && !(HELP.entry && HELP.entry.learn))) return location.replace(base);   // (an SD card file: where you were)
     history.replaceState(null, "", base + "#learn");
     location.reload();
   }
@@ -58,7 +58,11 @@
   const LEARN_FILTER_AT = 20;
   const LEARN_TYPES = { demo: "Demo", mine: "On your machine" };
   const learnGroup = (v) => v.group || "My clips";
-  const learnPlay = (v) => (v.type === "mine" ? mineGo(v) : helpGo(v.id));
+  const learnPlay = (v) => (v.type === "mine" ? mineGo(v) : v.imported ? helpFile(v.file, v.text, v) : helpGo(v.id));
+  function helpFile(name, text, v) {                 // a file's text as a demo (reloads as the help machine: "file")
+    MS.set(HELP_FILE, JSON.stringify(Object.assign({ name, text }, v ? { learn: true, title: v.title, blurb: v.blurb } : {})));
+    helpGo("file");
+  }
   // BitChange's BIT= on this router: the new bit (HandSetup form) | null = the same one back
   function learnBit(kv) {
     const k = LR4DemoScript.shankOf(kv && kv.bit), r = LR4Routers.ROUTERS[RT.set.router];
@@ -73,14 +77,70 @@
     b.innerHTML = `<b></b><em></em><span></span><i></i>`;
     b.children[0].textContent = v.title; b.children[1].textContent = v.secs ? helpSecs(v.secs) : "";
     b.children[2].textContent = v.blurb;
-    b.children[3].textContent = LEARN_TYPES[v.type] || LEARN_TYPES.demo;
+    b.children[3].textContent = (LEARN_TYPES[v.type] || LEARN_TYPES.demo) + (v.imported ? ` · imported (${v.file})` : "");
     b.title = v.type === "mine" ? `Play "${v.title}" on your machine (it puts back what it moves)`
       : `Play "${v.title}" in this page (on a temporary machine: yours stays as it is)`;
     b.addEventListener("click", () => learnPlay(v));
-    return b;
+    if (!v.imported) return b;
+    const w = document.createElement("div"), x = document.createElement("button");   // yours: the row + its Delete
+    w.className = "ln-imp"; w.setAttribute("role", "listitem"); b.removeAttribute("role");
+    x.type = "button"; x.className = "ln-del"; x.textContent = "✕"; x.title = `Delete "${v.title}" (your imported clip)`;
+    x.setAttribute("aria-label", x.title);
+    x.addEventListener("click", () => learnDelete(v));
+    w.append(b, x);
+    return w;
+  }
+  // ---- your own clips (Part 47b.2): .gcode / .nc files or a .zip of them, kept in this browser per machine
+  // (IndexedDB lr4-sandbox-learn@<machine>, machines.js DBS: deleted / exported with the machine). Each one goes through
+  // the parser first: a file with errors isn't added (they're listed). Only G-code and (Video ...) lines: a demo runs on
+  // the temporary help machine's FluidNC, a mine clip only its BitChange / TouchPlate - nothing runs code or fetches
+  // a URL (Design FILE= is an .svg next to the page). ----
+  const LEARN_DB = SdCard.card(MS.db("lr4-sandbox-learn"), "/learn");
+  const LEARN_EXT = /\.(gcode|nc|ngc|txt)$/i;
+  const learnDec = (b) => new TextDecoder().decode(b);
+  async function learnMine() {                       // the imported clips, as Learn lists them
+    let recs = [];
+    try { recs = await LEARN_DB.store.all(); } catch (e) { /* no IndexedDB */ }
+    return recs.map((r) => helpClip(r.path.split("/").pop(), learnDec(r.bytes), { id: "my:" + r.path, path: r.path, imported: true }))
+      .filter((c) => !c.errors.length);
+  }
+  async function learnAll() { return (HELP.all = (await helpIndex()).concat(await learnMine())); }
+  // files (File / { name, text }) -> added: [names]; errors: ["name: why"]
+  async function learnImport(files) {
+    const items = [], errors = [], added = [];
+    for (const f of files) {
+      const name = f.name.split(/[\\/]/).pop();
+      if (/\.zip$/i.test(name)) {
+        try {
+          const Z = await loadJSZip(), zip = await Z.loadAsync(f.arrayBuffer ? await f.arrayBuffer() : f.data);
+          for (const e of Object.values(zip.files)) {
+            if (e.dir || /(^|\/)(__MACOSX|\.)/.test(e.name)) continue;
+            if (!LEARN_EXT.test(e.name)) { errors.push(`${name} > ${e.name}: not a .gcode / .nc file`); continue; }
+            items.push({ name: e.name.split("/").pop(), text: await e.async("string"), from: name + " > " });
+          }
+        } catch (e) { errors.push(`${name}: couldn't read the zip (${e.message})`); }
+      } else if (LEARN_EXT.test(name)) items.push({ name, text: f.text !== undefined && typeof f.text === "string" ? f.text : await f.text(), from: "" });
+      else errors.push(`${name}: not a .gcode / .nc / .zip file`);
+    }
+    const builtIn = new Set((await helpIndex()).map((c) => c.file));
+    for (const it of items) {
+      if (it.text.length > 2e6) { errors.push(`${it.from}${it.name}: over 2 MB`); continue; }
+      const c = helpClip(it.name, it.text);
+      if (c.errors.length) { errors.push(`${it.from}${it.name}: ${c.errors.slice(0, 3).join("; ")}${c.errors.length > 3 ? ` (+${c.errors.length - 3} more)` : ""}`); continue; }
+      if (builtIn.has(it.name)) { errors.push(`${it.from}${it.name}: a built-in clip has that name - rename the file`); continue; }
+      await LEARN_DB.store.put("/learn/" + it.name, it.text);
+      added.push(c.title);
+    }
+    return { added, errors };
+  }
+  async function learnDelete(v) {
+    if (!await askBox({ title: `Delete "${v.title}"?`, text: `Your imported clip (${v.file}) goes from this machine's Learn list.`, ok: "Delete" })) return false;
+    await LEARN_DB.store.remove(v.path);
+    await learnList();
+    return true;
   }
   async function learnList() {
-    const list = await helpIndex(), host = $("ln-list"), f = $("ln-filter");
+    const list = await learnAll(), host = $("ln-list"), f = $("ln-filter");
     f.hidden = list.length < LEARN_FILTER_AT;
     const q = f.hidden ? "" : f.value.trim().toLowerCase();
     const shown = list.filter((v) => !q || `${v.title} ${v.blurb} ${learnGroup(v)}`.toLowerCase().includes(q));
@@ -209,7 +269,7 @@
   }
   function mineClose() { mineStop(); $("ln-now").hidden = true; MINE.v = null; }
   function learnNext(v) {                            // the next clip in v's group
-    const g = (HELP.list || []).filter((x) => learnGroup(x) === learnGroup(v)), i = g.findIndex((x) => x.id === v.id);
+    const g = (HELP.all || HELP.list || []).filter((x) => learnGroup(x) === learnGroup(v)), i = g.findIndex((x) => x.id === v.id);
     return i >= 0 ? g[i + 1] || null : null;
   }
   {
@@ -243,6 +303,18 @@
     p.append(b);
     pop.append(p);
   }
+  function learnSay(r) {                             // an import's outcome under the buttons
+    const m = $("ln-imp-msg");
+    m.replaceChildren();
+    if (r.added.length) m.append(`Added: ${r.added.join(", ")}.`);
+    if (r.errors.length) {
+      const ul = document.createElement("ul");
+      ul.className = "ln-errs";
+      for (const t of r.errors) { const li = document.createElement("li"); li.textContent = t; ul.append(li); }
+      m.append(r.added.length ? " Not added:" : "Not added:", ul);
+    }
+    if (!r.added.length && !r.errors.length) m.textContent = "Nothing to add.";
+  }
   async function learnShow(id) {                     // Learn, that clip's row lit and focused
     LR4ShowMode("learn");
     await learnList();
@@ -257,6 +329,15 @@
     LR4OnMode((m) => { if (m === "learn") learnList(); });
     if (document.documentElement.dataset.mode === "learn") learnList();
     $("ln-filter").addEventListener("input", learnList);
+    $("ln-file").addEventListener("change", async (e) => {
+      const files = [...e.target.files];
+      e.target.value = "";
+      if (!files.length) return;
+      $("ln-imp-msg").textContent = "Reading…";
+      const r = await learnImport(files);
+      await learnList();
+      learnSay(r);
+    });
     $("ln-parts-btn").addEventListener("click", () => welcome(true));
     $("wc-tour").addEventListener("click", () => { welcome(false); $("t-learn").click(); learnShow("tour"); });
   }
@@ -310,7 +391,7 @@
     if (id === "file") {                             // an SD card file (▶ Play as a video)
       let f = null;
       try { f = JSON.parse(MS.get(HELP_FILE) || "null"); } catch (e) { /* none */ }
-      entry = f && { id, title: f.name, blurb: "Your G-code file, played as a video", file: f.name, text: f.text };
+      entry = f && { id, title: f.title || f.name, blurb: f.blurb || "Your G-code file, played as a video", file: f.name, text: f.text, learn: !!f.learn };
     } else entry = (await helpIndex()).find((v) => v.id === id);
     document.body.classList.add("help-on");
     $("mc-btn").textContent = `Help: ${entry ? entry.title : id}`;
@@ -364,4 +445,5 @@
       state: () => ({ on: !!MINE.on, id: MINE.v ? MINE.v.id : null, k: MINE.on ? MINE.on.at() : -1, msg: $("ln-msg").textContent,
         steps: [...$("ln-steps").querySelectorAll("button")].map((b) => b.textContent), lit: $("ln-steps").querySelector("button.on")?.textContent || null }) },
     state: () => ({ id: HELP.id, playing: !!HELP.clock && !HELP.done, paused: HELP.paused, done: HELP.done, free: !!(HELP.clock && HELP.clock.free) }),
-    playFile(name, text) { MS.set(HELP_FILE, JSON.stringify({ name, text })); helpGo("file"); } };
+    playFile: (name, text) => helpFile(name, text),
+    import: async (files) => { const r = await learnImport(files); await learnList(); return r; }, del: learnDelete, all: learnAll };

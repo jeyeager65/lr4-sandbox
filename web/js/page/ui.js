@@ -472,7 +472,8 @@
     go(id) { if (id !== undefined) MS.use(id); location.replace(MC.plain()); },
     cards: (id) => [["sd", SdCard.card(LR4Machines.dbOf(id, "lr4-sandbox-sd"), SdCard.DIR)],
       ["flash", SdCard.card(LR4Machines.dbOf(id, "lr4-sandbox-flash"), "/native_localfs")],
-      ["design", SdCard.card(LR4Machines.dbOf(id, "lr4-sandbox-design"), "/design")]],
+      ["design", SdCard.card(LR4Machines.dbOf(id, "lr4-sandbox-design"), "/design")],
+      ["learn", SdCard.card(LR4Machines.dbOf(id, "lr4-sandbox-learn"), "/learn")]],
     // a machine's databases -> { sd, flash, design, spoilboard } (spoilboard keys without the machine's prefix; the
     // front plate design always, the cards only with files)
     async data(id, files = true, spoil = true) {
