@@ -149,7 +149,8 @@
       }
       m.motor_cap = H;
       const D = obj(b.dial) || {};
-      m.dial = { place: ["top", "window"].includes(D.place) ? D.place : "end", d: num(D.d, 8, 80, 24), t: num(D.t, 2, 30, 6) };
+      m.dial = { place: ["top", "window", "knob"].includes(D.place) ? D.place : "end", d: num(D.d, 8, 80, 24), t: num(D.t, 2, 30, 6) };
+      if (m.dial.place === "knob") Object.assign(m.dial, { x: num(D.x, -150, 150, 0), sink: num(D.sink, 0, 30, 1) });   // flat on the top (the T1's)
       if (m.dial.place === "window") {               // lying flat inside the cap, its rim seen through a window (the Kobalt's, user 2026-10-30)
         const Wn = obj(D.win) || {}, dd = m.dial.d;
         Object.assign(m.dial, { in: num(D.in, -20, 60, 1), drop: num(D.drop, 0, 60, 2),
@@ -162,7 +163,7 @@
       if (m.dial.style === "dome") m.dial.dome = { top: num(obj(D.dome) && D.dome.top, 0, 0.95, 0.45) };
       m.dial.ribs = Math.round(num(D.ribs, 1, 12, 7));   // ridges between two numbers (the land round each number grows with their spacing)
       if (m.dial.style === "bevel") m.dial.bevel = { top: num(obj(D.bevel) && D.bevel.top, 0, 0.95, 0.6) };   // (the Makita's: a straight bevel, user 2026-10-31)
-      if (m.dial.place !== "window") {
+      if (m.dial.place !== "window" && m.dial.place !== "knob") {
         const Sl = obj(D.slot), Su = obj(D.surround) || {}, kind = ["sunk", "raised"].includes(Su.kind) ? Su.kind : "none";
         if (D.slot === false) m.dial.slot = false;
         else if (Sl) {

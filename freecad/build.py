@@ -37,6 +37,8 @@ import Mesh                                       # noqa: E402
 from fclib import core, hw, mesh, wood            # noqa: E402
 import lr4                                        # noqa: E402
 importlib.reload(lr4)
+import touch_pose                                 # noqa: E402
+importlib.reload(touch_pose)
 
 core.set_units("mm")
 V = App.Vector
@@ -501,44 +503,23 @@ rt_cord = [pl_router.multVec(V(*rt_info["cord"]["tip"])),            # the stub'
 # centred in it, pad down beside the bottom mount, spade up above the top mount; the clip bites the strip's front
 # edge between the mounts (V1E: store them touching)
 if TOUCH_PLATE:
-    ts = lr4.TOUCH_SLOT
-    (mx, my), (cx, cy) = ts["mouth"], ts["closed"]
-    u = V(mx - cx, my - cy, 0)
-    u.normalize()
-    nrm = V(0, 0, 1).cross(u)
-    k = (ts["strip_x"] - cx) / (mx - cx)
-    tst, pad = lr4.TOUCH_STORE, lr4.TOUCH_PLATE["pad"]
-    org = V(cx + k * (mx - cx), cy + k * (my - cy), tst["pad_z"] + pad)      # the pad's top edge
-    # hw frame: pad up from z 0, x across the strip; flipped (x -> -x, z -> -z) so the pad hangs down and the
-    # frame's -x edge faces the slot's mouth (u, the front)
-    tpl = pl_kobalt.multiply(App.Placement(App.Matrix(-u.x, nrm.x, 0, org.x, -u.y, nrm.y, 0, org.y, 0, 0, -1, org.z,
-                                                      0, 0, 0, 1)))
-    rx_, ry_, rz_, dz_ = lr4.TOUCH_TILT                    # angled a little about the slot, resting on its connector
-    tpl = tpl.multiply(App.Placement(V(0, 0, dz_), App.Rotation())).multiply(
-        App.Placement(V(), App.Rotation(rz_, ry_, rx_), V(0, 0, org.z - sum(ts["z"]) / 2)))
-    tp = hw.tiny_touch_plate(tpl, clip=False, wire=8.0, **lr4.TOUCH_PLATE)
+    # the Kobalt's pose (touch_pose.py; the Makita / DeWalt mounts' cage poses go to the page via touch_alt.py)
+    tp = hw.tiny_touch_plate(pl_kobalt.multiply(touch_pose.plate("kobalt")), clip=False, wire=8.0, **lr4.TOUCH_PLATE)
     for k_, nm in (("plate", "TouchPlate"), ("spade", "TouchPlate_Spade"), ("spade_metal", "TouchPlate_Spade_Metal"),
                    ("wire_plate", "TouchPlate_Wire")):
         m.add(nm, tp[k_], group="Core", colour=hw.TOUCH_PLATE_COLOURS[k_])
     # rod magnet end-on on the +X top-mount bolt's head (it faces the front), the clip hanging from its outer end
-    md, mt = tst["magnet"]
-    bd_ = pl_kobalt.Rotation.multVec(V(*tst["bolt_d"]))   # into the core (+Y): the head is on the -d side
-    hh = 0.55 * 5.0                                        # M5 button head height (hw.button_screw)
-    mc = pl_kobalt.multVec(V(*tst["bolt"])) - bd_ * hh     # rod's back end on the head's crown
-    if TOUCH_CLIP:                                          # the clip with the magnet in its jaws (hw.bu45_clip frame:
-        ex, ez = bd_ * -1, V(0, 0, 1)                       # magnet middle, x along the rod, the clip hanging to -z)
-        ey, cm = ez.cross(ex), mc - bd_ * (mt / 2)
-        cpl = App.Placement(App.Matrix(ex.x, ey.x, ez.x, cm.x, ex.y, ey.y, ez.y, cm.y, ex.z, ey.z, ez.z, cm.z, 0, 0, 0, 1))
-        cp = App.Placement(V(*TOUCH_CLIP_POSE[:3]), App.Rotation(V(1, 0, 0), TOUCH_CLIP_POSE[3]))
-        if TOUCH_CLIP_POSE[4]:                              # turned round about the vertical through the magnet's middle
-            cp = cp.multiply(App.Placement(V(), App.Rotation(V(0, 0, 1), 180)))
-        clip = hw.bu45_clip(os.path.join(HERE, "models", "alligator_clip"), cpl, clip=cp)   # magnet stays on the bolt
+    md, mt = lr4.TOUCH_STORE["magnet"]
+    cpl = pl_kobalt.multiply(touch_pose.magnet("kobalt"))   # hw.bu45_clip's frame: magnet middle, x along the rod
+    if TOUCH_CLIP:                                          # the clip with the magnet in its jaws, hanging to -z
+        clip = hw.bu45_clip(os.path.join(HERE, "models", "alligator_clip"), cpl, clip=touch_pose.clip_pose(TOUCH_CLIP_POSE))
         for k_, nm in (("magnet", "TouchPlate_Magnet"), ("a", "TouchPlate_Clip_A"), ("b", "TouchPlate_Clip_B"),
                        ("screw", "TouchPlate_Clip_Screw"), ("spring", "TouchPlate_Clip_Spring"),
                        ("wire_core", "TouchPlate_Clip_Wire"), ("wire_insulation", "TouchPlate_Clip_Insulation")):
             m.add(nm, clip[k_], group="Core", colour=hw.BU45_COLOURS[k_])
     else:
-        m.add("TouchPlate_Magnet", Part.makeCylinder(md / 2, mt, mc, bd_ * -1), group="Core", colour=hw.STEEL)
+        m.add("TouchPlate_Magnet", Part.makeCylinder(md / 2, mt, cpl.multVec(V(-mt / 2, 0, 0)), cpl.Rotation.multVec(V(1, 0, 0))),
+              group="Core", colour=hw.STEEL)
 # TPU bristle strips bent into the skirt's groove (lr4.SKIRT_GROOVE): spine up at the groove ceiling, one strip
 # from each end of the gap, squeezed ~1.5 % so the two meet in the middle
 sg = lr4.SKIRT_GROOVE

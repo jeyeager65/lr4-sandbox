@@ -237,6 +237,8 @@
     if (!on) $("hs-plate-note").textContent = "";
     $("ctl-plate").setAttribute("aria-pressed", String(!!on));
     $("ctl-plate").textContent = on ? "Put the touch plate away" : "Touch plate under the bit";
+    $("rb-touch-go").setAttribute("aria-pressed", String(!!on));   // the router editor's (Part 50d)
+    $("rb-touch-go").textContent = on ? "Put the touch plate back" : "Take the touch plate out";
     ctlProbe();
     if (jobTouch(HAND.plate || null) && meta) move(HOME.pose ? [HOME.pose.x, HOME.pose.y, HOME.pose.z] : undefined);
   }

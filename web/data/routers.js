@@ -157,16 +157,29 @@
       "speeds_source": "Sienci: 5 V PWM, 0-100 % = 0-31250 RPM, under 10000 not accurate (GUESS: S = RPM straight)",
       "mount": "makita",
       "model": {
-        "label": "Sienci AutoSpin T1 (GUESS: Makita-size body, not measured)",
-        "collet_nut": {"type": "ER11A", "af": 17.0, "h": 13.0, "below": 1.5},
-        "collet": {"type": "ER11", "sizes": [3.175, 6.35], "l": 18.0, "d": 11.5, "taper": 8},
-        "shaft": {"d": 12.0, "exposed": 4.0, "thread": {"d": 13.0, "pitch": 0.75, "length": 8.0}, "flats": {"af": 10.0, "z": 13.5, "l": 3.0}},
-        "housing": {"d": 65.0, "l": 95.0},
-        "collar": {"d": 65.0, "l": 8.0},
-        "motor_cap": {"L": 78.0, "W": 72.0, "H": 89.0, "top_r": 8.0, "front_r": 14.0, "back_r": 14.0, "bot_r": 4.0},
-        "dial": {"place": "end", "d": 24.0, "t": 6.0},
+        "label": "Sienci AutoSpin T1 (the Makita RT0701C's body - user 2026-10-31; colors + the dial knob on top from Sienci's photos, GUESS sizes)",
+        "collet_nut": {"type": "Makita", "af": 22, "h": 12, "below": 5.9},
+        "collet": {"type": "Makita", "sizes": [6.35, 3.175], "l": 20, "d": 14, "taper": 8},
+        "shaft": {"d": 17, "exposed": 19.4, "thread": {"d": 17, "pitch": 1, "length": 6}},
+        "bearing_cap": {"d": 43.4, "l": 6.5},
+        "housing": {"d": 64, "l": 90, "ch": 1, "vent": {"depth": 10, "wall": 1.5, "spokes": 12, "w": 2.2, "inset": 2}},
+        "transition": {"l": 26, "shape": "cap", "edge": "none", "d": 64, "e": 0},
+        "motor_cap": {"L": 103.6, "W": 75.2, "H": 46, "at": [-10.2, 0], "bot_r": 2, "shape": {
+          "top": [{"x": -62, "y": 0, "s": "line"}, {"x": -62, "y": 14, "s": "line"}, {"x": -54, "y": 14, "s": "line"}, {"x": -36, "y": 28, "s": "curve"}, {"x": -26, "y": 34.5, "s": "curve"}, {"x": 0, "y": 37.6, "s": "curve"}, {"x": 24, "y": 34.5, "s": "curve"}, {"x": 34, "y": 31, "s": "curve"}, {"x": 38.5, "y": 22, "s": "curve"}, {"x": 41.6, "y": 0, "s": "line"}],
+          "front": [{"x": -62, "y": 6, "s": "line"}, {"x": -50, "y": 6, "s": "line"}, {"x": -50, "y": 0, "s": "line"}, {"x": 41.6, "y": 0, "s": "line", "r": 1}, {"x": 41.6, "y": 24, "s": "curve"}, {"x": 40, "y": 31, "s": "curve"}, {"x": 36, "y": 38, "s": "curve"}, {"x": 31, "y": 43.8, "s": "curve"}, {"x": 25, "y": 46, "s": "line"}, {"x": -25, "y": 46, "s": "curve"}, {"x": -33, "y": 43, "s": "curve"}, {"x": -37, "y": 40, "s": "line"}, {"x": -52, "y": 40, "s": "line", "r": 3}, {"x": -56, "y": 34, "s": "line"}, {"x": -62, "y": 34, "s": "line", "r": 2}],
+          "section": [{"x": 0, "y": 46, "s": "line"}, {"x": 37.6, "y": 46, "s": "line", "r": 12}, {"x": 37.6, "y": 0, "s": "line", "r": 1}, {"x": 0, "y": 0, "s": "line"}]}},
+        "dial": {"place": "knob", "x": 0, "sink": 2, "style": "bevel", "bevel": {"top": 0.6}, "ribs": 4, "d": 28, "t": 8, "ring": ["#f2b11e", "#c08712"]},
+        "shaft_lock": {"z": 25.72, "a": -55, "d": 14, "in": 14, "arm": 15, "pin": 7, "r": 24, "travel": 3, "button": 12, "out": 5.5},
+        "brushes": {"n": 2, "z": 153.87, "a": 90, "d": 12, "r": 37.6, "out": 2.5, "ring": 2, "inset": 1},
+        "strain_relief": {"l": 73, "d": 20, "bend": 0, "at": [-62, 0, 173.87]},
+        "cord": {"d": 7.6, "out": 15},
         "looks": {
-          "motor_cap": {"c": [0.1, 0.1, 0.11], "f": "plastic"}
+          "motor_cap": {"c": [0.89, 0.86, 0.80], "f": "plastic"},
+          "transition": {"c": [0.30, 0.31, 0.33], "f": "plastic"},
+          "collet_nut": {"c": [0.55, 0.56, 0.58], "f": "metal"},
+          "dial": {"c": [0.95, 0.69, 0.12], "f": "plastic"},
+          "switch": {"c": [0.95, 0.69, 0.12], "f": "plastic"},
+          "shaft_lock": {"c": [0.30, 0.31, 0.33], "f": "plastic"}
         }
       }
     },

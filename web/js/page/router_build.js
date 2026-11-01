@@ -59,7 +59,7 @@
       const mx = LR4RouterBody.transitionEdgeMax(m);
       if ((m.transition.e || 0) > mx) out.push(`Only ${mx} mm fits here (the cap's size / the transition's length): drawn at ${mx}.`);
     }
-    if (part === "dial" && !spin && m.dial.place !== "window" && !(window.LR4Csg && LR4Csg.ready())) out.push("The slot's settings need the geometry booleans, which haven't loaded.");
+    if (part === "dial" && !spin && m.dial.place !== "window" && m.dial.place !== "knob" && !(window.LR4Csg && LR4Csg.ready())) out.push("The slot's settings need the geometry booleans, which haven't loaded.");
     if (part === "motor_cap" && m.motor_cap && m.motor_cap.shape) out.push("Drawn in the shape editor: Length / Width / Height stretch the drawing.");
     return out;
   }
@@ -212,6 +212,8 @@
   const rbViewDrop = () => new RegExp("^(" + ["Dust_Skirt", "Bristles_TPU", "Router_Cord_Run",
     ...RB_VIEW_OFF.filter(([id]) => !$(id).checked).map(([, n]) => n)].join("|") + ")");
   const rbViewing = () => !!(INSPECT && INSPECT.as === "router");
+  // the rows shown with it: the core (does the router clear it), the touch plate + clip (Part 50d: stored on the mount)
+  const rbViewPlus = () => [$("rb-core").checked && "core", $("rb-touch").checked && "touch"].filter(Boolean);
   // the router editor (Part 46b, user 2026-10-30: "it's just grown too much to have in the side panel"): the close-up
   // with the outline in the side panel's place (#rte), the inspector on the right (Part 48b / c); Back / Esc leaves.
   // Not on a phone (user 2026-10-30): the button is hidden there.
@@ -223,20 +225,23 @@
     if (!on && typeof capEditOpen === "function") capEditOpen(false);   // the shape editor: when the motor cap's Edit shape asks
     if (on && typeof capEditFit === "function") requestAnimationFrame(capEditFit);   // framed in the room between the columns
     $("rb-core-box").hidden = !on;
+    $("rb-touch-row").hidden = !on;
     if (typeof rxMark === "function") rxMark();     // the dimensions on the model (router_edit.js)
     if (typeof rtiShow === "function") rtiShow();
   }
   $("rb-view").addEventListener("click", () => {
     if (rbViewing()) return inspectEnd();
-    inspect("router", { as: "router", label: "Your router", drop: rbViewDrop(), plus: $("rb-core").checked ? "core" : null });
+    inspect("router", { as: "router", label: "Your router", drop: rbViewDrop(), plus: rbViewPlus() });
     rbViewMark();
   });
+  // take the plate + clip out as for probing, and back (the Run tab's touch plate button: the same plate, table.js handPlate)
+  $("rb-touch-go").addEventListener("click", () => { if (meta && HOME.pose) handPlate(!HAND.plate); });
   $("rte-back").addEventListener("click", () => inspectEnd());
   $("rb-core-box").addEventListener("change", () => {   // the camera stays put
     if (!rbViewing()) return;
     INSPECT.drop = rbViewDrop();
-    INSPECT.plus = $("rb-core").checked ? "core" : null;   // the core too: does the router clear it
-    INSPECT.label = INSPECT.plus ? "Your router + the core" : "Your router";
+    INSPECT.plus = rbViewPlus();
+    INSPECT.label = $("rb-core").checked ? "Your router + the core" : "Your router";
     applyVisibility();
   });
   $("rb-pick").addEventListener("change", (e) => { rbMsg(""); rtSet({ router: e.target.value }); rbShow(); });

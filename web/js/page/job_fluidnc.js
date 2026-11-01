@@ -47,6 +47,7 @@
       FJ.job.C.feed(fjWork(cmd), rate * dts * 1.5 + 1);
     }
     fjCarve();
+    fjEvents();
   }
   // carve each sample as it comes (the mesh still once a frame): the next sample's slip / heat reads the stock cut up
   // to here - carved once a frame, the cut lagged the bit by a frame, so a busy PC read the slot walls as wood and
@@ -258,10 +259,17 @@
     JOB.partial.geometry.setDrawRange(0, 0);
     const w = J.T.last;
     if (w) { $("wx").textContent = w.x.toFixed(3); $("wy").textContent = w.y.toFixed(3); $("wz").textContent = w.z.toFixed(3); }
+    fjEvents();
+  }
+  // the events the trackers have passed: a tool change (M6) holds FluidNC there for the bit. Every sample (4 ms), not
+  // once a frame: FluidNC doesn't stop at an M6 by itself, and on slow frames (SwiftShader ~1.4 s) it ran the rest of a
+  // short job before the frame's check sent the ! (2026-10-31: test_page_hand's T2 job "Done." with no bit asked for)
+  function fjEvents() {
+    const J = FJ.job, tl = JOB.tl;
     for (; J.k < tl.events.length && tl.events[J.k].index <= (J.C || J.P || J.T).i; J.k++) {
-      const e = tl.events[J.k];                      // a tool change (M6): hold it there for the bit - also when the
-      if (e.kind === "tool") {                       // hold beat this tick there (slow frames): fjHold's own tick then
-        J.toolStop = e;                              // still finds it, so the popup asks for the bit, not "Paused (M0)"
+      const e = tl.events[J.k];                      // also when the hold beat this tick there: fjHold's own tick then
+      if (e.kind === "tool") {                       // still finds it, so the popup asks for the bit, not "Paused (M0)"
+        J.toolStop = e;
         if (!J.held) CTL.sim.realtime("!");
       }
     }

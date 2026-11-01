@@ -484,14 +484,16 @@
   // null = not drawn (a part from a file the user hasn't loaded, or Peter Plates "none")
   function recGeometry(rec) {
     if (rec.src) return srcGeometry(rec);
-    let e = geoCache.get(rec.key);
+    const tm = touchMove(rec), key = tm ? rec.key + "|" + tm.mount : rec.key;
+    let e = geoCache.get(key);
     if (e) return e;
     const p = rec.mesh, fin = FINISH[rec.meta.finish];
-    const pos = new Float32Array(bin, p.pos[0], p.pos[1] * 3);
+    let pos = new Float32Array(bin, p.pos[0], p.pos[1] * 3);
+    if (tm) pos = tm.move(pos);                       // a moved copy (pos is a view of the shared data)
     const idx = p.idx[2] === 32 ? new Uint32Array(bin, p.idx[0], p.idx[1]) : new Uint16Array(bin, p.idx[0], p.idx[1]);
     if (lite) {                                       // clustered: the shipped UVs no longer fit, dress() makes its own
       e = entry(dress(liteGeo(pos, idx), fin, false), fin, false);
-      geoCache.set(rec.key, e);
+      geoCache.set(key, e);
       return e;
     }
     const geo = new THREE.BufferGeometry();
@@ -499,8 +501,40 @@
     geo.setIndex(new THREE.BufferAttribute(idx, 1));
     if (p.uv !== undefined) geo.setAttribute("uv", new THREE.BufferAttribute(new Float32Array(bin, p.uv, p.pos[1] * 2), 2));
     e = entry(dress(geo, fin, p.uv !== undefined), fin, p.uv !== undefined);
-    geoCache.set(rec.key, e);
+    geoCache.set(key, e);
     return e;
+  }
+  // Part 50: the touch plate + magnet + clip as stored on the Makita / DeWalt mounts' cage (freecad/touch_alt.py ->
+  // data/touch_alt.json: per mount and group, the move from the Kobalt pose in the mount files' frame, D): drawn there
+  // while that mount's files are (mountAlt), as A . D . A^-1 (A: the top mount's file -> machine); else the Kobalt's
+  let touchAlt = null;
+  const touchMoves = {};
+  // the plate + clip stored in a cage (Makita / DeWalt, as drawn): { n } = out through the cage's front, level (world,
+  // the mount files' (1, 1, 0) / r2); job.js lifts them out of it before anything else (nothing passes its walls)
+  function touchCage() {
+    const top = cfg && touchAlt && touchAlt.mounts[mountNow()] && cfg.parts.find((r) => r.key === "Tool_Mount_T_Kobalt");
+    if (!top || !mountAlt(top.src)) return null;
+    const A = top.src.A, n = [0, 1, 2].map((i) => (A[i][0] + A[i][1]) / Math.SQRT2);
+    return { n: new THREE.Vector3(...n).normalize() };
+  }
+  function touchMove(rec) {
+    const mount = mountNow(), d = touchAlt && touchAlt.mounts[mount], name = rec.meta.name;
+    const group = d && ["plate", "magnet", "clip"].find((g) => touchAlt[g].includes(name));
+    const top = group && cfg.parts.find((r) => r.key === "Tool_Mount_T_Kobalt");
+    if (!top || !mountAlt(top.src)) return null;
+    const k = mount + "|" + group;
+    if (!touchMoves[k]) {
+      const A = new THREE.Matrix4().set(...top.src.A.flat(), 0, 0, 0, 1);
+      const M = A.clone().multiply(new THREE.Matrix4().set(...d[group].flat())).multiply(A.clone().invert());
+      touchMoves[k] = { mount, M, move: (pos) => { const out = new Float32Array(pos), v = new THREE.Vector3();
+        for (let i = 0; i < out.length; i += 3) { v.fromArray(out, i).applyMatrix4(M); v.toArray(out, i); }
+        return out; } };
+    }
+    return touchMoves[k];
+  }
+  function touchMatrix(name) {                       // a touch part's move into the cage (null: drawn as on the Kobalt)
+    const rec = cfg && cfg.parts.find((r) => r.meta && r.meta.name === name), t = rec && touchMove(rec);
+    return t ? t.M : null;
   }
 
   // ---- bring your own files (share data: cfg.files + a `src` per V1E part instead of its mesh - pipeline/share_data.py).
@@ -1337,6 +1371,7 @@ float lr4G(float x) { float s = 2.0 * fract(x) - 1.0; return floor(x) / 3.0 + (s
     const r = await fetch(lr4v(DATA + "lr4_config.json"));   // lr4v: cache busting (index.html)
     if (!r.ok) throw new Error("lr4_config.json " + r.status);
     cfg = await r.json();
+    touchAlt = await fetch(lr4v(DATA + "touch_alt.json")).then((q) => (q.ok ? q.json() : null)).catch(() => null);   // Part 50
     const total = cfg.geometry_bytes || 0;             // gzip of the meshes (fit_config.py / share_data.py)
     let got = 0;
     const raw = await fetchBytes(lr4v(DATA + "lr4_config_geometry.bin.gz"), (n) => { got += n;

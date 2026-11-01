@@ -167,6 +167,9 @@
       dial = cut ? { axis: "y", at: [xt, at[1], zt + lift - set - d / 2], d, t, out: 90,
         open: { o: [xt, at[1], zt], n: [0, 0, 1], u: [1, 0, 0], v: [0, 1, 0], lift, deep: set + d / 2, S, R: Object.assign({}, R, { out: "none" }) } }
         : { axis: "y", at: [xt, at[1], zt - d / 2 + 5], d, t, out: 90, plate: [d + 4, t + 3] };
+    } else if (dp.place === "knob") {                  // flat on the top, face up, standing proud: `x` along the cap (0 = over
+      const xk = dp.x ?? 0;                             // the axis), `sink` into the top (the Sienci T1's, user 2026-10-31)
+      dial = { axis: "z", at: [xk, at[1], topX(xk) + t / 2 - (dp.sink ?? 1)], d, t, out: 0 };
     } else if (dp.place === "window") {                // flat inside the cap, rim `in` from the end, its top `drop` under the cap's top; the window
       const W = dp.win || {}, cx = x1 - (dp.in ?? 1) - d / 2, wl = W.l || d * 0.35, ww = W.w || d * 0.8;   // over its rim (open at the end: a notch)
       const cz = topX(cx + d / 2 - 2) - (dp.drop ?? 2) - t / 2;

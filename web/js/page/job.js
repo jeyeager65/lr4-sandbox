@@ -508,18 +508,45 @@
   const ease = (k) => (k < 0.5 ? 2 * k * k : 1 - (2 - 2 * k) ** 2 / 2);
   // A route round the router (user 2026-10-24: a straight line went through it): waypoints [p0 .. pn]; the turn
   // happens between waypoint 1 and n-1 (out in the open, not in the slot / on the bolt). -> { at(e): {p, r} }
-  function touchRoute(pts) {
+  function touchRoute(pts, k0 = 1) {                 // the turn (r) runs from point k0 to the last but one; seg / f: where on it
     const s = [0];
     for (let i = 1; i < pts.length; i++) s.push(s[i - 1] + pts[i].distanceTo(pts[i - 1]));
-    const L = s[s.length - 1] || 1, ra = s[1] / L, rb = s[pts.length - 2] / L;
+    const L = s[s.length - 1] || 1, ra = s[k0] / L, rb = s[pts.length - 2] / L;
     return { at(e) {
       const d = e * L;
       let i = 1;
       while (i < pts.length - 1 && s[i] < d) i++;
-      const f = s[i] > s[i - 1] ? (d - s[i - 1]) / (s[i] - s[i - 1]) : 1;
-      return { p: pts[i - 1].clone().lerp(pts[i], Math.min(1, Math.max(0, f))),
+      const f = Math.min(1, Math.max(0, s[i] > s[i - 1] ? (d - s[i - 1]) / (s[i] - s[i - 1]) : 1));
+      return { p: pts[i - 1].clone().lerp(pts[i], f), seg: i - 1, f,
         r: rb > ra ? Math.min(1, Math.max(0, (e - ra) / (rb - ra))) : e };
     } };
+  }
+  // in a cage (Part 50; user 2026-10-31: "angle the plate as it goes on and comes out so it doesn't go through the
+  // head"): the head overhangs the cage's mouth, so the plate / clip lean their tops out about their bottom end (on
+  // the cage's inner side), then slide up that line; the lean comes off as they turn. lean: { R, pts, lam } - R about
+  // the level axis across the cage; pts: the route's first points (from c), lam: the share of R at each (D, steps: the
+  // bottom straight up D while the lean grows - tried for the clip, it hit the head: it has to shift out as it rises)
+  // the Makita (touch_hits, 2026-10-31): plate 6 deg clear; clip 6 deg clears the head, its jaws / spring / screw graze
+  // the cage's front lips by ~1 mm early on (they sit right behind them; under 6 deg it goes through the head)
+  const TOUCH_LEAN = { plate: 6 * Math.PI / 180, clip: 6 * Math.PI / 180 };
+  function touchLean(cage, ms, c, L, ang, D = 0, steps = 1) {   // c: the route point (parked), L: down the strip
+    const ax = new THREE.Vector3(0, 0, 1).cross(cage.n).normalize(), R = new THREE.Quaternion().setFromAxisAngle(ax, ang);
+    let d = -Infinity;
+    for (const m of ms) {
+      const pa = m.geometry.attributes.position.array, b = new THREE.Vector3(...(m.userData.base || { t: [0, 0, 0] }).t);
+      for (let i = 0; i < pa.length; i += 3) d = Math.max(d, (pa[i] + b.x) * L.x + (pa[i + 1] + b.y) * L.y + (pa[i + 2] + b.z) * L.z);
+    }
+    const pv = c.clone().addScaledVector(L, d - c.dot(L)), pts = [c.clone()], lam = [0];   // pv: the bottom end, in line with c
+    for (let j = 1; j <= steps; j++) {
+      const k = j / steps, l = D ? k * k : 1;
+      pts.push(c.clone().sub(pv).applyQuaternion(new THREE.Quaternion().setFromAxisAngle(ax, ang * l)).add(pv).addScaledVector(L, -D * k));
+      lam.push(l);
+    }
+    return { R, pts, lam };
+  }
+  function touchLeanQ(lean, at, er) {
+    const k = lean.lam.length - 1, l = at.seg < k ? lean.lam[at.seg] + (lean.lam[at.seg + 1] - lean.lam[at.seg]) * at.f : 1 - er;
+    return new THREE.Quaternion().slerp(lean.R, l);
   }
   function touchClear() {                            // (world, parked) the +X side clear of the shoe, mounts and router,
     let x = -Infinity, z = Infinity, zNut = Infinity;   // and the shoe's bottom (skirt off)
@@ -557,7 +584,15 @@
     // the strip's handle to the front and toward the middle: front-left in the right half of X travel, clear of the
     // Max end's plates (user 2026-10-28, z_level's right probe)
     const tv = meta.travel, right = !pl.world && pl.x > (tv.x[1] - tv.x[0]) / 2;
-    const dir = new THREE.Vector3(right ? -1 : 1, -1, 0).normalize(), up = new THREE.Vector3(0, 0, 1), side = up.clone().cross(dir);
+    // stored in a cage (Part 50, user 2026-10-31: "angle into underneath the bit so the wire doesn't have to be as
+    // long"): the strip in under the router toward the core's hole the wire comes out of (rope.js), the pad under the bit
+    const cage = touchCage(), hole = cage && ROPE.hBase && ropeAnchor(0, ROPE.out);
+    let dir = new THREE.Vector3(right ? -1 : 1, -1, 0).normalize();
+    if (hole) {
+      const pad = new THREE.Vector3(at[0] + pl.x, at[1] + pl.y, 0), d = hole.clone().sub(pad).setZ(0);
+      if (d.length() > 1) dir = d.normalize();
+    }
+    const up = new THREE.Vector3(0, 0, 1), side = up.clone().cross(dir);
     // either face can go up: the one that needs less turning from the stored pose once the strip has tipped over
     // (user 2026-10-24: it flipped right over to show the face you see in the holder)
     const turnTo = (s) => new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(dir, side.clone().multiplyScalar(s),
@@ -612,6 +647,17 @@
       // the strip (8 wide) clear of the slot's mouth; then it pivots about the pad (user: "angle it from the crimped
       // end down") as the pad drops to just above the stock in front of the shoe; then in under the bit, flat
       const p1 = c0.clone().addScaledVector(u, 20);  // (10 frees the strip; 20 lets the pad and connector tip clear)
+      // in a cage (Makita / DeWalt, Part 50; user 2026-10-31: "straight but at the angle of the holder"): up along its
+      // strip (the cage leans it) till the strip and spade are out of the cage's top, then out and tipping over
+      const cage = touchCage(), up = [];
+      let lean = null;
+      if (cage) {                                    // leaned (touchLean), then up that line till the strip's out
+        lean = touchLean(cage, [plate], c0.clone().sub(mo), f.L, TOUCH_LEAN.plate);
+        const ax = f.L.clone().negate().applyQuaternion(lean.R), h = new THREE.Box3().setFromObject(plate).getSize(new THREE.Vector3()).z / Math.max(ax.z, 0.5) + 5;
+        const cl = lean.pts[1].add(mo);
+        up.push(cl, cl.clone().addScaledVector(ax, h));
+        p1.copy(up[1]).addScaledVector(cage.n, 20);
+      }
       const p2 = new THREE.Vector3(p1.x, p1.y, c1.z + 3);   // tips over where it is, the pad dropping (no swing to Y0)
       // the turn (user: "the top should come straight at me"): the strip's top swings straight from up to its final
       // direction (one tip about a level axis) while the plate rolls about the strip to land flat - not the
@@ -619,10 +665,11 @@
       const Ls = f.L.clone(), Lf = f.L.clone().applyQuaternion(A.target.q), ax = Ls.clone().cross(Lf);
       const tip = ax.length() > 1e-6 ? new THREE.Quaternion().setFromAxisAngle(ax.normalize(), Ls.angleTo(Lf)) : new THREE.Quaternion();
       const roll = tip.clone().invert().multiply(A.target.q);   // about the stored strip: tip(1) * roll = the final turn
-      A.platePath = { target: A.target, b, tip, roll, route: touchRoute([c0, p1, p2, c1]) };
+      A.platePath = { target: A.target, b, tip, roll, lean, route: touchRoute(cage ? [c0, ...up, p1, p2, c1] : [c0, p1, p2, c1], cage ? 2 : 1) };
     }
     const at = A.platePath.route.at(ease(A.plate)), er = ease(at.r);
     const qk = new THREE.Quaternion().slerp(A.platePath.tip, er).multiply(new THREE.Quaternion().slerp(A.platePath.roll, er));
+    if (A.platePath.lean) qk.premultiply(touchLeanQ(A.platePath.lean, at, er));
     for (const m of parts) {                         // every piece turns about the pad (they share the plate's base)
       const bm = new THREE.Vector3(...(m.userData.base || { t: [0, 0, 0] }).t).sub(A.platePath.b);
       m.userData.held = true;
@@ -653,7 +700,8 @@
     let af2 = 0;                                     // the flat itself (the corners are turned off: not rc cos 30)
     for (let i = 0; i < p.length; i += 3) af2 = Math.max(af2, (p[i] + bt.x - nc.x) * n.x + (p[i + 1] + bt.y - nc.y) * n.y);
     const sz = mb.getSize(new THREE.Vector3()), rMag = Math.min(sz.x, sz.y, sz.z) / 2;
-    const as = sz.x > sz.y ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(0, 1, 0);   // stored: the rod lies level
+    const cage = touchCage();                        // stored: the rod lies level (in a cage: along its n, Part 50)
+    const as = cage ? cage.n.clone() : sz.x > sz.y ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(0, 1, 0);
     const ct = nc.clone().addScaledVector(n, af2 + rMag + 0.05);                          // on the flat, nut mid-height
     let t = new THREE.Vector3(0, 0, 1).cross(n);
     if (t.dot(as) < 0) t.negate();
@@ -687,12 +735,24 @@
     if (!N) return;
     if (!N.route) {                                  // a little off the bolt head (along the rod), out along +X past the
       const cl = touchClear(), c0 = N.cs, c1 = N.ct;  // shoe (user: along X, smaller), down under the shoe's open bottom,
-      const p1 = c0.clone().add(new THREE.Vector3(3, -6, 0));   // in along -X under the nut, up onto it
+      const cage = touchCage(), lift = [];           // in along -X under the nut, up onto it. In a cage (Part 50): first
+      let p1 = c0.clone().add(new THREE.Vector3(3, -6, 0));   // up along the plate's strip (its tail lies along it; the
+      const plate = cage && meshes.find((m) => m.userData.name === "TouchPlate");   // cage leans them) till the tail is out,
+      if (plate) {                                   // then out through the front (leaned first: touchLean)
+        const L = touchFrame(plate.geometry).L, cms = meshes.filter((m) => CLIP_RE.test(m.userData.name));
+        let z0 = Infinity;
+        for (const m of cms) z0 = Math.min(z0, new THREE.Box3().setFromObject(m).min.z - touchMotion().z);
+        N.lean = touchLean(cage, cms, c0, L, TOUCH_LEAN.clip);
+        const ax = L.clone().negate().applyQuaternion(N.lean.R);
+        lift.push(N.lean.pts[1], N.lean.pts[1].clone().addScaledVector(ax, (c0.z - z0) / Math.max(ax.z, 0.5) + 5));
+        p1 = lift[lift.length - 1].clone().addScaledVector(cage.n, 15);
+      }
       const low = cl.zShoe - 8, xS = Math.max(p1.x, cl.x);
-      N.route = touchRoute([c0, p1, new THREE.Vector3(xS, p1.y, p1.z), new THREE.Vector3(xS, c1.y, low),
-        new THREE.Vector3(c1.x, c1.y, low), c1]);
+      N.route = touchRoute([c0, ...lift, p1, new THREE.Vector3(xS, p1.y, p1.z), new THREE.Vector3(xS, c1.y, low),
+        new THREE.Vector3(c1.x, c1.y, low), c1], lift.length || 1);
     }
     const at = N.route.at(ease(A.clip)), mo = touchMotion(), qk = new THREE.Quaternion().slerp(N.q, ease(at.r));
+    if (N.lean) qk.premultiply(touchLeanQ(N.lean, at, ease(at.r)));
     const ck = at.p;
     for (const m of meshes) {
       if (!CLIP_RE.test(m.userData.name)) continue;

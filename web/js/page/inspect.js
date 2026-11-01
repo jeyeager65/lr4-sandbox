@@ -39,7 +39,7 @@
   }
   function inspectSetOf() {                           // the row's set, less opt.drop
     const s = LR4ShowTree.inspectSet(tree, INSPECT.id);
-    if (INSPECT.plus) for (const id of LR4ShowTree.inspectSet(tree, INSPECT.plus)) s.add(id);   // another row with it (the core)
+    for (const p of [].concat(INSPECT.plus || [])) for (const id of LR4ShowTree.inspectSet(tree, p)) s.add(id);   // other rows with it (the core, the touch plate)
     if (INSPECT.drop) for (const id of [...s]) if (INSPECT.drop.test(id)) s.delete(id);
     return s;
   }

@@ -296,6 +296,27 @@ TOUCH_TILT = (-1.5, 0.0, 0.0, 1.0)    # as stored: deg about the plate's local x
 TOUCH_STORE = dict(pad_z=57.5, magnet=(3.15, 12.6),
                    bolt=(-7.27, 43.95, 125.0), bolt_d=(-1.0, 0.0, 0.0))   # that bolt's head seat + axis (Kobalt frame,
                                                                             # from build/fasteners.json)
+# The Makita / DeWalt top mounts (Part 50, user's photo of a Makita LR4 2026-10-31; DeWalt the same - user) have a CAGE
+# instead of the slot: a channel out from the ring at 45 deg (n = (1, 1)/r2 out, e = (1, -1)/r2 across; the mount files'
+# frame = the Kobalt frame), open at the top and bottom, ~9.5 wide at the bottom, its +e wall leaning out going up
+# (~18 deg), the -e wall upright from z 123. As stored: the PAD UP resting across the two walls' tops (they differ:
+# the pad tilts ~12 deg in its own plane, the strip leaning down the channel), the strip + spade hanging down through
+# it, the plate's face toward n; the magnet stuck end-on to the pad's front (n) face, the clip hanging from it.
+# Measured (rays in the STLs' sections, 2026-10-31): c = a plan point inside the channel; ring = the mount ring's
+# nearest point along -n from c across the pad's width (e -9..9; the ring isn't square to n: 5.46 / 5.08 straight
+# back from c); lip = the outer lips' inner face along +n; walls = (e, z) of each wall's inner top corner (-e side, +e
+# side); mid = (e, z) of the channel's middle half way down (where the strip's axis passes).
+TOUCH_CAGE = dict(
+    makita=dict(c=(25.0, 33.5), ring=5.27, lip=3.82, walls=((-4.73, 131.65), (7.90, 128.95)), mid=(0.24, 122.0)),
+    dewalt=dict(c=(29.2, 33.5), ring=4.96, lip=4.13, walls=((-4.78, 131.70), (7.96, 129.00)), mid=(0.21, 122.0)))
+TOUCH_MAGNET_ON_PAD = 9.0     # the magnet's axis on the pad, up from its bottom edge (centre of the 18 mm pad; GUESS)
+# Both the strip and the clip down INSIDE the cage (user 2026-10-31; the clip's wire leaves its bottom): the strip
+# against the ring side, the clip's 8 mm body in front of it (the cage is ~9.3 deep), the gap each side of both:
+TOUCH_CAGE_GAP = 0.1
+TOUCH_CAGE_CLIP_POSE = (None, 0, 0, None, True)  # the clip on that magnet (build.py TOUCH_CLIP_POSE's terms): slid
+                                                # along the rod to the middle of the room in front of the strip (None),
+                                                # swung so its tail runs down the strip (None = touch_pose.along_strip;
+                                                # user 2026-10-31), turned round as on the bolt
 
 
 # Kobalt dust shoe: the TPU bristle strips (printed flat, 166.5 x 26.3 x 3.0; a ~5.6 mm spine along one edge)

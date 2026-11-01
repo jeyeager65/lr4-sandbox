@@ -43,23 +43,33 @@
   })();
   const ropeClip = () => meshes.filter((m) => CLIP_RE.test(m.userData.name || ""));
   const ropeBaseOf = (m) => new THREE.Vector3(...(m.userData.base || { t: [0, 0, 0] }).t);
-  function ropeEnd(ms, pick) {                        // (base frame) the centroid of the stub's free end: pick = "low" / "high" z
-    const v = new THREE.Vector3(), pts = [];
+  // (base frame) the centroid of the stub's free end: pick = "low" / "high" z - as stored on the Kobalt (in a cage,
+  // Part 50: picked with the cage's move undone, then moved back; kobalt: left as on the Kobalt - the core's hole)
+  function ropeEnd(ms, pick, kobalt) {
+    const v = new THREE.Vector3(), pts = [], M = touchMatrix(ms[0].userData.name), Mi = M && M.clone().invert();
     for (const m of ms) {
       const a = m.geometry.attributes.position.array, b = ropeBaseOf(m);
-      for (let i = 0; i < a.length; i += 3) pts.push(v.set(a[i], a[i + 1], a[i + 2]).add(b).clone());
+      for (let i = 0; i < a.length; i += 3) {
+        v.set(a[i], a[i + 1], a[i + 2]);
+        if (Mi) v.applyMatrix4(Mi);
+        pts.push(v.clone().add(b));
+      }
     }
     const zs = pts.map((p) => p.z), z = pick === "low" ? Math.min(...zs) : Math.max(...zs);
     const end = pts.filter((p) => Math.abs(p.z - z) < 0.6);
-    return end.reduce((s, p) => s.add(p), new THREE.Vector3()).multiplyScalar(1 / end.length);
+    const c = end.reduce((s, p) => s.add(p), new THREE.Vector3()).multiplyScalar(1 / end.length);
+    if (M && !kobalt) { const b = ropeBaseOf(ms[0]); c.sub(b).applyMatrix4(M).add(b); }
+    return c;
   }
   function ropeBase() {                               // the stubs' ends + the clip's far end (stored pose, base frame), once
-    if (ROPE.eBase) return true;
     const cw = meshes.filter((m) => /^TouchPlate_Clip_(Wire|Insulation)$/.test(m.userData.name || "")), jaw = meshes.find((m) => m.userData.name === "TouchPlate_Clip_A");
     const pw = meshes.find((m) => m.userData.name === "TouchPlate_Wire");
     if (!cw.length || !jaw || !pw) return false;
+    if (ROPE.eBase && ROPE.baseGeo === pw.geometry) return true;   // again when the parts are redrawn (a new mount's cage)
+    ROPE.baseGeo = pw.geometry;
     const ins = cw.find((m) => m.userData.name === "TouchPlate_Clip_Insulation") || cw[0];
     ROPE.eBase = ropeEnd(cw, "low");                  // the clip's stub hangs down from the crimp: its free end
+    ROPE.hBase = ropeEnd(cw, "low", true);            // the same on the Kobalt: what the core's hole is measured from
     ROPE.cBase = ropeEnd([ins], "high");              // and where it leaves the crimp
     ROPE.pBase = ropeEnd([pw], "high");               // the plate's leaves the spade upward (stored): its free end
     ROPE.sBase = ropeEnd([pw], "low");                // and the spade
@@ -68,14 +78,58 @@
     ROPE.tBase = ROPE.cBase.clone().add(jc.sub(ROPE.cBase).normalize().multiplyScalar(ROPE.len));
     return true;
   }
-  const ropeAnchor = (dx, at) => ROPE.eBase.clone().add(new THREE.Vector3(ROPE.win[0] + at[0] + dx, ROPE.win[1] + at[1], ROPE.win[2] + at[2])).add(touchMotion());
+  const ropeAnchor = (dx, at) => ROPE.hBase.clone().add(new THREE.Vector3(ROPE.win[0] + at[0] + dx, ROPE.win[1] + at[1], ROPE.win[2] + at[2])).add(touchMotion());
   const ropeAt = (m, p) => p.clone().sub(ropeBaseOf(m)).applyQuaternion(m.quaternion).add(m.position);   // a base-frame point where m is now
   function ropeEnds() {                               // world: clip [crimp, clip tip, stub end] (null once flung), plate [spade, stub end]
     const jaw = meshes.find((q) => q.userData.name === "TouchPlate_Clip_A"), pw = meshes.find((q) => q.userData.name === "TouchPlate_Wire");
     return { clip: ROPE.flung ? null : [ropeAt(jaw, ROPE.cBase), ropeAt(jaw, ROPE.tBase), ropeAt(jaw, ROPE.eBase)],
       plate: [ropeAt(pw, ROPE.sBase), ropeAt(pw, ROPE.pBase)] };
   }
-  function ropeColliders(held) {                      // boxes (the router body, the mounts' rings: vertical cylinders) of what
+  // a mount as its outline round the router's axis (Part 50, user 2026-10-31: the wires went through the Makita's bottom
+  // mount - its ears / cage reach past the ring): per 5 deg and 3 mm of height, how far out it reaches (its triangles
+  // sampled ~2 mm apart), once per mesh (in the mesh's frame: it rides the core with the router). The cells round the
+  // core's hole are left at ROPE_RING (the wires come out there; a mount's box there shoved them out, 2026-10-27)
+  const ROPE_PA = 72, ROPE_PZ = 3;
+  function ropeProfile(m, axis, b) {
+    const la = m.worldToLocal(axis.clone()), key = la.x.toFixed(1) + "," + la.y.toFixed(1);
+    let P = m.userData.ropeProf;
+    if (!P || P.geo !== m.geometry || P.key !== key) {
+      const g = m.geometry, pa = g.attributes.position, ix = g.index, n = ix ? ix.count : pa.count;
+      g.computeBoundingBox();
+      const z0 = g.boundingBox.min.z, nz = Math.ceil((g.boundingBox.max.z - z0) / ROPE_PZ) + 1, rad = new Float32Array(ROPE_PA * nz);
+      const A = new THREE.Vector3(), B = new THREE.Vector3(), C = new THREE.Vector3(), v = new THREE.Vector3();
+      const put = (p) => {
+        const dx = p.x - la.x, dy = p.y - la.y, r = Math.hypot(dx, dy);
+        const ia = Math.floor(((Math.atan2(dy, dx) / (2 * Math.PI)) + 1) * ROPE_PA) % ROPE_PA, iz = Math.floor((p.z - z0) / ROPE_PZ);
+        const k = iz * ROPE_PA + ia;
+        if (r > rad[k]) rad[k] = r;
+      };
+      for (let i = 0; i < n; i += 3) {
+        A.fromBufferAttribute(pa, ix ? ix.getX(i) : i); B.fromBufferAttribute(pa, ix ? ix.getX(i + 1) : i + 1); C.fromBufferAttribute(pa, ix ? ix.getX(i + 2) : i + 2);
+        const s = Math.min(12, Math.ceil(Math.max(A.distanceTo(B), B.distanceTo(C), C.distanceTo(A)) / 2));
+        for (let u = 0; u <= s; u++) for (let w = 0; w <= s - u; w++) {
+          put(v.copy(A).multiplyScalar(1 - (u + w) / s || 0).addScaledVector(B, s ? u / s : 0).addScaledVector(C, s ? w / s : 0));
+        }
+      }
+      P = m.userData.ropeProf = { geo: m.geometry, key, z0, nz, rad, open: null };
+    }
+    if (!P.open && ROPE.hBase) {                      // the hole: its cells (and their neighbours) no further out than the ring
+      P.open = true;
+      for (const dx of [-ROPE.dx, ROPE.dx]) for (const at of [ROPE.from, ROPE.out]) {
+        const h = m.worldToLocal(ropeAnchor(dx, at)), r = Math.hypot(h.x - la.x, h.y - la.y);
+        const ia = Math.floor(((Math.atan2(h.y - la.y, h.x - la.x) / (2 * Math.PI)) + 1) * ROPE_PA) % ROPE_PA, iz = Math.floor((h.z - P.z0) / ROPE_PZ);
+        for (let a = -1; a <= 1; a++) for (let z = -2; z <= 2; z++) {
+          if (iz + z < 0 || iz + z >= P.nz) continue;
+          const k = (iz + z) * ROPE_PA + (ia + a + ROPE_PA) % ROPE_PA;
+          P.rad[k] = Math.min(P.rad[k], Math.max(ROPE_RING, r - 2));
+        }
+      }
+    }
+    m.updateMatrixWorld();
+    const o = new THREE.Vector3(la.x, la.y, P.z0).applyMatrix4(m.matrixWorld);
+    return { prof: P, x: o.x, y: o.y, z0: o.z, z1: b.max.z };
+  }
+  function ropeColliders(held) {                      // boxes (the router body, the mounts' outlines round it) of what
     const out = [];                                   // the cable can hit
     let axis = null;                                  // the router's axis (x, y): the mounts' rings are round it
     const add = (m) => {
@@ -87,7 +141,7 @@
         const c = b.getCenter(new THREE.Vector3()), s = b.getSize(new THREE.Vector3());
         out.push({ cyl: true, x: c.x, y: c.y, r: Math.min(s.x, s.y) / 2, z0: b.min.z, z1: b.max.z });
         axis = c;
-      } else if (/^Tool_Mount_/.test(m.userData.name)) { if (axis) out.push({ cyl: true, x: axis.x, y: axis.y, r: ROPE_RING, z0: b.min.z, z1: b.max.z }); }
+      } else if (/^Tool_Mount_/.test(m.userData.name)) { if (axis) out.push(ropeProfile(m, axis, b)); }
       else out.push({ b });
     };
     const list = meshes.filter((m) => (held ? ROPE_COLS_HELD : ROPE_COLS).test(m.userData.name || ""));
@@ -96,6 +150,23 @@
     return out;
   }
   function ropePen(p, R, c) {                         // how far p (radius R) is into collider c: { n (out), d } or null
+    if (c.prof) {                                     // a mount's outline: out sideways, or over / under its cells
+      const P = c.prof, dx = p.x - c.x, dy = p.y - c.y, r = Math.hypot(dx, dy);
+      const ia = Math.floor(((Math.atan2(dy, dx) / (2 * Math.PI)) + 1) * ROPE_PA) % ROPE_PA;
+      const at = (iz) => (iz < 0 || iz >= P.nz ? 0 : P.rad[iz * ROPE_PA + ia]);
+      const lo = Math.floor((p.z - R - c.z0) / ROPE_PZ), hi = Math.floor((p.z + R - c.z0) / ROPE_PZ);
+      let rad = 0;
+      for (let iz = lo; iz <= hi; iz++) rad = Math.max(rad, at(iz));
+      if (!rad || r >= rad + R) return null;
+      const side = rad + R - r;
+      let up = hi, dn = lo;                           // the nearest clear slab above / below
+      while (up < P.nz && at(up) && r < at(up) + R) up++;
+      while (dn >= 0 && at(dn) && r < at(dn) + R) dn--;
+      const dUp = c.z0 + up * ROPE_PZ + R - p.z, dDn = p.z - (c.z0 + (dn + 1) * ROPE_PZ - R);
+      if (dUp < side && dUp <= dDn) return { n: new THREE.Vector3(0, 0, 1), d: dUp };
+      if (dDn < side) return { n: new THREE.Vector3(0, 0, -1), d: dDn };
+      return { n: r > 1e-6 ? new THREE.Vector3(dx / r, dy / r, 0) : new THREE.Vector3(1, 0, 0), d: side };
+    }
     if (c.cyl) {
       if (p.z < c.z0 - R || p.z > c.z1 + R) return null;
       const dx = p.x - c.x, dy = p.y - c.y, r = Math.hypot(dx, dy);

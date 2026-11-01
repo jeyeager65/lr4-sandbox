@@ -106,10 +106,13 @@
   row("motor_cap", "Corners", "model.motor_cap.bot_r", "Under edges", "len", { min: 0, max: 100, step: 0.5, when: boxCap, help: "The fillet round its underside." });
   // the dial
   const place = (m) => m.dial && m.dial.place, sur = (m) => (m.dial && m.dial.surround) || { kind: "none" };
-  row("dial", "Place", "model.dial.place", "Where", "choice", { opts: [["end", "On the end"], ["top", "On top"], ["window", "In a window"]],
-    help: "On the end: lying flat inside the head, a slice of its rim through a slot in the switch end (Makita, DeWalt). On top: standing across the head, its rim up through a slot. In a window: lying flat, seen through a window in the top (Kobalt)." });
+  row("dial", "Place", "model.dial.place", "Where", "choice", { opts: [["end", "On the end"], ["top", "On top"], ["window", "In a window"], ["knob", "A knob on top"]],
+    help: "On the end: lying flat inside the head, a slice of its rim through a slot in the switch end (Makita, DeWalt). On top: standing across the head, its rim up through a slot. In a window: lying flat, seen through a window in the top (Kobalt). A knob on top: lying flat on the top, face up, standing out of it (Sienci T1)." });
   row("dial", "Place", "model.dial.d", "Ø", "len", { min: 8, max: 80, step: 0.5 });
   row("dial", "Place", "model.dial.t", "Thickness", "len", { min: 2, max: 30, step: 0.5 });
+  const knob = (m) => place(m) === "knob";
+  row("dial", "Knob", "model.dial.x", "Along the head", "len", { min: -150, max: 150, step: 0.5, when: knob, help: "Its centre along the head from the router's axis (+ = toward the switch end)." });
+  row("dial", "Knob", "model.dial.sink", "Sunk into the top", "len", { min: 0, max: 30, step: 0.5, when: knob, help: "How much of its thickness is below the top." });
   const win = (m) => place(m) === "window";
   row("dial", "Window", "model.dial.in", "Rim in from the end", "len", { min: -20, max: 60, step: 0.5, when: win, help: "Where the wheel sits: its rim this far in from the switch end." });
   row("dial", "Window", "model.dial.drop", "Below the top", "len", { min: 0, max: 60, step: 0.5, when: win });
@@ -126,7 +129,7 @@
     help: "The flat top's share of the radius: the bevel runs from the rim in to it." });
   row("dial", "Numbers", "model.dial.dome.top", "Flat top", "num", { unit: "x r", min: 0, max: 0.95, step: 0.05, when: (m) => m.dial && m.dial.style === "dome",
     help: "The flat top's share of the radius (0 = a full dome)." });
-  const slot = (m) => place(m) !== "window";
+  const slot = (m) => place(m) !== "window" && place(m) !== "knob";
   row("dial", "Slot", "model.dial.slot.w", "Slot width", "len", { min: 2, max: 120, step: 0.5, when: slot, csg: true, help: "The slot the rim shows through (blank = sized from the dial)." });
   row("dial", "Slot", "model.dial.slot.h", "Slot height", "len", { min: 1, max: 60, step: 0.5, when: slot, csg: true });
   row("dial", "Slot", "model.dial.slot.r", "Slot corner", "len", { min: 0, max: 60, step: 0.5, when: slot, csg: true, help: "Half the height = round ends." });
