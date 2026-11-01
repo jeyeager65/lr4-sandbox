@@ -183,7 +183,7 @@
       const T = LR4ToolChange;
       return { done, steps: T.steps, at: T.at, seek: T.seek, hold: T.hold, stop: T.stop };
     },
-    touchplate(kv) {                                 // job.js's probing animation: the shoe's bottom, the clip, the plate - out and back
+    touchplate(kv, cam = true) {                     // job.js's probing animation: the shoe's bottom, the clip, the plate - out and back
       if (typeof handPlate !== "function" || !meta || !HOME.pose) return "The machine isn't loaded yet.";
       if (!meshes.some((m) => m.userData.name === "TouchPlate")) return "No touch plate on this machine.";
       if (HAND.plate || touchOut()) return "The touch plate is out: put it away first (Run > Touch plate under the bit).";
@@ -194,7 +194,10 @@
       const phase = () => (A.out ? (A.skirt < 1 ? 0 : A.clip < 1 ? 1 : 2) : A.plate > 0 ? 3 : A.clip > 0 ? 4 : 5);
       const out = () => { if (!HAND.plate) handPlate(true); };
       const back = () => { if (HAND.plate) handPlate(false); };
-      const end = () => { A.hold = false; Object.assign(TOUCH_PLATE, keep); };
+      // the view eased in to the router (from the front, a little to the side) and back after, as the bit change does
+      const rb = tcMesh("Router_Bit"), view = cam && rb && !(window.LR4Director && LR4Director.directing && LR4Director.directing())
+        ? learnCam(bitTip(rb).add(new THREE.Vector3(0, 0, 40)), new THREE.Vector3(0.45, -1, 0.45), 520) : null;
+      const end = () => { A.hold = false; Object.assign(TOUCH_PLATE, keep); if (view) view.back(); };
       handPlate(true);
       const done = new Promise((res) => {
         (function tick() {
@@ -213,9 +216,25 @@
           out(); touchJump(1, 1, 1); back();
           if (k >= 4) touchJump(1, k === 4 ? 1 : 0, 0);
         },
-        stop() { C.stopped = true; back(); touchJump(0, 0, 0); end(); } };
+        stop() { C.stopped = true; back(); touchJump(0, 0, 0); end(); if (view) view.back(true); } };
     },
   };
+  // ease the camera to look at t from dir (dist mm) over 0.8 s; .back(now) eases (or jumps) back to where it was
+  function learnCam(t, dir, dist) {
+    const p0 = camera.position.clone(), t0 = controls.target.clone(), p1 = t.clone().addScaledVector(dir.normalize(), dist);
+    let run = 0;
+    const ease = (a, b, c, d, secs) => {
+      cancelAnimationFrame(run);
+      const t1 = performance.now();
+      (function step() {
+        const u = Math.min(1, (performance.now() - t1) / (secs * 1000)), k = u * u * (3 - 2 * u);
+        camera.position.lerpVectors(a, b, k); controls.target.lerpVectors(c, d, k); controls.update();
+        if (u < 1) run = requestAnimationFrame(step);
+      })();
+    };
+    ease(p0, p1, t0, t, 0.8);
+    return { back: (now) => ease(camera.position.clone(), p0, controls.target.clone(), t0, now ? 0 : 0.8) };
+  }
   function mineGo(v) {
     mineStop();
     const msg = $("ln-msg"), why = mineBusy() || (v.mine && MINE_PLAY[v.mine.kind] ? MINE_PLAY[v.mine.kind](v.mine.kv) : "This clip can't play here.");
