@@ -127,6 +127,12 @@
     pause, ▶ to go on. The sound comes on for a Demo. Jobs play at up to 5× real time.</p>
     <p>Any G-code file with <code>(Video ...)</code> comments on the SD card can be played the same way (Run > SD
     card > ▶ Play as a video).</p></div>
+  <div class="ln-now" id="ln-now" role="region" aria-label="Playing on your machine" hidden>
+    <div class="ln-now-h"><b id="ln-now-t"></b><i>On your machine</i></div>
+    <ol class="ln-steps" id="ln-steps" aria-label="Steps (click one to jump there)"></ol>
+    <div class="buttons"><button type="button" id="ln-pause" aria-pressed="false">⏸ Pause</button><button type="button" id="ln-stop">■ Stop</button><button type="button" id="ln-next">Next ›</button></div>
+    <p class="foot" id="ln-msg" role="status"></p>
+  </div>
   <input type="search" class="ln-filter" id="ln-filter" placeholder="Filter the clips" aria-label="Filter the clips" hidden>
   <div class="ln-list" id="ln-list"></div>
   <p class="foot" id="ln-parts" hidden>Load your part files for the full picture (without them the parts show as grey

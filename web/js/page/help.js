@@ -38,7 +38,7 @@
   const LEARN_FILTER_AT = 20;
   const LEARN_TYPES = { demo: "Demo", mine: "On your machine" };
   const learnGroup = (v) => v.group || "My clips";
-  const learnPlay = (v) => (v.type === "mine" && window.LR4Learn && LR4Learn.mine ? LR4Learn.mine(v.id) : helpGo(v.id));
+  const learnPlay = (v) => (v.type === "mine" ? mineGo(v) : helpGo(v.id));
   function learnRow(v) {
     const b = document.createElement("button");
     b.type = "button"; b.setAttribute("role", "listitem"); b.className = "hv-row"; b.dataset.id = v.id;
@@ -70,6 +70,129 @@
     }).filter(Boolean));
     if (!shown.length) host.textContent = list.length ? "No clip matches." : "No clips found.";
     $("ln-parts").hidden = !$("parts-chip").classList.contains("missing");
+  }
+  // ---- On your machine (Part 47.2): a clip that plays on your own router / mount / collets and changes nothing.
+  // Each player: () => a message (can't play here) | { steps() captions, at() step now, seek(k), hold(on), stop(),
+  // done: Promise }; the Learn column shows its steps (the current one lit, a click jumps there), ⏸, Stop and Next
+  // (the next clip in its group). Leaving Learn stops it and puts everything back. ----
+  const MINE = { on: null, v: null, timer: 0 };
+  const mineBusy = () => (/^(Run|Jog|Home|Hold)/.test(CTL.state || "") ? "The machine is moving: try again once it's idle." : null);
+  const MINE_PLAY = {
+    bit_change() {                                   // tool_change.js on your router: a bit with the other collet's shank in, yours back after
+      if (typeof tcPlay !== "function" || LR4ToolChange.busy()) return "A bit change is already playing.";
+      const r = LR4Routers.ROUTERS[RT.set.router];
+      if (!r || !RT.body || !tcMesh("Router_ColletNut")) return "No router to change a bit on: turn it on under Configure > 2 Options.";
+      const sizes = r.model.collet.sizes, sh = tcShank(tcBitNow().d, sizes), other = sizes.find((v) => Math.abs(v - sh) > 0.01) ?? sh;
+      const done = tcPlay({ bit: { shape: "flat", d: other, angle: 90, len: 0 }, cam: true });
+      if (!LR4ToolChange.busy()) return "No router to change a bit on.";
+      const T = LR4ToolChange;
+      return { done, steps: T.steps, at: T.at, seek: T.seek, hold: T.hold, stop: T.stop };
+    },
+    touch_plate() {                                  // job.js's probing animation: the shoe's bottom, the clip, the plate - out and back
+      if (typeof handPlate !== "function" || !meta || !HOME.pose) return "The machine isn't loaded yet.";
+      if (!meshes.some((m) => m.userData.name === "TouchPlate")) return "No touch plate on this machine.";
+      if (HAND.plate || touchOut()) return "The touch plate is out: put it away first (Run > Touch plate under the bit).";
+      const A = TOUCH_ANIM, keep = Object.assign({}, TOUCH_PLATE);
+      const ST = ["The dust shoe's bottom off", "The clip onto the collet nut", "The plate out under the bit",
+        "The plate back in its slot", "The clip back on its bolt", "The shoe's bottom back on"];
+      const C = { stopped: false, wait: 0 };
+      const phase = () => (A.out ? (A.skirt < 1 ? 0 : A.clip < 1 ? 1 : 2) : A.plate > 0 ? 3 : A.clip > 0 ? 4 : 5);
+      const out = () => { if (!HAND.plate) handPlate(true); };
+      const back = () => { if (HAND.plate) handPlate(false); };
+      const end = () => { A.hold = false; Object.assign(TOUCH_PLATE, keep); };
+      handPlate(true);
+      const done = new Promise((res) => {
+        (function tick() {
+          if (C.stopped) return res(false);
+          if (!A.hold) {
+            if (A.out && A.plate >= 1 && (C.wait += 0.1) >= 1.5) back();   // a moment out, then home
+            if (!A.out && !touchBusy()) { end(); return res(true); }
+          }
+          setTimeout(tick, 100);
+        })();
+      });
+      return { done, steps: () => ST, at: phase, hold: (on) => { A.hold = !!on; },
+        seek(k) {
+          C.wait = 0;
+          if (k <= 2) { out(); touchJump(k > 0 ? 1 : 0, k > 1 ? 1 : 0, 0); return; }
+          out(); touchJump(1, 1, 1); back();
+          if (k >= 4) touchJump(1, k === 4 ? 1 : 0, 0);
+        },
+        stop() { C.stopped = true; back(); touchJump(0, 0, 0); end(); } };
+    },
+  };
+  function mineGo(v) {
+    mineStop();
+    const msg = $("ln-msg"), why = mineBusy() || (MINE_PLAY[v.id] ? MINE_PLAY[v.id]() : "This clip can't play here.");
+    if (typeof why === "string") { mineBox(v); msg.textContent = why; $("ln-pause").hidden = true; return; }
+    MINE.on = why; MINE.v = v; MINE.k = -1;
+    mineBox(v);
+    msg.textContent = "";
+    why.done.then(() => { if (MINE.on === why) mineDone(); });
+    MINE.timer = setInterval(mineLit, 120);
+    mineLit();
+  }
+  function mineBox(v) {                              // the box over the list: title, steps, ⏸ / Stop / Next
+    $("ln-now").hidden = false;
+    $("ln-now-t").textContent = v.title;
+    $("ln-pause").hidden = false; $("ln-pause").textContent = "⏸ Pause"; $("ln-pause").setAttribute("aria-pressed", "false");
+    $("ln-stop").textContent = "■ Stop";
+    const nx = learnNext(v);
+    $("ln-next").hidden = !nx;
+    $("ln-next").title = nx ? `Next in ${learnGroup(v)}: ${nx.title}` : "";
+    const steps = MINE.on ? MINE.on.steps() : [];
+    $("ln-steps").replaceChildren(...steps.map((c, i) => {
+      if (!c) return null;                           // (a step with no caption goes on with the one before)
+      const li = document.createElement("li"), b = document.createElement("button");
+      b.type = "button"; b.textContent = c; b.dataset.k = i;
+      b.title = "Jump to this step";
+      b.addEventListener("click", () => { if (MINE.on) { MINE.on.seek(i); mineLit(); } });
+      li.append(b);
+      return li;
+    }).filter(Boolean));
+  }
+  function mineLit() {                               // the step playing now lit (or the captioned one it belongs to)
+    if (!MINE.on) return;
+    const k = MINE.on.at();
+    if (k === MINE.k) return;
+    MINE.k = k;
+    let lit = null;
+    for (const b of $("ln-steps").querySelectorAll("button")) if (+b.dataset.k <= k) lit = b;
+    for (const b of $("ln-steps").querySelectorAll("button")) {
+      b.classList.toggle("on", b === lit);
+      if (b === lit) b.setAttribute("aria-current", "step"); else b.removeAttribute("aria-current");
+    }
+  }
+  function mineDone() {
+    clearInterval(MINE.timer);
+    MINE.on = null;
+    for (const b of $("ln-steps").querySelectorAll("button")) { b.classList.remove("on"); b.removeAttribute("aria-current"); }
+    $("ln-pause").hidden = true;
+    $("ln-stop").textContent = "Close";
+    $("ln-msg").textContent = "Done - everything is back as it was.";
+  }
+  function mineStop() {                              // stop + put back (leaving Learn, another clip, Stop)
+    clearInterval(MINE.timer);
+    const on = MINE.on;
+    MINE.on = null;
+    if (on) on.stop();
+  }
+  function mineClose() { mineStop(); $("ln-now").hidden = true; MINE.v = null; }
+  function learnNext(v) {                            // the next clip in v's group
+    const g = (HELP.list || []).filter((x) => learnGroup(x) === learnGroup(v)), i = g.findIndex((x) => x.id === v.id);
+    return i >= 0 ? g[i + 1] || null : null;
+  }
+  {
+    $("ln-pause").addEventListener("click", () => {
+      if (!MINE.on) return;
+      const on = $("ln-pause").getAttribute("aria-pressed") !== "true";
+      MINE.on.hold(on);
+      $("ln-pause").setAttribute("aria-pressed", String(on));
+      $("ln-pause").textContent = on ? "▶ Go on" : "⏸ Pause";
+    });
+    $("ln-stop").addEventListener("click", mineClose);
+    $("ln-next").addEventListener("click", () => { const nx = MINE.v && learnNext(MINE.v); mineClose(); if (nx) learnPlay(nx); });
+    LR4OnMode((m) => { if (m !== "learn") mineClose(); });
   }
   async function learnShow(id) {                     // Learn, that clip's row lit and focused
     LR4ShowMode("learn");
@@ -180,5 +303,8 @@
     if (helpId()) helpStart();
   }
   window.LR4Help = { list: helpIndex, go: helpGo, exit: helpExit, pause: helpPause, follow: helpFollow, learn: learnShow, groups: LEARN_GROUPS,
+    mine: { play: (id) => helpIndex().then((l) => mineGo(l.find((v) => v.id === id))), stop: mineClose,
+      state: () => ({ on: !!MINE.on, id: MINE.v ? MINE.v.id : null, k: MINE.on ? MINE.on.at() : -1, msg: $("ln-msg").textContent,
+        steps: [...$("ln-steps").querySelectorAll("button")].map((b) => b.textContent), lit: $("ln-steps").querySelector("button.on")?.textContent || null }) },
     state: () => ({ id: HELP.id, playing: !!HELP.clock && !HELP.done, paused: HELP.paused, done: HELP.done, free: !!(HELP.clock && HELP.clock.free) }),
     playFile(name, text) { MS.set(HELP_FILE, JSON.stringify({ name, text })); helpGo("file"); } };

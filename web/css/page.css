@@ -922,6 +922,15 @@ button:disabled { opacity: 0.42; cursor: default; }
 .ln-group h2 { margin: 0 0 2px; }
 .ln-filter { width: 100%; }
 .learn .foot { margin: 0; }
+.ln-now { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; border: 1px solid var(--accent); border-radius: 8px; }
+.ln-now[hidden] { display: none; }
+.ln-now-h { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+.ln-now-h i { font-style: normal; font-size: 11px; color: var(--muted); }
+.ln-steps { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 1px; font-size: 13px; }
+.ln-steps button { border: 0; background: none; padding: 2px 4px; text-align: left; color: var(--muted); font-size: 13px; border-radius: 4px; }
+.ln-steps button:hover { color: var(--ink); }
+.ln-steps button.on { color: var(--ink); font-weight: 600; background: color-mix(in srgb, var(--accent) 18%, transparent); }
+.ln-now .buttons { display: flex; gap: 6px; flex-wrap: wrap; }
 .m-ic { display: none; }
 .wc-tour { margin: 0; font-size: 13px; }
 .hv-start { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 9; width: min(420px, calc(100% - 24px));

@@ -766,7 +766,22 @@
       }
     }
   }
+  // Learn's On your machine (Part 47.2, help.js): held (A.hold), or set at once to a spot (skirt / clip / plate 0..1)
+  function touchJump(skirt, clip, plate) {
+    const A = TOUCH_ANIM;
+    A.skirt = skirt; A.clip = clip; A.plate = plate;
+    for (const m of meshes) {                        // what's home again: move() places it
+      if (plate <= 0 && TOUCH_PARTS.includes(m.userData.name)) { m.userData.held = false; m.quaternion.identity(); }
+      if (clip <= 0 && CLIP_RE.test(m.userData.name)) m.quaternion.identity();
+    }
+    applyVisibility();
+    if (meta) move(HOME.pose ? [HOME.pose.x, HOME.pose.y, HOME.pose.z] : undefined);
+    if (skirt > 0 && skirt < 1) touchSkirtPlace();
+    if (clip > 0) touchClipPlace();
+    if (plate > 0) touchPlatePlace();
+  }
   function touchAnimTick(dt) {                       // out: skirt, clip, plate; home: plate, clip, skirt
+    if (TOUCH_ANIM.hold) return;
     const A = TOUCH_ANIM, step = dt / TOUCH_SECS, c0 = A.clip, p0 = A.plate, s0 = A.skirt;
     if (A.out) {
       A.skirt = Math.min(1, A.skirt + step);

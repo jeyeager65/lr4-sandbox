@@ -153,7 +153,7 @@
   }
   function tcTick(dt) {
     const S = TC.on;
-    if (!S) return;
+    if (!S || S.hold) return;
     S.t += dt * TC_ON.speed;
     while (S.k < S.steps.length && S.t >= S.steps[S.k][0]) {   // finish the step, on to the next
       S.steps[S.k][2](1, S);
@@ -265,6 +265,7 @@
       S.cam = { p0: camera.position.clone(), t0: controls.target.clone(), t1, p1: t1.clone().addScaledVector(dir, 210).add(new THREE.Vector3(0, 0, 25)) };
     }
     S.steps = tcSteps(S);
+    S.init = Object.fromEntries(TC_INIT.map((k) => [k, S[k]]));   // (tcSeek starts again from these)
     S.done = new Promise((res) => { S.res = res; });
     TC.on = S;
     tcCaption(S.steps[0][1]);
@@ -286,8 +287,33 @@
     move(HOME.pose ? [HOME.pose.x, HOME.pose.y, HOME.pose.z] : undefined);
     S.res(true);
   }
+  // Learn's On your machine (Part 47.2, help.js): jump to step k (everything from the start values, the steps before
+  // it done), hold, stop (the camera back too: the rest is tcEnd's). The state each step sets:
+  const TC_INIT = ["nutA", "nutDz", "press", "colA", "colB", "bitA", "bitB", "shaftA", "offA", "offB", "showA", "showB", "showColA", "showColB",
+    "showA2", "showB2", "nw", "hw", "shoeDz", "shoeOn"];
+  function tcSeek(k) {
+    const S = TC.on;
+    if (!S) return;
+    k = Math.max(0, Math.min(k, S.steps.length - 1));
+    Object.assign(S, S.init);
+    for (let i = 0; i < k; i++) S.steps[i][2](1, S);
+    S.steps[k][2](0, S);
+    S.k = k; S.t = 0;
+    let c = k;
+    while (c > 0 && !S.steps[c][1]) c--;             // a step with no caption goes on with the one before
+    tcCaption(S.steps[c][1]);
+    tcPlace();
+  }
+  function tcStop() {
+    const S = TC.on;
+    if (!S) return;
+    if (S.cam) tcCam(S, 0);
+    tcEnd();
+  }
   // (tests) how far out the front the nut wrench's handle points: cos of its angle from the machine's front
   const tcHandle = (S) => +new THREE.Vector3(-1, 0, 0).applyQuaternion(S.nutW.quaternion).dot(S.front).toFixed(3);
   window.LR4ToolChange = { play: (o) => tcPlay(o), busy: () => !!TC.on, speed: (k) => { TC_ON.speed = k > 0 ? k : 1; },
+    steps: () => (TC.on ? TC.on.steps.map((st) => st[1]) : []), at: () => (TC.on ? TC.on.k : -1), seek: tcSeek, stop: tcStop,
+    hold: (on) => { if (TC.on) TC.on.hold = !!on; },
     state: () => (TC.on ? { k: TC.on.k, n: TC.on.steps.length, nutDz: +TC.on.nutDz.toFixed(3), nutA: +TC.on.nutA.toFixed(3), press: TC.on.press, swap: TC.on.swap,
       two: !!TC.on.holdW, lock: TC.on.useLock, shaftA: +TC.on.shaftA.toFixed(3), nutEach: !!TC.on.nutB, front: TC.on.nutW && TC.on.nutW.visible ? tcHandle(TC.on) : null, wrench: !!(TC.on.nutW && TC.on.nutW.visible), caption: TC.cap ? TC.cap.textContent : "" } : null) };
