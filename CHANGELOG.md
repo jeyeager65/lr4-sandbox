@@ -3,6 +3,18 @@
 The version is the sandbox page's (`VERSION` in `web/js/page/job.js`, shown in its footer). The footer also shows
 the date the model data was built and the Printables file set it was solved for.
 
+## 0.65.0 - 2026-11-01
+- **Learn:** a third mode next to Configure and Run, with short clips that play live in the page, listed by group
+  (Getting started, Setting up, Running a job, Bits and collets, Probing / zero). It replaces the Help menu.
+  **Demo** clips play on a temporary machine, as the help videos did; Exit now brings you back to Learn.
+  **On your machine** clips play on your own router and change nothing: **Changing a bit** (the shaft held, the
+  collet nut off with a wrench, the bit and collet swapped, all back on) and **The touch plate out and back**.
+  While one plays, its steps are listed with the current one lit: click a step to jump there, Pause, Stop, or
+  Next for the next clip in the group. Leaving Learn stops it and puts everything back.
+- **Watch how:** the "?" help on As built, homing, lost steps, the bit, the touch plate and the front plate design
+  ends with a link to its clip in Learn.
+- On a phone the three modes are icons (✎ ▶ 🎓).
+
 ## 0.64.1 - 2026-10-31
 - Faster loading: preparing the part meshes takes about half as long, the workshop's textures are drawn once (also
   quicker table and room changes), and shader compiling skips its error check.
