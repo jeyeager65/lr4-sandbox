@@ -136,14 +136,17 @@
       "speeds_source": "even spread over DeWalt's 16000-27000 RPM spec - unverified",
       "mount": "dewalt",
       "model": {
-        "label": "DeWalt DWP611 (GUESS: published sizes, not measured)",
+        "label": "DeWalt DWP611 (GUESS: published sizes; the head scaled off a product photo by the 69 mm housing - user 2026-10-31, not measured)",
         "collet_nut": {"type": "DeWalt", "af": 22.0, "h": 15.0, "below": 1.5},
         "collet": {"type": "DeWalt", "sizes": [6.35], "l": 20.0, "d": 12.0, "taper": 8},
         "shaft": {"d": 12.0, "exposed": 4.0, "thread": {"d": 16.0, "pitch": 1.0, "length": 9.0}},
         "housing": {"d": 69.0, "l": 100.0},
         "collar": {"d": 69.0, "l": 6.0},
-        "motor_cap": {"L": 82.0, "W": 76.0, "H": 90.0, "top_r": 10.0, "front_r": 14.0, "back_r": 14.0, "bot_r": 4.0},
-        "dial": {"place": "end", "surround": {"kind": "raised", "depth": 1, "margin": 2, "edge": "fillet", "e": 0.6}, "d": 22.0, "t": 6.0},
+        "motor_cap": {"L": 80, "W": 80, "H": 47, "bot_r": 1, "shape": {
+          "top": [{"x": -40, "y": 0, "s": "arc", "r": 40}, {"x": 0, "y": 40, "s": "arc", "r": 40}, {"x": 40, "y": 0, "s": "line"}],
+          "front": [{"x": -36.3, "y": 0, "s": "line"}, {"x": 36.3, "y": 0, "s": "line"}, {"x": 38.9, "y": 9, "s": "curve"}, {"x": 40, "y": 21, "s": "curve"}, {"x": 39.5, "y": 32, "s": "curve"}, {"x": 35.7, "y": 42, "s": "curve"}, {"x": 26.7, "y": 47, "s": "line"}, {"x": -26.7, "y": 47, "s": "curve"}, {"x": -35.7, "y": 42, "s": "curve"}, {"x": -39.5, "y": 32, "s": "curve"}, {"x": -40, "y": 21, "s": "curve"}, {"x": -38.9, "y": 9, "s": "line"}],
+          "section": [{"x": 0, "y": 47, "s": "line"}, {"x": 26.7, "y": 47, "s": "curve"}, {"x": 35.7, "y": 42, "s": "curve"}, {"x": 39.5, "y": 32, "s": "curve"}, {"x": 40, "y": 21, "s": "curve"}, {"x": 38.9, "y": 9, "s": "line"}, {"x": 36.3, "y": 0, "s": "line"}, {"x": 0, "y": 0, "s": "line"}]}},
+        "dial": {"place": "end", "d": 30.0, "t": 7.0},
         "shaft_lock": {"z": 26.0, "a": -50.0, "d": 12.0, "r": 37.5, "travel": 3.0},
         "looks": {
           "motor_cap": {"c": [0.996, 0.741, 0.09], "f": "plastic"}
