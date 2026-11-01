@@ -1,0 +1,7 @@
+(Video Learn: NAME=The touch plate out and back)
+(Video Learn: GROUP=Probing / zero)
+(Video Learn: KIND=mine)
+(Video Learn: DESC=On your machine: the shoe's bottom off, the clip onto the collet nut, the plate under the bit - and)
+(Video Learn: DESC=all of it back.)
+(The touch plate out and back: a Learn clip that plays on your own machine - Part 47b)
+(Video TouchPlate: HOLD=1.5)

@@ -1,3 +1,8 @@
+(Video Learn: NAME=As built + tram)
+(Video Learn: GROUP=Setting up)
+(Video Learn: KIND=demo)
+(Video Learn: DESC=A racked gantry, a router out of tram and a warped spoilboard, and the squareness test that finds)
+(Video Learn: DESC=them.)
 (As built + tram: a racked gantry, a router out of tram, a warped spoilboard - Help video, Part 43)
 (The page plays it live: Learn > As built. YouTube: node tools/record_demo.js web/help/asbuilt.gcode)
 (KIND=ui: the whole page on screen. Keep every line under 127 bytes: FluidNC stops on longer ones)

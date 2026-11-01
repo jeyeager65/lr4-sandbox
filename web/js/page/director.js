@@ -481,6 +481,7 @@ window.LR4Director = (() => {
       else if (["asbuilt", "slip", "heat", "clip"].includes(cmd.kind)) { /* set before the intro (prepare) */ }
       else if (cmd.kind === "inspect") cam = await inspectCmd(cmd, cam);
       else if (cmd.kind === "wait") await hold(DS.secsOf(cmd, 1), cam);
+      else if (cmd.kind === "bitchange" || cmd.kind === "touchplate") await LR4Help.playCmd(cmd);   // Part 47b (help.js)
       else if (cmd.kind === "point") {
         const e = uiEl(cmd);
         if (e) { await readWait(cam); point(cmd, e); await hold(cmd.kv.text ? (readUntil - RUN.frames) / o.fps : DS.secsOf(cmd, 3), cam); ringOff(); }

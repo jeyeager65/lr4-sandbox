@@ -1,3 +1,8 @@
+(Video Learn: NAME=Safety: lost steps + fire)
+(Video Learn: GROUP=Running a job)
+(Video Learn: KIND=demo)
+(Video Learn: DESC=A knot makes X skip steps; Z losing a few steps on each lift ends in a jammed bit, smoke and a fire.)
+(Video Learn: DESC=Never leave it running.)
 (Safety: lost steps and a fire - LR4 Sandbox video, Part 44e)
 (Record: node tools/record_demo.js web/help/safety.gcode - the page plays it live: Learn > Safety)
 (Serve the repo first: python tools/serve.py sandbox --no-open)

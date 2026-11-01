@@ -1,6 +1,7 @@
 // lr4-sandbox page, part 14 of 14: Learn (Part 47; was the Help videos, Part 43b) - short clips replayed live in the
-// page, no MP4s, no YouTube links. Each one is a (Video ...) G-code script in help/ (help/index.json: id, title, secs,
-// blurb, group, type), the same file record_demo.js turns into the YouTube video. Listed in the Learn mode (top bar
+// page, no MP4s, no YouTube links. Each one is a (Video ...) G-code script in help/ (help/index.json: the files + a
+// demo's measured secs; title, group, type and line from the file's own (Video Learn: ...) header, Part 47b), the
+// same file record_demo.js turns into the YouTube video. Listed in the Learn mode (top bar
 // Configure | Run | Learn) by group; the welcome card's tour link opens it there. Two types: "demo" reloads the page as
 // the temporary machine "Help: <title>" (#help=<id>, machines.js: fresh each time, its own settings / SD card /
 // spoilboard), so your machine is never touched; Exit reloads back to yours, in Learn (#learn). "mine" plays on your
@@ -14,11 +15,30 @@
   const HELP = { list: null, id: null, entry: null, text: null, clock: null, paused: false, done: false };
   const HELP_FILE = "lr4-help-file";                 // per browser: an SD card file to play as a video (name + text)
   const helpId = () => { const m = /^#help=([\w.-]+)/.exec(location.hash); return m ? decodeURIComponent(m[1]) : null; };
-  async function helpIndex() {
-    if (!HELP.list) {
-      try { HELP.list = (await (await fetch(lr4v("help/index.json"))).json()).videos || []; } catch (e) { HELP.list = []; }
-    }
-    return HELP.list;
+  // the clips (Part 47b): help/index.json lists the files; each one's title, group, kind and line come from its own
+  // (Video Learn: ...) header (demo_script.js learnOf). A file that doesn't parse clean isn't listed (console says why)
+  function helpClip(file, text, extra) {
+    const sc = LR4DemoScript.parse(text), L = LR4DemoScript.learnOf(sc, file);
+    return Object.assign({ id: file.replace(/\.[^.]+$/, ""), file, text, title: L.title, group: L.group, type: L.type, blurb: L.blurb,
+      mine: L.mine, errors: L.errors, secs: LR4DemoScript.playSecs(sc) }, extra || {});
+  }
+  function helpIndex() {                             // (one load, however many ask while it's on its way)
+    if (!HELP.loading) HELP.loading = (async () => {
+      const list = [];
+      try {
+        const files = (await (await fetch(lr4v("help/index.json"))).json()).files || [];
+        const got = await Promise.all(files.map(async (f) => {
+          try { return helpClip(f.file, await (await fetch(lr4v("help/" + f.file))).text(), f.secs ? { secs: f.secs } : null); }
+          catch (e) { return null; }
+        }));
+        for (const c of got) {
+          if (c && !c.errors.length) list.push(c);
+          else if (c) console.warn(`help/${c.file}: not listed - ${c.errors.join("; ")}`);
+        }
+      } catch (e) { /* none */ }
+      return (HELP.list = list);
+    })();
+    return HELP.loading;
   }
   const helpSecs = (s) => (s >= 90 ? `about ${Math.round(s / 60)} min` : `about ${Math.round(s / 10) * 10 || s} s`);
   function helpGo(id) {                              // reload as the help machine for this video
@@ -39,6 +59,14 @@
   const LEARN_TYPES = { demo: "Demo", mine: "On your machine" };
   const learnGroup = (v) => v.group || "My clips";
   const learnPlay = (v) => (v.type === "mine" ? mineGo(v) : helpGo(v.id));
+  // BitChange's BIT= on this router: the new bit (HandSetup form) | null = the same one back
+  function learnBit(kv) {
+    const k = LR4DemoScript.shankOf(kv && kv.bit), r = LR4Routers.ROUTERS[RT.set.router];
+    if (!k || !r) return null;
+    let d = k.d;
+    if (k.other) { const sizes = r.model.collet.sizes, sh = tcShank(tcBitNow().d, sizes); d = sizes.find((v) => Math.abs(v - sh) > 0.01) ?? sh; }
+    return { shape: "flat", d, angle: 90, len: 0 };
+  }
   function learnRow(v) {
     const b = document.createElement("button");
     b.type = "button"; b.setAttribute("role", "listitem"); b.className = "hv-row"; b.dataset.id = v.id;
@@ -77,25 +105,27 @@
   // (the next clip in its group). Leaving Learn stops it and puts everything back. ----
   const MINE = { on: null, v: null, timer: 0 };
   const mineBusy = () => (/^(Run|Jog|Home|Hold)/.test(CTL.state || "") ? "The machine is moving: try again once it's idle." : null);
+  // keyed by the mine clip's command (its kv: BitChange BIT= HOLD= NUTS=, TouchPlate HOLD=); the director's intro
+  // runs them too (a demo with a bit change: LR4Help.playCmd)
   const MINE_PLAY = {
-    bit_change() {                                   // tool_change.js on your router: a bit with the other collet's shank in, yours back after
+    bitchange(kv, cam = true) {                      // tool_change.js on your router; yours back after (it changes nothing)
       if (typeof tcPlay !== "function" || LR4ToolChange.busy()) return "A bit change is already playing.";
       const r = LR4Routers.ROUTERS[RT.set.router];
       if (!r || !RT.body || !tcMesh("Router_ColletNut")) return "No router to change a bit on: turn it on under Configure > 2 Options.";
-      const sizes = r.model.collet.sizes, sh = tcShank(tcBitNow().d, sizes), other = sizes.find((v) => Math.abs(v - sh) > 0.01) ?? sh;
-      const done = tcPlay({ bit: { shape: "flat", d: other, angle: 90, len: 0 }, cam: true });
+      const hold = kv && kv.hold ? kv.hold.toLowerCase() : undefined, nuts = kv && kv.nuts ? kv.nuts.toLowerCase() : undefined;
+      const done = tcPlay({ bit: learnBit(kv), cam, hold, nuts });
       if (!LR4ToolChange.busy()) return "No router to change a bit on.";
       const T = LR4ToolChange;
       return { done, steps: T.steps, at: T.at, seek: T.seek, hold: T.hold, stop: T.stop };
     },
-    touch_plate() {                                  // job.js's probing animation: the shoe's bottom, the clip, the plate - out and back
+    touchplate(kv) {                                 // job.js's probing animation: the shoe's bottom, the clip, the plate - out and back
       if (typeof handPlate !== "function" || !meta || !HOME.pose) return "The machine isn't loaded yet.";
       if (!meshes.some((m) => m.userData.name === "TouchPlate")) return "No touch plate on this machine.";
       if (HAND.plate || touchOut()) return "The touch plate is out: put it away first (Run > Touch plate under the bit).";
       const A = TOUCH_ANIM, keep = Object.assign({}, TOUCH_PLATE);
       const ST = ["The dust shoe's bottom off", "The clip onto the collet nut", "The plate out under the bit",
         "The plate back in its slot", "The clip back on its bolt", "The shoe's bottom back on"];
-      const C = { stopped: false, wait: 0 };
+      const C = { stopped: false, wait: 0 }, hold = kv && kv.hold !== undefined ? Number(kv.hold) : 1.5;
       const phase = () => (A.out ? (A.skirt < 1 ? 0 : A.clip < 1 ? 1 : 2) : A.plate > 0 ? 3 : A.clip > 0 ? 4 : 5);
       const out = () => { if (!HAND.plate) handPlate(true); };
       const back = () => { if (HAND.plate) handPlate(false); };
@@ -105,7 +135,7 @@
         (function tick() {
           if (C.stopped) return res(false);
           if (!A.hold) {
-            if (A.out && A.plate >= 1 && (C.wait += 0.1) >= 1.5) back();   // a moment out, then home
+            if (A.out && A.plate >= 1 && (C.wait += 0.1) >= hold) back();   // a moment out (HOLD=), then home
             if (!A.out && !touchBusy()) { end(); return res(true); }
           }
           setTimeout(tick, 100);
@@ -123,7 +153,7 @@
   };
   function mineGo(v) {
     mineStop();
-    const msg = $("ln-msg"), why = mineBusy() || (MINE_PLAY[v.id] ? MINE_PLAY[v.id]() : "This clip can't play here.");
+    const msg = $("ln-msg"), why = mineBusy() || (v.mine && MINE_PLAY[v.mine.kind] ? MINE_PLAY[v.mine.kind](v.mine.kv) : "This clip can't play here.");
     if (typeof why === "string") { mineBox(v); msg.textContent = why; $("ln-pause").hidden = true; return; }
     MINE.on = why; MINE.v = v; MINE.k = -1;
     mineBox(v);
@@ -323,6 +353,13 @@
   }
   window.LR4Help = { list: helpIndex, go: helpGo, exit: helpExit, pause: helpPause, follow: helpFollow, learn: learnShow, groups: LEARN_GROUPS,
     topics: LEARN_TOPICS, watchLink,
+    // the director's (Video BitChange:) / (Video TouchPlate:) in a demo's intro: resolves when it's done
+    playCmd(c) {
+      const run = MINE_PLAY[c.kind] && MINE_PLAY[c.kind](c.kv, false);
+      if (typeof run === "string" || !run) { console.warn(`(Video ${c.kind}:) ${run || "unknown"}`); return Promise.resolve(false); }
+      return run.done;
+    },
+    clip: helpClip,
     mine: { play: (id) => helpIndex().then((l) => mineGo(l.find((v) => v.id === id))), stop: mineClose,
       state: () => ({ on: !!MINE.on, id: MINE.v ? MINE.v.id : null, k: MINE.on ? MINE.on.at() : -1, msg: $("ln-msg").textContent,
         steps: [...$("ln-steps").querySelectorAll("button")].map((b) => b.textContent), lit: $("ln-steps").querySelector("button.on")?.textContent || null }) },

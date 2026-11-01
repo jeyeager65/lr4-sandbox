@@ -1,3 +1,7 @@
+(Video Learn: NAME=Tour + first job)
+(Video Learn: GROUP=Getting started)
+(Video Learn: KIND=demo)
+(Video Learn: DESC=The Configure steps, then Run: Home, Zero and a name plate engraved on the page's own FluidNC.)
 (Tour + first job: the LR4 Sandbox page, then a name plate engraved on its own FluidNC - Help video, Part 43)
 (The page plays it live: Learn > Tour. YouTube: node tools/record_demo.js web/help/tour.gcode)
 (KIND=ui: the whole page on screen; Step / Point / Click use the page's element ids)

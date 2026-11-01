@@ -1,0 +1,8 @@
+(Video Learn: NAME=Changing a bit)
+(Video Learn: GROUP=Bits and collets)
+(Video Learn: KIND=mine)
+(Video Learn: DESC=On your router: the shaft held, the collet nut off, the bit - and its collet, for another shank -)
+(Video Learn: DESC=swapped and the nut back on.)
+(Changing a bit: a Learn clip that plays on your own router - Part 47b. The bit going in has the other)
+(collet size's shank, so the collet swaps too; your own bit is back at the end.)
+(Video BitChange: BIT=other)

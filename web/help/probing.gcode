@@ -1,3 +1,7 @@
+(Video Learn: NAME=Probing and zero)
+(Video Learn: GROUP=Probing / zero)
+(Video Learn: KIND=demo)
+(Video Learn: DESC=Work zero per axis, and the touch plate with its clip on the collet nut finding the stock's top.)
 (Probing + zero: X and Y from homing, Z from the touch plate - Help video, Part 43)
 (The page plays it live: Learn > Probing and zero. YouTube: node tools/record_demo.js web/help/probing.gcode)
 (KIND=ui: the whole page on screen. Keep every line under 127 bytes: FluidNC stops on longer ones)

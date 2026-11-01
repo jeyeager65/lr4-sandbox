@@ -178,6 +178,7 @@
     return { mesh: tcMesh("Router_Bit"), d: RT_BIT.d };
   }
   // play a change: o = { bit: the new bit (HandSetup form: { shape, d, len, flen, ... }) | null (the same bit back),
+// hold: "lock" | "wrenches", nuts: "each" | "one" (over the popup's choices: a Learn clip's BitChange),
   // cam: true = ease the view to the nut and back, from: { d, mesh } the bit going out (else the one drawn now) }; resolves when done (at once if there's no router to change on)
   function tcPlay(o) {
     o = o || {};
@@ -195,7 +196,7 @@
     S.rest = { nut: rest(nutM), collet: rest(colM), shaft: rest(shM), thread: rest(thM) };
     // the shaft held by its lock, or by a wrench on its flats (a router with a lock too, when Hold the shaft says so)
     const F = m.shaft.flats, Lk = m.shaft_lock;
-    S.two = !!F && (!Lk || TC_ON.hold === "wrenches"); S.useLock = !!Lk && !S.two;
+    S.two = !!F && (!Lk || (o.hold || TC_ON.hold) === "wrenches"); S.useLock = !!Lk && !S.two;   // (o.hold / o.nuts: a clip's BitChange)
     // the router's own frame in the world (its +x = the switch end; the nut's flats face +-y): the wrenches' rest turn,
     // their handle out along -x. Out the front instead (the machine's -y, square to the axis): the wrench swings
     // 30 deg either side of it, so the shaft is first turned till the nut's flats (and the shaft's: 180 deg apart) line up
@@ -258,7 +259,7 @@
     if (S.swap) {                                    // the other collet (a shade apart), in its own nut when Collets says a nut each
       S.colletB = collet(S.shankB, -0.08);
       S.colletB.visible = false;
-      if (TC_ON.nuts === "each") { S.nutB = nutM.clone(); S.nutB.visible = false; scene.add(S.nutB); }
+      if ((o.nuts || TC_ON.nuts) === "each") { S.nutB = nutM.clone(); S.nutB.visible = false; scene.add(S.nutB); }
     }
     if (o.cam && !(window.LR4Director && LR4Director.directing && LR4Director.directing())) {   // (a video moves the camera itself)
       const t1 = S.nutAt.clone().addScaledVector(ax, -14), dir = new THREE.Vector3(0.35, -1, 0).normalize();   // from the front, a little to the switch side

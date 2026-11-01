@@ -82,6 +82,20 @@
 //   (Video Design: EXAMPLE=on | FILE=help/plate.svg)   the front plate design (Configure > 6 Get the files, Part 41), as if
 //       uploaded: EXAMPLE = the template's own Example layer for this machine's plate; FILE = an SVG next to the page
 //       (made for this MACHINE='s plate length). The 3D plate and the strut plate job follow it
+//   (Video BitChange: BIT=1/8 HOLD=lock|wrenches NUTS=each|one)   a bit change on the machine's router (Part 47b,
+//       tool_change.js), intro only: BIT = the new bit's shank (1/8, 1/4, 3/8, 1/2, 6mm, 6.35 = mm; other = the router's
+//       other collet size; none = the same bit back), HOLD / NUTS as the bit popup's Hold the shaft / Collets (none:
+//       the viewer's own choice)
+//   (Video TouchPlate: HOLD=1.5)   the touch plate out under the bit (the shoe's bottom, the clip, the plate) and back
+//       after HOLD s (Part 47b, job.js's probing animation), intro only
+// Learn (Part 47b): a clip in the page's Learn list is a file like this with a header, ONE KEY PER LINE (FluidNC stops
+// on lines over 127 bytes), before the first move (one after it is an error):
+//   (Video Learn: NAME=Changing a bit)   its title (none: the file's name)
+//   (Video Learn: GROUP=Bits and collets)   its heading in Learn (none: My clips)
+//   (Video Learn: KIND=demo|mine)   demo (the default): plays on a temporary machine; mine: on yours, changing
+//       nothing - its one BitChange or TouchPlate line and nothing else
+//   (Video Learn: DESC=One line about it)   DESC lines add up (joined by a space); the others: the last one wins
+// No ")" in a value: it ends the comment. learnOf(parse(text), file) -> what Learn lists.
 // Lines before the first move are the intro, run in order; later ones run when playback reaches their line (Shot,
 // Text, Title, Wait, Speed). A file whose intro has no Shot / Home / Title / Text / Wait gets the default intro
 // (workshop orbit, home, machine orbit, stock).
@@ -94,10 +108,14 @@ const SETTINGS = { size: "wxh", machine: "wxh", fps: "num", volume: "num", pause
   fan: "bool", main: "colour", accent: "colour" };
 const MACHINE_KEYS = ["table", "room", "braces", "struts", "base", "peter", "router", "skirt", "hose", "fan", "main", "accent"];
 const PRESETS = ["all", "no-hardware", "printed", "frame"];   // web/js/show_tree.js PRESETS
-const KINDS = ["shot", "home", "zero", "title", "text", "wait", "speed", "pendant", "show", "inspect", "asbuilt", "slip", "heat", "fire", "extinguish", "estop", "clip", "term", "point", "click", "step", "design", "router"];
+const KINDS = ["shot", "home", "zero", "title", "text", "wait", "speed", "pendant", "show", "inspect", "asbuilt", "slip", "heat", "fire", "extinguish", "estop", "clip", "term", "point", "click", "step", "design", "router",
+  "bitchange", "touchplate"];
+const MINE_KINDS = ["bitchange", "touchplate"];         // what a KIND=mine Learn clip plays (Part 47b)
+const LEARN_KEYS = ["name", "group", "kind", "desc"];
+const SHANKS = { "1/8": 3.175, "1/4": 6.35, "3/8": 9.525, "1/2": 12.7 };
 const SLIP_AXES = ["x", "y", "z", "ymin", "ymax", "zmin", "zmax"];
 const UI_ONLY = new Set(["point", "click", "step"]);   // KIND=ui videos (the page on screen) only
-const INTRO_ONLY = new Set(["home", "zero"]);
+const INTRO_ONLY = new Set(["home", "zero", "bitchange", "touchplate"]);
 const JOB_ONLY = new Set(["estop"]);
 const SHOTS = new Set(["workshop", "machine", "stock", "tool", "toolfront", "core", "iso", "front", "top", "side", "back", "page", "pendant", "ymin", "ymax", "gantry", "gantrytop"]);
 const ASBUILT_NUM = ["rack", "tilt", "exag", "tram", "tramy", "warpx", "warpy", "bow", "rackmax", "tiltmax"];
@@ -134,7 +152,8 @@ function roomOf(v) {
 
 // text -> { settings, intro: [cmd], at: [cmd], firstMove (line), warnings }; cmd = { kind, kv, line (1-based) }
 function parse(text) {
-  const lines = String(text || "").split(/\r?\n/), out = { settings: {}, intro: [], at: [], firstMove: 0, warnings: [] };
+  const lines = String(text || "").split(/\r?\n/), out = { settings: {}, intro: [], at: [], firstMove: 0, warnings: [],
+    learn: { desc: [] }, errors: [] };
   for (let n = 0; n < lines.length; n++) {
     const l = lines[n], code = l.replace(/\([^)]*\)/g, " ").split(";")[0].toUpperCase();
     if (!out.firstMove && MOTION.test(code)) out.firstMove = n + 1;
@@ -142,6 +161,8 @@ function parse(text) {
     // checked before comments are stripped; tested 2026-10-24). In bytes: × and — count 2 and 3 in UTF-8
     const bytes = new TextEncoder().encode(l.replace(/\r$/, "")).length;
     if (bytes > LONG_LINE) out.warnings.push(`line ${n + 1}: ${bytes} bytes - FluidNC stops on lines over ${LONG_LINE} (error 14, Line too long)`);
+    const lm = /\(\s*Video\s+Learn\s*:([^)]*)\)/i.exec(l);
+    if (lm) { learnLine(out, lm[1], n + 1); continue; }
     const v = videoOf(l);
     if (!v) continue;
     const line = n + 1, before = !out.firstMove, warn = (t) => out.warnings.push(`line ${line}: ${t}`);
@@ -177,6 +198,54 @@ function parse(text) {
   }
   out.warnings.sort((a, b) => (+(/^line (\d+)/.exec(a) || [0, 1e9])[1]) - (+(/^line (\d+)/.exec(b) || [0, 1e9])[1]));
   return out;
+}
+
+// one (Video Learn: KEY=value) line into out.learn (errors: after the first move, an unknown key, two keys on a line)
+function learnLine(out, body, line) {
+  const err = (t) => out.errors.push(`line ${line}: ${t}`);
+  if (out.firstMove) return err("(Video Learn: ...) goes in the header, before the first move");
+  const m = /^\s*([A-Za-z]+)\s*=\s*(.*?)\s*$/.exec(body);
+  if (!m) return err("(Video Learn: KEY=value) - NAME, GROUP, KIND or DESC");
+  const k = m[1].toLowerCase(), v = m[2];
+  if (!LEARN_KEYS.includes(k)) return err(`(Video Learn:) doesn't know ${m[1].toUpperCase()} - NAME, GROUP, KIND or DESC`);
+  if (/(^|\s)(NAME|GROUP|KIND|DESC)\s*=/i.test(v)) return err("one key per (Video Learn:) line");
+  if (k === "kind" && !/^(demo|mine)$/i.test(v)) return err("KIND= demo or mine");
+  if (k === "desc") out.learn.desc.push(v);
+  else out.learn[k] = k === "kind" ? v.toLowerCase() : v;
+}
+// a parsed file -> what Learn lists: { title, group, type, blurb, mine (its BitChange / TouchPlate cmd), errors }
+function learnOf(sc, file) {
+  // (a warning is an error here too: a clip with a line FluidNC or the director can't run isn't listed)
+  const L = sc.learn || { desc: [] }, errors = (sc.errors || []).concat(sc.warnings || []), type = L.kind || "demo";
+  const mines = sc.intro.filter((c) => MINE_KINDS.includes(c.kind));
+  if (type === "mine") {
+    if (mines.length !== 1) errors.push(`KIND=mine wants one (Video BitChange:) or (Video TouchPlate:) line (it has ${mines.length})`);
+    const other = sc.intro.concat(sc.at).filter((c) => !MINE_KINDS.includes(c.kind));
+    if (sc.firstMove || other.length) errors.push("KIND=mine plays on your machine: only its BitChange / TouchPlate line, no moves or other (Video ...) lines");
+  }
+  const title = L.name || String(file || "clip").replace(/^.*[\\/]/, "").replace(/\.(gcode|nc|ngc|txt)$/i, "");
+  return { title, group: L.group || "My clips", type, blurb: L.desc.join(" "), mine: type === "mine" ? mines[0] || null : null, errors };
+}
+// BIT= of a BitChange -> { d: mm } | { other: true } | null (none: the same bit back); undefined = can't read it
+function shankOf(v) {
+  if (v === undefined || v === "") return null;
+  const t = String(v).trim().toLowerCase().replace(/"$/, "");
+  if (t === "other") return { other: true };
+  if (SHANKS[t]) return { d: SHANKS[t] };
+  const q = mm(t);
+  return q > 0 && q <= 25 ? { d: q } : undefined;
+}
+// about how long a clip plays (s), from its script: the TIME= of what holds, a bit change ~22, the touch plate ~6 +
+// its HOLD; a job's moves aren't timed here (built-in clips keep their measured secs in help/index.json)
+function playSecs(sc) {
+  let t = 0;
+  for (const c of sc.intro.concat(sc.at)) {
+    if (["title", "text", "wait", "point", "click", "step", "shot", "inspect"].includes(c.kind)) t += num(c.kv.time) ? Number(c.kv.time) : c.kind === "title" ? 3 : c.kind === "shot" ? 1.5 : 1;
+    else if (c.kind === "bitchange") t += 22;
+    else if (c.kind === "touchplate") t += 6 + (num(c.kv.hold) ? Number(c.kv.hold) : 1.5);
+    else if (c.kind === "home") t += 20;
+  }
+  return Math.round(t);
 }
 
 function check(c, intro) {
@@ -258,6 +327,18 @@ function check(c, intro) {
       if (bad.length) return `EStop doesn't know ${bad.map((q) => q.toUpperCase()).join(", ")}`;
       if (kv.do !== undefined && !/^(press|release)$/i.test(kv.do)) return "EStop DO= press or release";
       return kv.after === undefined || (num(kv.after) && +kv.after >= 0) ? null : "EStop AFTER= wants seconds";
+    }
+    case "bitchange": {
+      const bad = Object.keys(kv).filter((q) => !["bit", "hold", "nuts"].includes(q));
+      if (bad.length) return `BitChange doesn't know ${bad.map((q) => q.toUpperCase()).join(", ")}`;
+      if (shankOf(kv.bit) === undefined) return "BitChange BIT= a shank: 1/8, 1/4, 6mm, 6.35 (mm) or other";
+      if (kv.hold !== undefined && !/^(lock|wrenches)$/i.test(kv.hold)) return "BitChange HOLD= lock or wrenches";
+      return kv.nuts === undefined || /^(each|one)$/i.test(kv.nuts) ? null : "BitChange NUTS= each or one";
+    }
+    case "touchplate": {
+      const bad = Object.keys(kv).filter((q) => q !== "hold");
+      if (bad.length) return `TouchPlate doesn't know ${bad.map((q) => q.toUpperCase()).join(", ")}`;
+      return kv.hold === undefined || (num(kv.hold) && +kv.hold >= 0 && +kv.hold <= 30) ? null : "TouchPlate HOLD= 0 to 30 s";
     }
     case "home": {
       const v = kv.view && kv.view.toLowerCase();
@@ -346,7 +427,7 @@ const DEFAULTS = { size: [2560, 1440], fps: 30, job: 75, pause: 2, orbit: 10, so
   messagetime: 4 };
 
 const api = { DEFAULTS, parse, keyvals, videoOf, shotOf, titleText, secsOf, zeroOf, showOf, inspectOf, asbuiltOf, slipOf, heatOf, estopOf, machineOf, roomOf, defaultIntro, hasOwnIntro, mm,
-  SHOTS, MACHINE_KEYS };
+  SHOTS, MACHINE_KEYS, learnOf, shankOf, playSecs, MINE_KINDS, LEARN_KEYS, LONG_LINE };
 if (typeof module !== "undefined" && module.exports) module.exports = api;
 else root.LR4DemoScript = api;
 })(typeof self !== "undefined" ? self : this);

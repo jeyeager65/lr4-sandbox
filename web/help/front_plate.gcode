@@ -1,3 +1,7 @@
+(Video Learn: NAME=Your own front plate)
+(Video Learn: GROUP=Running a job)
+(Video Learn: KIND=demo)
+(Video Learn: DESC=The template, your SVG uploaded and checked, the plate in 3D, and the job's V-bit and bit change.)
 (Your own front plate: the template, an upload, the checks, the painted plate, the job's bit change - Help video, Part 43)
 (The page plays it live: Learn > Your own front plate. YouTube: node tools/record_demo.js web/help/front_plate.gcode)
 (KIND=ui: the whole page. The design = the template's own Example layer: Video Design EXAMPLE=on)

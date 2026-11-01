@@ -1,3 +1,8 @@
+(Video Learn: NAME=Why home?)
+(Video Learn: GROUP=Setting up)
+(Video Learn: KIND=demo)
+(Video Learn: DESC=Switched on, the gantry is racked and the beam off level: $H squares it, each side to its own)
+(Video Learn: DESC=switch.)
 (Why home? A LowRider 4 isn't square until it homes - LR4 Sandbox video)
 (Record: node tools/record_demo.js web/help/why_home.gcode - the page plays it live: Learn > Why home?)
 (Serve the repo first: python tools/serve.py sandbox --no-open)
