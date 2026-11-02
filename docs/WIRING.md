@@ -65,9 +65,10 @@ D:\GitHub\V1EngineeringInc-Docs). What the docs say:
   others (w7, w8, w8b). The wires pass under the hose at the middle; a partial twist if it tracks badly.
 
 - Power (w9c-w9e): the supply rides the gantry (in a bay, on the strut plates); its mains "out with the vacuum hose,
-  or a single extension cord into the beam". The model: the switch panel (table front) -> down under the table -> the
-  hose's floor end -> up the hose to the middle brace -> the braces -> the supply (~3.7 m at 26x50, ~5.8 m at 48x96).
-  The wall -> panel cord is not drawn (where your outlet is: yours).
+  or a single extension cord into the beam". The model (user 2026-11-02: in the beam through the braces; the router
+  cord along the hose): the switch panel (table front) -> along the front to the gantry end nearer the supply -> its
+  YZ plate -> the braces -> the supply (~3.0 m at 26x50, 1.6 m at 15x30, 4.7 m at 48x96). Part 52 moves the start to
+  a power inlet + outlets on the table's left (Min) end, where the hose leaves the table.
 
 Still GUESS (the user's machine): the exact exit point on the YZ plate, the tie points' heights, and the core
 bundle's sag / loop size. The model's "+75 mm per end" allowance covers the joins and the loops.
