@@ -80,14 +80,30 @@
       pts.fold = head.length + k + 1;                  // the spare: folded at the middle brace (its slack rides the hose)
       return pts;
     }
+    if ((r.via || []).includes("beam") && r.to && r.to.part) return wrMainsPath(a, b, wrMesh(r.to.part)) || [a, b];
     const box = wrMesh("Jackpot3_Box"), side = r.from && r.from.part && /_(Min|Max)(_|$)/.exec(r.from.part);
     if (box && side && r.to && r.to.board && (r.group === "motor" || r.group === "switch")) return wrBeamPath(a, b, side[1], box);
     return [a, b];
   }
+  // the supply's mains (user 2026-11-02: "in the beam through the braces"; V1E docs w9e: "a single extension cord into
+  // the beam"): from the switch panel along the table's front to the gantry's end nearer the supply, across to its YZ
+  // plate (the span the Y travel moves: its slack), in there like the Y / Z wires, along the braces to the supply. GUESS
+  function wrMainsPath(a, b, tgt) {
+    const braces = wrBraces();
+    if (!tgt || !braces.length) return null;
+    const tb = new THREE.Box3().setFromObject(tgt), mid = (braces[0].min.x + braces[braces.length - 1].max.x) / 2;
+    const side = (tb.min.x + tb.max.x) / 2 < mid ? "Min" : "Max", plate = wrMesh("YZ_Plate_" + side);
+    if (!plate) return null;
+    const pb = new THREE.Box3().setFromObject(plate), pts = wrBeamPath(a, b, side, tgt);
+    pts.splice(1, 0, new THREE.Vector3(side === "Max" ? pb.max.x : pb.min.x, a.y, a.z));
+    pts.fold = pts.fold === undefined ? undefined : pts.fold + 1;
+    pts.free = 1;
+    return pts;
+  }
   // V1E's LowRider docs (Wire Routing; user 2026-11-01: "through the beam and 3d printed parts"): a YZ assembly's
   // motors + endstops go through its plate's channels and out the back channel, then into the beam "with the beam at
   // full height", tied to each brace (tops or bottoms - the bottoms here: the box sits low) along to the board.
-  // GUESS until the user's photos: the plate's exit = its inner face at the back, 30 % up (docs w1: low, toward the
+  // GUESS (no LR4 to check - the docs only): the plate's exit = its inner face at the back, 30 % up (docs w1: low, toward the
   // end brace); at each brace, its back bottom corner (10 mm in); into the box through its end wall facing that side.
   // what the core's runs are tied along: the router cord if there is one (V1E: "bundling the wires with your Router power
   // cord"), else the vac hose; the curve whether or not that layer is shown (the wires are there either way)
@@ -182,7 +198,7 @@
       if (i + 1 < p.length) {
         const L = p[i].distanceTo(p[i + 1]);
         if (L < 100) continue;
-        const d = i === p.free ? Math.sqrt(3 * L * slack / 8) + 0.01 * L : 0.01 * L;
+        const d = i === p.free ? Math.min(400, Math.sqrt(3 * L * slack / 8) + 0.01 * L) : 0.01 * L;   // (the rest lies on the floor)
         for (let t = 1; t < 8; t++) out.push(p[i].clone().lerp(p[i + 1], t / 8).add(new THREE.Vector3(0, 0, -4 * d * (t / 8) * (1 - t / 8))));
       }
     }

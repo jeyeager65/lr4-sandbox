@@ -33,8 +33,8 @@
     { id: "probe", name: "Touch plate", group: "probe", from: { probe: true }, to: { board: "jp3.in.36" }, via: ["hose"],
       segs: [{ kind: "pair", len: 2000, colours: ["red", "black"], note: "the Tiny Touch Plate's own 2 m wire: the plate (red) to S, the clip (black) to G (V1E shop / docs)" }] },
     { id: "mains", name: "Mains to the switch panel", group: "power", from: { part: "SwitchPanel_Box" }, to: null, segs: [{ kind: "cord", len: null, note: "the wall: a 3-wire mains cord (GUESS)" }] },
-    { id: "psu-ac", name: "Switch panel to the 24 V supply", group: "power", from: { part: "SwitchPanel_Box" }, to: { part: "PSU_24V" }, via: ["hose"],
-      segs: [{ kind: "cord", len: null, note: "mains, cut by the e-stop (power.js); out to the gantry with the vac hose (V1E docs w9e; GUESS: under the table to the hose's floor end)" }] },
+    { id: "psu-ac", name: "Switch panel to the 24 V supply", group: "power", from: { part: "SwitchPanel_Box" }, to: { part: "PSU_24V" }, via: ["beam"],
+      segs: [{ kind: "cord", len: null, note: "mains, cut by the e-stop (power.js); an extension cord into the beam at the gantry's end nearer the supply, along the braces (user 2026-11-02; V1E docs w9e; GUESS)" }] },
     { id: "psu-dc", name: "24 V to the board", group: "power", from: { part: "PSU_24V" }, to: { board: "jp3.power" }, segs: [PAIR("24 V 2.5 A supply, its barrel plug cut off (V1E shop)")] },
     { id: "fan", name: "Lid fan", group: "power", from: { part: "Jackpot3_Fan" }, to: { board: "jp3.power" }, segs: [{ kind: "pair", len: null, colours: ["red", "black"], note: "the fan's own leads, wired to the power input: always on (V1E docs)" }] },
   ];

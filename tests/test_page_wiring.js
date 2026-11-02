@@ -54,11 +54,13 @@ const ok = (cond, msg) => { checks++; console.log((cond ? "  ok   " : "  FAIL ")
     const jn = await page.val(`(() => { const js = WR.joins ? WR.joins.children : []; return { n: js.length, vis: js.every((j) => j.visible),
       far: js.map((j) => Math.round(j.position.distanceTo(wrEnd(LR4Wiring.RUNS.find((r) => r.id === j.userData.run).from)))) }; })()`);
     ok(jn.n === 3 && jn.vis && jn.far.every((d) => d > 100 && d < 700), `3 taped joins (lead meets extender), each 100-700 mm in a straight line from its motor (the core's loops back with the hose) (${jn.far.join(", ")})`);
-    // the supply's mains: from the panel to the floor, the hose's floor end, up the hose (V1E docs w9e; GUESS)
-    const mains = await page.val(`(() => { const h = meshes.find((m) => m.userData.name === "Vacuum_Hose").geometry.parameters.path, ends = [h.getPoint(0), h.getPoint(1)];
-      const p = wrPath(LR4Wiring.RUNS.find((q) => q.id === "psu-ac")), low = ends[0].z < ends[1].z ? ends[0] : ends[1];
-      return { n: p.length, viaFloor: p.some((v) => v.distanceTo(low) < 5), len: Math.round(wrLen(p)) }; })()`);
-    ok(mains.viaFloor && mains.n > 10, `the supply's mains runs out with the vac hose from its floor end (${mains.n} points, ${mains.len} mm now)`);
+    // the supply's mains: into the beam at the gantry's end nearer the supply, along the braces (user 2026-11-02; GUESS)
+    const mains = await page.val(`(() => { const p = wrPath(LR4Wiring.RUNS.find((q) => q.id === "psu-ac")), psu = meshes.find((m) => m.userData.name === "PSU_24V");
+      const pc = new THREE.Box3().setFromObject(psu).getCenter(new THREE.Vector3()), bs = wrBraces(), mid = (bs[0].min.x + bs[bs.length - 1].max.x) / 2;
+      const pl = new THREE.Box3().setFromObject(meshes.find((m) => m.userData.name === "YZ_Plate_" + (pc.x < mid ? "Min" : "Max")));
+      const ties = p.filter((v) => bs.some((bb) => Math.abs(v.distanceTo(wrTie(bb))) < 1)).length;
+      return { side: pc.x < mid ? "Min" : "Max", atPlate: p.some((v) => v.x >= pl.min.x - 1 && v.x <= pl.max.x + 1 && v.y >= pl.min.y - 1 && v.y <= pl.max.y + 1), ties, free: p.free, len: Math.round(wrLen(p)) }; })()`);
+    ok(mains.atPlate && mains.ties >= 1 && mains.free === 1, `the supply's mains: into the beam at the ${mains.side} end's YZ plate, ${mains.ties} brace ties (${mains.len} mm now)`);
     // the BOM: the extenders counted from the routes at this size + the endstops' own wire
     const bom = await page.val(`(() => { const t0 = performance.now(); renderBom(); const ms = performance.now() - t0;
       const rows = [...document.querySelectorAll("#bom-body tr")].map((tr) => tr.textContent);
