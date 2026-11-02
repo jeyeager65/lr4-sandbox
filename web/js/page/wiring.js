@@ -72,7 +72,9 @@
       let k = 0;
       s.forEach((p, i) => { if (p.distanceTo(mc) < s[k].distanceTo(mc)) k = i; });
       const on = braces.filter((bb) => (hi ? cx(bb) < cx(mb) && cx(bb) > wall : cx(bb) > cx(mb) && cx(bb) < wall));
-      return wrIntoBox([a, ...s.slice(0, k + 1), wrTie(mb), ...(hi ? on.reverse() : on).map(wrTie)], wall, bx, b);
+      const pts = wrIntoBox([a, ...s.slice(0, k + 1), wrTie(mb), ...(hi ? on.reverse() : on).map(wrTie)], wall, bx, b);
+      pts.fold = k + 2;                                // the spare: folded at the middle brace (its slack rides the hose)
+      return pts;
     }
     const box = wrMesh("Jackpot3_Box"), side = r.from && r.from.part && /_(Min|Max)(_|$)/.exec(r.from.part);
     if (box && side && r.to && r.to.board && (r.group === "motor" || r.group === "switch")) return wrBeamPath(a, b, side[1], box);
@@ -81,8 +83,8 @@
   // V1E's LowRider docs (Wire Routing; user 2026-11-01: "through the beam and 3d printed parts"): a YZ assembly's
   // motors + endstops go through its plate's channels and out the back channel, then into the beam "with the beam at
   // full height", tied to each brace (tops or bottoms - the bottoms here: the box sits low) along to the board.
-  // GUESS until the user's photos: the plate's exit = its back face, 25 mm under its top; at each brace, its back
-  // bottom corner (10 mm in); into the box through its end wall facing that side.
+  // GUESS until the user's photos: the plate's exit = its inner face at the back, 30 % up (docs w1: low, toward the
+  // end brace); at each brace, its back bottom corner (10 mm in); into the box through its end wall facing that side.
   // what the core's runs are tied along: the router cord if there is one (V1E: "bundling the wires with your Router power
   // cord"), else the vac hose; the curve whether or not that layer is shown (the wires are there either way)
   function wrCarrier() {
@@ -103,10 +105,14 @@
   function wrBeamPath(a, b, side, box) {
     const plate = wrMesh("YZ_Plate_" + side), bx = new THREE.Box3().setFromObject(box);
     const pts = [a];
-    if (plate) { const pb = new THREE.Box3().setFromObject(plate); pts.push(new THREE.Vector3((pb.min.x + pb.max.x) / 2, pb.max.y, pb.max.z - 25)); }
+    if (plate) {                                      // out low on the plate's inner face, at its back (w1; yze6: "out of the bottom")
+      const pb = new THREE.Box3().setFromObject(plate);
+      pts.push(new THREE.Vector3(side === "Max" ? pb.min.x : pb.max.x, pb.max.y - 20, pb.min.z + 0.3 * (pb.max.z - pb.min.z)));
+    }
     const max = side === "Max", wall = max ? bx.max.x : bx.min.x;
     const on = wrBraces().filter((bb) => (max ? (bb.min.x + bb.max.x) / 2 > wall : (bb.min.x + bb.max.x) / 2 < wall));
     for (const bb of (max ? on.reverse() : on)) pts.push(wrTie(bb));   // from that side's end brace in toward the box
+    if (on.length) { pts.free = pts.length - on.length - 1; pts.fold = pts.free + 1; }   // the span the gantry moves; the end brace's tie
     return wrIntoBox(pts, wall, bx, b);
   }
   const wrLen = (p) => p.reduce((s, v, i) => (i ? s + v.distanceTo(p[i - 1]) : 0), 0);
@@ -148,6 +154,31 @@
     scene.add(WR.lines);
     wrTick();
   }
+  // a route as the wire lies (51b): the span the gantry moves (plate -> end brace) hangs with the travel's slack here
+  // (the longest over the travel less now: a parabola that much longer, depth ~ sqrt(3 L e / 8)); the rest of the
+  // runs' spare (what it has less what it needs) folded on itself and tied at its fold point (V1E docs w4-w5: "Pull
+  // all the slack to the furthest section", "Fold each wire up on itself"), hanging; the other spans a slight sag
+  const WR_FOLD = 120;                               // the bundle's length, mm (GUESS)
+  function wrDrawn(r, p, len) {
+    const q = (WR.report || []).find((x) => x.id === r.id), slack = q && q.worst ? Math.max(0, q.worst - len) : 0;
+    const spare = q && q.have && q.need ? q.have - q.need : 0, out = [];
+    for (let i = 0; i < p.length; i++) {
+      out.push(p[i]);
+      if (i === p.fold && i + 1 < p.length && spare > 2 * WR_FOLD / 3) {   // the bundle: hairpins along the next span, tied flat
+        const n = Math.max(1, Math.min(6, Math.round(spare / (2 * WR_FOLD)))), h = Math.min(WR_FOLD, spare / (2 * n), 0.4 * p[i].distanceTo(p[i + 1]));
+        const u = p[i + 1].clone().sub(p[i]).normalize().multiplyScalar(h);
+        for (let j = 0; j < n; j++) out.push(p[i].clone().add(u).add(new THREE.Vector3(0, 0, -(j * 3 + 1.5))), p[i].clone().add(new THREE.Vector3(0, 0, -(j * 3 + 3))));
+        out.push(p[i]);
+      }
+      if (i + 1 < p.length) {
+        const L = p[i].distanceTo(p[i + 1]);
+        if (L < 100) continue;
+        const d = i === p.free ? Math.sqrt(3 * L * slack / 8) + 0.01 * L : 0.01 * L;
+        for (let t = 1; t < 8; t++) out.push(p[i].clone().lerp(p[i + 1], t / 8).add(new THREE.Vector3(0, 0, -4 * d * (t / 8) * (1 - t / 8))));
+      }
+    }
+    return out;
+  }
   function wrTick() {                                 // each frame while shown: the ends ride their parts
     wrBoard();
     if (!WR.lines) return;
@@ -155,12 +186,13 @@
       const p = wrPath(ln.userData.run);
       ln.visible = !!p;
       if (!p) continue;
-      const a = new Float32Array(p.length * 3); p.forEach((v, i) => v.toArray(a, i * 3));
+      ln.userData.len = wrLen(p);
+      const w = wrDrawn(ln.userData.run, p, ln.userData.len);
+      const a = new Float32Array(w.length * 3); w.forEach((v, i) => v.toArray(a, i * 3));
       const g = ln.geometry, at = g.getAttribute("position");
-      if (at && at.count === p.length) { at.array.set(a); at.needsUpdate = true; }
+      if (at && at.count === w.length) { at.array.set(a); at.needsUpdate = true; }
       else g.setAttribute("position", new THREE.BufferAttribute(a, 3));
       g.computeBoundingSphere();
-      ln.userData.len = p.reduce((s, v, i) => (i ? s + v.distanceTo(p[i - 1]) : 0), 0);
     }
   }
   function wrSet(on) {
@@ -199,7 +231,7 @@
     const q = (WR.report || []).find((x) => x.id === r.id), m = (v) => (v / 1000).toFixed(2) + " m";
     const fit = !q || !q.need ? "" : q.reaches === null ? `<span>longest over the travel ${m(q.worst)} (+ ${WR_ALLOW * 2} mm at the ends)</span>`
       : `<span>longest over the travel ${m(q.worst)} + ends: ${m(q.need)}${q.ext ? `; ${q.ext} extender${q.ext > 1 ? "s" : ""}` : ""}${q.cut ? `; your wire ${m(q.cut)}` : ""}` +
-        ` - ${q.reaches ? "reaches" : `<em>${q.short} mm short: extend it</em>`}</span>`;
+        ` - ${q.reaches ? `reaches${q.have - q.need > 50 ? `, ${m(q.have - q.need)} spare folded at a brace` : ""}` : `<em>${q.short} mm short: extend it</em>`}</span>`;
     el.innerHTML = `<b>${r.name}</b><span>${wrEndName(r.from)} → ${wrEndName(r.to)}</span><span>${segs}</span><span>routed now: ${m(ln.userData.len)} (GUESS route)</span>${fit}`;
     const b = canvas.parentElement.getBoundingClientRect();
     el.style.left = `${cx - b.left + 14}px`; el.style.top = `${cy - b.top + 14}px`; el.hidden = false;
