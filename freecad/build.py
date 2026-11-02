@@ -214,8 +214,9 @@ for tp in table_parts:
     elif tp["role"] == "rib":
         note = note.format(len(tp["slots"]), "top" if "_Y" in tp["name"] else "bottom")
     rgb = wood.PLYWOOD if tp["role"] in ("rib", "edge", "skin") else MDF_TABLE
+    base = tp["role"] not in ("spoil", "strip")      # the base (sheet / torsion box): drawn, not in the cut list (user 2026-11-02)
     m.add(tp["name"], shp, group="Table", colour=rgb if tp["role"] != "spoil" else SPOIL_RGB,
-          cut=wood.sheet(t=dims[0] / IN, w=dims[1] / IN, l=dims[2] / IN, note=note))
+          **({} if base else dict(cut=wood.sheet(t=dims[0] / IN, w=dims[1] / IN, l=dims[2] / IN, note=note))))
 os.makedirs(os.path.join(ROOT, "build"), exist_ok=True)
 with open(os.path.join(ROOT, "build", "table.json"), "w") as f:   # tests/test_table_model.js vs web/js/table_model.js
     json.dump(dict(kind=TABLE, TW=TW, TL=TL, xtable=xtable, ytable=ytable, cut=[CUT_X, CUT_Y], T=T,

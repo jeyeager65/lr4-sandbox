@@ -6,8 +6,8 @@ let checks = 0, fails = 0;
 const ok = (c, m) => { checks++; if (!c) { fails++; console.log("  FAIL " + m); } else console.log("  ok   " + m); };
 
 const names = new Set(cfg.parts.map((p) => p.meta && p.meta.name).filter(Boolean));
-const PAGE_MADE = new Set(["SwitchPanel_Box"]);     // drawn by the page itself (scene.js), not in the build's data
-const ends = W.RUNS.flatMap((r) => [r.from, r.to]).filter(Boolean);
+const PAGE_MADE = new Set(["SwitchPanel_Box", "TableHub_Boxes", "TableHub_Inlet"]);   // drawn by the page itself (scene.js), not in the build's data
+const ends = W.runsFor(true).concat(W.RUNS).flatMap((r) => [r.from, r.to]).filter(Boolean);   // the hub variants too (Part 52c)
 const badPart = ends.filter((e) => e.part && !names.has(e.part) && !PAGE_MADE.has(e.part)).map((e) => e.part);
 ok(!badPart.length, `every part end is a part of the model (${badPart.join() || "all"})`);
 const badSpot = ends.filter((e) => e.board && !W.JP3.spots[e.board]).map((e) => e.board);

@@ -116,35 +116,14 @@ def _in(mm):
 
 
 def table_rows(g):
-    """The table's stock rows (Part 33; web/js/table_model.js rows() mirrors this): [qty, part, material, size, notes]."""
-    parts, kind = g["table_parts"], g["TABLE"]
-    box = {p["name"]: p["box"] for p in parts}
+    """The table's stock rows (Part 33; web/js/table_model.js rows() mirrors this): [qty, part, material, size, notes].
+    The spoilboard + rail strips only - the base under them (sheet / torsion box) is a drawn placeholder, not in the BOM
+    (user 2026-11-02: not a table designer)."""
+    box = {p["name"]: p["box"] for p in g["table_parts"]}
     size = lambda n: " x ".join(_in(b[i + 3] - b[i]) for b in [box[n]] for i in (0, 1)) + " in"
-    rows = [[1, "Spoilboard", '3/4" MDF', size("Spoilboard"), "the bit's full travel + 1/4\" a side: a 3/4\" bit surfaces all of it"],
+    return [[1, "Spoilboard", '3/4" MDF', size("Spoilboard"), "the bit's full travel + 1/4\" a side: a 3/4\" bit surfaces all of it"],
             [1, "Rail strip, Min", '3/4" MDF', size("RailStrip_Min"), "Y belt holders + the Min wheels ride on it"],
             [1, "Rail strip, Max", '3/4" MDF', size("RailStrip_Max"), "Y belt holders + Y rail clips"]]
-    if kind == "torsion":
-        s = box["Spoilboard"]
-        over = _in(max(s[1], box["RailStrip_Min"][4] - s[4]))
-        for r in rows[1:]:
-            r[4] += f"; sticks out {over} in past each end of the box"
-        eb = box["RailEdge_Min"]
-        rows.append([2, "Rail side board", '5/8" plywood (GUESS)', f"{_in(eb[5] - eb[2])} x {_in(eb[4] - eb[1])} in",
-                     "the box's outer long rib, run the full length under the rail strip; "
-                     f"{len(next(p for p in parts if p['name'] == 'RailEdge_Min')['slots'])} half-lap slots from the top"])
-    if kind == "sheet":
-        rows.append([1, "Table sheet", '3/4" MDF', size("TableBase"),
-                     f"calculator footprint + {g['TABLE_MARGIN_IN']:g}\" margin; the strips + spoilboard on it"])
-        return rows
-    for axis, along, slot in (("Y", "along Y", "top"), ("X", "along X", "bottom")):
-        ribs = [p for p in parts if p["name"].startswith(f"TableRib_{axis}")]
-        b = ribs[0]["box"]
-        L = max(b[3] - b[0], b[4] - b[1])
-        rows.append([len(ribs), f"Torsion box rib, {along}", '5/8" plywood (GUESS)',
-                     f"{_in(b[5] - b[2])} x {_in(L)} in", f"{len(ribs[0]['slots'])} half-lap slots from the {slot}"])
-    rows.append([2, "Torsion box skin", '1/4" plywood or hardboard (GUESS)', size("TableSkin_Top"),
-                 "top + bottom, between the rail side boards; glued + nailed to every rib"])
-    return rows
 
 
 def data(g):

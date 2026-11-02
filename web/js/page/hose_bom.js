@@ -136,9 +136,30 @@
         mesh.geometry = new THREE.TubeGeometry(cc, Math.ceil(cc.getLength() / 12), d / 2, 8, false);
       };
       const c = meta.hose.cord, sh = (p) => [p[0] + dx, p[1] + dy, p[2] + dz];
-      if (cordMesh) tube(cordMesh, cordRoute(dense, meta.hose, c, sh(c.tip), sh(c.tip2), dx), c.d);
+      if (cordMesh) {
+        let cp = cordRoute(dense, meta.hose, c, sh(c.tip), sh(c.tip2), dx);
+        const o = typeof HUB !== "undefined" && optsOn().hub && HUB.port && HUB.outlet;
+        if (o) {                                          // Part 52c: off the hose before the port, down + over to the ROUTER socket
+          const P = HUB.port, far = (p) => Math.hypot(p[0] - P[0], p[1] - P[1], p[2] - P[2]) >= 170;
+          while (cp.length > 6 && !far(cp[cp.length - 1])) cp.pop();
+          const q = o.router, last = cp[cp.length - 1];
+          cp = cp.concat([[P[0] - 70, (last[1] + q[1]) / 2, q[2] - 80], [q[0] - 70, q[1], q[2] - 30], [q[0] - 31, q[1], q[2]]]);
+        }
+        tube(cordMesh, cp, c.d);
+      }
       if (sleeveMesh) tube(sleeveMesh, cordRoute(dense, meta.hose, meta.hose.sleeve, null, null, dx, [0, dy, dz]), meta.hose.sleeve.d);
     }
+  }
+  // Part 52b: the hose length this size needs - the route's longest over the travel's corners (the span from the
+  // beam's end to the fixed end - the hub's port, or the floor point - stretches as the gantry runs in Y)
+  function hoseNeed() {
+    if (!meta || !meta.hose) return null;
+    const t = meta.travel, L = [];
+    for (const dx of t.x) for (const dy of t.y) for (const dz of [t.z[0], t.z[1]]) {
+      const pts = hoseRoute(meta.hose, dx, dz).map(([x, y, z, f]) => (f === "table" ? new THREE.Vector3(x, y, z) : new THREE.Vector3(x, y + dy, z + dz)));
+      L.push(new THREE.CatmullRomCurve3(pts, false, "centripetal").getLength());
+    }
+    return { max: Math.max(...L), min: Math.min(...L) };
   }
   // cordRoute mirrors lr4.cord_route (Python) - keep the two in step
   let cordMesh = null, sleeveMesh = null;
@@ -243,6 +264,7 @@
     }
     {                                                  // the wiring at this size (Part 51b: the routes over the travel, wiring.js)
       const wf = typeof LR4WiringView !== "undefined" && LR4WiringView.fit(), R = wf && wf.runs, m = (v) => (v / 1000).toFixed(1);
+      const hn = hoseNeed();
       if (R) {
         const by = (re) => LR4Wiring.RUNS.filter((r) => re.test(r.id) && R[r.id]);
         const ext = by(/-motor$/).filter((r) => R[r.id].ext).map((r) => `${r.name.replace(/ motor$/, "")} ${R[r.id].ext}`).join(", ");
@@ -252,8 +274,13 @@
             [1, `2-wire lead for the endstops, ~${m(tot)} m in all (your own)`, `crimped or soldered to each switch (V1E docs), cut to fit: ` +
               own.map((q) => `${q.name.replace(/ endstop$/, "")} ${m(R[q.id].cut)}`).join(", ") + " m; the far ones spliced to their extender"]];
           if (pr && !pr.reaches && /^V1E Tiny Touch Plate/.test(r[1] || "")) return [[r[0], r[1], `${r[2]}; its 2 m wire is ${pr.short} mm short at this size: extend it`]];
+          if (/^2-1\/2" x 20 ft clear PVC/.test(r[1] || "") && hn) {   // Part 52b: the length this size needs
+            const spare = 20 * 12 * IN - hn.max, to = optsOn().hub ? "the table hub's dust port" : "the floor off the Min end";
+            return [[r[0], r[1], `${r[2]}; this size needs ~${m(hn.max)} m from the shoe to ${to} (gantry at the far Y stop): ` +
+              (spare >= 0 ? `~${m(spare)} m to spare` : `${m(-spare)} m SHORT - a longer hose`)]];
+          }
           if (R["psu-ac"] && R["psu-ac"].cut && /^24 V power supply/.test(r[1] || ""))
-            return [[r[0], r[1], `${r[2]}; on the gantry: its mains cord from the switch panel ~${m(R["psu-ac"].cut)} m, out with the vac hose (V1E docs; GUESS route)`]];
+            return [[r[0], r[1], `${r[2]}; on the gantry: its mains cord from the ${optsOn().hub ? "table hub" : "switch panel"} ~${m(R["psu-ac"].cut)} m, into the beam along the braces (V1E docs; GUESS route)`]];
           return [r];
         }) }));
       }

@@ -51,35 +51,17 @@
     return out;
   }
 
-  // the cut list's table rows [qty, part, material, size, notes] (bom.py table_rows)
+  // the cut list's table rows [qty, part, material, size, notes] (bom.py table_rows): the spoilboard + rail strips only -
+  // their sizes follow the machine; the base under them (sheet / torsion box) is a drawn placeholder, not in the BOM
+  // (user 2026-11-02: "I don't want to turn this into a table designer")
   const inch = (mm) => `${+(Math.round(mm / IN * 16) / 16).toFixed(4)}`;
-  const NAMES = /^(Table top|Table sheet|Spoilboard|Rail strip, (Min|Max)|Rail side board|Torsion box rib, along [XY]|Torsion box skin)$/;
-  function rows(kind, list, marginIn) {
+  const NAMES = /^(Table top|Spoilboard|Rail strip, (Min|Max))$/;
+  function rows(kind, list) {
     const box = Object.fromEntries(list.map((p) => [p.name, p.box]));
     const size = (n) => `${inch(box[n][3] - box[n][0])} x ${inch(box[n][4] - box[n][1])} in`;
-    const out = [[1, "Spoilboard", '3/4" MDF', size("Spoilboard"), `the bit's full travel + 1/4" a side: a 3/4" bit surfaces all of it`],
+    return [[1, "Spoilboard", '3/4" MDF', size("Spoilboard"), `the bit's full travel + 1/4" a side: a 3/4" bit surfaces all of it`],
       [1, "Rail strip, Min", '3/4" MDF', size("RailStrip_Min"), "Y belt holders + the Min wheels ride on it"],
       [1, "Rail strip, Max", '3/4" MDF', size("RailStrip_Max"), "Y belt holders + Y rail clips"]];
-    if (kind === "torsion") {
-      const s = box.Spoilboard, over = inch(Math.max(s[1], box.RailStrip_Min[4] - s[4]));
-      for (const r of out.slice(1)) r[4] += `; sticks out ${over} in past each end of the box`;
-      const eb = box.RailEdge_Min;
-      out.push([2, "Rail side board", '5/8" plywood (GUESS)', `${inch(eb[5] - eb[2])} x ${inch(eb[4] - eb[1])} in`,
-        `the box's outer long rib, run the full length under the rail strip; ${list.find((p) => p.name === "RailEdge_Min").slots.length} half-lap slots from the top`]);
-    }
-    if (kind !== "torsion") {
-      out.push([1, "Table sheet", '3/4" MDF', size("TableBase"),
-        `calculator footprint + ${marginIn == null ? 1 : marginIn}" margin; the strips + spoilboard on it`]);
-      return out;
-    }
-    for (const [axis, along, slot] of [["Y", "along Y", "top"], ["X", "along X", "bottom"]]) {
-      const ribs = list.filter((p) => p.name.startsWith(`TableRib_${axis}`)), b = ribs[0].box;
-      out.push([ribs.length, `Torsion box rib, ${along}`, '5/8" plywood (GUESS)',
-        `${inch(b[5] - b[2])} x ${inch(Math.max(b[3] - b[0], b[4] - b[1]))} in`, `${ribs[0].slots.length} half-lap slots from the ${slot}`]);
-    }
-    out.push([2, "Torsion box skin", '1/4" plywood or hardboard (GUESS)', size("TableSkin_Top"),
-      "top + bottom, between the rail side boards; glued + nailed to every rib"]);
-    return out;
   }
 
   const api = { TABLE, KINDS, NAMES, ribSpots, parts, rows };

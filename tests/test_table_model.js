@@ -66,15 +66,14 @@ ok(t.Spoilboard[0] >= t.RailStrip_Min[3] + TM.TABLE.spoil_gap - 1e-9 && t.Spoilb
   `small size: spoilboard ${t.Spoilboard[0].toFixed(1)}..${t.Spoilboard[3].toFixed(1)} between the strips`);
 // cut list rows
 const r1 = TM.rows("sheet", sh), r2 = TM.rows("torsion", tor);
-ok(r1.length === 4 && r1[0][3] === "26.5625 x 50.5625 in" && r1[3][1] === "Table sheet" && r1[3][3] === "40 x 65 in", JSON.stringify(r1.map((r) => r[3])));
+ok(r1.length === 3 && r1[0][3] === "26.5625 x 50.5625 in" && r1[1][1] === "Rail strip, Min", JSON.stringify(r1.map((r) => r[3])));   // no base rows (user 2026-11-02)
 const rr = (n) => r2.find((r) => r[1] === n) || [];
 // the skins: top flush with z 0, bottom under the ribs, between the rail side boards, the box's length (user 2026-11-02)
 const sk = Object.fromEntries(tor.filter((p) => p.role === "skin").map((p) => [p.name, p.box])), k0 = TM.TABLE.skin_t;
 ok(sk.TableSkin_Top && near(sk.TableSkin_Top[5], 0) && near(sk.TableSkin_Bottom[5], -k0 - TM.TABLE.rib_h) && near(sk.TableSkin_Top[0], ry[0].box[3]) &&
   near(sk.TableSkin_Top[3], ry[4].box[0]) && near(sk.TableSkin_Top[1], tsp[1]) && near(ry[0].box[2], sk.TableSkin_Bottom[2]) && near(rx[0].box[5], -k0),
   `skins ${JSON.stringify(sk)}`);
-ok(r2.length === 7 && rr("Torsion box skin")[0] === 2 && rr("Rail side board")[0] === 2 && rr("Rail side board")[3] === "4 x 65 in" && rr("Torsion box rib, along Y")[0] === 3 && rr("Torsion box rib, along Y")[3] === "3.5 x 50.5625 in" && rr("Torsion box rib, along X")[0] === 6 && rr("Torsion box rib, along X")[3] === "3.5 x 40 in" &&
-  /6 half-lap slots from the top/.test(rr("Torsion box rib, along Y")[4]), JSON.stringify(r2.slice(3)));
+ok(r2.length === 3 && JSON.stringify(r2) === JSON.stringify(TM.rows("torsion", tor).slice(0, 3)) && rr("Spoilboard")[0] === 1, JSON.stringify(r2.map((r) => r[1])));
 ok(r2.every((r) => TM.NAMES.test(r[1])) && TM.NAMES.test("Table top"), "row names match NAMES");
 
 console.log(`${checks - fails}/${checks} checks passed`);

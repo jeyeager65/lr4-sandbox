@@ -1317,6 +1317,10 @@ float lr4G(float x) { float s = 2.0 * fract(x) - 1.0; return floor(x) / 3.0 + (s
       out.push([boxesGeo(slots), flat(dark), ud(name + "Slots", label.replace(/ \(.*$/, "") + " slots", dark, "Electronics")]);
     };
     duplex(yO, "TableHub_Outlet", "Router / vac outlet (duplex, tab broken: top = router, bottom = vac - each on its switch panel toggle, both dead with the e-stop)");
+    HUB.outlet = { router: [fx - 7, yO, zm + 19], vac: [fx - 7, yO, zm - 19] };   // the sockets' faces (Part 52c: the plugs)
+    const plugGeo = (q) => boxesGeo([[q[0] - 31, q[1] - 15, q[2] - 13, q[0], q[1] + 15, q[2] + 13]]);
+    out.push([plugGeo(HUB.outlet.router), flat([0.07, 0.07, 0.08], { roughness: 0.6 }),
+      ud("TableHub_RouterPlug", "The router cord's plug (in the ROUTER socket - left plugged in)", [0.07, 0.07, 0.08], "Hose")]);
     duplex(yA, "TableHub_Accessory", "Accessory outlet (duplex, always on while the table has power - lights, a laptop, chargers; cut by the e-stop)");
     // the dust port: a bulkhead through the panel - a flange outside, a lock nut inside, stubs both ways
     const yP = y0 + W - 105, sx = fx - 40, ix = fx + T + HUB.stub, L = fx - sx;   // the mouth 40 mm out from the (set back) panel
@@ -1357,6 +1361,12 @@ float lr4G(float x) { float s = 2.0 * fract(x) - 1.0; return floor(x) / 3.0 + (s
       out.push([new THREE.TubeGeometry(c, Math.ceil(c.getLength() / 10), 36, 16, false), flat(hoseC, { roughness: 0.7 }),
         vud(name, `${label}, ~${(c.getLength() / 1000).toFixed(1)} m drawn`, hoseC)]);
     };
+    // the vac's cord: off its head, along the floor, up under the panel and round to the VAC socket (Part 52c)
+    const vq = HUB.outlet.vac, vc = new THREE.CatmullRomCurve3([[vac[0] - 120, vac[1] - 150, v1 + 60], [vac[0] - 200, vac[1] - 180, fz + 60],
+      [vac[0] - 260, vac[1] - 200, fz + 8], [fx + 60, vq[1] + 50, fz + 8], [fx - 50, vq[1] + 30, z0 - 80], [vq[0] - 70, vq[1], vq[2] - 40], [vq[0] - 31, vq[1], vq[2]]]
+      .map((p) => new THREE.Vector3(...p)), false, "centripetal");
+    out.push([new THREE.TubeGeometry(vc, 80, 4.5, 8, false), flat([0.07, 0.07, 0.08], { roughness: 0.6 }), vud("ShopVac_Cord", `Shop vac cord to the VAC socket (~${(vc.getLength() / 1000).toFixed(1)} m drawn)`, [0.07, 0.07, 0.08])]);
+    out.push([plugGeo(vq), flat([0.07, 0.07, 0.08], { roughness: 0.6 }), vud("ShopVac_Plug", "Shop vac plug (in the VAC socket)", [0.07, 0.07, 0.08])]);
     hose("ShopVac_Hose", "Vac hose: the dust port's inside stub to the separator inlet (2-1/2 in; the rest of a long hose coiled)", [[ppx - 30, yP, pb], [ppx + 40, yP, pb],
       [ppx + 120, yP - 30, pb - 60], [sepIn[0], sepIn[1] + 130, inZ + 10], [sepIn[0], sepIn[1] + 60, inZ], [sepIn[0], sepIn[1] + 10, inZ], [sepIn[0], sepIn[1] - 40, inZ]]);   // the cuff over the stub
     hose("ShopVac_Hose2", "Separator hose: the separator outlet to the vac (2-1/2 in)", [[sepOut[0], sepOut[1], sepOut[2] - 30], [sepOut[0], sepOut[1], sepOut[2] + 40],

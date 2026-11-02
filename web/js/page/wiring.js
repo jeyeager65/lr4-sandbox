@@ -53,6 +53,9 @@
   // height), along it to the box, in. The rest (power): straight (the switch panel's mains crosses the Y travel - it
   // needs its slack there). WR_ALLOW: per end, for the connector + a service loop (GUESS) ----
   const WR_ALLOW = 75;
+  // the table hub option (Part 52c): the mains into its inlet, the supply fed from it, its cable to the switch panel
+  const wrHub = () => typeof optsOn === "function" && !!optsOn().hub;
+  const wrRuns = () => LR4Wiring.runsFor(wrHub());
   function wrPath(r) {
     const a = wrEnd(r.from), b = wrEnd(r.to);
     if (!a || !b) return null;
@@ -81,6 +84,10 @@
       return pts;
     }
     if ((r.via || []).includes("beam") && r.to && r.to.part) return wrMainsPath(a, b, wrMesh(r.to.part)) || [a, b];
+    if (r.id === "hub-panel") {                       // stapled along the table's underside, behind the end, to the panel (GUESS)
+      const pn = wrMesh("TableHub_Panel"), uz = pn ? new THREE.Box3().setFromObject(pn).max.z - 15 : a.z, x = a.x;
+      return [a, new THREE.Vector3(x, a.y, uz), new THREE.Vector3(x, b.y + 90, uz), new THREE.Vector3(b.x, b.y + 90, uz), b];
+    }
     const box = wrMesh("Jackpot3_Box"), side = r.from && r.from.part && /_(Min|Max)(_|$)/.exec(r.from.part);
     if (box && side && r.to && r.to.board && (r.group === "motor" || r.group === "switch")) return wrBeamPath(a, b, side[1], box);
     return [a, b];
@@ -143,21 +150,21 @@
     const t = meta.travel, back = [HOME.pose.x, HOME.pose.y, HOME.pose.z], worst = {};
     for (const x of t.x) for (const y of t.y) for (const z of t.z) {
       move([x, y, z]);
-      for (const r of LR4Wiring.RUNS) { const p = wrPath(r); if (p) worst[r.id] = Math.max(worst[r.id] || 0, wrLen(p)); }
+      for (const r of wrRuns()) { const p = wrPath(r); if (p) worst[r.id] = Math.max(worst[r.id] || 0, wrLen(p)); }
     }
     move(back);
     const need = {};
     for (const [id, w] of Object.entries(worst)) if (w) need[id] = Math.round(w + 2 * WR_ALLOW);
     const f = LR4Wiring.fit(need);
     WR.fit = f;
-    return LR4Wiring.RUNS.map((r) => Object.assign({ id: r.id, name: r.name, worst: Math.round(worst[r.id] || 0), need: need[r.id] || 0 },
+    return wrRuns().map((r) => Object.assign({ id: r.id, name: r.name, worst: Math.round(worst[r.id] || 0), need: need[r.id] || 0 },
       f.runs[r.id] || { have: null, reaches: null, short: 0 }));
   }
   // the BOM's wiring (hose_bom.js renderBom): the fit at this scene, once per scene (its travel + whether the cord /
   // hose are there) - the report moves the machine through the travel's corners
   function wrFit() {
     if (typeof LR4Wiring === "undefined" || !meta || !meta.travel || !HOME.pose || !wrMesh("Jackpot3_Box")) return null;
-    const key = JSON.stringify([meta.travel, !!wrMesh("Router_Cord_Run"), !!wrMesh("Vacuum_Hose")]);
+    const key = JSON.stringify([meta.travel, !!wrMesh("Router_Cord_Run"), !!wrMesh("Vacuum_Hose"), wrHub()]);
     if (WR.fitKey !== key) { WR.report = wrReport(); WR.fitKey = key; }
     return WR.fit;
   }
@@ -166,7 +173,7 @@
     for (const k of ["lines", "joins"]) if (WR[k]) { scene.remove(WR[k]); WR[k].traverse((o) => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); }); WR[k] = null; }
     if (!WR.on || typeof LR4Wiring === "undefined") return;
     WR.lines = new THREE.Group(); WR.joins = new THREE.Group();
-    for (const r of LR4Wiring.RUNS) {
+    for (const r of wrRuns()) {
       const ln = new THREE.Line(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({ color: LR4Wiring.GROUPS[r.group].colour, depthTest: false, transparent: true, opacity: 0.95 }));
       ln.renderOrder = 20; ln.userData.run = r; ln.frustumCulled = false;
       WR.lines.add(ln);

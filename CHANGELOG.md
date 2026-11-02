@@ -3,6 +3,22 @@
 The version is the sandbox page's (`VERSION` in `web/js/page/job.js`, shown in its footer). The footer also shows
 the date the model data was built and the Printables file set it was solved for.
 
+## 0.67.0 - 2026-11-02
+- **Table power hub + dust port** (Options, off by default): a panel set into the table's left end, under it - the
+  dust port where the hose drops (a bulkhead: the machine hose in outside, the vac's inside), a 20 A power inlet for
+  the extension cord, a ROUTER / VAC outlet and an always-on accessory outlet, labelled, in new-work boxes. The
+  machine hose ends in the port; the router cord leaves it there for its outlet. **Shop vac + separator** (needs the
+  hub): a drum vac and a cyclone separator on a bucket under the table, hosed to the port, plugged into VAC.
+- With the hub, the switch panel moves to the front's left end on the sheet table too, and a magnetic paddle switch
+  (red STOP over a green START, no restart after a power cut) replaces the mushroom e-stop; Run's button reads
+  STOP / Start.
+- The switch panel's rockers are now 20 A lighted toggles (lit while on) under a 2-gang plate.
+- **Torsion table:** a top and a bottom skin (1/4", GUESS) between the rail side boards; the box is 1/2" deeper.
+- BOM: the hose row says how much hose this size needs (to the floor, or the hub's port) and the spare from 20 ft.
+  The wiring adds the hub's runs (mains into its inlet, the supply fed from it, the cable to the switch panel). The
+  table's base (the sheet, the torsion box) and the hub are out of the BOM - drawn placeholders, not a table designer;
+  the spoilboard and rail strips stay (their sizes follow the machine).
+
 ## 0.66.2 - 2026-11-01
 - **A router's mount files not loaded** (the Makita / DeWalt mount + dust shoe): the Router step and the router editor
   say so (the Kobalt's are drawn in their place) and the clash check leaves the shoe out (it warned about the Kobalt's

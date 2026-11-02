@@ -228,7 +228,7 @@
   // in this browser (lr4-opts; the pendant in lr4-pendant). ----
   const OPT = { router: true, skirt: true, hose: true, fan: true, hub: false, vac: false };   // hub + vac: Part 52, optional
   const OPT_PARTS = { router: /^(Router_(?!Cord_Run)|Tool_Mount_|Dust_Shoe|Dust_Skirt|Bristles_TPU)/, skirt: DUST_PARTS,
-    hose: /^(Vacuum_Hose|Router_Cord_Run|Cable_Sleeve|Hose_Holder|Hose_Hook|Dust_Shoe|Dust_Skirt|Bristles_TPU)/, fan: /^Jackpot3_Fan/,
+    hose: /^(Vacuum_Hose|Router_Cord_Run|Cable_Sleeve|Hose_Holder|Hose_Hook|Dust_Shoe|Dust_Skirt|Bristles_TPU|TableHub_RouterPlug)/, fan: /^Jackpot3_Fan/,
     hub: /^(TableHub_|SwitchPanel_Paddle)/, vac: /^ShopVac_/ };
   const pendantOn = () => document.getElementById("ft-on").checked;   // My machine > FluidTouch pendant (kept)
   // a router with mount "none" (My LR4 > Router, user 2026-10-29): no dust shoe, so no hose either

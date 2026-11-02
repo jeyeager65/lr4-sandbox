@@ -67,8 +67,17 @@ D:\GitHub\V1EngineeringInc-Docs). What the docs say:
 - Power (w9c-w9e): the supply rides the gantry (in a bay, on the strut plates); its mains "out with the vacuum hose,
   or a single extension cord into the beam". The model (user 2026-11-02: in the beam through the braces; the router
   cord along the hose): the switch panel (table front) -> along the front to the gantry end nearer the supply -> its
-  YZ plate -> the braces -> the supply (~3.0 m at 26x50, 1.6 m at 15x30, 4.7 m at 48x96). Part 52 moves the start to
-  a power inlet + outlets on the table's left (Min) end, where the hose leaves the table.
+  YZ plate -> the braces -> the supply (~3.0 m at 26x50, 1.6 m at 15x30, 4.7 m at 48x96).
+
+- The table hub (Part 52, an option, off by default - not from the V1E docs): a panel set into the table's left
+  (Min) end, under it - a flanged power inlet (the extension cord: 12 AWG with 20 A ends on a 20 A circuit), the
+  router / vac duplex (tab broken: each half on its switch panel toggle) and an always-on accessory duplex, in
+  single-gang boxes. The line runs to the switch panel's magnetic STOP / START switch and back, then to the toggles,
+  the accessory outlet and the supply: one 12 AWG cable bundle along the table's underside between the hub and the
+  panel (~0.8 m at 26x50). The supply's mains starts at the hub (~1.5 m at 26x50, into the beam along the braces).
+  The router cord rides the hose to the port, then plugs into ROUTER; the vac into VAC. Every switch in the path rated
+  for the circuit (20 A at 120 V); router 9 A + vac 9 A + supply < 1 A is under a 20 A breaker, but nothing else on
+  that circuit while it runs. A relay from FluidNC for the vac (M8) is planned, not built: its own box.
 
 Still GUESS (the user's machine): the exact exit point on the YZ plate, the tie points' heights, and the core
 bundle's sag / loop size. The model's "+75 mm per end" allowance covers the joins and the loops.

@@ -189,9 +189,11 @@
     q = sec("Buy / cut: stock");
     if (q) {
       const fmt = (mm) => `${Math.round(mm)} mm (${(mm / IN).toFixed(3)} in)`;
-      const at = q.rows.findIndex((r) => TM.NAMES.test(r[1]));   // the table rows: this size + base (bom.py table_rows)
+      // the table rows: the build's (any it ever wrote, base rows too) -> this size's spoilboard + strips (bom.py table_rows)
+      const OLD = /^(Table top|Table sheet|Spoilboard|Rail strip, (Min|Max)|Rail side board|Torsion box (rib, along [XY]|skin))$/;
+      const at = q.rows.findIndex((r) => OLD.test(r[1]));
       if (at >= 0) {
-        q.rows = q.rows.filter((r) => !TM.NAMES.test(r[1]));
+        q.rows = q.rows.filter((r) => !OLD.test(r[1]));
         q.rows.splice(at, 0, ...TM.rows(S.base, TM.parts(S.base, S.TW, S.TL, xtable, ytable, S.cutX, S.cutY)));
       }
       set(byName(q, 1, "X rail"), 3, fmt(xrails));
