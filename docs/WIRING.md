@@ -40,7 +40,9 @@ Endstops are only read while homing (not limit switches). All inputs: active low
 - **Steppers** ([Nema 17 84 oz-in](https://www.v1e.com/products/nema-17-76oz-in-steppers)): leads "approximately 30""
   (~760 mm), 4 wires (black / green / red / blue as drawn - GUESS order), a 4-pin plug.
 - **Endstops** ([limit switch](https://www.v1e.com/products/limit-switch-endstop)): Omron SS-3GL13PT, NC / NO, solder or
-  2.8 mm female spades; no lead - the near ones (Y0, Z0) need a 2-wire lead to the board (GUESS: the builder's own).
+  2.8 mm female spades; bare - every switch gets the builder's own 2-wire lead ("crimped or soldered endstop", out the
+  bottom of the YZ plate): the near ones (Y0, Z0) to the board, the far ones (Y1, Z1, X) to their motor's extender join,
+  spliced to its 2 spare wires (w3). Lengths per size: the page's BOM (wiring.js fit).
 - **Wire sleeve** ([wire-sleeve](https://www.v1e.com/products/wire-sleeve)): 3/8" PET, by the foot - the core's
   bundle (the X extender + the touch plate's leads) along the hose (hose_bom.js).
 - **Power supply** ([24V](https://www.v1e.com/products/24v-power-supply)): 24 V 2.5 A (60 W), a barrel plug - "cut it

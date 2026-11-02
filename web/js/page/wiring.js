@@ -120,10 +120,20 @@
       for (const r of LR4Wiring.RUNS) { const p = wrPath(r); if (p) worst[r.id] = Math.max(worst[r.id] || 0, wrLen(p)); }
     }
     move(back);
-    return LR4Wiring.RUNS.map((r) => {
-      const have = r.segs.every((g) => g.len) ? r.segs.reduce((s, g) => s + g.len, 0) : null, w = worst[r.id] || 0, need = w ? w + 2 * WR_ALLOW : 0;
-      return { id: r.id, name: r.name, worst: Math.round(w), need: Math.round(need), have, reaches: have === null || !need ? null : have >= need, short: have && need > have ? Math.round(need - have) : 0 };
-    });
+    const need = {};
+    for (const [id, w] of Object.entries(worst)) if (w) need[id] = Math.round(w + 2 * WR_ALLOW);
+    const f = LR4Wiring.fit(need);
+    WR.fit = f;
+    return LR4Wiring.RUNS.map((r) => Object.assign({ id: r.id, name: r.name, worst: Math.round(worst[r.id] || 0), need: need[r.id] || 0 },
+      f.runs[r.id] || { have: null, reaches: null, short: 0 }));
+  }
+  // the BOM's wiring (hose_bom.js renderBom): the fit at this scene, once per scene (its travel + whether the cord /
+  // hose are there) - the report moves the machine through the travel's corners
+  function wrFit() {
+    if (typeof LR4Wiring === "undefined" || !meta || !meta.travel || !HOME.pose || !wrMesh("Jackpot3_Box")) return null;
+    const key = JSON.stringify([meta.travel, !!wrMesh("Router_Cord_Run"), !!wrMesh("Vacuum_Hose")]);
+    if (WR.fitKey !== key) { WR.report = wrReport(); WR.fitKey = key; }
+    return WR.fit;
   }
   // ---- the rat's nest ----
   function wrLines() {
@@ -188,7 +198,8 @@
     const r = ln.userData.run, segs = r.segs.map((s) => `${s.kind === "ribbon" ? "V1E extender" : s.kind}${s.len ? ` ${(s.len / 1000).toFixed(2)} m` : ""}`).join(" + ");
     const q = (WR.report || []).find((x) => x.id === r.id), m = (v) => (v / 1000).toFixed(2) + " m";
     const fit = !q || !q.need ? "" : q.reaches === null ? `<span>longest over the travel ${m(q.worst)} (+ ${WR_ALLOW * 2} mm at the ends)</span>`
-      : `<span>longest over the travel ${m(q.worst)} + ends: ${m(q.need)} of ${m(q.have)} - ${q.reaches ? "reaches" : `<em>${q.short} mm short: another extender</em>`}</span>`;
+      : `<span>longest over the travel ${m(q.worst)} + ends: ${m(q.need)}${q.ext ? `; ${q.ext} extender${q.ext > 1 ? "s" : ""}` : ""}${q.cut ? `; your wire ${m(q.cut)}` : ""}` +
+        ` - ${q.reaches ? "reaches" : `<em>${q.short} mm short: extend it</em>`}</span>`;
     el.innerHTML = `<b>${r.name}</b><span>${wrEndName(r.from)} → ${wrEndName(r.to)}</span><span>${segs}</span><span>routed now: ${m(ln.userData.len)} (GUESS route)</span>${fit}`;
     const b = canvas.parentElement.getBoundingClientRect();
     el.style.left = `${cx - b.left + 14}px`; el.style.top = `${cy - b.top + 14}px`; el.hidden = false;
@@ -199,5 +210,5 @@
   { const c = document.getElementById("lay-wiring"); if (c) c.addEventListener("change", () => wrSet(c.checked)); }
   wrBoard();
   // tests / videos
-  window.LR4WiringView = { report: () => (WR.report = wrReport()), set: wrSet, on: () => WR.on, board: () => !!WR.board, runs: () => (WR.lines ? WR.lines.children.map((l) => ({ id: l.userData.run.id, shown: l.visible, len: Math.round(l.userData.len || 0) })) : []),
+  window.LR4WiringView = { report: () => (WR.report = wrReport()), fit: wrFit, set: wrSet, on: () => WR.on, board: () => !!WR.board, runs: () => (WR.lines ? WR.lines.children.map((l) => ({ id: l.userData.run.id, shown: l.visible, len: Math.round(l.userData.len || 0) })) : []),
     pick: (x, y) => { const l = wrPick(x, y); return l ? l.userData.run.id : null; } };

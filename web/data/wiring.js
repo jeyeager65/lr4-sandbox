@@ -15,6 +15,9 @@
   const LEAD = { kind: "lead", len: 760, colours: ["black", "green", "red", "blue"], note: "the stepper's own lead (~30\", V1E shop)" };
   const EXT = (shares) => ({ kind: "ribbon", len: 1500, wires: 6, note: "V1E stepper extender (1.5 m, 26 AWG, 6 wires: the motor's 4 + the endstop's 2)", shares });
   const PAIR = (note) => ({ kind: "pair", len: null, colours: ["red", "black"], note });
+  // the switches come bare (V1E docs: "crimped or soldered endstop"): a far one's own wire runs to its motor's extender
+  // join and is spliced to the extender's 2 spare wires there (w3: "Repeat for Y1 and Z1 Stepper and endstops")
+  const OWN = PAIR("the switch's own 2-wire lead to the extender's join, cut to fit (the builder's; V1E docs)");
   // motor0 = the Min end (X = 0 side): GUESS (the docs don't say; FluidNC's config picks)
   const RUNS = [
     { id: "x-motor", name: "X motor", group: "motor", from: { part: "X_Stepper_Plug" }, to: { board: "jp3.motor.X" }, via: ["hose"], segs: [LEAD, EXT("x-stop")] },
@@ -22,13 +25,13 @@
     { id: "z0-motor", name: "Z0 motor", group: "motor", from: { part: "Z_Stepper_Min_Plug" }, to: { board: "jp3.motor.Z" }, segs: [LEAD] },
     { id: "y1-motor", name: "Y1 motor", group: "motor", from: { part: "Y_Stepper_Max_Plug" }, to: { board: "jp3.motor.A" }, segs: [LEAD, EXT("y1-stop")] },
     { id: "z1-motor", name: "Z1 motor", group: "motor", from: { part: "Z_Stepper_Max_Plug" }, to: { board: "jp3.motor.B" }, segs: [LEAD, EXT("z1-stop")] },
-    { id: "x-stop", name: "X endstop", group: "switch", from: { part: "Endstop_X" }, to: { board: "jp3.in.25" }, via: ["hose"], segs: [EXT("x-motor")] },
+    { id: "x-stop", name: "X endstop", group: "switch", from: { part: "Endstop_X" }, to: { board: "jp3.in.25" }, via: ["hose"], segs: [OWN, EXT("x-motor")] },
     { id: "y0-stop", name: "Y0 endstop", group: "switch", from: { part: "Endstop_Y_Min" }, to: { board: "jp3.in.33" }, segs: [PAIR("a 2-wire lead, spades on the switch (GUESS: the builder's own)")] },
     { id: "z0-stop", name: "Z0 endstop", group: "switch", from: { part: "Endstop_Z_Min" }, to: { board: "jp3.in.32" }, segs: [PAIR("a 2-wire lead, spades on the switch (GUESS: the builder's own)")] },
-    { id: "y1-stop", name: "Y1 endstop", group: "switch", from: { part: "Endstop_Y_Max" }, to: { board: "jp3.in.35" }, segs: [EXT("y1-motor")] },
-    { id: "z1-stop", name: "Z1 endstop", group: "switch", from: { part: "Endstop_Z_Max" }, to: { board: "jp3.in.34" }, segs: [EXT("z1-motor")] },
+    { id: "y1-stop", name: "Y1 endstop", group: "switch", from: { part: "Endstop_Y_Max" }, to: { board: "jp3.in.35" }, segs: [OWN, EXT("y1-motor")] },
+    { id: "z1-stop", name: "Z1 endstop", group: "switch", from: { part: "Endstop_Z_Max" }, to: { board: "jp3.in.34" }, segs: [OWN, EXT("z1-motor")] },
     { id: "probe", name: "Touch plate", group: "probe", from: { probe: true }, to: { board: "jp3.in.36" }, via: ["hose"],
-      segs: [PAIR("the plate (red) to S, the clip (black) to G (V1E docs; GUESS: one 2-wire lead)")] },
+      segs: [{ kind: "pair", len: 2000, colours: ["red", "black"], note: "the Tiny Touch Plate's own 2 m wire: the plate (red) to S, the clip (black) to G (V1E shop / docs)" }] },
     { id: "mains", name: "Mains to the switch panel", group: "power", from: { part: "SwitchPanel_Box" }, to: null, segs: [{ kind: "cord", len: null, note: "the wall: a 3-wire mains cord (GUESS)" }] },
     { id: "psu-ac", name: "Switch panel to the 24 V supply", group: "power", from: { part: "SwitchPanel_Box" }, to: { part: "PSU_24V" }, segs: [{ kind: "cord", len: null, note: "mains, cut by the e-stop (power.js; GUESS)" }] },
     { id: "psu-dc", name: "24 V to the board", group: "power", from: { part: "PSU_24V" }, to: { board: "jp3.power" }, segs: [PAIR("24 V 2.5 A supply, its barrel plug cut off (V1E shop)")] },
@@ -36,7 +39,26 @@
   ];
   const GROUPS = { motor: { name: "Motors", colour: "#3d8bfd" }, switch: { name: "Endstops", colour: "#2fb67c" }, probe: { name: "Touch plate", colour: "#e5484d" },
     power: { name: "Power", colour: "#f5a524" } };
-  const api = { JP3, RUNS, GROUPS };
+  // fit (51b): what each run needs at a size ({ id: mm - the longest routed over the travel + both ends' allowance }) ->
+  // what it gets. A motor with an extender takes as many V1E extenders as it needs past its own lead (at least its one);
+  // its endstop shares them (the same ribbons) and its own wire makes up the rest, cut to fit (>= MIN_CUT). A run with
+  // a length-less segment (the builder's own wire): that one is cut to fit. The rest: reaches, or how short.
+  const EXT_LEN = 1500, MIN_CUT = 150;
+  function fit(need) {
+    const runs = {}, sum = (r) => r.segs.reduce((s, g) => s + (g.kind !== "ribbon" && g.len ? g.len : 0), 0);
+    const order = RUNS.filter((r) => r.id in need).sort((p, q) => (p.group === "motor" ? 0 : 1) - (q.group === "motor" ? 0 : 1));
+    for (const r of order) {
+      const n = need[r.id], known = sum(r), rib = r.segs.find((g) => g.kind === "ribbon"), free = r.segs.some((g) => !g.len);
+      let ext = 0;
+      if (rib) ext = r.group === "motor" ? Math.max(1, Math.ceil(Math.max(0, n - known) / EXT_LEN)) : (runs[rib.shares] || {}).ext || 1;
+      const cut = free ? Math.max(MIN_CUT, Math.ceil((n - known - ext * EXT_LEN) / 10) * 10) : null;   // to 10 mm
+      const have = known + ext * EXT_LEN + (cut || 0);
+      runs[r.id] = { need: n, have, ext, cut, reaches: have >= n, short: have >= n ? 0 : Math.round(n - have) };
+    }
+    const extenders = RUNS.filter((r) => r.group === "motor" && runs[r.id]).reduce((s, r) => s + runs[r.id].ext, 0);
+    return { runs, extenders };
+  }
+  const api = { JP3, RUNS, GROUPS, fit, EXT_LEN };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.LR4Wiring = api;
 })(typeof self !== "undefined" ? self : this);

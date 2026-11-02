@@ -239,6 +239,21 @@
         return r;
       }) }));
     }
+    {                                                  // the wiring at this size (Part 51b: the routes over the travel, wiring.js)
+      const wf = typeof LR4WiringView !== "undefined" && LR4WiringView.fit(), R = wf && wf.runs, m = (v) => (v / 1000).toFixed(1);
+      if (R) {
+        const by = (re) => LR4Wiring.RUNS.filter((r) => re.test(r.id) && R[r.id]);
+        const ext = by(/-motor$/).filter((r) => R[r.id].ext).map((r) => `${r.name.replace(/ motor$/, "")} ${R[r.id].ext}`).join(", ");
+        const own = by(/-stop$/).filter((r) => R[r.id].cut), tot = own.reduce((s, r) => s + R[r.id].cut, 0), pr = R.probe;
+        secs = secs.map((sec) => Object.assign({}, sec, { rows: (sec.rows || []).flatMap((r) => {
+          if (/^Stepper wire extension/.test(r[1] || "")) return [[wf.extenders, r[1], `${ext} - routed over the travel at this size (GUESS routes; Layers > Wiring)`],
+            [1, `2-wire lead for the endstops, ~${m(tot)} m in all (your own)`, `crimped or soldered to each switch (V1E docs), cut to fit: ` +
+              own.map((q) => `${q.name.replace(/ endstop$/, "")} ${m(R[q.id].cut)}`).join(", ") + " m; the far ones spliced to their extender"]];
+          if (pr && !pr.reaches && /^V1E Tiny Touch Plate/.test(r[1] || "")) return [[r[0], r[1], `${r[2]}; its 2 m wire is ${pr.short} mm short at this size: extend it`]];
+          return [r];
+        }) }));
+      }
+    }
     const open = new Set([...body.querySelectorAll("details")].filter((d) => d.open).map((d) => d.dataset.title));
     body.textContent = "";
     if (!secs.length) { sum.textContent = "Not in this export."; return; }

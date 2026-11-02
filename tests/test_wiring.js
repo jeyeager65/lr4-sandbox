@@ -30,6 +30,18 @@ ok(pairs.size === 3 && [...pairs].every((p) => /^x-motor\+x-stop$|^y1-motor\+y1-
   `3 extenders, each shared by a motor + its endstop both ways (${[...pairs].join(", ")})`);
 ok(W.RUNS.filter((r) => r.group === "motor").every((r) => r.segs[0].kind === "lead" && r.segs[0].len === 760), "every motor starts with its own ~760 mm lead");
 
+// fit (51b): extenders by the motor's need past its lead; the endstop shares them + its own wire cut to fit
+{
+  const f = W.fit({ "x-motor": 2033, "x-stop": 2103, "y1-motor": 2300, "y1-stop": 1300, "z1-motor": 1214, "z1-stop": 1201, "y0-stop": 538, probe: 2144 });
+  const R = f.runs;
+  ok(R["x-motor"].ext === 1 && R["x-motor"].reaches && R["y1-motor"].ext === 2 && R["z1-motor"].ext === 1, `motors: 1 extender while 760 + 1500 reaches, 2 past it (x ${R["x-motor"].ext}, y1 ${R["y1-motor"].ext}, z1 ${R["z1-motor"].ext})`);
+  ok(f.extenders === 4, `extenders counted by the motors (${f.extenders})`);
+  ok(R["x-stop"].ext === 1 && R["x-stop"].cut === 610 && R["x-stop"].reaches, `the X endstop: its motor's 1 extender + its own wire cut to fit (${R["x-stop"].cut} mm)`);
+  ok(R["y1-stop"].ext === 2 && R["y1-stop"].cut === 150 && R["z1-stop"].cut === 150, "an endstop with spare extender length: the shortest own wire (150 mm)");
+  ok(R["y0-stop"].ext === 0 && R["y0-stop"].cut === 540, `a near endstop: its own wire only (${R["y0-stop"].cut} mm)`);
+  ok(!R.probe.reaches && R.probe.short === 144 && R.probe.cut === null, `the touch plate's 2 m wire: ${R.probe.short} mm short of 2144`);
+}
+
 // the spots: on the board, inside the box (its size from the data: hi_ref - lo_ref)
 const box = cfg.parts.find((p) => p.meta && p.meta.name === "Jackpot3_Box"), size = box.hi_ref.map((v, i) => v - box.lo_ref[i]);
 const out = Object.entries(W.JP3.spots).filter(([, s]) => s.at.some((v, i) => v < 0 || v > size[i]));

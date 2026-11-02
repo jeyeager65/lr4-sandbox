@@ -50,6 +50,13 @@ const ok = (cond, msg) => { checks++; console.log((cond ? "  ok   " : "  FAIL ")
       return { y1: by["y1-motor"], y0: by["y0-motor"], pts: p.length, braces: meshes.filter((m) => /^Brace_/.test(m.userData.name) && !/__/.test(m.userData.name)).length, back: before === [HOME.pose.x, HOME.pose.y, HOME.pose.z].join() }; })()`);
     ok(e.y1.reaches && e.y0.reaches && e.y1.worst > 2 * e.y0.worst, `26 x 50: Y1 reaches on lead + extender (${e.y1.need} of ${e.y1.have} mm), Y0 on its lead (${e.y0.need} of ${e.y0.have})`);
     ok(e.pts >= e.braces + 2 - 1 && e.back, `Y1 routed out its YZ plate + along the braces to the box (${e.pts} points, ${e.braces} braces); the pose put back`);
+    // the BOM: the extenders counted from the routes at this size + the endstops' own wire
+    const bom = await page.val(`(() => { const t0 = performance.now(); renderBom(); const ms = performance.now() - t0;
+      const rows = [...document.querySelectorAll("#bom-body tr")].map((tr) => tr.textContent);
+      return { ext: rows.find((t) => /Stepper wire extension/.test(t)) || "", own: rows.find((t) => /2-wire lead for the endstops/.test(t)) || "", ms: Math.round(ms) }; })()`);
+    ok(/^3\s*Stepper wire extension.*X 1, Y1 1, Z1 1/.test(bom.ext) && /X [\d.]+, Y0 [\d.]+/.test(bom.own),
+      `BOM at 26 x 50: 3 extenders (X / Y1 / Z1 one each), the endstops' own wire listed (${bom.ext.slice(0, 60)} | ${bom.own.slice(0, 50)})`);
+    ok(bom.ms < 2000, `the BOM with the wiring fit: ${bom.ms} ms (cached per scene after the first)`);
     await page.val(`(LR4WiringView.set(false), true)`);
     ok(await page.val("!WR.lines && !document.getElementById('lay-wiring').checked"), "off: the lines gone, the box unticked");
     ok(!(await page.val("window.__errors && window.__errors.length")), "no page errors");
