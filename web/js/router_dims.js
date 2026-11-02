@@ -89,7 +89,10 @@
           add(Object.assign({ id: "dial-d", label: "Dial Ø", v: D.d, kind: "dia", a: [cx + rd, cy, cz], b: [cx - rd, cy, cz], off: [0, 0, 0], views: ["top"] }, dk));
           add(Object.assign({ id: "dial-df", label: "Dial Ø", v: D.d, kind: "dia", a: [cx + rd, cy + rd, cz + ht], b: [cx + rd, cy - rd, cz + ht], off: [0, 0, 8], f: 2, views: ["right"] }, dk));
           add(Object.assign({ id: "dial-t", label: "Dial thickness", v: D.t, kind: "len", a: [cx + rd, cy - rd, cz - ht], b: [cx + rd, cy - rd, cz + ht], off: [0, -10, 0], views: ["right"] }, tk));
-        } else {                                      // standing across the cap, its rim up through the top
+        } else if (D.axis === "x") {                  // standing on top, turned across the head: its rim up through the top
+          add(Object.assign({ id: "dial-d", label: "Dial Ø", v: D.d, kind: "dia", a: [cx, cy, cz + rd], b: [cx, cy, cz - rd], off: [0, 0, 0], views: ["right"] }, dk));
+          add(Object.assign({ id: "dial-t", label: "Dial thickness", v: D.t, kind: "len", a: [cx - ht, cy + rd, z1], b: [cx + ht, cy + rd, z1], off: [0, 8, 0], views: ["top"] }, tk));
+        } else {                                      // standing on top in line with the head, its rim up through the top
           add(Object.assign({ id: "dial-d", label: "Dial Ø", v: D.d, kind: "dia", a: [cx, cy, cz + rd], b: [cx, cy, cz - rd], off: [0, 0, 0], views: ["front"] }, dk));
           add(Object.assign({ id: "dial-t", label: "Dial thickness", v: D.t, kind: "len", a: [cx + rd, cy - ht, z1], b: [cx + rd, cy + ht, z1], off: [8, 0, 0], views: ["top"] }, tk));
         }
@@ -113,9 +116,9 @@
     const Bc = m.brushes;
     G = "brushes";
     if (Bc) {
-      const c = Math.cos((Bc.a * Math.PI) / 180), s = Math.sin((Bc.a * Math.PI) / 180), tip = [(Bc.r + Bc.out) * c, (Bc.r + Bc.out) * s, Bc.z];
-      add({ id: "brush-z", label: "Brush cap height", v: Bc.z, kind: "len", a: [tip[0], tip[1], 0], b: tip, off: [c >= 0 ? 12 : -12, 0, 0], k: "model.brushes.z", views: ["front", "right"] });
-      add({ id: "brush-d", label: "Brush cap Ø", v: Bc.d, kind: "dia", a: [tip[0], tip[1], Bc.z - Bc.d / 2], b: [tip[0], tip[1], Bc.z + Bc.d / 2], off: [c >= 0 ? 4 : -4, 0, 0], k: "model.brushes.d", f: 2, views: ["front", "right"] });
+      const tip = [0, Bc.r + Bc.out, Bc.z];             // the +y one (they're either side)
+      add({ id: "brush-z", label: "Brush cap height", v: Bc.z, kind: "len", a: [tip[0], tip[1], 0], b: tip, off: [12, 0, 0], k: "model.brushes.z", views: ["front", "right"] });
+      add({ id: "brush-d", label: "Brush cap Ø", v: Bc.d, kind: "dia", a: [tip[0], tip[1], Bc.z - Bc.d / 2], b: [tip[0], tip[1], Bc.z + Bc.d / 2], off: [4, 0, 0], k: "model.brushes.d", f: 2, views: ["front", "right"] });
     }
     // the shaft lock button: a peg from the axis at height z, a deg round from +x (counter-clockwise from above), Ø d,
     // reaching r out from the center
@@ -151,7 +154,7 @@
       const at = h.at || [0, 0];
       out.push({ id: "motor_cap", label: LABEL.motor_cap, shape: { box: [at[0] - h.L / 2, at[0] + h.L / 2, at[1] - h.W / 2, at[1] + h.W / 2, top, top + h.H] } });
       const D = BODY && BODY.expand(m).dial;
-      if (D && D.d > 0) out.push({ id: "dial", label: LABEL.dial, shape: { cyl: { c: D.at, axis: D.axis === "z" ? [0, 0, 1] : [0, 1, 0], d: D.d, l: D.t } } });
+      if (D && D.d > 0) out.push({ id: "dial", label: LABEL.dial, shape: { cyl: { c: D.at, axis: D.axis === "z" ? [0, 0, 1] : D.axis === "x" ? [1, 0, 0] : [0, 1, 0], d: D.d, l: D.t } } });
       const SW = BODY && BODY.expand(m).switch;
       if (SW) { const [x, y, z] = SW.at, [a, b, c] = SW.size; out.push({ id: "switch", label: LABEL.switch, shape: { box: [x - a / 2 - 1, x + a / 2 + 2, y - b / 2, y + b / 2, z - c / 2, z + c / 2] } }); }
     }
@@ -162,8 +165,7 @@
     }
     const Bc = m.brushes;
     if (Bc) {
-      const c = Math.cos((Bc.a * Math.PI) / 180), s = Math.sin((Bc.a * Math.PI) / 180);
-      out.push({ id: "brushes", label: LABEL.brushes, shape: { cyl: { c: [(Bc.r + Bc.out / 2) * c, (Bc.r + Bc.out / 2) * s, Bc.z], axis: [c, s, 0], d: Bc.d + 2 * (Bc.ring || 0), l: Bc.out } } });
+      out.push({ id: "brushes", label: LABEL.brushes, shape: { cyl: { c: [0, Bc.r + Bc.out / 2, Bc.z], axis: [0, 1, 0], d: Bc.d + 2 * (Bc.ring || 0), l: Bc.out } } });
     }
     if (r.mount !== "none") out.push({ id: "mount", label: LABEL.mount, shape: null });
     return out;

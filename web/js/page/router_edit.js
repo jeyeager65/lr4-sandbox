@@ -19,9 +19,29 @@
     '<button type="button" id="rbx-flat" class="rbx-lens" aria-pressed="false" title="Flat: a narrow lens, so sizes read like a drawing">Flat</button>' +
     '</div><div class="rbx-undo"><button type="button" data-undo="rb-undo" disabled title="Undo (Ctrl+Z)">↶</button>' +
     '<button type="button" data-undo="rb-redo" disabled title="Redo (Ctrl+Shift+Z)">↷</button>' +
-    '<button type="button" id="rbx-tc" title="Watch a bit change on this router: the bit set in Run > On the table goes in">Change bit</button></div><p class="rbx-tip" id="rbx-tip">Click a part to edit it · click a number to type it · drag a ● to pull that end · drag the view to turn it</p>' +
+    '<button type="button" id="rbx-tc" title="Watch a bit change on this router: the bit set in Run > On the table goes in">Change bit</button>' +
+    '<button type="button" id="rbx-slice" aria-pressed="false" title="Slice across at a height: the parts cut open there (tick Core under Show to see what it touches; red = the core inside the router)">Slice</button>' +
+    '<input type="range" id="rbx-sz" min="0" max="300" step="0.5" value="150" aria-label="Slice height" hidden><output id="rbx-szv" hidden></output></div><p class="rbx-tip" id="rbx-tip">Click a part to edit it · click a number to type it · drag a ● to pull that end · drag the view to turn it</p>' +
     '';
   rxStage.insertBefore(rxBox, document.getElementById("insp"));   // under Inspect's panels
+  // ---- what's shown round the router: chips (user 2026-11-01, not the fold-out checkbox list). Each sets its hidden
+  // checkbox in #rb-core-box and fires its change (router_build.js shows / hides by them); the shoe's slot slider with them ----
+  const RX_SHOW = [["rb-shoe", "Shoe", "The dust shoe's top"], ["rb-mb", "Lower mount", "The bottom mount (its bolts too)"],
+    ["rb-mt", "Upper mount", "The top mount (its bolts too)"], ["rb-core", "Core", "The core: does the router clear it"],
+    ["rb-touch", "Touch plate", "The touch plate + clip, stored on the upper mount"]];
+  const rxShow = document.createElement("div");
+  rxShow.className = "rbx-show"; rxShow.setAttribute("role", "group"); rxShow.setAttribute("aria-label", "Show");
+  rxShow.innerHTML = RX_SHOW.map(([id, l, t]) => `<button type="button" class="chip" data-for="${id}" aria-pressed="false" title="${t}: show / hide">${l}</button>`).join("") +
+    '';
+  rxBox.appendChild(rxShow);
+  function rxShowMark() { for (const b of rxShow.querySelectorAll(".chip")) b.setAttribute("aria-pressed", String(!!$(b.dataset.for).checked)); }
+  rxShow.addEventListener("click", (e) => {
+    const b = e.target.closest(".chip"); if (!b) return;
+    const c = $(b.dataset.for); c.checked = !c.checked; c.dispatchEvent(new Event("change", { bubbles: true }));
+    rxShowMark();
+  });
+  $("rb-core-box").addEventListener("change", rxShowMark);   // set some other way (tests, a script): the chips follow
+  rxShowMark();
   const rxSvg = rxBox.querySelector("svg");
 
   function rxRouter() { return LR4Routers.ROUTERS[RT.set.router]; }
@@ -285,10 +305,52 @@
   });
 
   // on with the Close-up (router_build.js rbViewMark), off when it ends
+  // ---- Slice (user 2026-11-01: "slice Z in the router edit mode ... see exactly where it is touching and by how much"):
+  // Inspect's section cut across z at a height up the router (mm from the nut's bottom, the editor's own heights),
+  // looked at from above; the core's points inside the router (router.js rtClash) within 1 mm of it marked red ----
+  const RXS = { on: false, dots: null };
+  function rxSliceSet(on) {
+    RXS.on = on;
+    $("rbx-slice").setAttribute("aria-pressed", String(on));
+    $("rbx-sz").hidden = $("rbx-szv").hidden = !on;
+    if (on) {
+      const top = RT.body && LR4RouterBody.overall ? LR4RouterBody.overall(rxRouter().model) : 250;
+      $("rbx-sz").max = Math.ceil(top + 10);
+      if (!RXS.z) $("rbx-sz").value = Math.round(top * 0.8);
+      rxSliceMove();
+      rxLook("top");
+    } else if (window.LR4Inspect && LR4Inspect.tools) LR4Inspect.tools.section("");
+    rxSliceDots();
+  }
+  function rxSliceMove() {
+    const mm = +$("rbx-sz").value, w = rxWorld([0, 0, mm]), r = LR4Inspect.tools.range("z");
+    RXS.z = mm;
+    $("rbx-szv").textContent = `${mm.toFixed(1)} mm`;
+    if (!w || !r) return;
+    LR4Inspect.tools.section("z", Math.min(1, Math.max(0, (w.z - r[0]) / Math.max(r[1] - r[0], 1e-6))), false);
+    rxSliceDots();
+  }
+  function rxSliceDots() {                            // the clash's points within 1 mm under the cut (red, over everything)
+    if (RXS.dots) { RXS.dots.parent && RXS.dots.parent.remove(RXS.dots); RXS.dots.geometry.dispose(); RXS.dots = null; }
+    const C = RT.clashPts, w = RXS.on && rxWorld([0, 0, RXS.z || 0]);
+    if (!C || !w || !C.a.length) return;
+    C.mesh.updateMatrixWorld();
+    const zl = new THREE.Vector3().copy(w).applyMatrix4(C.mesh.matrixWorld.clone().invert()).z, keep = [];
+    for (let i = 0; i < C.a.length; i += 3) if (C.a[i + 2] <= zl + 0.05 && C.a[i + 2] > zl - 1) keep.push(C.a[i], C.a[i + 1], C.a[i + 2]);
+    if (!keep.length) return;
+    const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.Float32BufferAttribute(keep, 3));
+    RXS.dots = new THREE.Points(g, new THREE.PointsMaterial({ color: 0xff2a2a, size: 4, sizeAttenuation: false, depthTest: false }));
+    RXS.dots.renderOrder = 10;
+    C.mesh.add(RXS.dots);
+  }
+  $("rbx-slice").addEventListener("click", () => rxSliceSet(!RXS.on));
+  $("rbx-sz").addEventListener("input", rxSliceMove);
   function rxMark() {
     const on = typeof rbViewing === "function" && rbViewing();
     if (on === !rxBox.hidden) return;
     rxBox.hidden = !on;
+    if (!on && RXS.on) rxSliceSet(false);
+    if (on) rxShowMark();
     if (on) { rxLook(RX.view || "front", true); return; }
     RX.drag = RX.edit = RX.anim = null;
     rxPick(null);

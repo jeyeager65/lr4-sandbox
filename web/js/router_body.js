@@ -163,18 +163,22 @@
     const R = Object.assign({ kind: "none", depth: 2, margin: 3, edge: "chamfer", e: 1, out: "none" }, dp.surround);
     const lift = R.kind === "raised" ? R.depth : R.kind === "sunk" ? -R.depth : 0, set = dp.set ?? 0.3;
     if (dp.place === "top") {
-      const xt = x1 - d / 2 - Math.max(e, 8), zt = topX(xt);
-      dial = cut ? { axis: "y", at: [xt, at[1], zt + lift - set - d / 2], d, t, out: 90,
-        open: { o: [xt, at[1], zt], n: [0, 0, 1], u: [1, 0, 0], v: [0, 1, 0], lift, deep: set + d / 2, S, R: Object.assign({}, R, { out: "none" }) } }
-        : { axis: "y", at: [xt, at[1], zt - d / 2 + 5], d, t, out: 90, plate: [d + 4, t + 3] };
+      // plane: the wheel in line with the head (its axis y, the slot along x) or across it (axis x, the slot along y)
+      const across = dp.plane === "across", xt = dp.x ?? x1 - (across ? t / 2 : d / 2) - Math.max(e, 8), zt = topX(xt), ax = across ? "x" : "y";
+      dial = cut ? { axis: ax, at: [xt, at[1], zt + lift - set - d / 2], d, t, out: 90,
+        open: { o: [xt, at[1], zt], n: [0, 0, 1], u: across ? [0, 1, 0] : [1, 0, 0], v: across ? [1, 0, 0] : [0, 1, 0], lift, deep: set + d / 2, S, R: Object.assign({}, R, { out: "none" }) } }
+        : { axis: ax, at: [xt, at[1], zt - d / 2 + 5], d, t, out: 90, plate: across ? [t + 3, d + 4] : [d + 4, t + 3] };
     } else if (dp.place === "knob") {                  // flat on the top, face up, standing proud: `x` along the cap (0 = over
-      const xk = dp.x ?? 0;                             // the axis), `sink` into the top (the Sienci T1's, user 2026-10-31)
-      dial = { axis: "z", at: [xk, at[1], topX(xk) + t / 2 - (dp.sink ?? 1)], d, t, out: 0 };
+      const xk = dp.x ?? 0, yk = at[1] + (dp.y ?? 0);   // the axis), `y` across, `sink` into the top (the Sienci T1's, user 2026-10-31)
+      const zk = h.shape ? z0 + (CS.topAt(h.shape, xk, yk - at[1]) ?? H) : z1, pd = dp.pad && dp.pad.d > 0 ? dp.pad : null;
+      // a raised pad under it (its top `h` over the head's top there, reaching 6 down into the head: it meets a curved top)
+      const pad = pd ? { c: [xk, yk], d: pd.d, z0: zk - 6, z1: zk + pd.h } : null;
+      dial = { axis: "z", at: [xk, yk, (pad ? pad.z1 : zk) + t / 2 - (dp.sink ?? 1)], d, t, out: 0, pad };
     } else if (dp.place === "window") {                // flat inside the cap, rim `in` from the end, its top `drop` under the cap's top; the window
       const W = dp.win || {}, cx = x1 - (dp.in ?? 1) - d / 2, wl = W.l || d * 0.35, ww = W.w || d * 0.8;   // over its rim (open at the end: a notch)
       const cz = topX(cx + d / 2 - 2) - (dp.drop ?? 2) - t / 2;
       dial = { axis: "z", at: [cx, at[1], cz], d, t, out: 0,
-        win: { x: [cx + d / 2 - wl, W.open === false ? cx + d / 2 + 1.5 : x1 + 5], y: [at[1] - ww / 2, at[1] + ww / 2], z: cz - t / 2 - 0.6, bevel: W.bevel ?? 2, r: W.r || 0 } };
+        win: { x: [cx + d / 2 - wl, W.open === false ? cx + d / 2 + 1.5 : x1 + 5], y: [at[1] - ww / 2, at[1] + ww / 2], z: cz - t / 2 - 0.6, bevel: W.bevel ?? 2, r: W.r || 0, follow: !!W.follow } };
     } else {
       let zc = topX(x1 - d / 2) - e - t / 2 - 1, xe = h.shape ? (CS.ends(h.shape, zc - z0) || [0, x1])[1] : x1;
       if (cut) {                                     // a hood over the slot: the top where it meets the face (a shaped top falls
@@ -191,7 +195,7 @@
       : dp.place === "top" ? z0 + H / 2 : Math.min(z0 + H * 0.4, dial.at[2] - t / 2 - sh / 2 - 3);
     return Object.assign({}, m, {
       cap: Object.assign({ at, L: h.L, W: h.W, r: [rb, rf], z: [z0, z1], top_r: e, bot_r: Math.min(h.bot_r ?? 2, H / 2 - e) }, h.shape ? { shape: h.shape } : {}),
-      dial: Object.assign(dial, dp.at ? { at: dp.at } : {}, { ring: dp.ring, ribs: dp.ribs ?? 7, dome: dp.style === "dome" ? { top: Math.min(dp.dome ? dp.dome.top ?? 0.45 : 0.45, 0.95) } : null,
+      dial: Object.assign(dial, dp.at ? { at: dp.at } : {}, { ring: dp.ring, marks: dp.marks || null, ribs: dp.ribs ?? 7, dome: dp.style === "dome" ? { top: Math.min(dp.dome ? dp.dome.top ?? 0.45 : 0.45, 0.95) } : null,
         bevel: dp.style === "bevel" ? { top: Math.min(dp.bevel ? dp.bevel.top ?? 0.6 : 0.6, 0.95) } : null }),
       switch: Object.assign({ at: [(h.shape ? (CS.ends(h.shape, swz - z0) || [0, x1])[1] : x1) + 0.75, at[1], swz], size: [1.5, sw, sh], rocker: [3.0, sw * 0.7, sh * 0.65] }, m.switch),
       strain_relief: Object.assign({ at: [h.shape ? (CS.ends(h.shape, H * 0.6) || [at[0] - h.L / 2])[0] : at[0] - h.L / 2, at[1], z0 + H * 0.6], l: 40.0, d: 12.0, bend: 45.0 }, m.strain_relief),
@@ -419,7 +423,9 @@
     const zb = (x, y) => {                           // depth bvx under the top at the opening's edge, up 45 deg to the top bvx out
       const t = tAt(x, y);                           // (and on up, clear of it)
       if (t === null) return zl;
-      const bvx = bv * Math.max(0, Math.min(1, (35 - steep(x, y)) / 20));
+      // follow (user 2026-11-01, the Kobalt: its notch runs out through the end's flat chamfer - the bevel stopped where
+      // that starts): full width all the way, down the steep part too
+      const bvx = B.follow ? bv : bv * Math.max(0, Math.min(1, (35 - steep(x, y)) / 20));
       return t - bvx + Math.max(sdW(x, y), 0);
     };
     const opening = rr ? rrLoft({ o: [0, 0, 0], u: [1, 0, 0], v: [0, 1, 0], n: [0, 0, 1] }, [[B.z, B.x[0], bx1, B.y[0], B.y[1], rr], [zl, B.x[0], bx1, B.y[0], B.y[1], rr]])
@@ -593,10 +599,10 @@
     if (m.dial && m.dial.win) { const w = windowPocket(capM, m.dial.win, m.cap); if (w) capM = w; else dialWindow(capM, m.dial.win, m.cap); }
     if (m.dial && m.dial.open) capM = dialOpening(capM, m.dial, P.trim) || capM;
     append(P.motor_cap, capM);
-    if (m.brushes) {                                 // the brush caps: n round the axis from a, each a disc from r out `out`
+    if (m.brushes) {                                 // the brush caps: two, either side (+-y: 90 / 270 deg), each a disc from r out `out`
       const Bc = m.brushes, holes = CSG && CSG.ready() ? mesh() : null;
-      for (let i = 0; i < Bc.n; i++) {
-        const a = (Bc.a + 360 * i / Bc.n) * Math.PI / 180, dir = [Math.cos(a), Math.sin(a), 0];
+      for (const sy of [1, -1]) {
+        const dir = [0, sy, 0];
         // its screwdriver slot (user 2026-10-30: "they all have one"): a dark bar on its face, `slot` deg from upright
         const face = Bc.ring > 0 ? Bc.r - (Bc.inset ?? 1) : Bc.r + Bc.out, sl = (Bc.slot ?? 15) * Math.PI / 180, tv = [-dir[1], dir[0], 0];
         const along = [tv[0] * Math.sin(sl), tv[1] * Math.sin(sl), Math.cos(sl)], across = [tv[0] * Math.cos(sl), tv[1] * Math.cos(sl), -Math.sin(sl)];
@@ -647,10 +653,14 @@
       if (L.pin > 0 && rb > sr) append(P.shaft_lock, cyl([dir[0] * sr, dir[1] * sr, L.z], dir, L.pin, rb - sr + 0.5, 24));
       Z.lock = { dir, z: L.z, travel: tr };
     }
-    const D = m.dial, ax = D.axis === "y" ? [0, 1, 0] : [0, 0, 1];
+    const D = m.dial, ax = D.axis === "y" ? [0, 1, 0] : D.axis === "x" ? [1, 0, 0] : [0, 0, 1];
+    if (D.pad) {                                     // the knob's raised pad: part of the head, its top edge chamfered 1
+      const r = D.pad.d / 2, e = Math.min(1, (D.pad.z1 - D.pad.z0) / 2);
+      append(P.motor_cap, turned([[0, D.pad.z0], [r, D.pad.z0], [r, D.pad.z1 - e], [r - e, D.pad.z1], [0, D.pad.z1]], [D.pad.c[0], D.pad.c[1], 0], [0, 0, 1], 64));
+    }
     if (D.dome || D.bevel) append(P.dial, turned([[0, 0], ...dialProfile(Object.assign({}, D, { d: D.d - 1 }))], add(D.at, mul(ax, -D.t / 2)), ax, 72));   // rim + domed top
     else append(P.dial, cyl(add(D.at, mul(ax, -D.t / 2)), ax, D.d - 1, D.t, 72));   // (1 under: the page's ridged rim rounds over its edges)
-    const oa = (D.out || 0) * Math.PI / 180, out = D.axis === "y" ? [Math.cos(oa), 0, Math.sin(oa)] : [Math.cos(oa), Math.sin(oa), 0];
+    const oa = (D.out || 0) * Math.PI / 180, out = D.axis === "y" ? [Math.cos(oa), 0, Math.sin(oa)] : D.axis === "x" ? [0, Math.cos(oa), Math.sin(oa)] : [Math.cos(oa), Math.sin(oa), 0];
     if (D.plate) {                                   // (no booleans) the dark slot round a dial on top: a thin plate on the cap's top
       const s = m.cap, nx = 6, ny = 6, base = P.trim.pos.length / 3;
       for (let i = 0; i <= nx; i++) for (let j = 0; j <= ny; j++) {
@@ -672,7 +682,7 @@
       }
     }
     const { cord } = cordParts(P, m.strain_relief, m.cord);
-    return { parts: P, dial: { c: D.at, axis: ax, out, r: D.d / 2, t: D.t, ring: D.ring || null, ribs: D.ribs ?? 7, dome: D.dome, bevel: D.bevel || null }, cord, rocker, top, z: Z };
+    return { parts: P, dial: { c: D.at, axis: ax, out, r: D.d / 2, t: D.t, ring: D.ring || null, marks: D.marks || null, ribs: D.ribs ?? 7, dome: D.dome, bevel: D.bevel || null }, cord, rocker, top, z: Z };
   }
   // a spindle (user 2026-10-29: some run a 65 mm spindle instead of a router): the nut, shaft, bearing cap and the
   // can (housing) up to the top, a dark end cap (motor_cap) on it; air-cooled: a fan grille on top, water-cooled: two
@@ -680,13 +690,22 @@
   // no switch (a VFD runs it).
   function spindle(m, P, Z) {
     const top = stack(m, P), cd = m.housing.d, capH = Math.min(8, m.housing.l / 4);
-    // the can's top capH is the end cap: the housing's own top face is under it
-    append(P.motor_cap, turned([[0, top - capH], [cd / 2 + 0.05, top - capH], [cd / 2 + 0.05, top - 1.5], [cd / 2 - 1.5, top], [0, top]], [0, 0, 0], [0, 0, 1]));
+    // the can's top capH is the end cap: the housing's own top face is under it - the cap's top tc 0.4 over it (user
+    // 2026-11-01: the two faces at one height fought - silver streaks through the cap's top)
+    const tc = top + 0.4;
+    append(P.motor_cap, turned([[0, top - capH], [cd / 2 + 0.05, top - capH], [cd / 2 + 0.05, tc - 1.5], [cd / 2 - 1.5, tc], [0, tc]], [0, 0, 0], [0, 0, 1]));
     if (m.cooling === "water")                       // two barbs up out of the cap, either side of the axis
-      for (const y of [-cd * 0.22, cd * 0.22]) { append(P.trim, cyl([cd * 0.18, y, top - 1], [0, 0, 1], 10, 6, 24)); append(P.trim, cyl([cd * 0.18, y, top + 5], [0, 0, 1], 6, 12, 24)); }
-    else for (let i = 0; i < 4; i++) {               // the fan grille: dark rings on the cap
-      const r = cd * (0.12 + 0.1 * i);
-      append(P.trim, turned([[r, top + 0.15], [r + cd * 0.04, top + 0.15], [r + cd * 0.04, top + 0.3], [r, top + 0.3]], [0, 0, 0], [0, 0, 1], 48));
+      for (const y of [-cd * 0.22, cd * 0.22]) { append(P.trim, cyl([cd * 0.18, y, tc - 1], [0, 0, 1], 10, 6, 24)); append(P.trim, cyl([cd * 0.18, y, tc + 5], [0, 0, 1], 6, 12, 24)); }
+    else {                                           // the fan grille: ring ribs + a cross of spokes standing 1 mm proud, in the
+      // can's metal (user 2026-11-01: dark on the dark cap it looked odd - a guard over the dark openings)
+      // (user 2026-11-01: 0.15 mm thin rings 0.15 over the cap flickered into streaks); each from 0.2 under the cap's face
+      for (let i = 0; i < 4; i++) {
+        const r = cd * (0.12 + 0.1 * i), w = Math.max(1.2, cd * 0.025);
+        append(P.housing, turned([[r, tc - 0.2], [r + w, tc - 0.2], [r + w, tc + 1], [r, tc + 1], [r, tc - 0.2]], [0, 0, 0], [0, 0, 1], 72));
+      }
+      const L = cd * 0.92 - 3;                         // inside the cap's chamfer
+      append(P.housing, box([0, 0, tc + 0.4], [L, 2, 1.2]));
+      append(P.housing, box([0, 0, tc + 0.4], [2, L, 1.2]));
     }
     const pz = top - capH - 12;                      // the plug: a boss out of the -x side, the cable on out of it
     append(P.trim, cyl([-cd / 2 + 1, 0, pz], [-1, 0, 0], 16, 14, 32));

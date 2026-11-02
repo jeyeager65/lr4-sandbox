@@ -59,7 +59,8 @@ ok(/Slot width/.test(labels("dial", ke)) && !/Window length/.test(labels("dial",
   "on the end: the slot's rows (none without the geometry booleans)");
 ok(!/Depth/.test(labels("dial", ke)) && /Depth/.test(labels("dial", Object.assign(clone(ke), { model: Object.assign(clone(ke.model), { dial: Object.assign(clone(ke.model.dial), { surround: { kind: "raised" } }) }) }))),
   "the surround's sizes once there is one");
-ok(/Top edges/.test(labels("motor_cap", kb)), "a box cap: its corners");
+const kbox = clone(kb); delete kbox.model.motor_cap.shape;   // (the Kobalt is shaped since 2026-11-01: a box of its sizes)
+ok(/Top edges/.test(labels("motor_cap", kbox)), "a box cap: its corners");
 const ksh = clone(kb); ksh.model.motor_cap.shape = { top: [] };
 ok(!/Top edges/.test(labels("motor_cap", ksh)), "a drawn cap: no corners");
 const sp = R.preset("spindle65");

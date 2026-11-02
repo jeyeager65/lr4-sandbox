@@ -109,7 +109,7 @@ const JOBTXT = ["(LR4 router test)", STOCK, "(ToolDef 1: SHAPE=flat D=6.35 FLUTE
       out.kob2 = look();
       return out;
     })()`);
-    ok(b.kob.w === 80 && b.t1.w === 75.2 && b.carb.w === 75 && b.kob2.w === 80 && b.carb.top < b.kob.top, `the model from the preset: motor cap 80 wide (Kobalt) -> 75.2 (T1: the Makita's body) -> 75 (Carbide, lower) -> 80 (${JSON.stringify([b.kob.w, b.t1.w, b.carb.w, b.kob2.w, b.kob.top, b.carb.top])})`);
+    ok(b.kob.w === 80 && b.t1.w === 75.2 && b.carb.w === 75.2 && b.kob2.w === 80 && b.carb.top < b.kob.top, `the model from the preset: motor cap 80 wide (Kobalt) -> 75.2 (T1: the Makita's body) -> 75.2 (Carbide: the Makita's body too, lower) -> 80 (${JSON.stringify([b.kob.w, b.t1.w, b.carb.w, b.kob2.w, b.kob.top, b.carb.top])})`);
     ok(b.kob.ax[2] > 0.99 && Math.abs(b.carb.ax[2]) < 0.01, `the wheel's axis: upright (Kobalt); the Carbide's on top stands across its head (Part 46d) (${JSON.stringify([b.kob.ax, b.carb.ax])})`);
     ok(/Carbide/.test(b.carb.label) && /Kobalt/.test(b.kob2.label), `the housing's label follows (${b.carb.label})`);
     ok(b.carb.cord && b.kob.cord && Math.hypot(...b.carb.cord.map((v, i) => v - b.kob.cord[i])) > 10 && JSON.stringify(b.kob2.cord) === JSON.stringify(b.kob.cord),

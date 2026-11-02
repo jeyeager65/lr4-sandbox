@@ -135,7 +135,7 @@
           const [lo, hi] = rtiRange(r, v), slide = r.kind !== "rpm";
           html += `<label class="rti-row${slide ? "" : " rti-ns"}" data-k="${k}"${tip}><span>${l}</span>` +
             (slide ? `<input type="range" min="${lo}" max="${hi}" step="${r.step || 0.5}" aria-label="${l}">` : "") +
-            `<input type="number" step="any" aria-label="${l}"><em>${rtiEsc(r.unit)}</em></label>`;
+            `<div class="unit-input rti-box"><input type="number" step="any" aria-label="${l}">${r.unit ? `<em>${rtiEsc(r.unit)}</em>` : ""}</div></label>`;
         } else if (r.kind === "choice") {
           html += `<div class="rti-opt" data-k="${k}" role="group" aria-label="${l}"${tip}><span>${l}</span>` +
             r.opts.map(([ov, ol]) => `<button type="button" data-v="${rtiEsc(ov)}" aria-pressed="false">${rtiEsc(ol)}</button>`).join("") + "</div>";
@@ -145,7 +145,7 @@
           html += `<label class="rti-row rti-sel" data-k="${k}"${tip}><span>${l}</span><select>` +
             r.opts.map(([ov, ol]) => `<option value="${rtiEsc(ov)}">${rtiEsc(ol)}</option>`).join("") + "</select></label>";
         } else if (r.kind === "text" || r.kind === "list") {
-          html += `<label class="rti-row rti-text" data-k="${k}"${tip}><span>${l}</span><input type="text" maxlength="${r.kind === "text" ? 40 : 120}"><em>${rtiEsc(r.unit)}</em></label>`;
+          html += `<label class="rti-row rti-text" data-k="${k}"${tip}><span>${l}</span><div class="unit-input rti-box"><input type="text" maxlength="${r.kind === "text" ? 40 : 120}">${r.unit ? `<em>${rtiEsc(r.unit)}</em>` : ""}</div></label>`;
         } else if (r.kind === "look") {
           html += `<div class="rti-row rti-look" data-k="${k}"${tip}><span>${l}</span><input type="color" aria-label="${l} color">` +
             `<select aria-label="${l} finish">${LR4Routers.FINISHES.map((f) => `<option value="${f}">${f[0].toUpperCase() + f.slice(1)}</option>`).join("")}</select></div>`;

@@ -20,8 +20,8 @@
 //   arm: a bracket that wide from the boss up to the housing (0 = none), pin: Ø of the button's pin into the shaft's
 //   hole (square to the flats; 0 = none), r: reach from the axis (the boss's end),
 //   travel: press depth, button: Ø, out: how far the button stands out (defaults 0.7 d, travel + 1) };
-//   brushes { n, z, a, d, r: its base out from the axis, out (no border), ring: a border in the head's color flush with
-//   the body (r = its surface), inset: the cap in it } (the brush caps);
+//   brushes { z, d, r: its base out from the axis, out (no border), ring: a border in the head's color flush with
+//   the body (r = its surface), inset: the cap in it } (the brush caps: always two, either side - left / right of the switch end);
 //   strain_relief { at, l, d: at the cap, bend: deg toward +y }; cord { d, out: the stub drawn past the relief };
 //   looks { part: { c: sRGB 0..1, f: metal | plastic | rubber } } for every part (js/routers.js LOOK_PARTS).
 //   A spindle: { kind: "spindle", collet_nut, collet, shaft, bearing_cap, housing (the can), cooling: air | water }.
@@ -42,7 +42,7 @@
   "default": "kobalt",
   "routers": {
     "kobalt": {
-      "name": "Kobalt trim router",
+      "name": "Kobalt K7TR-03",
       "source": "manual",
       "speeds": [[1, 10000], [2, 14000], [3, 18000], [4, 22000], [5, 26000], [6, 35000]],
       "speeds_source": "manual table",
@@ -55,9 +55,15 @@
         "bearing_cap": {"d": 40.0, "l": 11.0},
         "housing": {"d": 65.8, "l": 94.0, "vent": {"depth": 10.0, "inset": 0.5, "wall": 3.5, "spokes": 12, "w": 3.0}},
         "collar": {"d": 66.6, "l": 22.0},
-        "motor_cap": {"L": 105, "W": 80, "H": 60, "top_r": 14, "front_r": 14, "back_r": 14, "bot_r": 14},
-        "dial": {"place": "window", "win": {"open": true}, "style": "dome", "dome": {"top": 0.45}, "d": 22.0, "t": 8.0, "ring": ["#202022", "#0b0b0c"]},
-        "shaft_lock": {"z": 24.0, "a": -51.5, "d": 17.0, "in": 10.0, "r": 28.0, "button": 12.0, "pin": 5.0, "out": 4.0, "travel": 1.5},
+        "transition": {"l": 17, "shape": "cap", "edge": "none", "d": 66.6, "e": 0},
+        "motor_cap": {"L": 105, "W": 80, "H": 43, "bot_r": 2, "shape": {
+          "top": [{"x": -52.5, "y": 0, "s": "line"}, {"x": -52.5, "y": 9, "s": "line"}, {"x": -47, "y": 9, "s": "line", "r": 1}, {"x": -46.5, "y": 24.5, "s": "curve"}, {"x": -40, "y": 29.6, "s": "curve"}, {"x": -32, "y": 35.2, "s": "curve"}, {"x": -22, "y": 39.15, "s": "curve"}, {"x": 0, "y": 39.96, "s": "curve"}, {"x": 22, "y": 39.15, "s": "curve"}, {"x": 32, "y": 35, "s": "curve"}, {"x": 39, "y": 30.2, "s": "curve"}, {"x": 43, "y": 26.8, "s": "curve"}, {"x": 45.5, "y": 22, "s": "line"}, {"x": 45.5, "y": 21, "s": "line", "r": 2}, {"x": 52.5, "y": 20, "s": "line", "r": 2}, {"x": 52.5, "y": 0, "s": "line"}],
+          "front": [{"x": -46, "y": 0, "s": "line", "r": 2}, {"x": 46, "y": 0, "s": "line", "r": 2}, {"x": 52.5, "y": 3.5, "s": "line", "r": 2}, {"x": 52.5, "y": 26.2, "s": "line", "r": 3}, {"x": 44, "y": 43, "s": "line", "r": 3}, {"x": -45, "y": 43, "s": "line", "r": 3}, {"x": -52.5, "y": 22.2, "s": "line", "r": 3}, {"x": -52.5, "y": 3.5, "s": "line", "r": 2}],
+          "section": [{"x": 0, "y": 43, "s": "line"}, {"x": 22, "y": 43, "s": "line", "r": 3}, {"x": 40, "y": 34, "s": "line", "r": 3}, {"x": 40, "y": 0, "s": "line", "r": 1}, {"x": 0, "y": 0, "s": "line"}]}},
+        "dial": {"place": "window", "d": 25, "t": 8, "in": 6, "drop": 5, "win": {"l": 9, "w": 19.6, "open": true, "bevel": 5, "r": 1, "follow": true}, "style": "bevel", "ribs": 4, "bevel": {"top": 0.6}, "ring": ["#202022", "#0b0b0c"]},
+        "shaft_lock": {"z": 25.0, "a": -51.5, "d": 17.0, "in": 10.0, "r": 28.0, "button": 12.0, "pin": 5.0, "out": 4.0, "travel": 1.5},
+        "brushes": {"z": 168.5, "d": 21, "r": 40, "out": 5, "ring": 2.5, "inset": 2.5, "slot": 15},
+        "switch": {"down": 28.9},
         "strain_relief": {"at": [-52.5, 0, 185], "l": 45.0, "d": 13.0, "bend": 45.0},
         "looks": {
           "shaft": {"c": [0.09, 0.09, 0.1], "f": "metal"},
@@ -87,8 +93,9 @@
           "front": [{"x": -62, "y": 6, "s": "line"}, {"x": -50, "y": 6, "s": "line"}, {"x": -50, "y": 0, "s": "line"}, {"x": 41.6, "y": 0, "s": "line", "r": 1}, {"x": 41.6, "y": 24, "s": "curve"}, {"x": 40, "y": 31, "s": "curve"}, {"x": 36, "y": 38, "s": "curve"}, {"x": 31, "y": 43.8, "s": "curve"}, {"x": 25, "y": 46, "s": "line"}, {"x": -25, "y": 46, "s": "curve"}, {"x": -33, "y": 43, "s": "curve"}, {"x": -37, "y": 40, "s": "line"}, {"x": -52, "y": 40, "s": "line", "r": 3}, {"x": -56, "y": 34, "s": "line"}, {"x": -62, "y": 34, "s": "line", "r": 2}],
           "section": [{"x": 0, "y": 46, "s": "line"}, {"x": 37.6, "y": 46, "s": "line", "r": 12}, {"x": 37.6, "y": 0, "s": "line", "r": 1}, {"x": 0, "y": 0, "s": "line"}]}},
         "dial": {"place": "window", "in": 4, "drop": 3, "win": {"l": 10, "w": 30, "r": 8, "bevel": 0, "open": true}, "style": "bevel", "bevel": {"top": 0.6}, "ribs": 4, "d": 30, "t": 8, "ring": ["#c8322b", "#8e1f1a"]},
-        "shaft_lock": {"z": 25.72, "a": -55, "d": 14, "in": 14, "arm": 15, "pin": 7, "r": 24, "travel": 3, "button": 12, "out": 5.5},
-        "brushes": {"n": 2, "z": 153.87, "a": 90, "d": 12, "r": 37.6, "out": 2.5, "ring": 2, "inset": 1},
+        "switch": {"down": 35.5},
+        "shaft_lock": {"z": 25.0, "a": -61.5, "d": 14, "in": 14, "arm": 15, "pin": 7, "r": 24, "travel": 3, "button": 12, "out": 5.5},
+        "brushes": {"z": 153.87, "d": 12, "r": 37.6, "out": 2.5, "ring": 2, "inset": 1},
         "strain_relief": {"l": 73, "d": 20, "bend": 0, "at": [-62, 0, 173.87]},
         "cord": {"d": 7.6, "out": 15},
         "looks": {
@@ -107,25 +114,31 @@
       "speeds_source": "Carbide 3D table (approximate)",
       "mount": "makita",
       "model": {
-        "label": "Carbide Compact Router (user-measured 2026-10-28; shape from photos)",
+        "label": "Carbide Compact Router (the Makita RT0701C's body - user 2026-11-01: \"like the Makita\" - with its own measured ER11 bit end, gray head, dial on top)",
+        "clamp": 38,
         "collet_nut": {"type": "ER11A", "af": 19.0, "h": 13.0, "below": 1.5},
         "collet": {"type": "ER11", "sizes": [3.175, 6.35], "l": 18.0, "d": 11.5, "taper": 8},
-        "shaft": {"d": 13.8, "exposed": 16.0, "thread": {"d": 13.0, "pitch": 0.75, "length": 8.0}, "flats": {"af": 12.8, "z": 14.5, "l": 5.0}},
-        "bearing_cap": {"d": 43.0, "l": 8.0},
-        "housing": {"d": 64.8, "l": 72.0, "vent": {"depth": 10.0, "inset": 0.5, "wall": 2.2, "spokes": 12, "w": 2.2}},
-        "collar": {"d": 66.0, "l": 9.0},
-        "transition": {"l": 38.0, "d": 73.0, "shape": "round", "edge": "none"},
-        "motor_cap": {"L": 100.0, "W": 75.0, "H": 44.0, "top_r": 14.0, "front_r": 14.0, "back_r": 14.0, "bot_r": 4.0},
-        "dial": {"place": "top", "surround": {"kind": "sunk", "depth": 2, "margin": 3, "edge": "chamfer", "e": 0.8}, "d": 28.0, "t": 9.0, "ring": ["#c22a22", "#871a15"]},
-        "shaft_lock": {"z": 24.0, "a": -51.5, "d": 14.0, "in": 10.0, "arm": 15.0, "r": 26.0, "button": 10.0, "pin": 5.0, "out": 4.0, "travel": 3.5},
-        "strain_relief": {"at": [-50.0, 0, 176.0], "l": 40.0, "d": 12.0, "bend": 45.0},
+        "shaft": {"d": 13.8, "exposed": 18.5, "thread": {"d": 13.0, "pitch": 0.75, "length": 8.0}, "flats": {"af": 12.8, "z": 14.5, "l": 5.0}},
+        "bearing_cap": {"d": 43.4, "l": 6.5},
+        "housing": {"d": 64, "l": 90, "ch": 1, "vent": {"depth": 10, "wall": 1.5, "spokes": 12, "w": 2.2, "inset": 2}},
+        "transition": {"l": 26, "shape": "cap", "edge": "none", "d": 64, "e": 0},
+        "motor_cap": {"L": 103.6, "W": 75.2, "H": 46, "at": [-10.2, 0], "bot_r": 2, "shape": {
+          "top": [{"x": -62, "y": 0, "s": "line"}, {"x": -62, "y": 14, "s": "line"}, {"x": -54, "y": 14, "s": "line"}, {"x": -36, "y": 28, "s": "curve"}, {"x": -26, "y": 34.5, "s": "curve"}, {"x": 0, "y": 37.6, "s": "curve"}, {"x": 24, "y": 34.5, "s": "curve"}, {"x": 34, "y": 31, "s": "curve"}, {"x": 38.5, "y": 22, "s": "curve"}, {"x": 41.6, "y": 0, "s": "line"}],
+          "front": [{"x": -62, "y": 6, "s": "line"}, {"x": -50, "y": 6, "s": "line"}, {"x": -50, "y": 0, "s": "line"}, {"x": 41.6, "y": 0, "s": "line", "r": 1}, {"x": 41.6, "y": 24, "s": "curve"}, {"x": 40, "y": 31, "s": "curve"}, {"x": 36, "y": 38, "s": "curve"}, {"x": 31, "y": 43.8, "s": "curve"}, {"x": 25, "y": 46, "s": "line"}, {"x": -25, "y": 46, "s": "curve"}, {"x": -33, "y": 43, "s": "curve"}, {"x": -37, "y": 40, "s": "line"}, {"x": -52, "y": 40, "s": "line", "r": 3}, {"x": -56, "y": 34, "s": "line"}, {"x": -62, "y": 34, "s": "line", "r": 2}],
+          "section": [{"x": 0, "y": 46, "s": "line"}, {"x": 37.6, "y": 46, "s": "line", "r": 12}, {"x": 37.6, "y": 0, "s": "line", "r": 1}, {"x": 0, "y": 0, "s": "line"}]}},
+        "dial": {"place": "top", "plane": "across", "x": -20, "set": -3, "surround": {"kind": "sunk", "depth": 2, "margin": 3, "edge": "chamfer", "e": 0.8}, "d": 30.0, "t": 6.0, "ring": ["#c22a22", "#871a15"]},
+        "switch": {"down": 37},
+        "shaft_lock": {"z": 26.5, "a": -61.5, "d": 14, "in": 14, "arm": 15, "pin": 7, "r": 24, "travel": 3, "button": 12, "out": 5.5},
+        "brushes": {"z": 153.87, "d": 12, "r": 37.6, "out": 2.5, "ring": 2, "inset": 1},
+        "strain_relief": {"l": 73, "d": 20, "bend": 0, "at": [-62, 0, 173.87]},
+        "cord": {"d": 7.6, "out": 15},
         "looks": {
           "shaft": {"c": [0.09, 0.09, 0.1], "f": "metal"},
-          "bearing_cap": {"c": [0.4, 0.41, 0.43], "f": "plastic"},
-          "lock_boss": {"c": [0.4, 0.41, 0.43], "f": "plastic"},
           "collet_nut": {"c": [0.09, 0.09, 0.1], "f": "metal"},
           "motor_cap": {"c": [0.36, 0.37, 0.39], "f": "plastic"},
-          "dial": {"c": [0.78, 0.15, 0.13], "f": "plastic"}
+          "transition": {"c": [0.74, 0.75, 0.77], "f": "plastic"},
+          "dial": {"c": [0.78, 0.15, 0.13], "f": "plastic"},
+          "shaft_lock": {"c": [0.09, 0.09, 0.1], "f": "plastic"}
         }
       }
     },
@@ -136,20 +149,23 @@
       "speeds_source": "even spread over DeWalt's 16000-27000 RPM spec - unverified",
       "mount": "dewalt",
       "model": {
-        "label": "DeWalt DWP611 (GUESS: published sizes; the head scaled off a product photo by the 69 mm housing - user 2026-10-31, not measured)",
+        "label": "DeWalt DWP611 (GUESS: the user's photo in the LR4, 2026-11-01, scaled by the mount screws (61 mm apart; the 69 mm housing agrees): body, gray lip, head heights - not measured)",
+        "clamp": 32,
         "collet_nut": {"type": "DeWalt", "af": 22.0, "h": 15.0, "below": 1.5},
         "collet": {"type": "DeWalt", "sizes": [6.35], "l": 20.0, "d": 12.0, "taper": 8},
         "shaft": {"d": 12.0, "exposed": 4.0, "thread": {"d": 16.0, "pitch": 1.0, "length": 9.0}},
-        "housing": {"d": 69.0, "l": 100.0},
-        "collar": {"d": 69.0, "l": 6.0},
-        "motor_cap": {"L": 80, "W": 80, "H": 47, "bot_r": 1, "shape": {
+        "bearing_cap": {"d": 42, "l": 2},
+        "housing": {"d": 69.0, "l": 120.0, "ch": 3, "vent": {"depth": 8, "wall": 2.5, "spokes": 8, "w": 4, "inset": 1.5}},
+        "transition": {"l": 10, "shape": "cap", "edge": "none", "d": 69, "e": 0},
+        "motor_cap": {"L": 80, "W": 80, "H": 42, "bot_r": 1, "shape": {
           "top": [{"x": -40, "y": 0, "s": "arc", "r": 40}, {"x": 0, "y": 40, "s": "arc", "r": 40}, {"x": 40, "y": 0, "s": "line"}],
-          "front": [{"x": -36.3, "y": 0, "s": "line"}, {"x": 36.3, "y": 0, "s": "line"}, {"x": 38.9, "y": 9, "s": "curve"}, {"x": 40, "y": 21, "s": "curve"}, {"x": 39.5, "y": 32, "s": "curve"}, {"x": 35.7, "y": 42, "s": "curve"}, {"x": 26.7, "y": 47, "s": "line"}, {"x": -26.7, "y": 47, "s": "curve"}, {"x": -35.7, "y": 42, "s": "curve"}, {"x": -39.5, "y": 32, "s": "curve"}, {"x": -40, "y": 21, "s": "curve"}, {"x": -38.9, "y": 9, "s": "line"}],
-          "section": [{"x": 0, "y": 47, "s": "line"}, {"x": 26.7, "y": 47, "s": "curve"}, {"x": 35.7, "y": 42, "s": "curve"}, {"x": 39.5, "y": 32, "s": "curve"}, {"x": 40, "y": 21, "s": "curve"}, {"x": 38.9, "y": 9, "s": "line"}, {"x": 36.3, "y": 0, "s": "line"}, {"x": 0, "y": 0, "s": "line"}]}},
+          "front": [{"x": -36.3, "y": 0, "s": "line"}, {"x": 36.3, "y": 0, "s": "line"}, {"x": 38.9, "y": 8, "s": "curve"}, {"x": 40, "y": 18.8, "s": "curve"}, {"x": 39.5, "y": 28.6, "s": "curve"}, {"x": 35.7, "y": 37.5, "s": "curve"}, {"x": 26.7, "y": 42, "s": "line"}, {"x": -26.7, "y": 42, "s": "curve"}, {"x": -35.7, "y": 37.5, "s": "curve"}, {"x": -39.5, "y": 28.6, "s": "curve"}, {"x": -40, "y": 18.8, "s": "curve"}, {"x": -38.9, "y": 8, "s": "line"}],
+          "section": [{"x": 0, "y": 42, "s": "line"}, {"x": 26.7, "y": 42, "s": "curve"}, {"x": 35.7, "y": 37.5, "s": "curve"}, {"x": 39.5, "y": 28.6, "s": "curve"}, {"x": 40, "y": 18.8, "s": "curve"}, {"x": 38.9, "y": 8, "s": "line"}, {"x": 36.3, "y": 0, "s": "line"}, {"x": 0, "y": 0, "s": "line"}]}},
         "dial": {"place": "end", "d": 30.0, "t": 7.0},
-        "shaft_lock": {"z": 26.0, "a": -50.0, "d": 12.0, "r": 37.5, "travel": 3.0},
         "looks": {
-          "motor_cap": {"c": [0.996, 0.741, 0.09], "f": "plastic"}
+          "motor_cap": {"c": [0.996, 0.741, 0.09], "f": "plastic"},
+          "collet_nut": {"c": [0.09, 0.09, 0.1], "f": "metal"},
+          "transition": {"c": [0.56, 0.56, 0.54], "f": "plastic"}
         }
       }
     },
@@ -157,23 +173,25 @@
       "name": "Sienci AutoSpin T1",
       "source": "gcode",
       "s": [10000, 31250],
-      "speeds_source": "Sienci: 5 V PWM, 0-100 % = 0-31250 RPM, under 10000 not accurate (GUESS: S = RPM straight)",
+      "speeds": [[1, 10000], [2, 10000], [3, 15000], [4, 20000], [5, 25000], [6, 30000]],
+      "speeds_source": "Sienci: 5 V PWM, 0-100 % = 0-31250 RPM, under 10000 not accurate (GUESS: S = RPM straight). Run by hand (Speed comes from: Speed dial): its knob's 1-5 (the stops after S) - GUESS: 10000-30000 evenly, S = the lowest",
       "mount": "makita",
       "model": {
-        "label": "Sienci AutoSpin T1 (the Makita RT0701C's body - user 2026-10-31; colors + the dial knob on top from Sienci's photos, GUESS sizes)",
+        "label": "Sienci AutoSpin T1 (the Makita RT0701C's body - user 2026-10-31; its head raised toward the switch end + the knob, the user's edit 2026-11-01; GUESS sizes)",
         "collet_nut": {"type": "Makita", "af": 22, "h": 12, "below": 5.9},
         "collet": {"type": "Makita", "sizes": [6.35, 3.175], "l": 20, "d": 14, "taper": 8},
         "shaft": {"d": 17, "exposed": 19.4, "thread": {"d": 17, "pitch": 1, "length": 6}},
         "bearing_cap": {"d": 43.4, "l": 6.5},
         "housing": {"d": 64, "l": 90, "ch": 1, "vent": {"depth": 10, "wall": 1.5, "spokes": 12, "w": 2.2, "inset": 2}},
         "transition": {"l": 26, "shape": "cap", "edge": "none", "d": 64, "e": 0},
-        "motor_cap": {"L": 103.6, "W": 75.2, "H": 46, "at": [-10.2, 0], "bot_r": 2, "shape": {
+        "motor_cap": {"L": 103.6, "W": 75.2, "H": 52.5, "at": [-10.2, 0], "bot_r": 2, "shape": {
           "top": [{"x": -62, "y": 0, "s": "line"}, {"x": -62, "y": 14, "s": "line"}, {"x": -54, "y": 14, "s": "line"}, {"x": -36, "y": 28, "s": "curve"}, {"x": -26, "y": 34.5, "s": "curve"}, {"x": 0, "y": 37.6, "s": "curve"}, {"x": 24, "y": 34.5, "s": "curve"}, {"x": 34, "y": 31, "s": "curve"}, {"x": 38.5, "y": 22, "s": "curve"}, {"x": 41.6, "y": 0, "s": "line"}],
-          "front": [{"x": -62, "y": 6, "s": "line"}, {"x": -50, "y": 6, "s": "line"}, {"x": -50, "y": 0, "s": "line"}, {"x": 41.6, "y": 0, "s": "line", "r": 1}, {"x": 41.6, "y": 24, "s": "curve"}, {"x": 40, "y": 31, "s": "curve"}, {"x": 36, "y": 38, "s": "curve"}, {"x": 31, "y": 43.8, "s": "curve"}, {"x": 25, "y": 46, "s": "line"}, {"x": -25, "y": 46, "s": "curve"}, {"x": -33, "y": 43, "s": "curve"}, {"x": -37, "y": 40, "s": "line"}, {"x": -52, "y": 40, "s": "line", "r": 3}, {"x": -56, "y": 34, "s": "line"}, {"x": -62, "y": 34, "s": "line", "r": 2}],
-          "section": [{"x": 0, "y": 46, "s": "line"}, {"x": 37.6, "y": 46, "s": "line", "r": 12}, {"x": 37.6, "y": 0, "s": "line", "r": 1}, {"x": 0, "y": 0, "s": "line"}]}},
-        "dial": {"place": "knob", "x": 0, "sink": 2, "style": "bevel", "bevel": {"top": 0.6}, "ribs": 4, "d": 28, "t": 8, "ring": ["#f2b11e", "#c08712"]},
-        "shaft_lock": {"z": 25.72, "a": -55, "d": 14, "in": 14, "arm": 15, "pin": 7, "r": 24, "travel": 3, "button": 12, "out": 5.5},
-        "brushes": {"n": 2, "z": 153.87, "a": 90, "d": 12, "r": 37.6, "out": 2.5, "ring": 2, "inset": 1},
+          "front": [{"x": -62, "y": 6, "s": "line"}, {"x": -50, "y": 6, "s": "line"}, {"x": -50, "y": 0, "s": "line"}, {"x": 41.6, "y": 0, "s": "line", "r": 1}, {"x": 41.6, "y": 24, "s": "curve"}, {"x": 41.6, "y": 31.5, "s": "line"}, {"x": 41.6, "y": 52.5, "s": "line"}, {"x": -1.5, "y": 52.5, "s": "line", "r": 4}, {"x": -1.5, "y": 47, "s": "line", "r": 20.5}, {"x": -25, "y": 46, "s": "curve"}, {"x": -33, "y": 43, "s": "curve"}, {"x": -37, "y": 40, "s": "line"}, {"x": -52, "y": 40, "s": "line", "r": 3}, {"x": -56, "y": 34, "s": "line"}, {"x": -62, "y": 34, "s": "line", "r": 2}],
+          "section": [{"at": -62, "pts": [{"x": 0, "y": 46, "s": "line"}, {"x": 37.6, "y": 46, "s": "line", "r": 12}, {"x": 37.6, "y": 0, "s": "line", "r": 1}, {"x": 0, "y": 0, "s": "line"}]}, {"at": -1.5, "pts": [{"x": 0, "y": 46, "s": "line"}, {"x": 37.6, "y": 46, "s": "line", "r": 2}, {"x": 37.6, "y": 0, "s": "line", "r": 1}, {"x": 0, "y": 0, "s": "line"}]}, {"at": 30, "pts": [{"x": 0, "y": 46, "s": "line"}, {"x": 37.6, "y": 46, "s": "line", "r": 2}, {"x": 37.6, "y": 0, "s": "line", "r": 1}, {"x": 0, "y": 0, "s": "line"}]}, {"at": 40, "pts": [{"x": 0, "y": 46, "s": "line"}, {"x": 37.6, "y": 46, "s": "line", "r": 12}, {"x": 37.6, "y": 0, "s": "line", "r": 1}, {"x": 0, "y": 0, "s": "line"}]}]}},
+        "dial": {"place": "knob", "x": 21.5, "y": -17, "marks": ["S", "1", "2", "3", "4", "5"], "sink": 1.5, "style": "bevel", "bevel": {"top": 0.6}, "ribs": 4, "d": 28, "t": 7.5, "ring": ["#f2b11e", "#c08712"]},
+        "switch": {"down": 43.5},
+        "shaft_lock": {"z": 25.0, "a": -61.5, "d": 14, "in": 14, "arm": 15, "pin": 7, "r": 24, "travel": 3, "button": 12, "out": 5.5},
+        "brushes": {"z": 153.87, "d": 12, "r": 37.6, "out": 2.5, "ring": 2, "inset": 1},
         "strain_relief": {"l": 73, "d": 20, "bend": 0, "at": [-62, 0, 173.87]},
         "cord": {"d": 7.6, "out": 15},
         "looks": {

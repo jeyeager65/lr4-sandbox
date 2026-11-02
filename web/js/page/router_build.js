@@ -142,6 +142,11 @@
     if (k === "name") return rbEdit((p) => { p.name = String(v).slice(0, 40) || "My router"; });
     if (k === "mount") return rbEdit((p) => { p.mount = v; }, true);
     if (k === "source") return rbEdit((p) => { p.source = v; if (v === "gcode" && !p.s) p.s = [10000, 30000]; }, true);
+    if (k === "model.dial.marks") {                 // six labels, or none (1-6)
+      const a = String(v).split(/[,;\s]+/).filter(Boolean);
+      if (!a.length || a.length === 6) rbEdit((p) => { if (a.length) p.model.dial.marks = a; else delete p.model.dial.marks; }, true);
+      return;
+    }
     if (k === "model.collet.sizes") {
       const a = String(v).split(/[,;\s]+/).map(Number).filter((x) => x > 0);
       if (a.length) rbEdit((p) => { p.model.collet.sizes = a; }, true);
@@ -237,6 +242,9 @@
   // take the plate + clip out as for probing, and back (the Run tab's touch plate button: the same plate, table.js handPlate)
   $("rb-touch-go").addEventListener("click", () => { if (meta && HOME.pose) handPlate(!HAND.plate); });
   $("rte-back").addEventListener("click", () => inspectEnd());
+  // the editor is Configure's: Run / Learn leave it first, as Back would (user 2026-11-01: its panels stayed over Run's)
+  // (ui.js, which makes LR4OnMode, loads after this file: hooked once they all have)
+  document.addEventListener("DOMContentLoaded", () => { if (typeof LR4OnMode === "function") LR4OnMode((m) => { if (m !== "design" && rbViewing()) inspectEnd(); }); });
   $("rb-core-box").addEventListener("change", () => {   // the camera stays put
     if (!rbViewing()) return;
     INSPECT.drop = rbViewDrop();

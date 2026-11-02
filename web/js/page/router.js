@@ -6,6 +6,10 @@
   // dial. Kept per machine (lr4-router). The dial's numbers are a ring on Router_Dial (a child: it rides every pose
   // and the tram lean; not in meshes, so no picking or printed look), turned about the router's axis. ----
   const RT_KEY = "lr4-router";
+  // the dust shoe's height in its slot (the router's model.shoe, mm + up - the Mount panel): the upper shoe + the lower one
+  // on it (skirt, bristles), not its screw (machine.js move; user 2026-11-01)
+  const SHOE_ADJ = /^(Dust_Shoe_Kobalt$|Dust_Skirt|Bristles_TPU)/;
+  const rtShoe = () => { const r = LR4Routers.ROUTERS[RT.set.router]; return (r && r.model && r.model.shoe) || 0; };
   try { RT.set = LR4Routers.settings(JSON.parse(MS.get(RT_KEY) || "null")); } catch (e) { /* defaults */ }
   function rtSave() { try { MS.set(RT_KEY, JSON.stringify(RT.set)); } catch (e) { /* not kept */ } }
   const rtRpmText = (v) => `~${(Math.round(v / 100) * 100).toLocaleString("en-US")} RPM`;
@@ -121,11 +125,12 @@
       }
       if (part === "dial") {                         // the wheel's centre, axis and the rim that shows (ref frame)
         const d = B.b.dial;
-        ud.dial = d && { c: LR4RouterBody.placeV(d.c, B.f), axis: LR4RouterBody.placeV(d.axis, B.f, true), out: LR4RouterBody.placeV(d.out, B.f, true), r: d.r, t: d.t, ribs: d.ribs, dome: d.dome, bevel: d.bevel };
+        ud.dial = d && { c: LR4RouterBody.placeV(d.c, B.f), axis: LR4RouterBody.placeV(d.axis, B.f, true), out: LR4RouterBody.placeV(d.out, B.f, true), r: d.r, t: d.t, ribs: d.ribs, marks: d.marks, dome: d.dome, bevel: d.bevel };
       }
       if (part === "shaft_lock" && B.b.z.lock) ud.lockDir = LR4RouterBody.placeV(B.b.z.lock.dir, B.f, true);
       out.push([dress(geo, null, false), rtMaterial(L), ud]);
     }
+    rtClashSoon();                                   // once they're in the scene: does it hit the core?
     out.push([rtBitGeo(B.f), material(null, { c: [0.72, 0.73, 0.75], r: 0.28 }), Object.assign({}, ud0, { name: "Router_Bit", label: "Router bit", color: [0.62, 0.64, 0.67] })]);
     return out;
   }
@@ -144,6 +149,93 @@
     h.cord.tip = h.cord.tip0.map((v, i) => v + dt[i]);
     const dir = w(c.dir);
     h.cord.tip2 = h.cord.tip.map((v, i) => v + dir[i] * L);
+  }
+  // ---- does the router hit the core? (user 2026-11-01, the Kobalt's new head): the router's parts as columns on a 1 mm
+  // grid from above, each the z spans inside one part (its closed mesh: the crossings sorted, paired); the core's
+  // surface sampled ~1.5 mm apart round them - a point over 0.5 mm into a span is a clash. Run a moment after a router's
+  // meshes are made; the Router step (its dot too) and the router editor say which part and how far. ----
+  // what it's checked against: the core, and the dust shoe (its height in the slot - the router's model.shoe - can bring it up to the
+  // router: the Kobalt's lock collar, user 2026-11-01)
+  const RT_CLASH_CORE = /^(Core|Bearing_Core_|Dust_Shoe_Kobalt$)/, RT_CLASH_CELL = 1, RT_CLASH_MIN = 0.5;
+  const rtClashWhat = (n) => (/^Dust_Shoe/.test(n) ? "the dust shoe" : "the core");
+  function rtClashSoon() { clearTimeout(RT.clashT); RT.clashT = setTimeout(rtClashShow, 400); }
+  function rtTris(m, fn) {                           // each triangle of m in world coordinates
+    const g = m.geometry, pa = g.attributes.position, ix = g.index, n = ix ? ix.count : pa.count;
+    m.updateMatrixWorld();
+    const A = new THREE.Vector3(), B = new THREE.Vector3(), C = new THREE.Vector3(), M = m.matrixWorld;
+    for (let i = 0; i + 2 < n; i += 3) {
+      A.fromBufferAttribute(pa, ix ? ix.getX(i) : i).applyMatrix4(M); B.fromBufferAttribute(pa, ix ? ix.getX(i + 1) : i + 1).applyMatrix4(M);
+      C.fromBufferAttribute(pa, ix ? ix.getX(i + 2) : i + 2).applyMatrix4(M);
+      fn(A, B, C);
+    }
+  }
+  function rtClash() {                               // [{ label, depth (mm), n (points) }] worst first, or null (nothing to check)
+    const parts = meshes.filter((m) => RT_OWN.test(m.userData.name || "") && m.userData.name !== "Router_Bit" && m.geometry);
+    const core = meshes.filter((m) => RT_CLASH_CORE.test(m.userData.name || "") && m.geometry);
+    if (!parts.length || !core.length) return null;
+    const box = new THREE.Box3();
+    for (const m of parts) box.expandByObject(m);
+    const S = RT_CLASH_CELL, x0 = box.min.x, y0 = box.min.y, nx = Math.ceil((box.max.x - x0) / S) + 1, ny = Math.ceil((box.max.y - y0) / S) + 1;
+    const cols = parts.map(() => new Map());         // per part: cell -> its crossings' z
+    parts.forEach((m, k) => rtTris(m, (A, B, C) => {  // each cell centre under the triangle: the triangle's z there
+      const d = (B.x - A.x) * (C.y - A.y) - (C.x - A.x) * (B.y - A.y);
+      if (Math.abs(d) < 1e-9) return;                 // edge-on from above
+      const i0 = Math.max(0, Math.ceil((Math.min(A.x, B.x, C.x) - x0) / S - 0.5)), i1 = Math.min(nx - 1, Math.floor((Math.max(A.x, B.x, C.x) - x0) / S - 0.5));
+      const j0 = Math.max(0, Math.ceil((Math.min(A.y, B.y, C.y) - y0) / S - 0.5)), j1 = Math.min(ny - 1, Math.floor((Math.max(A.y, B.y, C.y) - y0) / S - 0.5));
+      for (let i = i0; i <= i1; i++) for (let j = j0; j <= j1; j++) {
+        const px = x0 + (i + 0.5) * S, py = y0 + (j + 0.5) * S;
+        const u = ((B.x - px) * (C.y - py) - (C.x - px) * (B.y - py)) / d, v = ((C.x - px) * (A.y - py) - (A.x - px) * (C.y - py)) / d, w = 1 - u - v;
+        if (u < 0 || v < 0 || w < 0) continue;
+        const key = i * ny + j, a = cols[k].get(key);
+        const z = u * A.z + v * B.z + w * C.z;
+        if (a) a.push(z); else cols[k].set(key, [z]);
+      }
+    }));
+    for (const c of cols) for (const [key, a] of c) a.sort((p, q) => p - q);
+    const hit = new Map(), pad = new THREE.Box3().copy(box).expandByScalar(1), P = new THREE.Vector3(), pts = [];
+    let what = "";                                    // the target being sampled (the core / the dust shoe)
+    const test = (p) => {                             // a core point: into which part's span, how far (vertically)
+      const i = Math.floor((p.x - x0) / S), j = Math.floor((p.y - y0) / S);
+      if (i < 0 || j < 0 || i >= nx || j >= ny) return;
+      for (let k = 0; k < parts.length; k++) {
+        const a = cols[k].get(i * ny + j);
+        if (!a) continue;
+        for (let q = 0; q + 1 < a.length; q += 2) {
+          const dz = Math.min(p.z - a[q], a[q + 1] - p.z);
+          if (dz > RT_CLASH_MIN) {
+            const key = k + "|" + what, h = hit.get(key) || { k, what, depth: 0, n: 0 };
+            h.n++; h.depth = Math.max(h.depth, dz); hit.set(key, h);
+            if (pts.length < 90000) pts.push(p.x, p.y, p.z);
+          }
+        }
+      }
+    };
+    for (const m of core) { what = rtClashWhat(m.userData.name); rtTris(m, (A, B, C) => {
+      if (!pad.containsPoint(A) && !pad.containsPoint(B) && !pad.containsPoint(C)) return;
+      const s = Math.min(12, Math.ceil(Math.max(A.distanceTo(B), B.distanceTo(C), C.distanceTo(A)) / 1.5));
+      for (let u = 0; u <= s; u++) for (let w = 0; w <= s - u; w++) {
+        P.copy(A).multiplyScalar(1 - (u + w) / s || 0).addScaledVector(B, s ? u / s : 0).addScaledVector(C, s ? w / s : 0);
+        test(P);
+      }
+    }); }
+    const out = [...hit.values()].map((h) => ({ label: (parts[h.k].userData.label || parts[h.k].userData.name).replace(/ \(.*\)$/, ""), what: h.what,
+      depth: +h.depth.toFixed(1), n: h.n })).sort((a, b) => b.depth - a.depth);
+    out.pts = pts;                                   // where (world): the core's points inside the router
+    return out;
+  }
+  function rtClashShow() {
+    if (typeof meshes === "undefined") return;
+    const h = rtClash(), r = LR4Routers.ROUTERS[RT.set.router];
+    RT.clash = h;
+    const hs = meshes.find((m) => m.userData.name === "Router_Housing");   // its points in the housing's frame (they ride along)
+    if (hs && h) { hs.updateMatrixWorld(); const inv = hs.matrixWorld.clone().invert(), v = new THREE.Vector3(), a = new Float32Array(h.pts.length);
+      for (let i = 0; i < a.length; i += 3) v.set(h.pts[i], h.pts[i + 1], h.pts[i + 2]).applyMatrix4(inv).toArray(a, i);
+      RT.clashPts = { mesh: hs, a }; } else RT.clashPts = null;
+    if (typeof rxSliceDots === "function") rxSliceDots();
+    const t = h && h.length ? `The ${r ? r.name : "router"} runs into ${h.slice(0, 3).map((q) => `${q.what} (its ${q.label.toLowerCase()}, ~${q.depth} mm)`).join(", ")}. ` +
+      "Check its sizes or the shoe's height in its slot (Edit router > Slice: tick Core under Show to see the core)." : "";
+    for (const id of ["rb-clash", "rte-clash"]) { const el = document.getElementById(id); if (el) { el.textContent = t; el.hidden = !t; } }
+    const dot = document.getElementById("dot-rt"); if (dot) dot.hidden = !t;
   }
   function rtSwap() {                                // a new router (or its model edited): its meshes in place of the old
     if (typeof meshes === "undefined" || typeof meta === "undefined" || !meta || typeof cfg === "undefined" || !cfg) return;
@@ -219,7 +311,7 @@
     geo.userData.mm = { band: s[M - 1], circ: 2 * Math.PI * (j > 0 ? prof[j - 1][0] + f * (prof[j][0] - prof[j - 1][0]) : prof[0][0]), h: 2.6 };   // (the numbers' size)
     return geo;
   }
-  function rtRingTex(col, v, vRim, mm, P = RING) {             // v: the numbers' height up the band (0 bottom .. 1 top); none = a plain rim;
+  function rtRingTex(col, v, vRim, mm, P = RING, marks = null) {   // marks: the six stops' labels (else 1-6)             // v: the numbers' height up the band (0 bottom .. 1 top); none = a plain rim;
     // mm: { band, circ, h } the band's length up + its circumference there (mm), the numbers' height: drawn true to size
     const c = document.createElement("canvas"), W = 2048, H = v ? 192 : 96, g = c.getContext("2d");
     c.width = W; c.height = H;
@@ -235,7 +327,7 @@
     g.font = `bold ${Math.round(nh * px / 0.72)}px sans-serif`;
     for (let d = D[0]; d <= D[1]; d++) {
       g.save(); g.translate(ringTheta(d) / 360 * W, v ? H * (1 - v) : H / 2); g.scale(1, sy);
-      g.fillText(String(d), 0, 0.04 * nh * px);
+      g.fillText(marks ? marks[d - D[0]] : String(d), 0, 0.04 * nh * px);
       g.restore();
     }
     const t = new THREE.CanvasTexture(c);
@@ -282,10 +374,12 @@
         dm.add(pivot);
         dm.userData.ring = ring;
       }
-      ring.rotation.z = -LR4Routers.dialDeg(RT.set.dial) * Math.PI / 180;
-      const col = ringColor(RT.set.router), gv = ring.geometry.userData, key = [col.join(), gv.v, gv.vRim, gv.mm.band.toFixed(2), gv.mm.circ.toFixed(2), D.ribs ?? 7].join("|");   // one texture per look + size, kept
+      // a G-code router with an S stop (the T1's spindle mode): turned to S - its speed comes from the file, not the dial
+      const rr = LR4Routers.ROUTERS[RT.set.router], sAt = D.marks ? D.marks.indexOf("S") : -1;
+      ring.rotation.z = -LR4Routers.dialDeg(rr && rr.source === "gcode" && sAt >= 0 ? LR4Routers.DIAL[0] + sAt : RT.set.dial) * Math.PI / 180;
+      const col = ringColor(RT.set.router), gv = ring.geometry.userData, key = [col.join(), gv.v, gv.vRim, gv.mm.band.toFixed(2), gv.mm.circ.toFixed(2), D.ribs ?? 7, (D.marks || []).join()].join("|");   // one texture per look + size, kept
       RT.texs = RT.texs || {};
-      if (!RT.texs[key]) RT.texs[key] = rtRingTex(col, gv.v, gv.vRim, gv.mm, ringPat(D.ribs));
+      if (!RT.texs[key]) RT.texs[key] = rtRingTex(col, gv.v, gv.vRim, gv.mm, ringPat(D.ribs), D.marks);
       if (ring.material.map !== RT.texs[key]) { ring.material.map = RT.texs[key]; ring.material.needsUpdate = true; }
     }
     const sel = $("rt-router"), man = LR4Routers.manual(RT.set.router);
@@ -301,7 +395,7 @@
     let el = RT.readout;
     if (!el) { el = RT.readout = document.createElement("div"); el.className = "rt-readout"; el.setAttribute("aria-live", "polite"); canvas.parentElement.appendChild(el); }
     const man = LR4Routers.manual(RT.set.router);
-    el.innerHTML = man ? `<b>Dial ${RT.set.dial.toFixed(1)}</b><span>${rtRpmText(LR4Routers.dialRpm(RT.set.dial, RT.set.router))}</span>` :
+    el.innerHTML = man ? `<b>Dial ${LR4Routers.dialMark(RT.set.dial, RT.set.router)}</b><span>${rtRpmText(LR4Routers.dialRpm(RT.set.dial, RT.set.router))}</span>` :
       `<b>${LR4Routers.ROUTERS[RT.set.router].name}</b><span>its speed comes from the G-code (S)</span>`;
     el.classList.add("on");
     clearTimeout(RT.fade);

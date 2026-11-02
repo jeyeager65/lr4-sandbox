@@ -76,8 +76,8 @@ const ok = (cond, msg) => { checks++; console.log((cond ? "  ok   " : "  FAIL ")
       await put("model.transition.e", 5); await put("model.housing.ch", 2);
       out.tr.after = [cb().transition.shape, cb().transition.edge, cb().transition.e, cb().housing.ch, !rowsOf("transition").includes("model.transition.d"), rowsOf("transition").includes("model.transition.e")];
       LR4RouterBuild.look("housing", { f: "rubber" }); await T.sleep(300);
-      LR4RouterBuild.look("collar", { c: "#1f5fbf" }); await T.sleep(400);
-      const mOf = (n) => meshes.find((m) => m.userData.name === n), hm = mOf("Router_Housing"), cm = mOf("Router_Collar");
+      LR4RouterBuild.look("transition", { c: "#1f5fbf" }); await T.sleep(400);   // (the Carbide: the Makita's body since 2026-11-01, no collar)
+      const mOf = (n) => meshes.find((m) => m.userData.name === n), hm = mOf("Router_Housing"), cm = mOf("Router_Transition");
       out.tr.look = [cb().looks.housing.f, +hm.material.roughness.toFixed(2), hm.material.metalness, cm.material.color.b > 0.3 && cm.material.color.r < 0.05];
       $$("rb-reset").click(); await T.sleep(100);
       LR4Router.set({ router: "kobalt" }); await T.sleep(100);
@@ -223,6 +223,7 @@ const ok = (cond, msg) => { checks++; console.log((cond ? "  ok   " : "  FAIL ")
       const it = () => [...document.querySelectorAll("#rto .rto-b")].map((b) => b.dataset.id), to = { items: it().join() };
       document.querySelector('#rto [data-id="housing"]').click(); await T.sleep(50);
       to.pick = [RX.sel, LR4RouterInspect.part(), (document.querySelector("#rto [aria-current]") || {}).dataset.id];
+      document.querySelector('#rto [data-rm="brushes"]').click(); await T.sleep(300);   // (the Kobalt has brush caps since 2026-11-01: off first, so + Add offers them)
       $$("rto-add").click(); await T.sleep(50);
       to.menu = [!$$("rto-menu").hidden, [...document.querySelectorAll("#rto-menu [data-add]")].map((b) => b.dataset.add).join()];
       document.querySelector('#rto-menu [data-add="brushes"]').click(); await T.sleep(300);
@@ -309,9 +310,9 @@ const ok = (cond, msg) => { checks++; console.log((cond ? "  ok   " : "  FAIL ")
     ok(b.after === "kobalt" && b.gone, "Delete: gone, back to the Kobalt");
     ok(b.L2 === 78 && b.edits.length === 0, `Reset: the test router back to 78 (${b.L2}), no edits left (${b.edits})`);
     ok(b.head && b.head.L === 105 && b.head.W === 80 && b.headShown && !b.back, `Kobalt: the motor cap ${b.head && b.head.L} x ${b.head && b.head.W} (its lock back after Reset)`);
-    ok(b.kLock && b.kLock.r === 28 && b.kLock.z === 24 && b.kLock.travel === 1.5 && b.lockOn, `the Kobalt: its shaft lock ${JSON.stringify(b.kLock)}`);
-    ok(b.tr.l === "38" && b.tr.dShown && b.tr.after.join() === "cap,fillet,5,2,true,true", `the Carbide's transition (38): shaped to the cap, a 5 fillet, housing chamfer 2 (${JSON.stringify(b.tr)})`);
-    ok(b.tr.look[0] === "rubber" && b.tr.look[1] === 0.88 && b.tr.look[2] === 0 && b.tr.look[3], `a look per part: a rubber housing, a blue collar (${JSON.stringify(b.tr.look)})`);
+    ok(b.kLock && b.kLock.r === 28 && b.kLock.z === 25 && b.kLock.travel === 1.5 && b.lockOn, `the Kobalt: its shaft lock ${JSON.stringify(b.kLock)}`);
+    ok(b.tr.l === "26" && !b.tr.dShown && b.tr.after.join() === "cap,fillet,5,2,true,true", `the Carbide's transition (26, the Makita's: shaped to the cap, no Ø row): a 5 fillet, housing chamfer 2 (${JSON.stringify(b.tr)})`);
+    ok(b.tr.look[0] === "rubber" && b.tr.look[1] === 0.88 && b.tr.look[2] === 0 && b.tr.look[3], `a look per part: a rubber housing, a blue transition (${JSON.stringify(b.tr.look)})`);
     const s = b.spin;
     ok(!s.ring && s.dialTris === 0 && s.body && Math.abs(s.d - 65) < 16, `the 65 mm spindle: no dial ring, its switch on, can ${s.d} across (with the plug) ${JSON.stringify(s)}`);
     ok(s.canShown && s.gripHidden, "spindle: its housing is the can (no bottom chamfer)");
@@ -348,7 +349,7 @@ const ok = (cond, msg) => { checks++; console.log((cond ? "  ok   " : "  FAIL ")
     ok(fi.tick[0] && fi.tick[1] === "1 of 6 measured" && fi.tick[2] === "grip", `a Fit item ticked, kept per router (${fi.tick})`);
     ok(fi.go.join() === "housing,model.housing.d", `its Set: the housing picked, its Ø row focused (${fi.go})`);
     ok(fi.preset.join() === "true,Kobalt test,makita,,true", `Start from the Makita: its shape + mount, the name kept; Undo back (${fi.preset})`);
-    ok(/^router,mount,collet_nut,shaft,flats,bearing_cap,housing,vent,collar,motor_cap,dial,switch,shaft_lock/.test(o.items), `the outline: the Kobalt's parts nut up (${o.items})`);
+    ok(/^router,mount,collet_nut,shaft,flats,bearing_cap,housing,vent,collar,transition,motor_cap,dial,switch,shaft_lock,brushes/.test(o.items), `the outline: the Kobalt's parts nut up (${o.items})`);
     ok(o.pick.join() === "housing,housing,housing", `picked from the outline: lit there, on the model, in the inspector (${o.pick})`);
     ok(o.menu[0] && /brushes/.test(o.menu[1]) && !/shaft_lock/.test(o.menu[1]), `+ Add a part: what it hasn't got (${o.menu[1]})`);
     ok(o.added.join() === "true,brushes,brushes,true,true", `brush caps added: on the router, picked (${o.added})`);

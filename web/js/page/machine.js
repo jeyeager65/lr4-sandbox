@@ -199,6 +199,7 @@
       m.scale.set(b.s[0], b.s[1], b.s[2]);
       m.position.set(b.t[0] + (k === "core" ? dx : 0), b.t[1] + (k === "table" ? 0 : dy), b.t[2] + (k === "core" || k === "beam" ? dz : 0));
       if (m.userData.ex) m.position.add(new THREE.Vector3(...m.userData.ex));   // inspect's exploded view
+      if (SHOE_ADJ.test(m.userData.name || "")) m.position.z += rtShoe();   // the dust shoe up / down its slot (the router's)
       if (RT_SPIN.test(m.userData.name || "")) m.quaternion.identity();
       const c = m.userData.clip;
       if (c) {                          // straight belt run (exported at full reach): cut where it meets the moving

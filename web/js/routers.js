@@ -18,6 +18,9 @@
   const DIAL_STOP = 0.5;                             // the real dials click in half steps (user 2026-10-28)
 
   const clamp = (v, a, b) => Math.min(Math.max(v, a), b);
+  // the dust shoe up / down its slot (user 2026-11-01): mm, + up - the router's (model.shoe: how it sits depends on the
+  // router); the slot (all three shoes: 11.3 for the 5.3 M5) lets it move SHOE_SLOT either way of the middle, as built
+  const SHOE_SLOT = 3, SHOE_STEP = 0.5;
   function settings(o) {                             // a stored / shared object -> a valid { router, dial }
     o = o && typeof o === "object" ? o : {};
     const router = ROUTERS[o.router] ? o.router : DEFAULTS.router, d = Number(o.dial);
@@ -35,13 +38,22 @@
     const s = settings(set), r = ROUTERS[s.router];
     return r.source === "manual" ? dialRpm(s.dial, s.router) : Math.min(planned, r.s[1]);
   }
+  // a dial with its own stop labels (model.dial.marks: the T1's S 1 2 3 4 5, user 2026-11-01 - manual on 1-5, or S for
+  // the G-code): what's printed at a stop (between two: both), and the stop a file's "Dial N" means (the one labeled N)
+  const marksOf = (id) => { const r = ROUTERS[id]; return (r && r.model && r.model.dial && r.model.dial.marks) || null; };
+  function dialMark(dial, id) {
+    const m = marksOf(id), i = dial - DIAL[0];
+    if (!m) return String(+dial.toFixed(1));
+    return Math.abs(i - Math.round(i)) < 1e-6 ? m[Math.round(i)] : `${m[Math.floor(i)]}-${m[Math.ceil(i)]}`;
+  }
+  function dialFor(n, id) { const m = marksOf(id), i = m ? m.indexOf(String(n)) : -1; return i >= 0 ? DIAL[0] + i : n; }
   // a note for the router-on event ev ({ rpm, dial? }) with these settings, or "" (nothing to say)
   function note(set, ev) {
     if (!ev || !(ev.rpm > 0)) return "";
     const s = settings(set), r = ROUTERS[s.router], k = (v) => `~${(Math.round(v / 100) * 100).toLocaleString("en-US")} RPM`;
     if (r.source === "manual") {
-      if (ev.dial === undefined || Math.abs(ev.dial - s.dial) < 0.25) return "";
-      return `The file asks for dial ${ev.dial}; the ${r.name}'s dial is at ${s.dial} (${k(dialRpm(s.dial, s.router))}): ` +
+      if (ev.dial === undefined || Math.abs(dialFor(ev.dial, s.router) - s.dial) < 0.25) return "";
+      return `The file asks for dial ${ev.dial}; the ${r.name}'s dial is at ${dialMark(s.dial, s.router)} (${k(dialRpm(s.dial, s.router))}): ` +
         `it runs at the dial. Turn the dial on the router (drag it) to match.`;
     }
     if (ev.dial !== undefined) return `This file was posted for a manual router (dial ${ev.dial}); the ${r.name} takes its ` +
@@ -93,11 +105,14 @@
     if (!obj(p) || !obj(p.model)) return null;
     const base = ORIG.kobalt, b = JSON.parse(JSON.stringify(p.model)), q = { name: String(p.name || "My router").slice(0, 40) };
     q.source = p.source === "gcode" ? "gcode" : "manual";
-    if (q.source === "manual") {
+    // both kept when given (user 2026-11-01: the AutoSpin T1 runs either way - its knob's 1-5, or S for the G-code): the
+    // source picks which one it runs by
+    if (q.source === "manual" || Array.isArray(p.speeds)) {
       const t = Array.isArray(p.speeds) && p.speeds.length === 6 ? p.speeds : base.speeds;
       q.speeds = t.map((e, i) => [i + 1, num(Array.isArray(e) ? e[1] : e, 1000, 60000, base.speeds[i][1])]);
       for (let i = 1; i < 6; i++) q.speeds[i][1] = Math.max(q.speeds[i][1], q.speeds[i - 1][1]);   // never slower up the dial
-    } else {
+    }
+    if (q.source === "gcode" || Array.isArray(p.s)) {
       const s = Array.isArray(p.s) ? p.s : [10000, 30000];
       q.s = [num(s[0], 0, 60000, 10000), 0]; q.s[1] = num(s[1], q.s[0] + 1, 60000, 30000);
     }
@@ -115,18 +130,20 @@
     m.shaft = { d: num(S.d, 4, 60, 12), exposed: num(S.exposed, 0, 60, 4), thread: { d: num(T.d, 4, 60, 13), pitch: num(T.pitch, 0.25, 4, 0.75), length: num(T.length, 1, 40, 8) } };
     const F = obj(S.flats);
     if (F) m.shaft.flats = { af: num(F.af, 2, m.shaft.d - 0.5, m.shaft.d * 0.8), z: num(F.z, 0, 200, m.collet_nut.h), l: num(F.l, 0.5, 40, 3) };
+    m.shoe = Math.round(num(b.shoe, -SHOE_SLOT, SHOE_SLOT, 0) / SHOE_STEP) * SHOE_STEP;   // the dust shoe in its slot (mm, + up)
     if (b.kind === "spindle") {                      // the can = the housing; its top = the end cap (router_body.js spindle)
       m.kind = "spindle";
       const bc = section(b.bearing_cap, { d: 0, l: 0 }, 0, 200);
       if (bc && bc.d > 0 && bc.l > 0) m.bearing_cap = bc;
       m.housing = section(b.housing, { d: 65, l: 180 }, 20, 150) || { d: 65, l: 180 };
       m.housing.l = Math.max(m.housing.l, 30);
+      m.housing.ch = num(obj(b.housing) && b.housing.ch, 0, 20, 1);   // its bevel at the bottom, as a router's
       m.cooling = b.cooling === "water" ? "water" : "air";
     } else {
       for (const k of ["bearing_cap", "housing", "collar"]) { const s = section(b[k], { d: 0, l: 0 }, 0, 200); if (s && s.d > 0 && s.l > 0) m[k] = s; }
       if (!m.housing) m.housing = { d: 65, l: 95 };
-      const ch = num(obj(b.housing) && b.housing.ch, 0, 20, 0);
-      if (ch) m.housing.ch = ch;
+      // its bevel at the bottom (collet end): 1 mm unless set (user 2026-11-01: every router has one; 0 = none)
+      m.housing.ch = num(obj(b.housing) && b.housing.ch, 0, 20, 1);
       const V = obj(b.housing) && obj(b.housing.vent);   // the open end the fan blows out of: a tube wall, spokes from the hub
       if (V && num(V.depth, 0, 60, 0) > 0) m.housing.vent = { depth: num(V.depth, 0, 60, 10), wall: num(V.wall, 0.8, 10, 2.5),
         spokes: Math.round(num(V.spokes, 0, 24, 12)), w: num(V.w, 1, 20, 3), inset: num(V.inset, 0, 50, 0.5) };
@@ -150,17 +167,26 @@
       m.motor_cap = H;
       const D = obj(b.dial) || {};
       m.dial = { place: ["top", "window", "knob"].includes(D.place) ? D.place : "end", d: num(D.d, 8, 80, 24), t: num(D.t, 2, 30, 6) };
-      if (m.dial.place === "knob") Object.assign(m.dial, { x: num(D.x, -150, 150, 0), sink: num(D.sink, 0, 30, 1) });   // flat on the top (the T1's)
+      if (m.dial.place === "knob") {                 // flat on the top (the T1's): x along the head, y across it, sink into the top; pad:
+        const Pd = obj(D.pad) || {};                  // a raised round pad it sits on (d 0 = none; user 2026-11-01, the T1's photos)
+        Object.assign(m.dial, { x: num(D.x, -150, 150, 0), y: num(D.y, -60, 60, 0), sink: num(D.sink, 0, 30, 1), pad: { d: num(Pd.d, 0, 150, 0), h: num(Pd.h, 0, 20, 3) } });
+      }
+      if (m.dial.place === "top") {                  // its wheel in line with the head or turned 90 deg; x: along the head from the
+        m.dial.plane = D.plane === "across" ? "across" : "along";   // axis (+ = the switch end; none: near the switch end) - the Carbide's, user 2026-11-01
+        if (D.x != null && D.x !== "" && Number.isFinite(+D.x)) m.dial.x = num(D.x, -150, 150, 0);
+      }
       if (m.dial.place === "window") {               // lying flat inside the cap, its rim seen through a window (the Kobalt's, user 2026-10-30)
         const Wn = obj(D.win) || {}, dd = m.dial.d;
         Object.assign(m.dial, { in: num(D.in, -20, 60, 1), drop: num(D.drop, 0, 60, 2),
           win: { l: num(Wn.l, 2, 120, +(dd * 0.35).toFixed(1)), w: num(Wn.w, 2, 120, +(dd * 0.8).toFixed(1)), open: Wn.open !== false,
-          bevel: num(Wn.bevel, 0, 10, 2), r: num(Wn.r, 0, 60, 0) } });   // bevel: the 45 deg edge from the top into the window; r: its corners (plan)
+          bevel: num(Wn.bevel, 0, 10, 2), r: num(Wn.r, 0, 60, 0), follow: Wn.follow === true } });   // follow: the bevel on down a steep top (the Kobalt's chamfered end)   // bevel: the 45 deg edge from the top into the window; r: its corners (plan)
       }
       // its style (user 2026-10-30, an option): numbers on the ridged rim, or on a domed top (dome.top: the flat top's
       // share of the radius); the slot it shows through + the surround round that (Part 46d: end / top; js/router_body.js)
       m.dial.style = ["dome", "bevel"].includes(D.style) ? D.style : "rim";
       if (m.dial.style === "dome") m.dial.dome = { top: num(obj(D.dome) && D.dome.top, 0, 0.95, 0.45) };
+      // marks: what's printed at the dial's six stops instead of 1-6 (the T1: S 1 2 3 4 5 - S = spindle mode, user 2026-11-01)
+      if (Array.isArray(D.marks) && D.marks.length === DIAL[1] - DIAL[0] + 1) m.dial.marks = D.marks.map((q) => String(q).slice(0, 2));
       m.dial.ribs = Math.round(num(D.ribs, 1, 12, 7));   // ridges between two numbers (the land round each number grows with their spacing)
       if (m.dial.style === "bevel") m.dial.bevel = { top: num(obj(D.bevel) && D.bevel.top, 0, 0.95, 0.6) };   // (the Makita's: a straight bevel, user 2026-10-31)
       if (m.dial.place !== "window" && m.dial.place !== "knob") {
@@ -179,8 +205,8 @@
       const Sw = obj(b.switch);                      // the switch: its centre `down` under the head's top (else placed by the dial)
       if (Sw && Number.isFinite(+Sw.down)) m.switch = { down: num(Sw.down, 0, 300, 20) };
       const Bc = obj(b.brushes);                     // the motor's brush caps (user 2026-10-30: "pretty much all of these trim routers"):
-      if (Bc) m.brushes = { n: Math.round(num(Bc.n, 1, 4, 2)), z: num(Bc.z, 0, 400, 100), a: num(Bc.a, -360, 360, 90), d: num(Bc.d, 3, 40, 12),
-        r: num(Bc.r, 5, 120, 30), out: num(Bc.out, 0.5, 30, 5), ring: num(Bc.ring, 0, 15, 0), inset: num(Bc.inset, -10, 10, 1), slot: num(Bc.slot, -180, 180, 15) };   // slot: its screwdriver slot, deg from upright   // n round the axis from a deg, each d across, its base r out,
+      if (Bc) m.brushes = { z: num(Bc.z, 0, 400, 100), d: num(Bc.d, 3, 40, 12),
+        r: num(Bc.r, 5, 120, 30), out: num(Bc.out, 0.5, 30, 5), ring: num(Bc.ring, 0, 15, 0), inset: num(Bc.inset, -10, 10, 1), slot: num(Bc.slot, -180, 180, 15) };   // slot: its screwdriver slot, deg from upright   // two, either side (user 2026-11-01: a brushed motor has only ever 2), each d across, its base r out,
       // standing out (no border); ring: a border that wide round each in the head's color, flush with the body - r then = the
       // body's surface (user 2026-10-30: most cross into the transition; "shouldn't stick out"), the cap `inset` in it
       const L = obj(b.shaft_lock);
@@ -212,7 +238,7 @@
     if (!q) { delete ROUTERS[id]; delete SC.ROUTERS[id]; return null; }
     ROUTERS[id] = Object.assign({ name: q.name, source: q.source }, q.speeds ? { speeds: q.speeds } : {}, q.s ? { s: q.s } : {},
       { model: q.model, mount: q.mount, edited: !!p, custom: !ORIG[id] });
-    if (q.speeds) SC.ROUTERS[id] = { name: q.name, speeds: q.speeds }; else delete SC.ROUTERS[id];
+    if (q.speeds && q.source === "manual") SC.ROUTERS[id] = { name: q.name, speeds: q.speeds }; else delete SC.ROUTERS[id];   // the CAM's: run by the dial
     return q;
   }
   function preset(id) {                              // router id as a data-file preset (for editing / export)
@@ -236,7 +262,7 @@
   for (const id of Object.keys(ORIG)) define(id, null);   // every preset cleaned: its looks + defaults filled in
   if (root.MS && root.MS.get) loadEdits(root.MS);    // the page: before job.js / page/router.js list them
 
-  const api = { ROUTERS, DEFAULTS, DIAL, DIAL_STOP, DIAL_STEP, EDITS_KEY, LOOK_PARTS, FINISHES, settings, manual, dialRpm, rpm, note, spinRps, dialDeg,
+  const api = { ROUTERS, DEFAULTS, DIAL, DIAL_STOP, DIAL_STEP, SHOE_SLOT, SHOE_STEP, EDITS_KEY, LOOK_PARTS, FINISHES, settings, manual, dialRpm, rpm, note, spinRps, dialDeg, dialMark, dialFor,
     clean, define, preset, newId, loadEdits };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.LR4Routers = api;

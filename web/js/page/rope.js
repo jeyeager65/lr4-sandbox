@@ -66,6 +66,9 @@
     const pw = meshes.find((m) => m.userData.name === "TouchPlate_Wire");
     if (!cw.length || !jaw || !pw) return false;
     if (ROPE.eBase && ROPE.baseGeo === pw.geometry) return true;   // again when the parts are redrawn (a new mount's cage)
+    // new ends (another mount's cage): the wires start over from them - the frozen put-away shape was the old ends'
+    // (user 2026-11-01: after a switch to the Makita / DeWalt the wires stayed where they had settled on the Kobalt)
+    if (ROPE.eBase) Object.assign(ROPE, { p: null, q: null, frozen: null, still: 0, at: null });
     ROPE.baseGeo = pw.geometry;
     const ins = cw.find((m) => m.userData.name === "TouchPlate_Clip_Insulation") || cw[0];
     ROPE.eBase = ropeEnd(cw, "low");                  // the clip's stub hangs down from the crimp: its free end
@@ -147,7 +150,38 @@
     const list = meshes.filter((m) => (held ? ROPE_COLS_HELD : ROPE_COLS).test(m.userData.name || ""));
     for (const m of list.sort((a, b) => (a.userData.name === "Router_Housing" ? -1 : b.userData.name === "Router_Housing" ? 1 : 0))) add(m);   // the router first: its axis
     if (JOB.stock && JOB.stock.visible) out.push({ b: new THREE.Box3().setFromObject(JOB.stock) });   // a group: top + walls
+    const pl = meshes.find((m) => m.userData.name === "TouchPlate");
+    if (pl && pl.visible) out.push(ropePlateBox(pl));
     return out;
+  }
+  // the plate itself (user 2026-11-01: in the Makita / DeWalt cage the clip's wire went through it): an oriented box in
+  // the plate's own frame - its normal from its faces (area-weighted), its long side, so the box is the 0.5 mm sheet
+  // (square to the Kobalt's axes it was a 3.6 mm slab round the slightly tilted sheet: the crimp's end sat inside it) -
+  // carried by the cage's move and the plate's own. k = the thin axis (the box's x)
+  function ropePlateBox(m) {
+    const M = touchMatrix("TouchPlate"), Mi = M && M.clone().invert();
+    if (!m.userData.ropeBox || m.userData.ropeBox.geo !== m.geometry) {
+      const g = m.geometry, pa = g.attributes.position, ix = g.index, nt = ix ? ix.count : pa.count, P = [];
+      for (let i = 0; i < pa.count; i++) { const v = new THREE.Vector3().fromBufferAttribute(pa, i); if (Mi) v.applyMatrix4(Mi); P.push(v); }
+      const bb = new THREE.Box3().setFromPoints(P), sz = bb.getSize(new THREE.Vector3());
+      const id = (i) => (ix ? ix.getX(i) : i), n = new THREE.Vector3(), e1 = new THREE.Vector3(), e2 = new THREE.Vector3(), f = new THREE.Vector3();
+      let ref = null;
+      for (let i = 0; i + 2 < nt; i += 3) {             // the sheet's two big faces point opposite ways: fold them onto one
+        const A = P[id(i)], B = P[id(i + 1)], C = P[id(i + 2)];
+        f.crossVectors(e1.subVectors(B, A), e2.subVectors(C, A));
+        if (!ref) { if (f.lengthSq() > 1e-6) ref = f.clone(); else continue; }
+        n.addScaledVector(f, f.dot(ref) < 0 ? -1 : 1);
+      }
+      n.normalize();
+      const long = sz.x >= sz.y && sz.x >= sz.z ? new THREE.Vector3(1, 0, 0) : sz.y >= sz.z ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(0, 0, 1);
+      const u = long.addScaledVector(n, -long.dot(n)).normalize(), w = new THREE.Vector3().crossVectors(n, u);
+      const Rb = new THREE.Matrix4().makeBasis(n, u, w), Rt = Rb.clone().transpose(), b = new THREE.Box3();
+      for (const v of P) b.expandByPoint(v.clone().applyMatrix4(Rt));
+      m.userData.ropeBox = { geo: m.geometry, b, Rb };
+    }
+    m.updateMatrixWorld();
+    const B = m.userData.ropeBox, T = (M ? m.matrixWorld.clone().multiply(M) : m.matrixWorld.clone()).multiply(B.Rb);
+    return { b: B.b, T, Ti: T.clone().invert(), k: "x" };
   }
   function ropePen(p, R, c) {                         // how far p (radius R) is into collider c: { n (out), d } or null
     if (c.prof) {                                     // a mount's outline: out sideways, or over / under its cells
@@ -175,6 +209,11 @@
       if (bottom < side) return { n: new THREE.Vector3(0, 0, -1), d: bottom };
       return { n: r > 1e-6 ? new THREE.Vector3(dx / r, dy / r, 0) : new THREE.Vector3(1, 0, 0), d: side };
     }
+    if (c.T) {                                        // an oriented box: test in its frame, the way out back to world
+      const e = ropePen(p.clone().applyMatrix4(c.Ti), R, { b: c.b });
+      if (e) e.n.transformDirection(c.T);
+      return e;
+    }
     const b = c.b;
     if (p.x < b.min.x - R || p.x > b.max.x + R || p.y < b.min.y - R || p.y > b.max.y + R || p.z < b.min.z - R || p.z > b.max.z + R) return null;
     const pen = [[p.x - (b.min.x - R), -1, 0, 0], [b.max.x + R - p.x, 1, 0, 0], [p.y - (b.min.y - R), 0, -1, 0],
@@ -185,6 +224,20 @@
   function ropePush(i) {                              // node i out of the colliders; the speed into the surface (mm/s)
     const p = ROPE.p[i], q = ROPE.q[i], R = (i === RN.CE || i === RN.CT ? 3 : 0) + ROPE.r;   // the clip is bulkier than its wire
     let hit = 0;
+    // the core's front face (its hole's, -Y out): no wire back in through it (user 2026-11-01: the put-away slack looped
+    // back into the core by the hole and twisted round the other wire) - everything they reach is in front of it
+    // the clip's wire stays on the clip's side of the plate (user 2026-11-01, the Carbide: it ran behind the plate - the
+    // clip couldn't come off first): over the plate's outline it's kept in front; past an edge it's free (to the hole)
+    const pl = ROPE.front;
+    if (pl && i < RN.CE - 1) {
+      const L = RC_A.copy(p).applyMatrix4(pl.Ti), b = pl.b, k = pl.k, f = pl.side > 0 ? b.max[k] + R : b.min[k] - R;
+      if (["x", "y", "z"].every((a) => a === k || (L[a] > b.min[a] - R && L[a] < b.max[a] + R)) && (L[k] - f) * pl.side < 0) {
+        const n = RC_N.set(0, 0, 0); n[k] = pl.side; n.transformDirection(pl.T);
+        const d = Math.abs(L[k] - f); p.addScaledVector(n, d); q.addScaledVector(n, d);
+      }
+    }
+    const F = ROPE.face;                              // (near the hole only: GUESS +-50 x, +-60 z of the core's face round it)
+    if (F && Math.abs(p.x - F.x) < 50 && Math.abs(p.z - F.z) < 60 && p.y > F.y - R) { const d = p.y - (F.y - R); p.y -= d; q.y = Math.min(q.y - d, p.y); }
     for (const c of ROPE.cols) {
       const e = ropePen(p, R, c);
       if (!e) continue;
@@ -204,6 +257,7 @@
     const a = ROPE.p[i], b = ROPE.p[j], wa = w(i), wb = w(j);
     if (wa + wb === 0) return;
     for (const c of ROPE.cols) {
+      if (c.T && ropeCross(i, j, wa, wb, c)) continue;
       let best = null;
       for (const t of [0.25, 0.5, 0.75]) {
         const e = ropePen(a.clone().lerp(b, t), ROPE.r, c);
@@ -213,6 +267,55 @@
       const da = best.d * wa / Math.max(wa, wb), db = best.d * wb / Math.max(wa, wb);   // (q too: no kick)
       a.addScaledVector(best.n, da); ROPE.q[i].addScaledVector(best.n, da);
       b.addScaledVector(best.n, db); ROPE.q[j].addScaledVector(best.n, db);
+    }
+  }
+  // a segment through the plate (user 2026-11-01, the DeWalt from the side: the clip's wire went straight through): the
+  // plate is a slab a few mm thick and the nodes are ~10 apart, so a segment can cross it with no sample inside - its
+  // ends either side of the slab, crossing inside its outline. Both ends then slide past the nearest edge (round it)
+  const RC_A = new THREE.Vector3(), RC_B = new THREE.Vector3(), RC_P = new THREE.Vector3(), RC_N = new THREE.Vector3();
+  function ropeCross(i, j, wa, wb, c, test) {       // test: only say whether it crosses
+    const b = c.b, R = ROPE.r, k = c.k;
+    const A = RC_A.copy(ROPE.p[i]).applyMatrix4(c.Ti), B = RC_B.copy(ROPE.p[j]).applyMatrix4(c.Ti), mid = (b.min[k] + b.max[k]) / 2;
+    if ((A[k] - mid) * (B[k] - mid) >= 0) return false;
+    const t = (mid - A[k]) / (B[k] - A[k]), P = RC_P.copy(A).lerp(B, t);
+    let best = null;
+    for (const q of ["x", "y", "z"]) {
+      if (q === k) continue;
+      const dn = P[q] - (b.min[q] - R), up = b.max[q] + R - P[q];
+      if (dn <= 0 || up <= 0) return false;           // it passes outside the outline
+      if (!best || dn < best.d) best = { q, s: -1, d: dn };
+      if (up < best.d) best = { q, s: 1, d: up };
+    }
+    if (test) return true;
+    const n = RC_N.set(0, 0, 0); n[best.q] = best.s; n.transformDirection(c.T);
+    const m = Math.max(wa, wb), da = best.d * wa / m, db = best.d * wb / m;
+    ROPE.p[i].addScaledVector(n, da); ROPE.q[i].addScaledVector(n, da);
+    ROPE.p[j].addScaledVector(n, db); ROPE.q[j].addScaledVector(n, db);
+    return true;
+  }
+  // the two wires don't pass through each other (user 2026-11-01: the black one cut through the red): every clip-wire
+  // segment against every plate-wire one, their closest points pushed to two radii apart (each end by its share and
+  // inverse mass; q too: no kick)
+  const RW_U = new THREE.Vector3(), RW_V = new THREE.Vector3(), RW_W = new THREE.Vector3(), RW_A = new THREE.Vector3(), RW_B = new THREE.Vector3();
+  function ropeApart(w) {
+    const [c, q] = RN.chains, D = 2 * ROPE.r, P = ROPE.p;
+    for (let a = 0; a + 1 < c.length; a++) for (let b = 0; b + 1 < q.length; b++) {
+      const i0 = c[a], i1 = c[a + 1], j0 = q[b], j1 = q[b + 1];
+      const wi0 = w(i0), wi1 = w(i1), wj0 = w(j0), wj1 = w(j1);
+      if (wi0 + wi1 + wj0 + wj1 === 0) continue;
+      RW_U.subVectors(P[i1], P[i0]); RW_V.subVectors(P[j1], P[j0]); RW_W.subVectors(P[i0], P[j0]);
+      const uu = RW_U.dot(RW_U), uv = RW_U.dot(RW_V), vv = RW_V.dot(RW_V), uw = RW_U.dot(RW_W), vw = RW_V.dot(RW_W), den = uu * vv - uv * uv;
+      let s = den > 1e-9 ? Math.min(1, Math.max(0, (uv * vw - vv * uw) / den)) : 0;
+      let t = vv > 1e-9 ? Math.min(1, Math.max(0, (uv * s + vw) / vv)) : 0;
+      s = uu > 1e-9 ? Math.min(1, Math.max(0, (uv * t - uw) / uu)) : 0;
+      RW_A.copy(P[i0]).addScaledVector(RW_U, s); RW_B.copy(P[j0]).addScaledVector(RW_V, t);
+      const n = RW_A.sub(RW_B), d = n.length();
+      if (d >= D) continue;
+      if (d < 1e-6) n.set(0, 0, 1); else n.multiplyScalar(1 / d);
+      const k = [[i0, (1 - s) * wi0], [i1, s * wi1], [j0, -(1 - t) * wj0], [j1, -t * wj1]];
+      const sum = k.reduce((z, e) => z + Math.abs(e[1]), 0);
+      if (sum === 0) continue;
+      for (const [i, f] of k) if (f) { const m = (D - d) * f / sum; P[i].addScaledVector(n, m); ROPE.q[i].addScaledVector(n, m); }
     }
   }
   function ropeLine(chain, a, b, sag) {               // lay a chain's nodes from a to b, sagging
@@ -233,7 +336,8 @@
     if (!ROPE.mesh) {
       const ins = meshes.find((m) => m.userData.name === "TouchPlate_Clip_Insulation");
       const black = ins ? ins.material : new THREE.MeshStandardMaterial({ color: 0x202020, roughness: 0.6 });
-      const red = new THREE.MeshStandardMaterial({ color: 0x8a0e0e, roughness: 0.55 });   // the plate's wire: a deep red, easier to see (user)
+      // the plate's wire: a deep red, easier to see (user); matte, little sheen (2026-11-01: the room's reflection made it pink)
+      const red = new THREE.MeshStandardMaterial({ color: 0xa00000, roughness: 0.85, envMapIntensity: 0.3 });
       ROPE.mesh = new THREE.Group();
       ROPE.mesh.userData.name = "TouchPlate_Cable";
       ROPE.mesh.add(new THREE.Mesh(new THREE.BufferGeometry(), black), new THREE.Mesh(new THREE.BufferGeometry(), red));
@@ -303,28 +407,42 @@
     // around at all when put away" - the colliders' refresh and the slack still nudged them)
     ROPE.still = stored ? (ROPE.still || 0) + dt : 0;
     if (!stored) ROPE.frozen = null;
-    if (stored && ROPE.still > 1.5) {
+    if (stored && ROPE.still > 1.5 && (ROPE.chk = (ROPE.chk || 0) + dt) > 0.5) {   // frozen through the plate (it settled while
+      ROPE.chk = 0;                                   // the plate wasn't a collider - hidden, mid-swap): settle again
+      const pl = ropeColliders(true).find((c) => c.T);
+      if (pl && RN.order.some(([i, j]) => ropeCross(i, j, 1, 1, pl, true))) { ROPE.frozen = null; ROPE.still = 0; ROPE.cols = null; }
+    }
+    if (stored && ROPE.still > 1.5 && (ROPE.frozen || (ROPE.vmax || 0) < 3 || ROPE.still > 6)) {   // settled, not just 1.5 s on (it froze mid-settle: wavy)
       if (!ROPE.frozen) ROPE.frozen = ROPE.p.map((p) => p.clone().sub(ac));
       ROPE.frozen.forEach((r, i) => { ROPE.p[i].copy(ac).add(r); ROPE.q[i].copy(ROPE.p[i]); });
       ROPE.rel = ROPE.frozen.map((r) => r.clone()); ROPE.vmax = 0; ROPE.vnode = -1;
       ropeMesh();
       return;
     }
-    const pay = (L, need, max) => {                   // grow when it's near taut, shrink only when it's clearly slack
-      const lo = need * 1.1 + 3, hi = need * 1.45 + 10;
+    // loose: the clip's wire put away hangs down from the crimp (user 2026-11-01: near taut it ran straight from the crimp
+    // to the core's hole - a right angle, through the plate)
+    const pay = (L, need, max, loose) => {            // grow when it's near taut, shrink only when it's clearly slack
+      const lo = loose ? need * 1.15 + 12 : need * 1.1 + 3, hi = loose ? need * 1.3 + 18 : need * 1.45 + 10;   // (more piled up on the mount: wavy)
       return L < lo ? Math.min(max, L + Math.min(400 * dt, lo - L)) : L > hi ? L - Math.min(60 * dt, L - hi) : L;
     };
     ROPE.Lp = pay(ROPE.Lp, ap.distanceTo(ends.plate[1]), ROPE.pmax);   // each wire: what reaches its end, a little slack
-    if (held) ROPE.Lc = pay(ROPE.Lc, ac.distanceTo(held[2]), ROPE.cmax);
+    if (held) ROPE.Lc = pay(ROPE.Lc, ac.distanceTo(held[2]), ROPE.cmax, stored);
     else {
       ROPE.flung.t += dt;
       ROPE.Lc = Math.min(ROPE.cmax, ROPE.Lc + 2500 * dt);   // pays out of the core as it's yanked
     }
-    if (!ROPE.cols || (ROPE.colsT += dt) > 0.25) { ROPE.cols = ropeColliders(!!held); ROPE.colsT = 0; }   // the core moves on
+    if (!ROPE.cols || (ROPE.colsT += dt) > 0.25) {   // the core moves on
+      ROPE.cols = ropeColliders(!!held); ROPE.colsT = 0;
+      // the plate's front = the side the clip's crimp is on (held: on the plate; flung: no rule)
+      const pc = held && ROPE.cols.find((c) => c.T);
+      if (pc) { const L = RC_B.copy(held[0]).applyMatrix4(pc.Ti); pc.side = L[pc.k] >= (pc.b.min[pc.k] + pc.b.max[pc.k]) / 2 ? 1 : -1; }
+      ROPE.front = pc || null;
+    }
     const rest = { c: ROPE.Lc / (ROPE.nc - 2), p: ROPE.Lp / (ROPE.np - 2), k: ROPE.len,   // the last segment: the stub's
       u: ROPE.eBase.distanceTo(ROPE.cBase), s: ROPE.eBase.distanceTo(ROPE.tBase) };   // the crimp's wire; its end -> the clip's far end
     const pin = (i) => i <= 1 || i === p0 || i === p0 + 1 || i === PE || i === PE - 1 || (held && (i === CE || i === CT || i === CE - 1));
     const w = (i) => (pin(i) ? 0 : i === CE || i === CT || i === CE - 1 ? 0.25 : 1);   // inverse masses: the clip is heavy
+    ROPE.face = ropeAnchor(0, [0, 0, 0]);             // the core's front face, where the hole is (ropePush)
     const steps = Math.min(30, Math.ceil(dt / ROPE_H)), g = ROPE_G * ROPE_H * ROPE_H;
     let hit = 0;
     for (let s = 0; s < steps; s++) {
@@ -360,6 +478,7 @@
         }
       }
       for (const [i, j] of RN.order) ropePushSeg(i, j, w);
+      ropeApart(w);
       for (let i = 0; i < RN.n; i++) if (!pin(i)) { const h = ropePush(i); if (i === CE || i === CT) hit = Math.max(hit, h); }
     }
     let vm = 0, vi = -1;                              // the fastest node frame to frame, relative to the core (the director's log)

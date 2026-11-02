@@ -31,7 +31,8 @@
   // the hand-set routers' speed tables (dial, RPM), half steps interpolated: web/data/routers.js (fluidnc_post.ROUTERS
   // has to match: tests/test_routers_data.py)
   const RD = typeof module !== "undefined" && module.exports ? require("../data/routers.js") : root.LR4RouterData;
-  const ROUTERS = Object.fromEntries(Object.entries(RD.routers).filter(([, r]) => r.speeds).map(([k, r]) => [k, { name: r.name, speeds: r.speeds }]));
+  // (run by their dial: a G-code router with a table too - the T1's knob, 2026-11-01 - isn't one)
+  const ROUTERS = Object.fromEntries(Object.entries(RD.routers).filter(([, r]) => r.speeds && r.source !== "gcode").map(([k, r]) => [k, { name: r.name, speeds: r.speeds }]));
   function dialRpm(dial, router) {
     const pts = ROUTERS[router].speeds;
     if (dial <= pts[0][0]) return pts[0][1];

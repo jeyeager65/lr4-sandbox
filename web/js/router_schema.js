@@ -51,6 +51,8 @@
   // the mount
   row("mount", "Mount", "mount", "Mount", "select", { opts: [["kobalt", "Kobalt"], ["makita", "Makita 701 / T1 (65 mm)"], ["dewalt", "DeWalt 611 (69 mm)"], ["none", "None"]],
     help: "Which V1E tool mount + dust shoe set it fits. None: no V1E dust shoe (no shoe or hose drawn)." });
+  row("mount", "Mount", "model.shoe", "Shoe in its slot", "len", { min: -3, max: 3, step: 0.5, when: (m, p) => p.mount !== "none",
+    help: "Slide the dust shoe up (+) or down (-) its slot on the bottom mount; 0 = the middle (as built). It sits differently with each router." });
   row("mount", "Mount", "model.clamp", "Nut below the clamp", "len", { min: 0, max: 150, step: 0.5, when: (m, p) => p.mount !== "none",
     help: "Where you clamp it: from the bottom of the collet nut up to the bottom of the lower clamp. More = the router and bit sit lower." });
   // the bit end
@@ -107,11 +109,17 @@
   // the dial
   const place = (m) => m.dial && m.dial.place, sur = (m) => (m.dial && m.dial.surround) || { kind: "none" };
   row("dial", "Place", "model.dial.place", "Where", "choice", { opts: [["end", "On the end"], ["top", "On top"], ["window", "In a window"], ["knob", "A knob on top"]],
-    help: "On the end: lying flat inside the head, a slice of its rim through a slot in the switch end (Makita, DeWalt). On top: standing across the head, its rim up through a slot. In a window: lying flat, seen through a window in the top (Kobalt). A knob on top: lying flat on the top, face up, standing out of it (Sienci T1)." });
+    help: "On the end: lying flat inside the head, a slice of its rim through a slot in the switch end (Makita, DeWalt). On top: standing in line with the head (or turned 90°), its rim up through a slot. In a window: lying flat, seen through a window in the top (Kobalt). A knob on top: lying flat on the top, face up, standing out of it (Sienci T1)." });
+  row("dial", "Place", "model.dial.plane", "Turned", "choice", { opts: [["along", "In line with the head"], ["across", "Across the head (90°)"]], when: (m) => place(m) === "top",
+    help: "On top: the wheel standing in line with the head (its rim along the head) or turned 90° (its rim across it)." });
   row("dial", "Place", "model.dial.d", "Ø", "len", { min: 8, max: 80, step: 0.5 });
+  row("dial", "Numbers", "model.dial.marks", "Stop labels", "text", { help: "What's printed at its six stops, comma separated (empty = 1-6). An S stop on a G-code router: shown turned to it (the AutoSpin T1's spindle mode)." });
   row("dial", "Place", "model.dial.t", "Thickness", "len", { min: 2, max: 30, step: 0.5 });
   const knob = (m) => place(m) === "knob";
-  row("dial", "Knob", "model.dial.x", "Along the head", "len", { min: -150, max: 150, step: 0.5, when: knob, help: "Its centre along the head from the router's axis (+ = toward the switch end)." });
+  row("dial", "Place", "model.dial.x", "Along the head", "len", { min: -150, max: 150, step: 0.5, when: (m) => knob(m) || place(m) === "top", help: "Its center along the head from the router's axis (+ = toward the switch end, - = toward the cord)." });
+  row("dial", "Knob", "model.dial.y", "Across the head", "len", { min: -60, max: 60, step: 0.5, when: knob, help: "Its center across the head from the middle (+ = the back, - = the front)." });
+  row("dial", "Knob", "model.dial.pad.d", "Raised pad Ø", "len", { min: 0, max: 150, step: 0.5, when: knob, help: "A round pad it sits on, higher than the rest of the top (0 = none)." });
+  row("dial", "Knob", "model.dial.pad.h", "Pad height", "len", { min: 0, max: 20, step: 0.5, when: (m) => knob(m) && m.dial.pad && m.dial.pad.d > 0, help: "How far the pad stands over the top." });
   row("dial", "Knob", "model.dial.sink", "Sunk into the top", "len", { min: 0, max: 30, step: 0.5, when: knob, help: "How much of its thickness is below the top." });
   const win = (m) => place(m) === "window";
   row("dial", "Window", "model.dial.in", "Rim in from the end", "len", { min: -20, max: 60, step: 0.5, when: win, help: "Where the wheel sits: its rim this far in from the switch end." });
@@ -121,6 +129,8 @@
   row("dial", "Window", "model.dial.win.r", "Window corner", "len", { min: 0, max: 60, step: 0.5, when: win, csg: true, help: "Rounds the window's corners as seen from above (the Makita's U); 0 = square." });
   row("dial", "Window", "model.dial.win.bevel", "Window bevel", "len", { min: 0, max: 10, step: 0.5, when: win, help: "The 45° edge from the top down into the window." });
   row("dial", "Window", "model.dial.win.open", "Open at the end (a notch)", "bool", { when: win });
+  row("dial", "Window", "model.dial.win.follow", "Bevel on down a steep end", "bool", { when: win, csg: true,
+    help: "Off: the bevel fades out where the head's top gets steep (a rounded end). On: it runs the whole way, down a chamfered end too." });
   row("dial", "Numbers", "model.dial.style", "Numbers", "choice", { opts: [["rim", "On the rim"], ["dome", "On a domed top"], ["bevel", "On a beveled edge"]],
     help: "On the rim (between its ridges), on a domed top (the wheel's upper half rounds up to a flat top), or on a beveled edge (a straight slope up to a flat top, the ridges running up it - the Makita's). Domed and beveled dials show best in a window." });
   row("dial", "Numbers", "model.dial.ribs", "Ridges between numbers", "count", { min: 1, max: 12, step: 1,
@@ -168,8 +178,6 @@
   row("shaft_lock", "Boss", lk("pin"), "Pin Ø", "len", { min: 0.5, max: 12, step: 0.5, when: pos(lk("pin")) });
   const bc = (k) => `model.brushes.${k}`;
   row("brushes", "Size", bc("z"), "Height", "len", { min: 0, max: 400, step: 0.5, help: "Up from the nut's bottom." });
-  row("brushes", "Size", bc("a"), "Angle", "ang", { min: -180, max: 180, step: 1, help: "The first one's angle round from the switch end; the rest evenly round." });
-  row("brushes", "Size", bc("n"), "How many", "count", { min: 1, max: 4, step: 1 });
   row("brushes", "Size", bc("d"), "Ø", "len", { min: 3, max: 40, step: 0.5 });
   row("brushes", "Size", bc("r"), "Body surface out from the center", "len", { min: 5, max: 120, step: 0.5, help: "How far out from the router's center the body's surface is where they sit." });
   row("brushes", "Size", bc("out"), "Stands out", "len", { min: 0.5, max: 30, step: 0.5, help: "How far a cap stands out of the body (with no border)." });
@@ -210,7 +218,7 @@
       add: (p) => { const m = p.model; m.shaft_lock = { z: +(nutTop(m) + 10).toFixed(1), a: -50, d: 14, r: +(m.housing.d / 2 + 3).toFixed(1), travel: 3, button: 10, out: 4 }; },
       remove: (p) => { delete p.model.shaft_lock; } },
     { id: "brushes", label: "Brush caps", part: "brushes", only: "r", has: (m) => !!m.brushes,   // two, either side, at the housing's top (where most sit)
-      add: (p) => { const m = p.model, top = nutTop(m) + m.housing.l; m.brushes = { n: 2, z: +(top - 8).toFixed(1), a: 90, d: 12, r: +(m.housing.d / 2 - 1).toFixed(1), out: 5, ring: 2, inset: 1, slot: 15 }; },
+      add: (p) => { const m = p.model, top = nutTop(m) + m.housing.l; m.brushes = { z: +(top - 8).toFixed(1), d: 12, r: +(m.housing.d / 2 - 1).toFixed(1), out: 5, ring: 2, inset: 1, slot: 15 }; },
       remove: (p) => { delete p.model.brushes; } },
   ];
 
@@ -254,15 +262,17 @@
   function shown(p, ctx = {}) {                       // ctx.clampDef: the build's nut below the clamp (a router with none set)
     const m = p.model, spin = spinOf(m), ex = spin || !BODY ? null : BODY.expand(m);
     const swDown = ex ? +(ex.cap.z[1] - ex.switch.at[2]).toFixed(1) : 0;
-    const O = ex && ex.dial.open, dial = O ? Object.assign({}, m.dial, { slot: O.S, set: m.dial.set ?? 0.3, surround: O.R }) : m.dial;
+    const O = ex && ex.dial.open, dial = O ? Object.assign({}, m.dial, { slot: O.S, set: m.dial.set ?? 0.3, surround: O.R }) : Object.assign({}, m.dial);
+    if (ex && m.dial && m.dial.place === "top" && dial.x == null) dial.x = +ex.dial.at[0].toFixed(1);   // where it sits (near the switch end) when not set
     return Object.assign({}, p, { model: Object.assign({}, m, { dial, overall: BODY ? BODY.overall(m) : 0, switch: { down: swDown },
-      housing: Object.assign({ ch: 0 }, m.housing), bearing_cap: m.bearing_cap || { d: 0, l: 0 }, collar: m.collar || { d: 0, l: 0 }, clamp: m.clamp ?? ctx.clampDef }) });
+      housing: Object.assign({ ch: 1 }, m.housing), bearing_cap: m.bearing_cap || { d: 0, l: 0 }, collar: m.collar || { d: 0, l: 0 }, clamp: m.clamp ?? ctx.clampDef }) });
   }
   const path = (o, k) => k.split(".").reduce((a, q) => (a == null ? undefined : a[q]), o);
   function value(p, k, sh) {                          // a row's value in preset p (sh: shown(p), made if not given)
     const s = sh || shown(p);
     if (k.startsWith("speeds.")) return p.speeds ? p.speeds[+k.split(".")[1]][1] : "";
     if (k === "model.collet.sizes") return p.model.collet.sizes.join(", ");
+    if (k === "model.dial.marks") return p.model.dial && p.model.dial.marks ? p.model.dial.marks.join(", ") : "";
     if (k === "kind") return spinOf(p.model) ? "spindle" : "router";
     if (k.startsWith("has:")) { const r = ROWS.find((q) => q.k === k); return !!r && path(s, r.of) > 0; }
     if (k === "model.dial.surround.kind") return (s.model.dial && s.model.dial.surround && s.model.dial.surround.kind) || "none";

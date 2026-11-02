@@ -484,7 +484,7 @@
   // null = not drawn (a part from a file the user hasn't loaded, or Peter Plates "none")
   function recGeometry(rec) {
     if (rec.src) return srcGeometry(rec);
-    const tm = touchMove(rec), key = tm ? rec.key + "|" + tm.mount : rec.key;
+    const tm = touchMove(rec) || shoeScrewMove(rec), key = tm ? rec.key + "|" + tm.mount : rec.key;
     let e = geoCache.get(key);
     if (e) return e;
     const p = rec.mesh, fin = FINISH[rec.meta.finish];
@@ -531,6 +531,28 @@
         return out; } };
     }
     return touchMoves[k];
+  }
+  // the dust shoe's screw (lr4.SHOE_SCREW_HOLE: an M5 at 35 deg in plan through the shoe's slot into the bottom mount)
+  // on the Makita / DeWalt files: their mount's hole is elsewhere than the Kobalt's the build put it in (user 2026-11-01,
+  // "an alignment problem"; private/hole_loops.py, fclib holes_near: each shoe's slot lines up with its own mount's
+  // hole) - moved by the hole's shift in the mount files' frame (mm), A . T . A^-1 as touchMove
+  // (+ out along the screw, (0.816, 0.578, 0), so the head seats as on the Kobalt: their shoe's face is 0.36 / 0.17 mm
+  // further out there - private/page_tools/screw_seat.js)
+  const SHOE_SCREW_ALT = { makita: [-0.75, 0.27, 0], dewalt: [2.41, -0.97, 0] };
+  const shoeScrewMoves = {};
+  function shoeScrewMove(rec) {
+    const mount = mountNow(), d = SHOE_SCREW_ALT[mount];
+    if (!d || !/^Dust_Shoe_Kobalt__M5_to_Tool_Mount_B_Kobalt/.test(rec.meta.name)) return null;
+    const bot = cfg.parts.find((r) => r.key === "Tool_Mount_B_Kobalt");
+    if (!bot || !mountAlt(bot.src)) return null;
+    if (!shoeScrewMoves[mount]) {
+      const A = new THREE.Matrix4().set(...bot.src.A.flat(), 0, 0, 0, 1);
+      const M = A.clone().multiply(new THREE.Matrix4().makeTranslation(...d)).multiply(A.clone().invert());
+      shoeScrewMoves[mount] = { mount, M, move: (pos) => { const out = new Float32Array(pos), v = new THREE.Vector3();
+        for (let i = 0; i < out.length; i += 3) { v.fromArray(out, i).applyMatrix4(M); v.toArray(out, i); }
+        return out; } };
+    }
+    return shoeScrewMoves[mount];
   }
   function touchMatrix(name) {                       // a touch part's move into the cage (null: drawn as on the Kobalt)
     const rec = cfg && cfg.parts.find((r) => r.meta && r.meta.name === name), t = rec && touchMove(rec);

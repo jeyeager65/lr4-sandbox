@@ -532,6 +532,7 @@
   }
   window.LR4Inspect.tools = { explode: (v) => { document.getElementById("insp-ex").value = v; setExplode(); },
     section: (axis, at, flip) => { SEC.axis = axis || ""; SEC.flip = !!flip; document.getElementById("insp-cut").value = at ?? 0.5; setSection(); },
+    range: (axis) => { const i = "xyz".indexOf(axis), b = INSPECT ? setBox() : null; return b ? [b.min.getComponent(i), b.max.getComponent(i)] : null; },   // the cut's ends (world)
     measure: (on) => { if (MEAS.on !== !!on) document.getElementById("insp-meas").click(); },
     snap: (x, y) => measureSnap({ clientX: x, clientY: y }), click: (x, y) => measureClick({ clientX: x, clientY: y }),
     result: () => document.getElementById("meas-out").textContent,

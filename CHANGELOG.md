@@ -3,6 +3,58 @@
 The version is the sandbox page's (`VERSION` in `web/js/page/job.js`, shown in its footer). The footer also shows
 the date the model data was built and the Printables file set it was solved for.
 
+## 0.66.1 - 2026-11-01
+- **Touch plate wires in the Makita / DeWalt cage:** after switching routers they stayed where they'd settled on the
+  Kobalt's mounts (the plate's red wire ran up past the top mount); they now start again from the plate and clip in the
+  cage. They no longer pass through the plate (a
+  crossing between two points of the wire counts too, and a settled wire is re-checked) or through each other; put away, the
+  clip's wire has the slack to hang down from the crimp instead of running taut to the core, and neither wire loops back
+  into the core's face by the hole. The clip's wire stays in front of the plate (on the clip's side - it can come off first); the red
+  wire is a deeper, matte red (it looked pink).
+- **Shaft lock on the Makita mount:** the Makita, Sienci T1 and Carbide presets' lock moved to the middle of the
+  Makita dust shoe's cutout (-61.5 deg, 25 mm up; it sat ~3 mm to one side).
+- **DeWalt DWP611 body** from a photo of one in the LR4: the housing 122 mm long (was 100) up to a 10 mm gray lip,
+  the yellow head 42 mm tall (was 47) - the top lands where the photo has it; no collar; no shaft lock (it's set into
+  the body); its bottom: an open vent end with 8 fins, a 3 mm bevel and a 42 mm bearing housing. It sits 4.5 mm higher in its mount (nut 32 mm below
+  the clamp) so its bottom clears the dust shoe.
+- **Carbide Compact Router:** the Makita's body on its own ER11 bit end (its measured 200 mm overall kept), the gray
+  head, 38 mm nut below the clamp (its lock re-centered in the shoe's cutout), a black shaft-lock button, and a red dial on top: 30 mm, 6 mm thick, turned across the head, toward the cord.
+- **A dial on top** can be turned 90 deg (Turned: in line with / across the head) and moved along the head (Along the
+  head, + toward the switch, - toward the cord).
+- **Spindle top:** the end cap's top no longer shares a height with the can's (they flickered into streaks); the fan grille
+  is ring ribs and a cross of spokes standing 1 mm proud.
+- **Sienci AutoSpin T1:** its head steps up toward the switch end (square-cornered there), its knob off-center on the raised part,
+  reading S 1 2 3 4 5 -
+  turned to S (spindle mode: the speed comes from the G-code). It runs either way: set Speed comes from to Speed dial and
+  its knob's 1-5 set the speed (GUESS: 10000-30000 RPM evenly); the dial readout and the notes use the knob's labels. A knob dial can now be moved across the head and given a
+  raised pad, and any dial can print its own six stop labels (Stop labels).
+- **Kobalt head** shaped from photos of one: chamfered top edges and ends, a rounded plan narrowing to the cord end with
+  the cord's boss, and the raised ridge at the switch end the dial and switch sit in (was a rounded box); 43 mm tall
+  on a 17 mm silver transition from the body, as the Makita's (the overall height unchanged). Its corners rounded so it
+  clears the core's cutout by ~1 mm (it ran up to ~13 mm into the core). Its dial (25 mm, bevelled, in a deeper window),
+  brush caps and switch as the user set them; its window's bevel runs on down the chamfered end (a dial window's new
+  Bevel on down a steep end - before, it faded out where the top got steep).
+- **Does the router hit the core?** The page checks once a router is drawn (its parts against the core, 1 mm apart):
+  the Router step (its dot too) and the router editor say which part runs in and about how far.
+- **Slice** in the router editor: cut the router (and the core, ticked under Show) across at a height, seen from above,
+  with the core's points inside the router marked red - where it touches and by how much.
+- The Kobalt is listed as **Kobalt K7TR-03** (the page and the FluidNC post's comments).
+- **Kobalt:** brush caps (two, either side, near the housing's top); its shaft lock 1 mm higher (25 up from the nut)
+  so the lock's collar clears the dust shoe (it was 0.5 mm into it).
+- **The dust shoe's screw on the Makita / DeWalt mounts** sits in their own mount's hole (it was in the Kobalt's: 1 /
+  2.5 mm off, beside the shoe's slot).
+- **Dust shoe in its slot** (the router editor > Mount: Shoe in its slot): slide the shoe up or down its slot on the
+  bottom mount, +-3 mm (the skirt and bristles with it, the screw stays) - each router its own, as it sits differently
+  with each. The clash check now looks at the dust shoe too.
+- The Makita's switch 35.5 mm below the head's top.
+- **Router editor:** what's shown round the router is a row of chips over the view (Shoe, Lower mount, Upper mount,
+  Core, Touch plate), joined like the view buttons, not a fold-out list; the bar starts beside the 📷 (no line of its own);
+  the units sit inside their boxes.
+- Run or Learn from the router editor leaves it first (its panels stayed over Run's).
+- **A 1 mm bevel** round the bottom of the motor housing on every router that had none (the Kobalt, the spindle); a
+  router's housing bevel is 1 mm unless set (0 = none).
+- **Brush caps:** always two, either side - the How many and Angle rows are gone (a saved router's are ignored).
+
 ## 0.66.0 - 2026-11-01
 - **Your own Learn clips:** every clip is a G-code file, the built-in ones too. Learn > **Import…** takes .gcode / .nc
   files or a .zip of them and keeps them in this browser for this machine (they go with the machine's export), listed

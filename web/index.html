@@ -309,6 +309,7 @@
         <div class="rb-btns">
           <button type="button" id="rb-view" aria-pressed="false" title="The router editor: every size, the motor cap's shape, colors - the router close up (Back or Esc to leave)">✎ Edit router…</button>
         </div>
+        <p class="foot warn" id="rb-clash" role="alert" hidden></p>
         <p class="foot rb-phone">Editing a router needs a bigger screen than a phone's.</p>
       </div>
     </details>
@@ -575,10 +576,12 @@
       <label class="check"><input type="checkbox" id="rb-mb" checked> Lower mount</label>
       <label class="check"><input type="checkbox" id="rb-mt" checked> Upper mount</label>
       <label class="check" title="To see how the router fits in the core"><input type="checkbox" id="rb-core"> Core</label>
-      <label class="check" title="Stored on the upper mount (Part 50)"><input type="checkbox" id="rb-touch" checked> Touch plate + clip</label></details>
+      <label class="check" title="Stored on the upper mount (Part 50)"><input type="checkbox" id="rb-touch" checked> Touch plate + clip</label>
+    </details>
     <div class="buttons rb-touch-row" id="rb-touch-row" hidden><button type="button" id="rb-touch-go" aria-pressed="false"
       title="Take the touch plate and its clip out as for probing (the clip onto the collet nut, the plate under the bit), and put them back">Take the touch plate out</button></div>
     <p class="foot rte-msg" id="rb-msg" hidden></p>
+    <p class="foot warn rte-msg" id="rte-clash" hidden></p>
     <div class="rte-body" id="rte-body">
       <nav class="rto" id="rto" aria-label="The router's parts"></nav>
       <div class="rto-add"><button type="button" id="rto-add" aria-expanded="false" aria-controls="rto-menu">+ Add a part</button>

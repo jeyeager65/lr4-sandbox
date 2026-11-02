@@ -11,6 +11,8 @@ let fails = 0, checks = 0;
 const ok = (cond, msg) => { checks++; if (!cond) { fails++; console.log("FAIL " + msg); } };
 
 ok(JSON.stringify(R.settings(null)) === JSON.stringify({ router: "kobalt", dial: 3 }), "defaults: Kobalt, dial 3");
+{ const sh = (v) => R.clean(Object.assign(R.preset("kobalt"), { model: Object.assign(R.preset("kobalt").model, { shoe: v }) })).model.shoe;
+  ok(R.ROUTERS.kobalt.model.shoe === 0 && sh(9) === R.SHOE_SLOT && sh(-1.3) === -1.5 && sh("x") === 0, "the router's dust shoe in its slot: 0 = the middle, within the slot, 0.5 steps"); }
 ok(R.settings({ router: "nope", dial: 9 }).router === "kobalt" && R.settings({ dial: 9 }).dial === 6, "unknown router / dial past 6 clamped");
 ok(R.settings({ dial: 0 }).dial === 1 && R.settings({ dial: "x" }).dial === 3 && R.settings({ dial: 3.456 }).dial === 3.5 && R.settings({ dial: 3.2 }).dial === 3, "dial clamped + snapped to the 0.5 stops");
 ok(R.manual("kobalt") && R.manual("makita") && !R.manual("t1"), "Kobalt / Makita manual, T1 G-code");
@@ -92,7 +94,7 @@ ok(mk["cap-L"].v === 78 && mk["cap-L"].k === "model.motor_cap.L" && mk["cap-L"].
 ok(Object.values(mk).every((d) => d.views.length && Number.isFinite(d.v) && [d.a, d.b, d.off].every((p) => p.length === 3 && p.every(Number.isFinite))), "dims: all placed, in a view");
 ok(mk["len-shaft"].k === "model.shaft.exposed" && mk["len-collet_nut"].k === "model.collet_nut.h" && mk["dia-collet_nut"].k === "model.collet_nut.af", "dims: the exposed shaft + the collet nut");
 const cb = dm("carbide");
-ok(cb["len-transition"].k === "model.transition.l" && cb["len-transition"].v === 38 && cb["dia-transition"].v === 73 && cb["housing-ch"].k === "model.housing.ch", "dims: the Carbide's transition + the housing chamfer");
+ok(cb["len-transition"].k === "model.transition.l" && cb["len-transition"].v === 26 && !cb["dia-transition"] && cb["housing-ch"].k === "model.housing.ch", "dims: the Carbide's transition (lofted to the cap: no Ø) + the housing chamfer");
 const hs = R.clean({ name: "H", model: { collet_nut: { af: 20, h: 12 }, shaft: { d: 12, exposed: 0 }, housing: { d: 65, l: 90, ch: 2.5 },
   transition: { l: 20, shape: "cap", edge: "fillet", e: 4 }, motor_cap: { L: 90, W: 80, H: 98 } } });
 const hd = Object.fromEntries(DM.dims(hs, 36.5).map((d) => [d.id, d]));
