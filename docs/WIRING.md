@@ -48,8 +48,19 @@ Endstops are only read while homing (not limit switches). All inputs: active low
 - **Touch plate**: the plate's wire (red) + the clip's (black) out of the core's hole (rope.js) to the probe input,
   in the sleeve (GUESS: one 2-wire lead).
 
-## Routing (GUESS until the user's photos)
+## Routing
 
-The core's runs (X motor, X endstop, the touch plate) go in the sleeve along the vacuum hose to the beam, then to the
-box. Y0 / Z0 / Y1 / Z1 and their endstops: from each YZ plate along the gantry's beam / struts to the Jackpot box
-(the box sits on the beam - build.py JP3_*). The far side's (Y1 / Z1) run is the long one: the extender.
+Source: V1E docs, LowRider "Wire Routing" (docs/lowrider/index.md, photos img/lr4/w1a-w9f; local clone
+D:\GitHub\V1EngineeringInc-Docs). What the docs say:
+
+- The board goes on the **YZ_Min side, first bay** (wiring + SD access) - the model's Jackpot box placement.
+- Y / Z wires leave the YZ assembly low on its inner face (w1), go **into the beam at full height** and are tied
+  **at each brace - top or bottom, both fine** (w4, w5b: top helps with dust). The model: brace bottoms.
+- YZ_Max's motors + endstops and the core's runs use **extensions**; each join folded back and taped (strain relief),
+  labelled (w2, w3). The spare length is pulled to the furthest section and folded into a bundle (w4, w5).
+- The core's wires: tied at the core's top (first position) with the core at X_Max, a small loop there; along the
+  router cord / vac hose through the hose hooks to the **brace just past halfway**, then into the braces with the
+  others (w7, w8, w8b). The wires pass under the hose at the middle; a partial twist if it tracks badly.
+
+Still GUESS (the user's machine): the exact exit point on the YZ plate, the tie points' heights, and the core
+bundle's sag / loop size. The model's "+75 mm per end" allowance covers the joins and the loops.

@@ -4,7 +4,7 @@
 //     inside the box (a child of Jackpot3_Box: it rides the beam) - only when the user's own board model isn't there
 //     (it never is in the public page: LOCAL_ONLY);
 //   - the rat's nest (51a.5): Layers > Wiring - a line per run from end to end, coloured by its group (the core's runs
-//     along the cable sleeve), drawn over the parts; hover / tap one: its name, from -> to, its segments, how far.
+//     along the router cord / vac hose), drawn over the parts; hover / tap one: its name, from -> to, its segments, how far.
   const WR = { on: false, board: null, lines: null, tip: null, hover: null };
   const WR_V = (a) => new THREE.Vector3(...a);
   const wrMesh = (n) => meshes.find((m) => m.userData.name === n);
@@ -48,7 +48,7 @@
     const m = wrMesh(e.part);
     return m && m.visible !== false ? new THREE.Box3().setFromObject(m).getCenter(new THREE.Vector3()) : null;
   }
-  // ---- routes (51b): a run's points end to end. The core's runs: along the cable sleeve. A motor's / endstop's on a YZ
+  // ---- routes (51b): a run's points end to end. The core's runs: along the cord / hose (wrCarrier). A motor's / endstop's on a YZ
   // plate to the board: up to the beam's line (GUESS until the user's photos: the box's middle depth, its floor's
   // height), along it to the box, in. The rest (power): straight (the switch panel's mains crosses the Y travel - it
   // needs its slack there). WR_ALLOW: per end, for the connector + a service loop (GUESS) ----
@@ -56,11 +56,23 @@
   function wrPath(r) {
     const a = wrEnd(r.from), b = wrEnd(r.to);
     if (!a || !b) return null;
-    const sl = (r.via || []).includes("sleeve") && typeof sleeveMesh !== "undefined" && sleeveMesh && sleeveMesh.visible && sleeveMesh.geometry.parameters && sleeveMesh.geometry.parameters.path;
-    if (sl) {
-      let s = sl.getPoints(24);
+    const along = (r.via || []).includes("hose") && wrCarrier();
+    if (along) {
+      let s = along.getPoints(48);
       if (s[0].distanceTo(a) > s[s.length - 1].distanceTo(a)) s = s.reverse();   // the core's end first
-      return [a, ...s, b];
+      const box = wrMesh("Jackpot3_Box"), braces = wrBraces();
+      if (!box || !braces.length || !(r.to && r.to.board)) return [a, ...s, b];
+      // V1E docs (w7, w8): tied along the cord / hose to the brace just past halfway (toward the box), off there into
+      // the braces with the others, along them to the box
+      const bx = new THREE.Box3().setFromObject(box), cx = (bb) => (bb.min.x + bb.max.x) / 2;
+      const mid = (braces[0].min.x + braces[braces.length - 1].max.x) / 2, hi = mid > cx(bx), wall = hi ? bx.max.x : bx.min.x;
+      const past = braces.filter((bb) => (cx(bb) - mid) * (hi ? -1 : 1) >= -1);    // halfway or past it, toward the box
+      const mb = (past.length ? past : braces).reduce((p, q) => (Math.abs(cx(q) - mid) < Math.abs(cx(p) - mid) ? q : p));
+      const mc = mb.getCenter(new THREE.Vector3());
+      let k = 0;
+      s.forEach((p, i) => { if (p.distanceTo(mc) < s[k].distanceTo(mc)) k = i; });
+      const on = braces.filter((bb) => (hi ? cx(bb) < cx(mb) && cx(bb) > wall : cx(bb) > cx(mb) && cx(bb) < wall));
+      return wrIntoBox([a, ...s.slice(0, k + 1), wrTie(mb), ...(hi ? on.reverse() : on).map(wrTie)], wall, bx, b);
     }
     const box = wrMesh("Jackpot3_Box"), side = r.from && r.from.part && /_(Min|Max)(_|$)/.exec(r.from.part);
     if (box && side && r.to && r.to.board && (r.group === "motor" || r.group === "switch")) return wrBeamPath(a, b, side[1], box);
@@ -71,19 +83,31 @@
   // full height", tied to each brace (tops or bottoms - the bottoms here: the box sits low) along to the board.
   // GUESS until the user's photos: the plate's exit = its back face, 25 mm under its top; at each brace, its back
   // bottom corner (10 mm in); into the box through its end wall facing that side.
-  function wrBeamPath(a, b, side, box) {
-    const plate = wrMesh("YZ_Plate_" + side), bx = new THREE.Box3().setFromObject(box);
-    const braces = meshes.filter((m) => /^Brace_/.test(m.userData.name || "") && !/__/.test(m.userData.name) && m.visible !== false)
-      .map((m) => new THREE.Box3().setFromObject(m)).sort((p, q) => p.min.x - q.min.x);
-    const pts = [a];
-    if (plate) { const pb = new THREE.Box3().setFromObject(plate); pts.push(new THREE.Vector3((pb.min.x + pb.max.x) / 2, pb.max.y, pb.max.z - 25)); }
-    const tie = (bb) => new THREE.Vector3((bb.min.x + bb.max.x) / 2, bb.max.y - 10, bb.min.z + 10);
-    const max = side === "Max", wall = max ? bx.max.x : bx.min.x;
-    const on = braces.filter((bb) => (max ? (bb.min.x + bb.max.x) / 2 > wall : (bb.min.x + bb.max.x) / 2 < wall));
-    for (const bb of (max ? on.reverse() : on)) pts.push(tie(bb));   // from that side's end brace in toward the box
+  // what the core's runs are tied along: the router cord if there is one (V1E: "bundling the wires with your Router power
+  // cord"), else the vac hose; the curve whether or not that layer is shown (the wires are there either way)
+  function wrCarrier() {
+    for (const n of ["Router_Cord_Run", "Vacuum_Hose"]) {
+      const m = wrMesh(n), p = m && m.geometry.parameters && m.geometry.parameters.path;
+      if (p) return p;
+    }
+    return null;
+  }
+  const wrBraces = () => meshes.filter((m) => /^Brace_/.test(m.userData.name || "") && !/__/.test(m.userData.name) && m.visible !== false)
+    .map((m) => new THREE.Box3().setFromObject(m)).sort((p, q) => p.min.x - q.min.x);
+  const wrTie = (bb) => new THREE.Vector3((bb.min.x + bb.max.x) / 2, bb.max.y - 10, bb.min.z + 10);   // a brace's back bottom corner
+  function wrIntoBox(pts, wall, bx, b) {              // through the box's end wall facing the run, to the spot
     const last = pts[pts.length - 1];
     pts.push(new THREE.Vector3(wall, Math.min(last.y, bx.max.y - 10), Math.max(last.z, bx.min.z + 10)), b);
     return pts;
+  }
+  function wrBeamPath(a, b, side, box) {
+    const plate = wrMesh("YZ_Plate_" + side), bx = new THREE.Box3().setFromObject(box);
+    const pts = [a];
+    if (plate) { const pb = new THREE.Box3().setFromObject(plate); pts.push(new THREE.Vector3((pb.min.x + pb.max.x) / 2, pb.max.y, pb.max.z - 25)); }
+    const max = side === "Max", wall = max ? bx.max.x : bx.min.x;
+    const on = wrBraces().filter((bb) => (max ? (bb.min.x + bb.max.x) / 2 > wall : (bb.min.x + bb.max.x) / 2 < wall));
+    for (const bb of (max ? on.reverse() : on)) pts.push(wrTie(bb));   // from that side's end brace in toward the box
+    return wrIntoBox(pts, wall, bx, b);
   }
   const wrLen = (p) => p.reduce((s, v, i) => (i ? s + v.distanceTo(p[i - 1]) : 0), 0);
   // each run over the machine's travel (its corners: X / Y / Z ends) - the longest it gets; what its segments give;
