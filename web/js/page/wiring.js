@@ -58,12 +58,16 @@
     if (!a || !b) return null;
     const along = (r.via || []).includes("hose") && wrCarrier();
     if (along) {
-      let s = along.getPoints(48);
-      if (s[0].distanceTo(a) > s[s.length - 1].distanceTo(a)) s = s.reverse();   // the core's end first
-      const box = wrMesh("Jackpot3_Box"), braces = wrBraces();
-      if (!box || !braces.length || !(r.to && r.to.board)) return [a, ...s, b];
+      // from the table (the switch panel's mains): the vac hose from its floor end, reached under the table (GUESS)
+      const core = wrMesh("Core"), cc = core ? new THREE.Box3().setFromObject(core).getCenter(new THREE.Vector3()) : a;
+      const fromTable = a.distanceTo(cc) > 500, hp = fromTable && wrMesh("Vacuum_Hose") && wrMesh("Vacuum_Hose").geometry.parameters.path;
+      let s = (hp || along).getPoints(48);
+      if ((s[0].distanceTo(cc) > s[s.length - 1].distanceTo(cc)) !== fromTable) s = s.reverse();   // the core's end first (the table's: last)
+      const head = fromTable ? [a, new THREE.Vector3(a.x, a.y, s[0].z)] : [a];
+      const box = r.to && (r.to.board ? wrMesh("Jackpot3_Box") : wrMesh(r.to.part)), braces = wrBraces();
+      if (!box || !braces.length) return [...head, ...s, b];
       // V1E docs (w7, w8): tied along the cord / hose to the brace just past halfway (toward the box), off there into
-      // the braces with the others, along them to the box
+      // the braces with the others, along them to the box (or the part: the supply's mains, w9e)
       const bx = new THREE.Box3().setFromObject(box), cx = (bb) => (bb.min.x + bb.max.x) / 2;
       const mid = (braces[0].min.x + braces[braces.length - 1].max.x) / 2, hi = mid > cx(bx), wall = hi ? bx.max.x : bx.min.x;
       const past = braces.filter((bb) => (cx(bb) - mid) * (hi ? -1 : 1) >= -1);    // halfway or past it, toward the box
@@ -72,8 +76,8 @@
       let k = 0;
       s.forEach((p, i) => { if (p.distanceTo(mc) < s[k].distanceTo(mc)) k = i; });
       const on = braces.filter((bb) => (hi ? cx(bb) < cx(mb) && cx(bb) > wall : cx(bb) > cx(mb) && cx(bb) < wall));
-      const pts = wrIntoBox([a, ...s.slice(0, k + 1), wrTie(mb), ...(hi ? on.reverse() : on).map(wrTie)], wall, bx, b);
-      pts.fold = k + 2;                                // the spare: folded at the middle brace (its slack rides the hose)
+      const pts = wrIntoBox([...head, ...s.slice(0, k + 1), wrTie(mb), ...(hi ? on.reverse() : on).map(wrTie)], wall, bx, b);
+      pts.fold = head.length + k + 1;                  // the spare: folded at the middle brace (its slack rides the hose)
       return pts;
     }
     const box = wrMesh("Jackpot3_Box"), side = r.from && r.from.part && /_(Min|Max)(_|$)/.exec(r.from.part);

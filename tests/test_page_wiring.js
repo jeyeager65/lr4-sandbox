@@ -50,6 +50,11 @@ const ok = (cond, msg) => { checks++; console.log((cond ? "  ok   " : "  FAIL ")
       return { y1: by["y1-motor"], y0: by["y0-motor"], pts: p.length, braces: meshes.filter((m) => /^Brace_/.test(m.userData.name) && !/__/.test(m.userData.name)).length, back: before === [HOME.pose.x, HOME.pose.y, HOME.pose.z].join() }; })()`);
     ok(e.y1.reaches && e.y0.reaches && e.y1.worst > 2 * e.y0.worst, `26 x 50: Y1 reaches on lead + extender (${e.y1.need} of ${e.y1.have} mm), Y0 on its lead (${e.y0.need} of ${e.y0.have})`);
     ok(e.pts >= e.braces + 2 - 1 && e.back, `Y1 routed out its YZ plate + along the braces to the box (${e.pts} points, ${e.braces} braces); the pose put back`);
+    // the supply's mains: from the panel to the floor, the hose's floor end, up the hose (V1E docs w9e; GUESS)
+    const mains = await page.val(`(() => { const h = meshes.find((m) => m.userData.name === "Vacuum_Hose").geometry.parameters.path, ends = [h.getPoint(0), h.getPoint(1)];
+      const p = wrPath(LR4Wiring.RUNS.find((q) => q.id === "psu-ac")), low = ends[0].z < ends[1].z ? ends[0] : ends[1];
+      return { n: p.length, viaFloor: p.some((v) => v.distanceTo(low) < 5), len: Math.round(wrLen(p)) }; })()`);
+    ok(mains.viaFloor && mains.n > 10, `the supply's mains runs out with the vac hose from its floor end (${mains.n} points, ${mains.len} mm now)`);
     // the BOM: the extenders counted from the routes at this size + the endstops' own wire
     const bom = await page.val(`(() => { const t0 = performance.now(); renderBom(); const ms = performance.now() - t0;
       const rows = [...document.querySelectorAll("#bom-body tr")].map((tr) => tr.textContent);

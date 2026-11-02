@@ -250,6 +250,8 @@
             [1, `2-wire lead for the endstops, ~${m(tot)} m in all (your own)`, `crimped or soldered to each switch (V1E docs), cut to fit: ` +
               own.map((q) => `${q.name.replace(/ endstop$/, "")} ${m(R[q.id].cut)}`).join(", ") + " m; the far ones spliced to their extender"]];
           if (pr && !pr.reaches && /^V1E Tiny Touch Plate/.test(r[1] || "")) return [[r[0], r[1], `${r[2]}; its 2 m wire is ${pr.short} mm short at this size: extend it`]];
+          if (R["psu-ac"] && R["psu-ac"].cut && /^24 V power supply/.test(r[1] || ""))
+            return [[r[0], r[1], `${r[2]}; on the gantry: its mains cord from the switch panel ~${m(R["psu-ac"].cut)} m, out with the vac hose (V1E docs; GUESS route)`]];
           return [r];
         }) }));
       }
