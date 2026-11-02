@@ -147,15 +147,20 @@
   }
   // ---- the rat's nest ----
   function wrLines() {
-    if (WR.lines) { scene.remove(WR.lines); WR.lines.traverse((o) => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); }); WR.lines = null; }
+    for (const k of ["lines", "joins"]) if (WR[k]) { scene.remove(WR[k]); WR[k].traverse((o) => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); }); WR[k] = null; }
     if (!WR.on || typeof LR4Wiring === "undefined") return;
-    WR.lines = new THREE.Group();
+    WR.lines = new THREE.Group(); WR.joins = new THREE.Group();
     for (const r of LR4Wiring.RUNS) {
       const ln = new THREE.Line(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({ color: LR4Wiring.GROUPS[r.group].colour, depthTest: false, transparent: true, opacity: 0.95 }));
       ln.renderOrder = 20; ln.userData.run = r; ln.frustumCulled = false;
       WR.lines.add(ln);
+      if (r.group === "motor" && r.segs[0].len && r.segs.some((g) => g.kind === "ribbon")) {   // the lead's plug meets the extender's
+        const j = new THREE.Mesh(new THREE.CylinderGeometry(6, 6, 45, 12), new THREE.MeshStandardMaterial({ color: 0xe8e8e0, roughness: 0.7 }));
+        j.userData = { run: r.id, at: r.segs[0].len - WR_ALLOW };
+        ln.userData.join = j; WR.joins.add(j);
+      }
     }
-    scene.add(WR.lines);
+    scene.add(WR.lines, WR.joins);
     wrTick();
   }
   // a route as the wire lies (51b): the span the gantry moves (plate -> end brace) hangs with the travel's slack here
@@ -183,14 +188,31 @@
     }
     return out;
   }
+  // a join (V1E docs w2-w3: "Fold the wires, leaving the connection straight", taped, labelled): the motor's lead
+  // ends its length along the route (less the plug end's allowance); the endstop's own wire is spliced in there too
+  function wrJoin(j, p) {
+    let s = j.userData.at;
+    for (let i = 1; i < p.length; i++) {
+      const L = p[i].distanceTo(p[i - 1]);
+      if (s <= L || i === p.length - 1) {
+        const d = p[i].clone().sub(p[i - 1]).normalize();
+        j.position.copy(p[i - 1]).addScaledVector(d, Math.min(s, L));
+        j.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), d);
+        return;
+      }
+      s -= L;
+    }
+  }
   function wrTick() {                                 // each frame while shown: the ends ride their parts
     wrBoard();
     if (!WR.lines) return;
     for (const ln of WR.lines.children) {
       const p = wrPath(ln.userData.run);
       ln.visible = !!p;
+      if (ln.userData.join) ln.userData.join.visible = !!p;
       if (!p) continue;
       ln.userData.len = wrLen(p);
+      if (ln.userData.join) wrJoin(ln.userData.join, p);
       const w = wrDrawn(ln.userData.run, p, ln.userData.len);
       const a = new Float32Array(w.length * 3); w.forEach((v, i) => v.toArray(a, i * 3));
       const g = ln.geometry, at = g.getAttribute("position");

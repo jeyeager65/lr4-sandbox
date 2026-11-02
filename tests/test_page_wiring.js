@@ -50,6 +50,10 @@ const ok = (cond, msg) => { checks++; console.log((cond ? "  ok   " : "  FAIL ")
       return { y1: by["y1-motor"], y0: by["y0-motor"], pts: p.length, braces: meshes.filter((m) => /^Brace_/.test(m.userData.name) && !/__/.test(m.userData.name)).length, back: before === [HOME.pose.x, HOME.pose.y, HOME.pose.z].join() }; })()`);
     ok(e.y1.reaches && e.y0.reaches && e.y1.worst > 2 * e.y0.worst, `26 x 50: Y1 reaches on lead + extender (${e.y1.need} of ${e.y1.have} mm), Y0 on its lead (${e.y0.need} of ${e.y0.have})`);
     ok(e.pts >= e.braces + 2 - 1 && e.back, `Y1 routed out its YZ plate + along the braces to the box (${e.pts} points, ${e.braces} braces); the pose put back`);
+    // the joins: one taped join per extender (the core, Y1, Z1), on its run
+    const jn = await page.val(`(() => { const js = WR.joins ? WR.joins.children : []; return { n: js.length, vis: js.every((j) => j.visible),
+      far: js.map((j) => Math.round(j.position.distanceTo(wrEnd(LR4Wiring.RUNS.find((r) => r.id === j.userData.run).from)))) }; })()`);
+    ok(jn.n === 3 && jn.vis && jn.far.every((d) => d > 100 && d < 700), `3 taped joins (lead meets extender), each 100-700 mm in a straight line from its motor (the core's loops back with the hose) (${jn.far.join(", ")})`);
     // the supply's mains: from the panel to the floor, the hose's floor end, up the hose (V1E docs w9e; GUESS)
     const mains = await page.val(`(() => { const h = meshes.find((m) => m.userData.name === "Vacuum_Hose").geometry.parameters.path, ends = [h.getPoint(0), h.getPoint(1)];
       const p = wrPath(LR4Wiring.RUNS.find((q) => q.id === "psu-ac")), low = ends[0].z < ends[1].z ? ends[0] : ends[1];
