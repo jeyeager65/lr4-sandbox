@@ -1188,3 +1188,10 @@ body.rec-ui .rec-msg { top: calc(3.5% + 44px); font-size: clamp(15px, 2.4vh, 38p
 .ce-wait button { margin-left: 6px; }
 #ce-overb[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
 .ce-draw.ce-over .ce-step { display: none; }
+
+/* the wiring's hover card (wiring.js, Part 51a) */
+.wr-tip { position: absolute; z-index: 30; pointer-events: none; display: grid; gap: 2px; max-width: 320px; padding: 6px 9px;
+  background: var(--panel, #1c1f24); border: 1px solid var(--line); border-radius: 6px; font-size: 12px; color: var(--ink); box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35); }
+.wr-tip b { font-size: 13px; }
+.wr-tip span { color: var(--muted); }
+.lay-extra { margin: 4px 0 6px; }

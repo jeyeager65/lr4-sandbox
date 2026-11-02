@@ -411,6 +411,7 @@
     spinTick(dt);                                     // the bit turning while a FluidNC job has the router on (machine.js;
                                                       // dt capped: a slow frame at 0.5 s turned it exactly half a turn)
     ropeTick(dt);                                     // the clip's wire; the clip flung off the nut (rope.js, Part 44d)
+    if (typeof wrTick === "function") wrTick();       // the stand-in board + the wiring's lines (wiring.js, Part 51a)
     if (typeof tcTick === "function") tcTick(dt);     // a bit change, animated (tool_change.js, Part 45b)
     soundTick();
     heatFxTick(dt);                                   // smoke, scorch, fire, the extinguisher (heat_fx.js, Part 44b)

@@ -718,6 +718,7 @@
   <section class="layers-pop" id="layers-pop" aria-labelledby="h-show" hidden>
     <div class="layers-head"><h2 id="h-show">Layers</h2><button type="button" id="layers-x" aria-label="Close" title="Close (Esc)">✕</button></div>
     <p class="foot">The view only - the BOM keeps every part. A bolt joining two assemblies is under both and shows with either.</p>
+    <label class="check lay-extra" title="The wiring list: a line per run from end to end (motors, endstops, the touch plate, power), over the parts - hover one for its name and ends"><input type="checkbox" id="lay-wiring"> Wiring</label>
     <div class="presets" id="show-presets" role="group" aria-label="Presets"></div>
     <div class="tree" id="show-tree" role="group" aria-label="Parts shown"></div>
     <button type="button" id="unhide" hidden></button>
@@ -1190,6 +1191,7 @@
 <script src="js/table_model.js" defer></script>
 <script src="js/strut_plate.js" defer></script>
 <script src="data/routers.js" defer></script>
+<script src="data/wiring.js" defer></script>
 <script src="js/strut_cam.js" defer></script>
 <script src="js/cap_shape.js" defer></script>
 <script src="js/routers.js" defer></script>
@@ -1233,6 +1235,7 @@
 <script src="js/page/heat_fx.js" defer></script>
 <script src="js/page/rope.js" defer></script>
 <script src="js/page/hose_bom.js" defer></script>
+<script src="js/page/wiring.js" defer></script>
 <script src="js/page/inspect.js" defer></script>
 <script src="js/page/power.js" defer></script>
 <script src="js/page/router.js" defer></script>
