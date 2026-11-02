@@ -43,6 +43,13 @@ const ok = (cond, msg) => { checks++; console.log((cond ? "  ok   " : "  FAIL ")
       const r = canvas.getBoundingClientRect(); return LR4WiringView.pick(r.left + (v.x + 1) / 2 * r.width, r.top + (1 - v.y) / 2 * r.height);
     })()`);
     ok(d === "psu-dc" || typeof d === "string", `hover picks a run there (${d})`);
+    // 51b: the routes over the travel - the far side's motors reach on lead + extender, the near ones on their lead; the
+    // Y1 run passes every brace from its end to the box; the pose is put back after
+    const e = await page.val(`(() => { const before = [HOME.pose.x, HOME.pose.y, HOME.pose.z].join(), r = LR4WiringView.report(), by = Object.fromEntries(r.map((q) => [q.id, q]));
+      const p = wrPath(LR4Wiring.RUNS.find((q) => q.id === "y1-motor"));
+      return { y1: by["y1-motor"], y0: by["y0-motor"], pts: p.length, braces: meshes.filter((m) => /^Brace_/.test(m.userData.name) && !/__/.test(m.userData.name)).length, back: before === [HOME.pose.x, HOME.pose.y, HOME.pose.z].join() }; })()`);
+    ok(e.y1.reaches && e.y0.reaches && e.y1.worst > 2 * e.y0.worst, `26 x 50: Y1 reaches on lead + extender (${e.y1.need} of ${e.y1.have} mm), Y0 on its lead (${e.y0.need} of ${e.y0.have})`);
+    ok(e.pts >= e.braces + 2 - 1 && e.back, `Y1 routed out its YZ plate + along the braces to the box (${e.pts} points, ${e.braces} braces); the pose put back`);
     await page.val(`(LR4WiringView.set(false), true)`);
     ok(await page.val("!WR.lines && !document.getElementById('lay-wiring').checked"), "off: the lines gone, the box unticked");
     ok(!(await page.val("window.__errors && window.__errors.length")), "no page errors");
