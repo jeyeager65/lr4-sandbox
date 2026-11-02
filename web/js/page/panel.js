@@ -112,12 +112,19 @@
     statusEl.hidden = true;
     renderFiles();
   }
+  // the files this machine draws from: the build's + the router's mount set (Makita / DeWalt: listed with their link and
+  // counted until loaded - user 2026-11-01, "did we add links to the new files?"; the other sets stay optional)
+  function neededNow() {
+    const out = new Map(needed), m = typeof mountNow === "function" ? mountNow() : "kobalt";
+    for (const p of cfg.parts) { const a = p.src && p.src.alt && p.src.alt[m]; if (a) (out.get(a.file) || out.set(a.file, []).get(a.file)).push(p.meta.name); }
+    return out;
+  }
   function renderFiles() {
-    const host = document.getElementById("files-list"), F = cfg.files;
+    const host = document.getElementById("files-list"), F = cfg.files, want = neededNow();
     const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
     let have = 0, diff = 0, html = "";
     const bySrc = {};
-    for (const p of needed.keys()) (bySrc[F.files[p].source] = bySrc[F.files[p].source] || []).push(p);
+    for (const p of want.keys()) (bySrc[F.files[p].source] = bySrc[F.files[p].source] || []).push(p);
     for (const [src, paths] of Object.entries(bySrc)) {
       const S = F.sources[src], items = [];
       let n = 0;
@@ -131,7 +138,7 @@
       html += `<div class="files-src"><b><a href="${esc(S.url)}" target="_blank" rel="noopener">${esc(S.title)}</a></b> <em>${n} of ${paths.length}</em>`
         + (items.length && list ? `<ul>${items.join("")}</ul>` : "") + "</div>";
     }
-    const total = needed.size;
+    const total = want.size;
     const head = have === total && !diff ? `<p class="sub">All ${total} files loaded.</p>`
       : `<p class="sub">${have} of ${total} files loaded${have < total ? " - the missing parts show as grey boxes" : ""}.</p>`;
     const warn = diff ? `<p class="warn">${diff} file(s) differ from the ones this page was solved for (as of ${esc(F.tested)}) - placed anyway, check they fit.</p>` : "";

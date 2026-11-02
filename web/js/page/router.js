@@ -21,6 +21,7 @@
     rtLook();
     if (RT.set.router !== was.router && typeof rbShow === "function") rbShow();   // My LR4 > Router (router_build.js)
     if (RT.set.router !== was.router && typeof optsRefresh === "function") optsRefresh();   // mount None: no shoe / hose (panel.js)
+    if (RT.set.router !== was.router && typeof renderFiles === "function" && needed) renderFiles();   // its mount set's files in Parts
     if (why) rtReadout();
     return RT.set;
   }
@@ -171,7 +172,9 @@
   }
   function rtClash() {                               // [{ label, depth (mm), n (points) }] worst first, or null (nothing to check)
     const parts = meshes.filter((m) => RT_OWN.test(m.userData.name || "") && m.userData.name !== "Router_Bit" && m.geometry);
-    const core = meshes.filter((m) => RT_CLASH_CORE.test(m.userData.name || "") && m.geometry);
+    // (the shoe drawn is the Kobalt's while the router's mount files aren't loaded: not the router's, left out)
+    const noShoe = typeof mountMissing === "function" && mountMissing().length > 0;
+    const core = meshes.filter((m) => RT_CLASH_CORE.test(m.userData.name || "") && m.geometry && !(noShoe && /^Dust_Shoe/.test(m.userData.name)));
     if (!parts.length || !core.length) return null;
     const box = new THREE.Box3();
     for (const m of parts) box.expandByObject(m);
@@ -232,8 +235,11 @@
       for (let i = 0; i < a.length; i += 3) v.set(h.pts[i], h.pts[i + 1], h.pts[i + 2]).applyMatrix4(inv).toArray(a, i);
       RT.clashPts = { mesh: hs, a }; } else RT.clashPts = null;
     if (typeof rxSliceDots === "function") rxSliceDots();
-    const t = h && h.length ? `The ${r ? r.name : "router"} runs into ${h.slice(0, 3).map((q) => `${q.what} (its ${q.label.toLowerCase()}, ~${q.depth} mm)`).join(", ")}. ` +
-      "Check its sizes or the shoe's height in its slot (Edit router > Slice: tick Core under Show to see the core)." : "";
+    const miss = typeof mountMissing === "function" ? mountMissing() : [], mn = r && { makita: "Makita 701 / T1", dewalt: "DeWalt 611" }[r.mount];
+    const tm = miss.length ? `The ${mn || "router's"} mount's files aren't loaded (${miss.map((f) => f.split("/").pop()).join(", ")}): the Kobalt's mounts and ` +
+      "dust shoe are drawn in their place, so the fit here isn't this router's. Load them with Parts (top right). " : "";
+    const t = tm + (h && h.length ? `The ${r ? r.name : "router"} runs into ${h.slice(0, 3).map((q) => `${q.what} (its ${q.label.toLowerCase()}, ~${q.depth} mm)`).join(", ")}. ` +
+      "Check its sizes or the shoe's height in its slot (Edit router > Slice: tick Core under Show to see the core)." : "");
     for (const id of ["rb-clash", "rte-clash"]) { const el = document.getElementById(id); if (el) { el.textContent = t; el.hidden = !t; } }
     const dot = document.getElementById("dot-rt"); if (dot) dot.hidden = !t;
   }

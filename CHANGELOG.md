@@ -3,6 +3,11 @@
 The version is the sandbox page's (`VERSION` in `web/js/page/job.js`, shown in its footer). The footer also shows
 the date the model data was built and the Printables file set it was solved for.
 
+## 0.66.2 - 2026-11-01
+- **A router's mount files not loaded** (the Makita / DeWalt mount + dust shoe): the Router step and the router editor
+  say so (the Kobalt's are drawn in their place) and the clash check leaves the shoe out (it warned about the Kobalt's
+  shoe). Parts lists the router's own mount set with its Printables link and counts it until it's loaded.
+
 ## 0.66.1 - 2026-11-01
 - **Touch plate wires in the Makita / DeWalt cage:** after switching routers they stayed where they'd settled on the
   Kobalt's mounts (the plate's red wire ran up past the top mount); they now start again from the plate and clip in the

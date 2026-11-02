@@ -618,6 +618,17 @@
   // mount's file (src.alt: the Makita 701 / T1 or DeWalt 611 set, in the Kobalt files' frame: the same A) once that
   // file is loaded, else the Kobalt's. MOUNT_NAME: the label's "Kobalt" for that set
   const MOUNT_NAME = { makita: "Makita 701", dewalt: "DeWalt 611" };
+  // the router's mount set's files that aren't loaded (user 2026-11-01: their parts are drawn as the Kobalt's then - say
+  // so, and the clash check leaves the shoe out): [file], [] = all in (or the Kobalt's / no mount)
+  function mountMissing() {
+    const m = mountNow(), out = [];
+    if (!cfg || !MOUNT_NAME[m]) return out;
+    for (const r of cfg.parts) {
+      const a = r.src && r.src.alt && r.src.alt[m];
+      if (a && !userFiles.has(a.file) && !out.includes(a.file)) out.push(a.file);
+    }
+    return out;
+  }
   const mountNow = () => { const r = typeof LR4Routers !== "undefined" && typeof RT !== "undefined" && LR4Routers.ROUTERS[RT.set.router]; return r ? r.mount : "kobalt"; };
   const mountAlt = (s) => { const a = s && s.alt && s.alt[mountNow()]; return a && userFiles.has(a.file) ? a : null; };
   function srcGeometry(rec) {
