@@ -226,14 +226,15 @@
   // skirt and the hose need the router (the hose threads into its shoe); the shoe goes with the hose (user 2026-10-23:
   // no hose = no shoe, skirt or bristles - the skirt needs both); the pendant is the FluidTouch option. Kept
   // in this browser (lr4-opts; the pendant in lr4-pendant). ----
-  const OPT = { router: true, skirt: true, hose: true, fan: true };
+  const OPT = { router: true, skirt: true, hose: true, fan: true, hub: false, vac: false };   // hub + vac: Part 52, optional
   const OPT_PARTS = { router: /^(Router_(?!Cord_Run)|Tool_Mount_|Dust_Shoe|Dust_Skirt|Bristles_TPU)/, skirt: DUST_PARTS,
-    hose: /^(Vacuum_Hose|Router_Cord_Run|Cable_Sleeve|Hose_Holder|Hose_Hook|Dust_Shoe|Dust_Skirt|Bristles_TPU)/, fan: /^Jackpot3_Fan/ };
+    hose: /^(Vacuum_Hose|Router_Cord_Run|Cable_Sleeve|Hose_Holder|Hose_Hook|Dust_Shoe|Dust_Skirt|Bristles_TPU)/, fan: /^Jackpot3_Fan/,
+    hub: /^(TableHub_|SwitchPanel_Paddle)/, vac: /^ShopVac_/ };
   const pendantOn = () => document.getElementById("ft-on").checked;   // My machine > FluidTouch pendant (kept)
   // a router with mount "none" (My LR4 > Router, user 2026-10-29): no dust shoe, so no hose either
   const mountNone = () => { const r = typeof LR4Routers !== "undefined" && typeof RT !== "undefined" && RT.set && LR4Routers.ROUTERS[RT.set.router]; return !!r && r.mount === "none"; };
   const optsOn = () => { const hose = OPT.router && OPT.hose && !mountNone();
-    return { router: OPT.router, skirt: hose && OPT.skirt, hose, fan: OPT.fan, pendant: pendantOn() }; };
+    return { router: OPT.router, skirt: hose && OPT.skirt, hose, fan: OPT.fan, pendant: pendantOn(), hub: OPT.hub, vac: OPT.hub && OPT.vac }; };
   function optsRefresh() {                           // the router / its mount changed (router.js, router_build.js)
     const none = mountNone();
     for (const k of ["skirt", "hose"]) {
@@ -246,6 +247,7 @@
   function fitted(m) {
     const n = m.userData.name || "", o = optsOn();
     if (m.userData.group === "Pendant") return o.pendant;
+    if (o.hub && /^SwitchPanel_EStop/.test(n)) return false;   // the hub's paddle switch takes the e-stop's place (Part 52)
     return Object.keys(OPT_PARTS).every((k) => o[k] || !OPT_PARTS[k].test(n));
   }
   function setupOpts() {                              // once
@@ -253,12 +255,15 @@
     const mark = () => {
       for (const k of Object.keys(OPT)) document.getElementById("opt-" + k).checked = OPT[k];
       for (const k of ["skirt", "hose"]) document.getElementById("opt-" + k).disabled = !OPT.router || mountNone() || (k === "skirt" && !OPT.hose);
+      document.getElementById("opt-vac").disabled = !OPT.hub;
     };
     for (const k of Object.keys(OPT)) document.getElementById("opt-" + k).addEventListener("change", (e) => {
       OPT[k] = e.target.checked;
       try { MS.set("lr4-opts", JSON.stringify(OPT)); } catch (err) { /* not kept */ }
       mark();
       if (meta) { applyVisibility(); renderBom(); }
+      if (k === "hub" && meta) { switchPanelPlace(); powerLook(); }   // the switch panel by the hub (sheet table); E-STOP | STOP
+      if (k === "hub" && hoseMesh && HOME.pose) updateHose(HOME.pose.x, HOME.pose.y, HOME.pose.z);   // the hose ends at the port (or the floor)
     });
     mark();
   }

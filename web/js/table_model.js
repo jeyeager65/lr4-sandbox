@@ -1,13 +1,13 @@
 // The table (Part 33): a spoilboard between two rail strips (3/4" MDF, z 0..T: the work surface, where the machine
-// has always sat) on a base below z 0 - "sheet" (one 3/4" MDF sheet) or "torsion" (a plywood egg-crate, no skins,
-// as long as the spoilboard: the rail strips stick out past its ends).
+// has always sat) on a base below z 0 - "sheet" (one 3/4" MDF sheet) or "torsion" (a plywood egg-crate between a top
+// and a bottom skin (user 2026-11-02), as long as the spoilboard: the rail strips stick out past its ends).
 // Mirrors freecad/lr4.py table_parts + bom.py table_rows; tests/test_table_model.js checks it against the Python.
 // Plain JS: parts() -> boxes (mm, the size builds' frame), rows() -> the cut list's table rows.
 (function (root) {
   "use strict";
   const IN = 25.4;
   const TABLE = { spoil_t: 0.75 * IN, spoil_margin: 0.25 * IN, spoil_gap: 0.125 * IN, strip_min: 2.5 * IN,
-    strip_max: 4.0 * IN, reach: [156.41, 134.5, 110.4715728752538, 201.0], sheet_t: 0.75 * IN, rib_t: 0.6 * IN, rib_h: 3.5 * IN, grid: 12.0 * IN, slot_clear: 0.4 };
+    strip_max: 4.0 * IN, reach: [156.41, 134.5, 110.4715728752538, 201.0], sheet_t: 0.75 * IN, rib_t: 0.6 * IN, rib_h: 3.5 * IN, skin_t: 0.25 * IN, grid: 12.0 * IN, slot_clear: 0.4 };
   const KINDS = ["sheet", "torsion"];
 
   // rib positions (low face) along a side: the outer two flush with the edges, the rest even, <= grid apart
@@ -33,22 +33,27 @@
       out.push({ name: "TableBase", box: [0, 0, -c.sheet_t, TW, TL, 0], slots: [], role: "base" });
       return out;
     }
-    const t = c.rib_t, h = c.rib_h, w = c.rib_t + c.slot_clear;
+    const t = c.rib_t, h = c.rib_h, s = c.skin_t, w = c.rib_t + c.slot_clear;
     const xs = ribSpots(TW, t, c.grid), ys = ribSpots(sy1 - sy0, t, c.grid).map((y) => sy0 + y);   // the box: the spoilboard's length
-    xs.forEach((x, i) => {                // the outer two run the full length under the rail strips (RailEdge_*)
+    // the ribs sit between the skins (z -s-h .. -s); the outer two run the full length under the rail strips (RailEdge_*)
+    // and the skins' depth too (z -h-2s .. 0): the box's sides, the skins between them
+    xs.forEach((x, i) => {
       const edge = i === 0 || i === xs.length - 1;
       out.push({ name: edge ? (i === 0 ? "RailEdge_Min" : "RailEdge_Max") : `TableRib_Y${i}`,
-        box: [x, edge ? 0 : sy0, -h, x + t, edge ? TL : sy1, 0], role: edge ? "edge" : "rib",
-        slots: ys.map((y) => [x - 1, y - (w - t) / 2, -h / 2, x + t + 1, y + (w + t) / 2, 1]) });
+        box: [x, edge ? 0 : sy0, edge ? -h - 2 * s : -s - h, x + t, edge ? TL : sy1, edge ? 0 : -s], role: edge ? "edge" : "rib",
+        slots: ys.map((y) => [x - 1, y - (w - t) / 2, -s - h / 2, x + t + 1, y + (w + t) / 2, edge ? 1 : -s + 1]) });
     });
-    ys.forEach((y, j) => out.push({ name: `TableRib_X${j + 1}`, box: [0, y, -h, TW, y + t, 0], role: "rib",
-      slots: xs.map((x) => [x - (w - t) / 2, y - 1, -h - 1, x + (w + t) / 2, y + t + 1, -h / 2]) }));
+    ys.forEach((y, j) => out.push({ name: `TableRib_X${j + 1}`, box: [0, y, -s - h, TW, y + t, -s], role: "rib",
+      slots: xs.map((x) => [x - (w - t) / 2, y - 1, -s - h - 1, x + (w + t) / 2, y + t + 1, -s - h / 2]) }));
+    const x0 = xs[0] + t, x1 = xs[xs.length - 1];
+    out.push({ name: "TableSkin_Top", box: [x0, sy0, -s, x1, sy1, 0], slots: [], role: "skin" },
+      { name: "TableSkin_Bottom", box: [x0, sy0, -2 * s - h, x1, sy1, -s - h], slots: [], role: "skin" });
     return out;
   }
 
   // the cut list's table rows [qty, part, material, size, notes] (bom.py table_rows)
   const inch = (mm) => `${+(Math.round(mm / IN * 16) / 16).toFixed(4)}`;
-  const NAMES = /^(Table top|Table sheet|Spoilboard|Rail strip, (Min|Max)|Rail side board|Torsion box rib, along [XY])$/;
+  const NAMES = /^(Table top|Table sheet|Spoilboard|Rail strip, (Min|Max)|Rail side board|Torsion box rib, along [XY]|Torsion box skin)$/;
   function rows(kind, list, marginIn) {
     const box = Object.fromEntries(list.map((p) => [p.name, p.box]));
     const size = (n) => `${inch(box[n][3] - box[n][0])} x ${inch(box[n][4] - box[n][1])} in`;
@@ -72,6 +77,8 @@
       out.push([ribs.length, `Torsion box rib, ${along}`, '5/8" plywood (GUESS)',
         `${inch(b[5] - b[2])} x ${inch(Math.max(b[3] - b[0], b[4] - b[1]))} in`, `${ribs[0].slots.length} half-lap slots from the ${slot}`]);
     }
+    out.push([2, "Torsion box skin", '1/4" plywood or hardboard (GUESS)', size("TableSkin_Top"),
+      "top + bottom, between the rail side boards; glued + nailed to every rib"]);
     return out;
   }
 

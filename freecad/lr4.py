@@ -658,7 +658,7 @@ MOTION_BEAM = ("XZ_Plate", "Z_Stub", "Z_Nut", "Z_BrassNut", "MGN12H", "Brace", "
                "X_Belt", "Belt_X", "Hose_", "Jackpot3", "PSU", "Vac_Hose")
 MOTION_CORE = ("Core", "Tool_Mount", "Dust_", "Router", "Bristles", "X_Stepper", "X_Pulley", "X_Idler",
                "Bearing_Core", "Endstop_X", "TouchPlate")
-MOTION_TABLE = ("TableMDF", "TableBase", "TableRib", "Spoilboard", "RailStrip", "RailEdge", "Y_Belt_", "Y_Rail", "Y_Clip", "Belt_Y")
+MOTION_TABLE = ("TableMDF", "TableBase", "TableRib", "TableSkin", "Spoilboard", "RailStrip", "RailEdge", "Y_Belt_", "Y_Rail", "Y_Clip", "Belt_Y")
 
 
 def motion(name):
@@ -687,7 +687,8 @@ def motion(name):
 # (the cutting area + a margin, what the bit cuts into) between two Rail strips the same thickness (the Y belt
 # holders + Min wheels on the Min one, the belt holders + Y clips on the Max one), all screwed onto a base below
 # z 0: "sheet" = one 3/4" MDF sheet (TableBase), "torsion" = a plywood egg-crate (TableRib_X* along X, TableRib_Y*
-# along Y, half-lapped: the Y ribs slotted from the top, the X ribs from the bottom; no skins) only as long as the
+# along Y, half-lapped: the Y ribs slotted from the top, the X ribs from the bottom; a top + bottom skin between the
+# outer ribs, user 2026-11-02) only as long as the
 # spoilboard - the rail strips run the full length and stick out past its ends, on the box's two outer long ribs run
 # the full length under them (RailEdge_Min / Max; user 2026-10-23).
 # web/js/table_model.js mirrors table_parts (tests/test_table_model.js compares it with build/table.json).
@@ -704,6 +705,7 @@ TABLE = dict(
     sheet_t=0.75 * 25.4,          # "sheet" base: 3/4" MDF - MEASURE YOURS
     rib_t=0.6 * 25.4,             # "torsion" ribs: 5/8" plywood (thinner than nominal) - GUESS / MEASURE YOURS
     rib_h=3.5 * 25.4,             # rib height - GUESS
+    skin_t=0.25 * 25.4,           # "torsion" top + bottom skins: 1/4" plywood or hardboard - GUESS / MEASURE YOURS
     grid=12.0 * 25.4,             # most rib spacing (centre to centre) - GUESS (the user's picture: ~12")
     slot_clear=0.4,               # half-lap slot width = rib_t + this
 )
@@ -733,17 +735,25 @@ def table_parts(kind, TW, TL, xtable, ytable, cut_x, cut_y, T=None, c=None):
     if kind == "sheet":
         out.append(dict(name="TableBase", box=(0.0, 0.0, -c["sheet_t"], TW, TL, 0.0), slots=[], role="base"))
         return out
-    t, h, w = c["rib_t"], c["rib_h"], c["rib_t"] + c["slot_clear"]
+    t, h, s, w = c["rib_t"], c["rib_h"], c["skin_t"], c["rib_t"] + c["slot_clear"]
     xs = rib_spots(TW, t, c["grid"])
     ys = [sy0 + y for y in rib_spots(sy1 - sy0, t, c["grid"])]   # the box: the spoilboard's length
-    for i, x in enumerate(xs):           # along Y: slots from the top where the X ribs cross. The outer two run the
-        edge = i in (0, len(xs) - 1)     # full length under the rail strips (RailEdge_*: stiffen the overhang, user)
+    # the ribs sit between the skins (z -s-h .. -s). Along Y: slots from the top where the X ribs cross. The outer two
+    # run the full length under the rail strips (RailEdge_*: stiffen the overhang, user) and the skins' depth too
+    # (z -h-2s .. 0): the box's sides, the skins between them
+    for i, x in enumerate(xs):
+        edge = i in (0, len(xs) - 1)
         out.append(dict(name=("RailEdge_Min" if i == 0 else "RailEdge_Max") if edge else f"TableRib_Y{i}",
-                        box=(x, 0.0 if edge else sy0, -h, x + t, TL if edge else sy1, 0.0), role="edge" if edge else "rib",
-                        slots=[(x - 1, y - (w - t) / 2, -h / 2, x + t + 1, y + (w + t) / 2, 1.0) for y in ys]))
+                        box=(x, 0.0 if edge else sy0, -h - 2 * s if edge else -s - h, x + t, TL if edge else sy1, 0.0 if edge else -s),
+                        role="edge" if edge else "rib",
+                        slots=[(x - 1, y - (w - t) / 2, -s - h / 2, x + t + 1, y + (w + t) / 2, 1.0 if edge else -s + 1)
+                               for y in ys]))
     for j, y in enumerate(ys):           # along X: slots from the bottom
-        out.append(dict(name=f"TableRib_X{j + 1}", box=(0.0, y, -h, TW, y + t, 0.0), role="rib",
-                        slots=[(x - (w - t) / 2, y - 1, -h - 1, x + (w + t) / 2, y + t + 1, -h / 2) for x in xs]))
+        out.append(dict(name=f"TableRib_X{j + 1}", box=(0.0, y, -s - h, TW, y + t, -s), role="rib",
+                        slots=[(x - (w - t) / 2, y - 1, -s - h - 1, x + (w + t) / 2, y + t + 1, -s - h / 2) for x in xs]))
+    x0, x1 = xs[0] + t, xs[-1]
+    out.append(dict(name="TableSkin_Top", box=(x0, sy0, -s, x1, sy1, 0.0), slots=[], role="skin"))
+    out.append(dict(name="TableSkin_Bottom", box=(x0, sy0, -2 * s - h, x1, sy1, -s - h), slots=[], role="skin"))
     return out
 
 

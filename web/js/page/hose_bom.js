@@ -83,7 +83,9 @@
     const [ddx, ddy, ddz] = h.drop;
     pts.push([h.exit_x + ddx * 0.55, ty + ddy * 0.4, tz + ddz * 0.25, "beam"]);
     pts.push([h.exit_x + ddx, ty + ddy, tz + ddz, "beam"]);
-    pts.push([h.exit_x + h.floor[0], h.floor_y, h.table_t + h.floor[2], "table"]);
+    const hub = typeof HUB !== "undefined" && HUB.port && optsOn().hub && HUB.port;   // Part 52 (page only): into the hub's dust port
+    if (hub) pts.push([hub[0] - 150, hub[1], hub[2] + 130, "table"], [hub[0] - 90, hub[1], hub[2] + 5, "table"], [hub[0] + 35, hub[1], hub[2], "table"]);   // in level, along +X
+    else pts.push([h.exit_x + h.floor[0], h.floor_y, h.table_t + h.floor[2], "table"]);
     return pts;
   }
   function makeHose() {

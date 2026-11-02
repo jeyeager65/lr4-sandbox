@@ -198,7 +198,8 @@ table_parts = lr4.table_parts(TABLE, TW, TL, xtable, ytable, CUT_X, CUT_Y, T=T)
 TABLE_NOTE = {"spoil": "3/4in MDF spoilboard (the bit's full travel + 1/4in a side), screwed down - surface it flat",
               "strip": "3/4in MDF rail strip: the Y belt holders + {} on it",
               "base": "3/4in MDF table sheet", "rib": "5/8in plywood rib, {} half-lap slots from the {}",
-              "edge": "5/8in plywood: the box's outer rib, full length under the rail strip, {} half-lap slots"}
+              "edge": "5/8in plywood: the box's outer rib, full length under the rail strip, {} half-lap slots",
+              "skin": "1/4in plywood or hardboard torsion box skin (GUESS), between the rail side boards"}
 for tp in table_parts:
     x0, y0, z0, x1, y1, z1 = tp["box"]
     shp = core.box(x0, x1, y0, y1, z0, z1)
@@ -212,7 +213,7 @@ for tp in table_parts:
         note = note.format(len(tp["slots"]))
     elif tp["role"] == "rib":
         note = note.format(len(tp["slots"]), "top" if "_Y" in tp["name"] else "bottom")
-    rgb = wood.PLYWOOD if tp["role"] in ("rib", "edge") else MDF_TABLE
+    rgb = wood.PLYWOOD if tp["role"] in ("rib", "edge", "skin") else MDF_TABLE
     m.add(tp["name"], shp, group="Table", colour=rgb if tp["role"] != "spoil" else SPOIL_RGB,
           cut=wood.sheet(t=dims[0] / IN, w=dims[1] / IN, l=dims[2] / IN, note=note))
 os.makedirs(os.path.join(ROOT, "build"), exist_ok=True)

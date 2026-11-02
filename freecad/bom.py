@@ -142,6 +142,8 @@ def table_rows(g):
         L = max(b[3] - b[0], b[4] - b[1])
         rows.append([len(ribs), f"Torsion box rib, {along}", '5/8" plywood (GUESS)',
                      f"{_in(b[5] - b[2])} x {_in(L)} in", f"{len(ribs[0]['slots'])} half-lap slots from the {slot}"])
+    rows.append([2, "Torsion box skin", '1/4" plywood or hardboard (GUESS)', size("TableSkin_Top"),
+                 "top + bottom, between the rail side boards; glued + nailed to every rib"])
     return rows
 
 

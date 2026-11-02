@@ -42,9 +42,9 @@ const inside = (s, x, y, z) => x > s[0] && x < s[3] && y > s[1] && y < s[4] && z
 let crossings = 0, good = 0;
 for (const a of ry) for (const b of rx) {
   crossings++;
-  const x = (a.box[0] + a.box[3]) / 2, y = (b.box[1] + b.box[4]) / 2, h = TM.TABLE.rib_h;
-  const top = a.slots.some((s) => inside(s, x, y, -h / 4)) && !a.slots.some((s) => inside(s, x, y, -3 * h / 4));
-  const bot = b.slots.some((s) => inside(s, x, y, -3 * h / 4)) && !b.slots.some((s) => inside(s, x, y, -h / 4));
+  const x = (a.box[0] + a.box[3]) / 2, y = (b.box[1] + b.box[4]) / 2, h = TM.TABLE.rib_h, k = TM.TABLE.skin_t;   // the ribs: z -k-h .. -k
+  const top = a.slots.some((s) => inside(s, x, y, -k - h / 4)) && !a.slots.some((s) => inside(s, x, y, -k - 3 * h / 4));
+  const bot = b.slots.some((s) => inside(s, x, y, -k - 3 * h / 4)) && !b.slots.some((s) => inside(s, x, y, -k - h / 4));
   if (top && bot) good++;
 }
 ok(good === crossings, `half-laps: ${good} of ${crossings} crossings slotted top (Y rib) + bottom (X rib)`);
@@ -68,7 +68,12 @@ ok(t.Spoilboard[0] >= t.RailStrip_Min[3] + TM.TABLE.spoil_gap - 1e-9 && t.Spoilb
 const r1 = TM.rows("sheet", sh), r2 = TM.rows("torsion", tor);
 ok(r1.length === 4 && r1[0][3] === "26.5625 x 50.5625 in" && r1[3][1] === "Table sheet" && r1[3][3] === "40 x 65 in", JSON.stringify(r1.map((r) => r[3])));
 const rr = (n) => r2.find((r) => r[1] === n) || [];
-ok(r2.length === 6 && rr("Rail side board")[0] === 2 && rr("Rail side board")[3] === "3.5 x 65 in" && rr("Torsion box rib, along Y")[0] === 3 && rr("Torsion box rib, along Y")[3] === "3.5 x 50.5625 in" && rr("Torsion box rib, along X")[0] === 6 && rr("Torsion box rib, along X")[3] === "3.5 x 40 in" &&
+// the skins: top flush with z 0, bottom under the ribs, between the rail side boards, the box's length (user 2026-11-02)
+const sk = Object.fromEntries(tor.filter((p) => p.role === "skin").map((p) => [p.name, p.box])), k0 = TM.TABLE.skin_t;
+ok(sk.TableSkin_Top && near(sk.TableSkin_Top[5], 0) && near(sk.TableSkin_Bottom[5], -k0 - TM.TABLE.rib_h) && near(sk.TableSkin_Top[0], ry[0].box[3]) &&
+  near(sk.TableSkin_Top[3], ry[4].box[0]) && near(sk.TableSkin_Top[1], tsp[1]) && near(ry[0].box[2], sk.TableSkin_Bottom[2]) && near(rx[0].box[5], -k0),
+  `skins ${JSON.stringify(sk)}`);
+ok(r2.length === 7 && rr("Torsion box skin")[0] === 2 && rr("Rail side board")[0] === 2 && rr("Rail side board")[3] === "4 x 65 in" && rr("Torsion box rib, along Y")[0] === 3 && rr("Torsion box rib, along Y")[3] === "3.5 x 50.5625 in" && rr("Torsion box rib, along X")[0] === 6 && rr("Torsion box rib, along X")[3] === "3.5 x 40 in" &&
   /6 half-lap slots from the top/.test(rr("Torsion box rib, along Y")[4]), JSON.stringify(r2.slice(3)));
 ok(r2.every((r) => TM.NAMES.test(r[1])) && TM.NAMES.test("Table top"), "row names match NAMES");
 

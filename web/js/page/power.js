@@ -36,14 +36,30 @@
     if (PWR[k] === on) return on;
     PWR[k] = on;
     if (SND.s) SND.s.event("switch");
-    const what = { router: "Router rocker", vac: "Vac rocker", body: "The router's own switch" }[k];
+    const what = { router: "Router toggle", vac: "Vac toggle", body: "The router's own switch" }[k];
     ctlAdd(`${what} ${on ? "on" : "off"}${PWR.estop && on ? " (no power: the e-stop is pressed)" : ""}.`, "dim");
     powerLook();
     return on;
   }
-  function powerClick(k) { if (k === "estop") { if (PWR.estop) estopRelease(); else estopPress(); } else powerSet(k); }
+  function powerClick(k) {                          // stop / start: the paddle switch (Part 52, with the table hub)
+    if (k === "estop" && typeof optsOn === "function" && optsOn().hub) k = PWR.estop ? "start" : "stop";   // Run's button: the paddle switch
+    if (k === "stop" || k === "start") paddleNudge(k);
+    if (k === "estop") { if (PWR.estop) estopRelease(); else estopPress(); } else if (k === "stop") estopPress(); else if (k === "start") estopRelease(); else powerSet(k);
+  }
+  function paddleNudge(k) {                         // momentary: the paddle swings in on its hinge + presses STOP, or START goes in; both spring back
+    const set = (on) => {
+      for (const m of meshes) {
+        const n = m.userData.name || "", b = m.userData.base;
+        if (!b) continue;
+        if (k === "stop" && /^SwitchPanel_Paddle(Face)?$/.test(n)) m.rotation.x = on ? 0.08 : 0;
+        if ((k === "stop" && n === "SwitchPanel_PaddleStopBtn") || (k === "start" && /^SwitchPanel_PaddleStart/.test(n))) m.position.y = b.t[1] + (on ? 3 : 0);
+      }
+    };
+    set(true);
+    setTimeout(() => set(false), 220);
+  }
   function powerWhy() {                              // why the router can't run now ("" = it can)
-    return PWR.estop ? "E-STOP pressed: no power" : !PWR.router ? "The router's rocker is off" :
+    return PWR.estop ? "E-STOP pressed: no power" : !PWR.router ? "The router's toggle is off" :
       !PWR.body ? "The router's own switch is off (click it on the router)" : "";
   }
   // the panel and the router's switch as PWR says: the e-stop head in / out, the lamp and rockers lit or dark, the
@@ -62,7 +78,7 @@
       if (!ud.t0) ud.t0 = ud.base.t.slice();
       if (n === "SwitchPanel_EStop") at(ud, PWR.estop ? SWP.travel : 0, 0);
       else if (n === "SwitchPanel_Lamp") lit(m, !PWR.estop);
-      else if (n === "SwitchPanel_Router" || n === "SwitchPanel_Vac") { m.rotation.x = PWR[ud.click] ? -0.17 : 0.17; lit(m, PWR[ud.click] && !PWR.estop); }
+      else if (n === "SwitchPanel_Router" || n === "SwitchPanel_Vac") { m.rotation.x = PWR[ud.click] ? -0.45 : 0.45; /* the toggle thrown up (on) / down */ lit(m, PWR[ud.click] && !PWR.estop); }
       else if (n === "Router_Switch") {                 // a rocker (the preset's two states, router.js); else slid down
         if (ud.rocker) { at(ud, 0, 0); m.geometry = ud.rocker[PWR.body ? "on" : "off"]; if (typeof rtRockerFace === "function") rtRockerFace(m, PWR.body); }
         else at(ud, 0, PWR.body ? 0 : -3);
@@ -70,8 +86,11 @@
     }
     if (meta && HOME.pose) move([HOME.pose.x, HOME.pose.y, HOME.pose.z]);
     const b = $("pwr-estop");
-    b.textContent = PWR.estop ? "↻ Release" : "E-STOP";
-    b.title = PWR.estop ? "Twist the e-stop to release it: the power comes back, FluidNC restarts (home it after)" :
+    const paddle = typeof optsOn === "function" && optsOn().hub;   // the paddle switch's START / STOP (Part 52)
+    b.textContent = PWR.estop ? (paddle ? "▶ Start" : "↻ Release") : paddle ? "STOP" : "E-STOP";
+    b.title = PWR.estop ? (paddle ? "Press START on the paddle switch: the power comes back, FluidNC restarts (home it after)" :
+      "Twist the e-stop to release it: the power comes back, FluidNC restarts (home it after)") :
+      paddle ? "Slap the STOP paddle: cuts the power - FluidNC, the router and the vac stop, and stay off until START" :
       "Emergency stop: cuts the power - FluidNC, the router and the vac stop";
     b.setAttribute("aria-pressed", String(PWR.estop));
     for (const q of document.querySelectorAll("[data-pwr=estop]")) { q.setAttribute("aria-pressed", String(PWR.estop)); q.title = b.title; }
@@ -81,7 +100,7 @@
       e.classList.toggle("lit", PWR[k] && !PWR.estop);
     }
     const why = powerWhy(), note = $("pwr-note");
-    note.textContent = why && why !== "E-STOP pressed: no power" ? why + ": the router won't start." : PWR.estop ? "No power: the lamp and rockers are dark." : "";
+    note.textContent = why && why !== "E-STOP pressed: no power" ? why + ": the router won't start." : PWR.estop ? "No power: the lamp and toggles are dark." : "";
     note.hidden = !note.textContent;
     runState();
   }

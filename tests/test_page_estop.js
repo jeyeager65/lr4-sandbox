@@ -1,10 +1,10 @@
 // Part 44f in headless Chrome (serve.py's headers): the switch panel.
-//  - the panel is drawn on the table's front face: lamp + rockers lit, the e-stop out;
-//  - a click on the vac rocker in the view switches it (dark), Run's Vac button back on;
+//  - the panel is drawn on the table's front face: lamp + toggles lit, the e-stop out;
+//  - a click on the vac toggle in the view switches it (dark), Run's Vac button back on;
 //  - mid-job with a fire burning (Heat + Fire, no auto extinguisher), E-STOP: the job stops, FluidNC down (not homed),
-//    the head in, the lamp + rockers dark, the pill says so, a boot is refused; the fire burns on and spreads, the bit cools;
+//    the head in, the lamp + toggles dark, the pill says so, a boot is refused; the fire burns on and spreads, the bit cools;
 //  - released (Run's button): FluidNC boots, not homed, the lamp lit;
-//  - the router's rocker off: a job runs with the router still (no spin), Run says why; the router's own switch slides.
+//  - the router's toggle off: a job runs with the router still (no spin), Run says why; the router's own switch slides.
 // Headless Chrome barely draws frames: the test drives the fx tick (LR4Heat.tick) itself.
 //   node tests/test_page_estop.js   (not in npm test: needs Chrome + Python; ~3 min)
 "use strict";
@@ -38,7 +38,7 @@ const SHORT = HEAD.concat(["G0 X20 Y50", "G1 Z-1 F300", "G1 X120 F600", "G0 Z5",
       const tb = tableBox(true), box = new THREE.Box3().setFromObject(panel.find((m) => m.userData.name === "SwitchPanel_Box"));
       out.panel = { n: panel.length, back: +(box.max.y - tb.min.y).toFixed(1), top: +(tb.min.z - box.max.z).toFixed(1), inX: box.min.x >= tb.min.x && box.max.x <= tb.max.x };
       out.look0 = look();
-      // a click on the vac rocker in the view (the camera straight at the panel)
+      // a click on the vac toggle in the view (the camera straight at the panel)
       const c = box.getCenter(new THREE.Vector3());
       camera.position.set(c.x, c.y - 500, c.z + 60); controls.target.copy(c); controls.update(); camera.updateMatrixWorld();
       const [x, y] = LR4Power.screen("SwitchPanel_Vac");
@@ -80,7 +80,7 @@ const SHORT = HEAD.concat(["G0 X20 Y50", "G1 Z-1 F300", "G1 X120 F600", "G0 Z5",
       await T.booted(prev2); await T.idle();
       out.released = { sim: !!window.LR4FluidNC, homed: LR4Ctl.homed(), look: look(), pill: document.getElementById("st-pill").textContent };
 
-      // the router's rocker off: the job runs, the router doesn't
+      // the router's toggle off: the job runs, the router doesn't
       LR4AsBuilt.set({ on: false });
       document.getElementById("pwr-router").click();
       out.why = document.getElementById("pwr-note").textContent;
@@ -105,7 +105,7 @@ const SHORT = HEAD.concat(["G0 X20 Y50", "G1 Z-1 F300", "G1 X120 F600", "G0 Z5",
       return out;
     })()`);
     ok(a.panel.n >= 9 && a.panel.back <= 0.01 && a.panel.top > 0 && a.panel.inX, `the panel on the table's front face, under its top: ${JSON.stringify(a.panel)}`);
-    ok(a.look0.Lamp.g > 0.2 && a.look0.Router.g > 0 && a.look0.Vac.g > 0, `lamp + rockers lit at the start ${JSON.stringify(a.look0)}`);
+    ok(a.look0.Lamp.g > 0.2 && a.look0.Router.g > 0 && a.look0.Vac.g > 0, `lamp + toggles lit at the start ${JSON.stringify(a.look0)}`);
     ok(a.vacClick.vac === false && a.vacClick.look.g === 0 && a.vacClick.btn === "false" && a.vacBack === true, `a click on the vac rocker in the view: off, dark; Run's Vac: on ${JSON.stringify(a.vacClick)}`);
     ok(a.fired && a.spinBefore, "mid-job, router turning, a fire lit");
     ok(a.pressed && !a.after.running && !a.after.sim && !a.after.homed, `E-STOP: the job stopped, FluidNC down, not homed ${JSON.stringify(a.after)}`);
@@ -116,7 +116,7 @@ const SHORT = HEAD.concat(["G0 X20 Y50", "G1 Z-1 F300", "G1 X120 F600", "G0 Z5",
     ok(a.heat.burning > 0 && a.heat.r1 > a.heat.r0 && a.heat.bit1 < a.heat.bit0 && !a.heat.spin, `the fire burns on and spreads, the bit cools, no spin ${JSON.stringify(a.heat)}`);
     ok(a.released.sim && !a.released.homed && a.released.look.Lamp.g > 0.2 && Math.abs(a.released.look.EStop.y - a.look0.EStop.y) < 0.01 && !/E-STOP/.test(a.released.pill),
       `released: FluidNC up, not homed, lamp lit, head out ${JSON.stringify(a.released)}`);
-    ok(/rocker is off/.test(a.why), `Run says why: ${a.why}`);
+    ok(/toggle is off/.test(a.why), `Run says why: ${a.why}`);
     ok(!a.rockerOff.spun && a.rockerOn, `the router rocker off: no spin in a job; on again: it turns ${JSON.stringify(a.rockerOff)}`);
     ok(a.body.tipped && /own switch/.test(a.body.why), `the router's own switch off: the rocker tips over, Run says why ${JSON.stringify(a.body)}`);
   } catch (e) {
