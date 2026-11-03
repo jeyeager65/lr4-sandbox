@@ -150,6 +150,10 @@
     h.cord.tip = h.cord.tip0.map((v, i) => v + dt[i]);
     const dir = w(c.dir);
     h.cord.tip2 = h.cord.tip.map((v, i) => v + dir[i] * L);
+    if (c.base) {                                    // Part 53: the strain relief's base - the cord rope starts there (hose_bom.js)
+      h.cord.base = h.cord.tip0.map((v, i) => v + w(c.base.map((q, k) => q - kob[k]))[i]);
+      h.cord.baseDir = w(c.baseDir); h.cord.relief = Object.assign({}, c.relief);
+    }
   }
   // ---- does the router hit the core? (user 2026-11-01, the Kobalt's new head): the router's parts as columns on a 1 mm
   // grid from above, each the z spans inside one part (its closed mesh: the crossings sorted, paired); the core's

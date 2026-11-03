@@ -148,10 +148,13 @@
   function wrReport() {
     if (typeof LR4Wiring === "undefined" || !meta || !meta.travel || !HOME.pose) return [];
     const t = meta.travel, back = [HOME.pose.x, HOME.pose.y, HOME.pose.z], worst = {};
-    for (const x of t.x) for (const y of t.y) for (const z of t.z) {
-      move([x, y, z]);
-      for (const r of wrRuns()) { const p = wrPath(r); if (p) worst[r.id] = Math.max(worst[r.id] || 0, wrLen(p)); }
-    }
+    if (typeof HR !== "undefined") HR.quick = true;     // the ropes settle briefly at each corner (Part 53 perf: ~3 s of the load)
+    try {
+      for (const x of t.x) for (const y of t.y) for (const z of t.z) {
+        move([x, y, z]);
+        for (const r of wrRuns()) { const p = wrPath(r); if (p) worst[r.id] = Math.max(worst[r.id] || 0, wrLen(p)); }
+      }
+    } finally { if (typeof HR !== "undefined") HR.quick = false; }
     move(back);
     const need = {};
     for (const [id, w] of Object.entries(worst)) if (w) need[id] = Math.round(w + 2 * WR_ALLOW);
@@ -162,10 +165,19 @@
   }
   // the BOM's wiring (hose_bom.js renderBom): the fit at this scene, once per scene (its travel + whether the cord /
   // hose are there) - the report moves the machine through the travel's corners
-  function wrFit() {
+  function wrFit(now) {
     if (typeof LR4Wiring === "undefined" || !meta || !meta.travel || !HOME.pose || !wrMesh("Jackpot3_Box")) return null;
     const key = JSON.stringify([meta.travel, !!wrMesh("Router_Cord_Run"), !!wrMesh("Vacuum_Hose"), wrHub()]);
-    if (WR.fitKey !== key) { WR.report = wrReport(); WR.fitKey = key; }
+    if (WR.fitKey !== key) {
+      // (load perf, Part 53: ~0.4 s - the report moves the machine and its ropes through the travel's corners) not in the
+      // BOM's first draw: just after, then the BOM again with the wiring rows. Called with now = true (tests, the probes): at once
+      if (now) { WR.report = wrReport(); WR.fitKey = key; return WR.fit; }
+      if (WR.later !== key) {
+        WR.later = key;
+        setTimeout(() => { if (WR.later !== key) return; WR.later = null; WR.report = wrReport(); WR.fitKey = key; if (typeof renderBom === "function") renderBom(); }, 800);   // after the first frames are up
+      }
+      return null;
+    }
     return WR.fit;
   }
   // ---- the rat's nest ----

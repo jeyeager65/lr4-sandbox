@@ -731,7 +731,7 @@
     const tube = (s) => sweep([ring([s[0][0], s[0][1], 0]), ...s.map(ring), ring([s[s.length - 1][0], s[s.length - 1][1], 0])]);
     append(P.strain_relief, tube(secs));
     if (C.out > 0) append(P.cord, tube([[add(p1, mul(dir, -0.5)), dir, C.d / 2], [add(p1, mul(dir, C.out)), dir, C.d / 2]]));
-    return { cord: { tip: add(p1, mul(dir, C.out || 0)), dir } };
+    return { cord: { tip: add(p1, mul(dir, C.out || 0)), dir, base: SR.at.slice(), baseDir: [-1, 0, 0], relief: { l: SR.l, d: SR.d, cd: C.d } } };
   }
   // into a frame: turned a (rad) about z, then moved to o
   function place(m, f) {

@@ -37,7 +37,8 @@ const STATE = `(() => {
     const a = await page.val(STATE);
     ok(["RailStrip_Min", "RailStrip_Max", "Spoilboard", "TableBase"].every((p) => a.parts.includes(p)) && !a.parts.includes("TableMDF") &&
       !a.parts.includes("TableRibs"), `sheet: ${a.parts.join(", ")}`);
-    ok(a.bom.includes("Spoilboard") && a.bom.includes("Table sheet") && !a.bom.includes("Table top"), `sheet cut list: ${a.bom.join(", ")}`);
+    // the base is a drawn placeholder, not in the BOM (user 2026-11-02): only the spoilboard + rail strips
+    ok(a.bom.includes("Spoilboard") && a.bom.includes("Rail strip, Min") && !a.bom.includes("Table sheet") && !a.bom.includes("Table top"), `sheet cut list: ${a.bom.join(", ")}`);
     // the spoilboard field = the Spoilboard (the bit's travel + 1/4 in a side: 674.8 x 1284.2 mm at 26 x 50), 3/4 in deep
     const w = a.spoil && a.spoil[1] - a.spoil[0], l = a.spoil && a.spoil[3] - a.spoil[2];
     ok(a.spoil && Math.abs(w - 674.8) < 3 && Math.abs(l - 1284.2) < 3 && Math.abs(a.spoil[4] + 19.05) < 0.1,
@@ -49,7 +50,7 @@ const STATE = `(() => {
     const b = await page.val(STATE);
     ok(!bad.length && b.pressed === "torsion", `LR4Machine base=torsion (${bad.join("; ")})`);
     ok(b.parts.includes("TableRibs") && !b.parts.includes("TableBase") && b.parts.includes("Spoilboard"), `torsion: ${b.parts.join(", ")}`);
-    ok(b.bom.includes("Torsion box rib, along Y") && b.bom.includes("Torsion box rib, along X") && !b.bom.includes("Table sheet"),
+    ok(b.bom.includes("Spoilboard") && !b.bom.some((n) => /^Torsion box|^Rail side board|^Table sheet/.test(n)),
       `torsion cut list: ${b.bom.join(", ")}`);
     ok(a.floor !== null && Math.abs(a.floor - b.floor) < 0.5, `the floor stays put (table height = spoilboard top): ${a.floor} / ${b.floor}`);
     const png = await page.send("Page.captureScreenshot", { format: "png" });

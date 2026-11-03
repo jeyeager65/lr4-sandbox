@@ -299,7 +299,8 @@
       m.userData.shown = inTree.has(m) && LR4ShowTree.on(tree, showOff, partId(m))
         && (!INSPECT || (INSPECT.set.has(partId(m)) && !INSPECT.hide.has(partId(m))))   // inspect: its set, less the list's unticked rows
         && !(TOUCH_ANIM.skirt >= 1 && PROBE_OFF.test(m.userData.name)) && !(AB.magnified && RACK_OFF.test(m.userData.name)) && !(jobBit && m.userData.name === "Router_Bit");   // off once it's slid out (job.js)
-      m.visible = m.userData.shown && !ROPE_STUB.test(m.userData.name);   // the touch plate's wire stubs: rope.js draws the wires
+      m.visible = m.userData.shown && !ROPE_STUB.test(m.userData.name)   // the touch plate's wire stubs: rope.js draws the wires
+        && !(/^Router_(StrainRelief|Cord)$/.test(m.userData.name) && cordMesh && fitted(cordMesh) && meta.hose && meta.hose.cord && meta.hose.cord.base);   // Part 53: the cord rope draws them, bending
     }
     const rb = meshes.find((m) => m.userData.name === "Router_Bit");
     bitOK = !!rb && inTree.has(rb) && LR4ShowTree.on(tree, showOff, partId(rb)) && (!INSPECT || (INSPECT.set.has(partId(rb)) && !INSPECT.hide.has(partId(rb))));

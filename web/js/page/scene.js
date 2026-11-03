@@ -1009,7 +1009,7 @@ float lr4G(float x) { float s = 2.0 * fract(x) - 1.0; return floor(x) / 3.0 + (s
   }
   // under the base (the torsion box is shorter than the strips). The torsion box is its own apron: the legs go right
   // under it, flush with its sides, no 2x4 apron (user 2026-10-23: "a table on a table" otherwise)
-  let LEG_BOXES = [];                                 // legMeshes' legs [x0, y0, z0, x1, y1, z1] (the hub dodges them)
+  let LEG_BOXES = [], APRON_BOXES = [];               // legMeshes' legs / aprons [x0, y0, z0, x1, y1, z1] (the hub dodges them; the hose rope)
   function legMeshes() {
     const tb = tableBox(true), all = tableBox();
     if (!tb) return [];
@@ -1026,7 +1026,7 @@ float lr4G(float x) { float s = 2.0 * fract(x) - 1.0; return floor(x) / 3.0 + (s
     for (const y of along(y0, y1)) for (const x of [x0, x1]) spots.add(`${x},${y}`);
     const legs = [...spots].map((k) => k.split(",").map(Number)).map(([x, y]) => [x, y, floor, x + LEG, y + LEG, under]);
     LEG_BOXES = legs;
-    const aprons = [[lo[0], lo[1], under - APRON_H, hi[0], lo[1] + APRON_T, under],
+    const aprons = APRON_BOXES = [[lo[0], lo[1], under - APRON_H, hi[0], lo[1] + APRON_T, under],
       [lo[0], hi[1] - APRON_T, under - APRON_H, hi[0], hi[1], under],
       [lo[0], lo[1] + APRON_T, under - APRON_H, lo[0] + APRON_T, hi[1] - APRON_T, under],
       [hi[0] - APRON_T, lo[1] + APRON_T, under - APRON_H, hi[0], hi[1] - APRON_T, under]];
@@ -1046,7 +1046,7 @@ float lr4G(float x) { float s = 2.0 * fract(x) - 1.0; return floor(x) / 3.0 + (s
     }
     if (hoseWire) hoseWire.dispose();
     meshes = [];
-    hoseMesh = cordMesh = sleeveMesh = hoseWire = null;
+    hoseMesh = cordMesh = sleeveMesh = hoseWire = tieMesh = reliefMesh = null;
   }
   function addMesh(geo, mat, ud) {
     const m = new THREE.Mesh(geo, mat);
@@ -1362,10 +1362,19 @@ float lr4G(float x) { float s = 2.0 * fract(x) - 1.0; return floor(x) / 3.0 + (s
         vud(name, `${label}, ~${(c.getLength() / 1000).toFixed(1)} m drawn`, hoseC)]);
     };
     // the vac's cord: off its head, along the floor, up under the panel and round to the VAC socket (Part 52c)
-    const vq = HUB.outlet.vac, vc = new THREE.CatmullRomCurve3([[vac[0] - 120, vac[1] - 150, v1 + 60], [vac[0] - 200, vac[1] - 180, fz + 60],
-      [vac[0] - 260, vac[1] - 200, fz + 8], [fx + 60, vq[1] + 50, fz + 8], [fx - 50, vq[1] + 30, z0 - 80], [vq[0] - 70, vq[1], vq[2] - 40], [vq[0] - 31, vq[1], vq[2]]]
-      .map((p) => new THREE.Vector3(...p)), false, "centripetal");
-    out.push([new THREE.TubeGeometry(vc, 80, 4.5, 8, false), flat([0.07, 0.07, 0.08], { roughness: 0.6 }), vud("ShopVac_Cord", `Shop vac cord to the VAC socket (~${(vc.getLength() / 1000).toFixed(1)} m drawn)`, [0.07, 0.07, 0.08])]);
+    // a limp rope (js/cable_sim.js, Part 53a; user: it went through the floor as a drawn curve): out of the drum's side
+    // toward the panel, settled on the floor, round the drum / bucket / legs and under the panel to its plug in VAC
+    const vq = HUB.outlet.vac, vB = [vq[0] - 31, vq[1], vq[2]];
+    const ux = fx - vac[0], uy = vq[1] - vac[1], ul = Math.hypot(ux, uy) || 1, vA = [vac[0] + 212 * ux / ul, vac[1] + 212 * uy / ul, v1 - 40];
+    // (user 2026-11-02: "fix this mess") laid like a real cord from a duplex: straight out of the plug's back, a smooth
+    // droop straight down beside the router cord (+Y of it: they never cross), along the floor, up the vac's side
+    const vy = vB[1] + 16, oX = ux / ul, oY = uy / ul;
+    const lay = [vB, [vB[0] - 18, vB[1], vB[2]], [vB[0] - 32, vy, vB[2] - 30], [vB[0] - 34, vy, z0 - 60], [vB[0] - 34, vy, fz + 60],
+      [vB[0] - 70, vy, fz + 6], [vA[0] + 160 * oX, vA[1] + 160 * oY, fz + 6], [vA[0] + 70 * oX, vA[1] + 70 * oY, fz + 40], [vA[0] + 25 * oX, vA[1] + 25 * oY, vA[2] - 60], vA];
+    // resampled and lifted to rest ON the floor (the curve dipped through it between its points)
+    const vc = new THREE.CatmullRomCurve3(new THREE.CatmullRomCurve3(lay.map((q) => new THREE.Vector3(...q)), false, "centripetal")
+      .getSpacedPoints(160).map((q) => { q.z = Math.max(q.z, fz + 4.6); return q; }), false, "centripetal");
+    out.push([new THREE.TubeGeometry(vc, 120, 4.5, 8, false), flat([0.07, 0.07, 0.08], { roughness: 0.6 }), vud("ShopVac_Cord", `Shop vac cord to the VAC socket (~${(vc.getLength() / 1000).toFixed(1)} m drawn)`, [0.07, 0.07, 0.08])]);
     out.push([plugGeo(vq), flat([0.07, 0.07, 0.08], { roughness: 0.6 }), vud("ShopVac_Plug", "Shop vac plug (in the VAC socket)", [0.07, 0.07, 0.08])]);
     hose("ShopVac_Hose", "Vac hose: the dust port's inside stub to the separator inlet (2-1/2 in; the rest of a long hose coiled)", [[ppx - 30, yP, pb], [ppx + 40, yP, pb],
       [ppx + 120, yP - 30, pb - 60], [sepIn[0], sepIn[1] + 130, inZ + 10], [sepIn[0], sepIn[1] + 60, inZ], [sepIn[0], sepIn[1] + 10, inZ], [sepIn[0], sepIn[1] - 40, inZ]]);   // the cuff over the stub
