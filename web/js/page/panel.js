@@ -228,7 +228,7 @@
   // in this browser (lr4-opts; the pendant in lr4-pendant). ----
   const OPT = { router: true, skirt: true, hose: true, fan: true, hub: false, vac: false };   // hub + vac: Part 52, optional
   const OPT_PARTS = { router: /^(Router_(?!Cord_Run)|Tool_Mount_|Dust_Shoe|Dust_Skirt|Bristles_TPU)/, skirt: DUST_PARTS,
-    hose: /^(Vacuum_Hose|Router_Cord_Run|Cable_Sleeve|Hose_Holder|Hose_Hook|Dust_Shoe|Dust_Skirt|Bristles_TPU|TableHub_RouterPlug)/, fan: /^Jackpot3_Fan/,
+    hose: /^(Vacuum_Hose|Router_Cord_Run|Core_Wires|Cable_Sleeve|Hose_Holder|Hose_Hook|Dust_Shoe|Dust_Skirt|Bristles_TPU|TableHub_RouterPlug)/, fan: /^Jackpot3_Fan/,
     hub: /^(TableHub_|SwitchPanel_Paddle)/, vac: /^ShopVac_/ };
   const pendantOn = () => document.getElementById("ft-on").checked;   // My machine > FluidTouch pendant (kept)
   // a router with mount "none" (My LR4 > Router, user 2026-10-29): no dust shoe, so no hose either
@@ -284,7 +284,7 @@
   let probing = false, jobBit = false, bitOK = true;   // bitOK: the job's bit shows where the model's would (Show, inspect)
   const PROBE_OFF = /^(Dust_Skirt|Bristles_TPU)/;
   // the cord + sleeve routes don't follow a magnified rack / tilt (machine.js abPose): hidden while it's drawn so (user 2026-10-26)
-  const RACK_OFF = /^(Router_Cord_Run|Cable_Sleeve)$/;
+  const RACK_OFF = /^(Router_Cord_Run|Core_Wires|Cable_Sleeve)$/;
   function applyVisibility() {
     const listed = meshes.filter((m) => m.userData.name && fitted(m) && variantOK(m) && !m.userData.missingHw);   // Part 38: not with its missing part
     const key = listed.map((m) => m.userData.name).join();
@@ -300,7 +300,8 @@
         && (!INSPECT || (INSPECT.set.has(partId(m)) && !INSPECT.hide.has(partId(m))))   // inspect: its set, less the list's unticked rows
         && !(TOUCH_ANIM.skirt >= 1 && PROBE_OFF.test(m.userData.name)) && !(AB.magnified && RACK_OFF.test(m.userData.name)) && !(jobBit && m.userData.name === "Router_Bit");   // off once it's slid out (job.js)
       m.visible = m.userData.shown && !ROPE_STUB.test(m.userData.name)   // the touch plate's wire stubs: rope.js draws the wires
-        && !(/^Router_(StrainRelief|Cord)$/.test(m.userData.name) && cordMesh && fitted(cordMesh) && meta.hose && meta.hose.cord && meta.hose.cord.base);   // Part 53: the cord rope draws them, bending
+        && !(/^Router_(StrainRelief|Cord)$/.test(m.userData.name) && cordMesh && fitted(cordMesh) && meta.hose && meta.hose.cord && meta.hose.cord.base)   // Part 53: the cord rope draws them, bending
+        && !(/^X_Stepper_Lead_/.test(m.userData.name) && !INSPECT && wireMesh && HR.wireLeads && optsOn().hose);   // 53b: the drawn wires carry on from them
     }
     const rb = meshes.find((m) => m.userData.name === "Router_Bit");
     bitOK = !!rb && inTree.has(rb) && LR4ShowTree.on(tree, showOff, partId(rb)) && (!INSPECT || (INSPECT.set.has(partId(rb)) && !INSPECT.hide.has(partId(rb))));

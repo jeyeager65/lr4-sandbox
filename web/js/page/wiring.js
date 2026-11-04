@@ -12,8 +12,56 @@
     const g = box.geometry; if (!g.boundingBox) g.computeBoundingBox();
     return g.boundingBox.min.clone().add(WR_V(at));
   }
+  // a point in the Jackpot board's own frame (mm: x along the motor headers, y toward the inputs, z up from the PCB's
+  // bottom face's plane as in private/jp3_spots.py, the PCB 1.16-3.70) -> the box mesh's frame / world (it rides the beam)
+  function wrBoardLocal(box, x, y, z) {
+    const P = LR4Wiring.JP3.pcb, at = WR_V(P.origin).addScaledVector(WR_V(P.x), x).addScaledVector(WR_V(P.y), y).addScaledVector(WR_V(P.n), z - 1.16);
+    return wrBoxLocal(box, at.toArray());
+  }
+  function wrBoardPt(x, y, z) {
+    const box = wrMesh("Jackpot3_Box");
+    if (!box || typeof LR4Wiring === "undefined") return null;
+    box.updateMatrixWorld();
+    return box.localToWorld(wrBoardLocal(box, x, y, z));
+  }
+  // ---- the ESP32 (user 2026-11-02: "we want to avoid routing wires over the wifi antenna"): the WROOM-32E module on
+  // the stand-in board (the user's own board model has its own), and its antenna's keep-out - a clear amber zone over
+  // the antenna end (past the board's +y edge), JP3.esp.keep mm round it; shown only with the Wiring layer (user 2026-11-03) ----
+  function wrEsp(box, own) {
+    if (WR.esp && WR.esp.parent !== box) { WR.esp.parent && WR.esp.parent.remove(WR.esp); WR.esp = null; }
+    if (!box || WR.esp || typeof LR4Wiring === "undefined" || !LR4Wiring.JP3.esp) return;
+    const E = LR4Wiring.JP3.esp, P = LR4Wiring.JP3.pcb, g = new THREE.Group();
+    g.name = "Jackpot3_ESP32";
+    const B = new THREE.Matrix4().makeBasis(WR_V(P.x), WR_V(P.y), WR_V(P.n)), q = new THREE.Quaternion().setFromRotationMatrix(B);
+    const block = (x0, y0, z0, sx, sy, sz, mat) => {   // a box in the board frame, min corner (x0, y0, z0)
+      const m = new THREE.Mesh(new THREE.BoxGeometry(sx, sy, sz), mat);
+      m.quaternion.copy(q);
+      m.position.copy(wrBoardLocal(box, x0 + sx / 2, y0 + sy / 2, z0 + sz / 2));
+      g.add(m);
+    };
+    const [x0, y0] = E.min, [sx, sy] = E.size, top = 3.7;
+    if (!own) {
+      block(x0, y0, top, sx, sy, 0.8, material(null, { c: [0.08, 0.09, 0.12], r: 0.6 }));   // the module's PCB
+      block(x0 + 0.5, y0 + 0.6, top + 0.8, sx - 1, E.ant - y0 - 1.2, E.h - 0.8, new THREE.MeshStandardMaterial({ color: 0xc8cacc, metalness: 0.8, roughness: 0.35 }));   // the shield
+      const gold = new THREE.MeshStandardMaterial({ color: 0xc9a227, metalness: 0.7, roughness: 0.4 });
+      for (let k = 0; k < 5; k++) block(x0 + 2 + k * 3, E.ant + 1.2, top + 0.8, 0.6, 4.8, 0.05, gold);   // the antenna's meander
+      for (let k = 0; k < 4; k++) block(x0 + 2 + k * 3, E.ant + (k % 2 ? 1.2 : 5.4), top + 0.8, 3.6, 0.6, 0.05, gold);
+    }
+    const K = E.keep, zm = new THREE.MeshBasicMaterial({ color: 0xffa31a, transparent: true, opacity: 0.2, depthWrite: false });
+    block(x0 - K, E.ant, top - K, sx + 2 * K, y0 + sy - E.ant + K, 2 * K, zm);   // the keep-out round the antenna end
+    { const z = g.children[g.children.length - 1];      // + its edges, so it reads against a dark box
+      z.add(new THREE.LineSegments(new THREE.EdgesGeometry(z.geometry), new THREE.LineBasicMaterial({ color: 0xffa31a, transparent: true, opacity: 0.8 }))); }
+    g.traverse((o) => { if (o.isMesh) o.userData.espKeep = o.material === zm; });
+    box.add(g);
+    WR.esp = g;
+    wrEspKeep();
+  }
+  function wrEspKeep() {
+    if (WR.esp) WR.esp.traverse((o) => { if (o.userData.espKeep) o.visible = !!WR.on; });
+  }
   // ---- the stand-in board ----
   function wrBoard() {
+    { const bx = wrMesh("Jackpot3_Box"); wrEsp(bx, !!wrMesh("Jackpot3_PCB")); }
     const box = wrMesh("Jackpot3_Box"), own = wrMesh("Jackpot3_PCB");
     if (WR.board && (WR.board.parent !== box || own)) { WR.board.parent && WR.board.parent.remove(WR.board); WR.board = null; }
     if (!box || own || WR.board || typeof LR4Wiring === "undefined") return;
@@ -46,7 +94,15 @@
     }
     if (e.probe) return typeof ropeAnchor === "function" && ROPE.hBase ? ropeAnchor(0, [0, 0, 0]) : wrEnd({ part: "TouchPlate" });
     const m = wrMesh(e.part);
-    return m && m.visible !== false ? new THREE.Box3().setFromObject(m).getCenter(new THREE.Vector3()) : null;
+    if (!m || m.visible === false) return null;
+    const bb = new THREE.Box3().setFromObject(m), c = bb.getCenter(new THREE.Vector3());
+    if (e.at === "near" || e.at === "far") {          // an end of its long axis, nearer / farther from the Jackpot box
+      const s = bb.getSize(new THREE.Vector3()), ax = s.x >= s.y && s.x >= s.z ? "x" : s.y >= s.z ? "y" : "z";
+      const jb = wrMesh("Jackpot3_Box"), jc = jb ? new THREE.Box3().setFromObject(jb).getCenter(new THREE.Vector3()) : c;
+      const p1 = c.clone(), p2 = c.clone(); p1[ax] = bb.min[ax]; p2[ax] = bb.max[ax];
+      return (e.at === "near") === (p1.distanceTo(jc) < p2.distanceTo(jc)) ? p1 : p2;
+    }
+    return c;
   }
   // ---- routes (51b): a run's points end to end. The core's runs: along the cord / hose (wrCarrier). A motor's / endstop's on a YZ
   // plate to the board: up to the beam's line (GUESS until the user's photos: the box's middle depth, its floor's
@@ -59,11 +115,32 @@
   function wrPath(r) {
     const a = wrEnd(r.from), b = wrEnd(r.to);
     if (!a || !b) return null;
+    if (r.id === "psu-dc") {                          // the brick's near end -> in through the box's +X wall slot (the core's wires'),
+      const bx = wrMesh("Jackpot3_Box"), s = bx && LR4Wiring.JP3.spots[r.to.board];   // along that wall's inside, into the
+      if (bx && s) {                                   // terminal from its open side (it faces +X: side entry)
+        const bb = new THREE.Box3().setFromObject(bx), q = bx.getWorldQuaternion(new THREE.Quaternion());
+        const out = WR_V(s.out).applyQuaternion(q), hin = new THREE.Vector3(bb.max.x - 2, bb.min.y + 31, bb.min.z + 19), nr = b.clone().addScaledVector(out, 10);
+        return [a, new THREE.Vector3(hin.x + 14, (a.y + hin.y) / 2, hin.z), hin, new THREE.Vector3(Math.min(hin.x - 4, nr.x + 4), (hin.y + nr.y) / 2, (hin.z + nr.z) / 2), nr, b];
+      }
+    }
     const along = (r.via || []).includes("hose") && wrCarrier();
     if (along) {
       // from the table (the switch panel's mains): the vac hose from its floor end, reached under the table (GUESS)
       const core = wrMesh("Core"), cc = core ? new THREE.Box3().setFromObject(core).getCenter(new THREE.Vector3()) : a;
       const fromTable = a.distanceTo(cc) > 500, hp = fromTable && wrMesh("Vacuum_Hose") && wrMesh("Vacuum_Hose").geometry.parameters.path;
+      // Part 53b: the core's runs in the wire bundle (hose_bom.js hrWires, V1E's core + wire routing docs): the motor's
+      // up its lead to the top of the -X face; the endstop's / touch plate's (through the core's tunnel) from its exit
+      // there; along the settled cord to past the box, a rope down into its +X wall's slot, to the spot
+      if (!fromTable && typeof HR !== "undefined" && HR.wireP && r.to && r.to.board) {
+        const inBox = typeof hrBoxRoute === "function" ? hrBoxRoute({ "x-motor": "motor", "x-stop": "stop", probe: "probe" }[r.id] || "stop", [0, 0]) : [];   // round the board (the ESP32's antenna)
+        { const bx = wrMesh("Jackpot3_Box"), n = WR_V(LR4Wiring.JP3.pcb.n).applyQuaternion(bx.getWorldQuaternion(new THREE.Quaternion()));
+          inBox.push(b.clone().addScaledVector(n, 14)); }   // then straight down onto the connector
+        const kind = r.from.part === "X_Stepper_Plug" ? "motor" : r.from.probe ? "probe" : "stop", mo = kind === "motor" && HR.wireMotor;
+        const head = mo ? HR.wireMotor.slice(0, -1) : [a, ...((HR.wirePre && HR.wirePre[kind]) || []).slice(1)];
+        const pts = [...head, ...HR.wireP.slice(mo ? HR.wireJ : 0), ...inBox, b];
+        pts.fold = head.length + HR.wireFold - (mo ? HR.wireJ : 0);   // the spare: folded where it leaves the cord
+        return pts;
+      }
       let s = (hp || along).getPoints(48);
       if ((s[0].distanceTo(cc) > s[s.length - 1].distanceTo(cc)) !== fromTable) s = s.reverse();   // the core's end first (the table's: last)
       const head = fromTable ? [a, new THREE.Vector3(a.x, a.y, s[0].z)] : [a];
@@ -85,6 +162,7 @@
     }
     if ((r.via || []).includes("beam") && r.to && r.to.part) return wrMainsPath(a, b, wrMesh(r.to.part)) || [a, b];
     if (r.id === "hub-panel") {                       // stapled along the table's underside, behind the end, to the panel (GUESS)
+      if (typeof HUB !== "undefined" && HUB.cables && HUB.cables.pts.Paddle) return HUB.cables.pts.Paddle.slice();   // the drawn 12-3 (scene.js hubCables)
       const pn = wrMesh("TableHub_Panel"), uz = pn ? new THREE.Box3().setFromObject(pn).max.z - 15 : a.z, x = a.x;
       return [a, new THREE.Vector3(x, a.y, uz), new THREE.Vector3(x, b.y + 90, uz), new THREE.Vector3(b.x, b.y + 90, uz), b];
     }
@@ -148,13 +226,16 @@
   function wrReport() {
     if (typeof LR4Wiring === "undefined" || !meta || !meta.travel || !HOME.pose) return [];
     const t = meta.travel, back = [HOME.pose.x, HOME.pose.y, HOME.pose.z], worst = {};
-    if (typeof HR !== "undefined") HR.quick = true;     // the ropes settle briefly at each corner (Part 53 perf: ~3 s of the load)
+    const hr = typeof HR !== "undefined" && HR, hl = [];
+    if (hr) HR.quick = true;                          // the ropes settle briefly at each corner (Part 53 perf: ~3 s of the load)
     try {
       for (const x of t.x) for (const y of t.y) for (const z of t.z) {
         move([x, y, z]);
         for (const r of wrRuns()) { const p = wrPath(r); if (p) worst[r.id] = Math.max(worst[r.id] || 0, wrLen(p)); }
+        if (hr && HR.hose) hl.push(HR.hose.length());   // the hose as it hangs (Part 53b: the BOM's length, hoseNeed)
       }
-    } finally { if (typeof HR !== "undefined") HR.quick = false; }
+    } finally { if (hr) HR.quick = false; }
+    if (hl.length) HR.need = { max: Math.max(...hl), min: Math.min(...hl), rope: true };
     move(back);
     const need = {};
     for (const [id, w] of Object.entries(worst)) if (w) need[id] = Math.round(w + 2 * WR_ALLOW);
@@ -261,6 +342,7 @@
     if (WR.on) WR.report = wrReport();               // (the lengths over the travel: once, as it's shown)
     const c = document.getElementById("lay-wiring"); if (c) c.checked = WR.on;
     if (!WR.on) wrTip(null);
+    wrEspKeep();
     wrLines();
   }
   // hover / tap: the nearest run within 8 px of the pointer

@@ -214,7 +214,7 @@
   // Close-up: Inspect's router row, less the shoe's bottom (skirt + bristles) and the cord's run to the hose; its Show
   // boxes take out the shoe top / each mount (with their own bolts) and add the core
   const RB_VIEW_OFF = [["rb-shoe", "Dust_Shoe"], ["rb-mb", "Tool_Mount_B"], ["rb-mt", "Tool_Mount_T"]];
-  const rbViewDrop = () => new RegExp("^(" + ["Dust_Skirt", "Bristles_TPU", "Router_Cord_Run",
+  const rbViewDrop = () => new RegExp("^(" + ["Dust_Skirt", "Bristles_TPU", "Router_Cord_Run", "Core_Wires", "Cable_Sleeve",
     ...RB_VIEW_OFF.filter(([id]) => !$(id).checked).map(([, n]) => n)].join("|") + ")");
   const rbViewing = () => !!(INSPECT && INSPECT.as === "router");
   // the rows shown with it: the core (does the router clear it), the touch plate + clip (Part 50d: stored on the mount)

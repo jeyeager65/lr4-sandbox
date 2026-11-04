@@ -1046,7 +1046,8 @@ float lr4G(float x) { float s = 2.0 * fract(x) - 1.0; return floor(x) / 3.0 + (s
     }
     if (hoseWire) hoseWire.dispose();
     meshes = [];
-    hoseMesh = cordMesh = sleeveMesh = hoseWire = tieMesh = reliefMesh = null;
+    hoseMesh = cordMesh = sleeveMesh = hoseWire = tieMesh = reliefMesh = wireMesh = null;
+    if (typeof PWR_MESH !== "undefined") PWR_MESH = null;
   }
   function addMesh(geo, mat, ud) {
     const m = new THREE.Mesh(geo, mat);
@@ -1157,9 +1158,24 @@ float lr4G(float x) { float s = 2.0 * fract(x) - 1.0; return floor(x) / 3.0 + (s
   // plate fits. Its face is a canvas (the yellow EMERGENCY STOP disc, labels). power.js presses / lights it; parts at
   // their base.t, the panel facing -Y.
   const SWP = { w: 250, h: 124, d: 60, estop: -85, lamp: -22, router: 37, vac: 83, plate: [60, 116, 114], travel: 6, inset: 60 };
+  // with the table hub (user 2026-11-03: "the estop [paddle switch] goes in an outlet box ... put the estop and switches
+  // below the table and have a panel kind of like the side panel"): a 5/8" plywood panel hanging under the front apron
+  // near the hub's end, its face 15 mm in from the table's front; behind it a 1-gang box (the paddle switch covers it)
+  // and a 3-gang box under a combination plate (a blank drilled 22 mm for the lamp, then the ROUTER and VAC toggles).
+  // x: off SWP.cxL; panel = its extent; H / T / encl: its height, thickness, the boxes' depth. GUESS sizes.
+  const SWP_E = { estop: -85, lamp: -22, router: 37, vac: 83, plate: [60, 116, 114], panel: null };
+  const SWP_H = { estop: -110, lamp: -16, router: 30, vac: 76, plate: [30, 145, 114], panel: [-175, 130], H: 190, T: 16, encl: 76, set: 15 };   // H: the hub panel's (a flush corner)
+  function swpHubFrame(bb) {                           // the hub panel's frame (world): y0 = its face, bk = its back, cz = its middle
+    bb = bb || tableBox(true);
+    if (!bb || SWP.cxL === undefined) return null;
+    const uz = bb.min.z - (U.base === "torsion" ? 0 : APRON_H), y0 = bb.min.y + SWP_H.set;
+    return { cx: SWP.cxL, y0, bk: y0 + SWP_H.T, uz, cz: uz - SWP_H.H / 2 };
+  }
   function switchPanelMeshes() {                      // [geometry, material, userData]: local geometry, world base.t
     const bb = tableBox(true);
     if (!bb) return [];
+    const hubOn = typeof optsOn === "function" && optsOn().hub;
+    Object.assign(SWP, hubOn ? SWP_H : SWP_E);
     let cx = bb.max.x - SWP.inset - SWP.w / 2, fy = bb.min.y, top = bb.min.z - 5, mount = null;
     const bx = (n) => { const m = meshes.find((q) => q.userData.name === n); return m && new THREE.Box3().setFromObject(m); };
     const st = bx("RailStrip_Min"), ed = bx("RailEdge_Min");
@@ -1169,9 +1185,13 @@ float lr4G(float x) { float s = 2.0 * fract(x) - 1.0; return floor(x) / 3.0 + (s
     }
     // Part 52: with the table hub on, the sheet table's panel moves to the left end too (by the pendant's spot), near the
     // hub's outlets - a short panel <-> hub cable (user 2026-11-02). The torsion table's is there already.
-    SWP.cxR = cx; SWP.cxL = mount ? cx : bb.min.x + 240 + SWP.w / 2;
-    cx = SWP.cx = typeof optsOn === "function" && optsOn().hub ? SWP.cxL : SWP.cxR;
-    const cz = top - SWP.h / 2, y0 = fy - SWP.d, at = (dx, dy = 0) => ({ t: [cx + dx, y0 + dy, cz], s: [1, 1, 1] });
+    // the hub's under-table panel (SWP_H): lined up against the front-left leg's right side (user 2026-11-03), 3 mm off
+    const fl = LEG_BOXES.filter((l) => l[1] < bb.min.y + 150).sort((p, q) => p[0] - q[0])[0];
+    SWP.cxR = cx; SWP.cxL = (fl ? fl[3] + 3 : bb.min.x + 65) - SWP_H.panel[0];
+    const HF = swpHubFrame(bb);
+    if (hubOn) mount = null;                          // (under the table instead)
+    cx = SWP.cx = hubOn ? SWP.cxL : SWP.cxR;
+    const cz = hubOn ? HF.cz : top - SWP.h / 2, y0 = hubOn ? HF.y0 : fy - SWP.d, at = (dx, dy = 0) => ({ t: [cx + dx, y0 + dy, cz], s: [1, 1, 1] });
     const ud = (name, label, base, extra) => Object.assign({ name, label, group: "Electronics", motion: "table", source: "hardware",
       ownGeo: true, base }, extra);
     const flat = (c, extra) => new THREE.MeshStandardMaterial(Object.assign({ color: new THREE.Color().setRGB(...c).convertSRGBToLinear(),
@@ -1181,10 +1201,19 @@ float lr4G(float x) { float s = 2.0 * fract(x) - 1.0; return floor(x) / 3.0 + (s
     const cyl = (r, d, y) => new THREE.CylinderGeometry(r, r, d, 32).translate(0, -y - d / 2, 0);
     const ring = (r0, r1, d) => lathe([[r0, 0], [r1, 0], [r1, d - 1], [r1 - 1, d], [r0, d], [r0, 0]]);
     const out = [];
-    out.push([new THREE.BoxGeometry(SWP.w, SWP.d, SWP.h).translate(0, SWP.d / 2, 0), flat([0.13, 0.13, 0.14]),
-      ud("SwitchPanel_Box", "Switch panel box (e-stop, power lamp, router + vac toggles; GUESS: 250 x 124 x 60 mm)", at(0), { color: [0.13, 0.13, 0.14] })]);
-    out.push([new THREE.PlaneGeometry(SWP.w, SWP.h).rotateX(Math.PI / 2).translate(0, -0.3, 0), flat([1, 1, 1], { map: switchFace(), roughness: 0.7 }),
-      ud("SwitchPanel_Face", "Switch panel face (EMERGENCY STOP disc, labels)", at(0), { color: [0.13, 0.13, 0.14] })]);
+    if (hubOn) {                                       // the plywood panel + the two boxes behind it
+      const [p0, p1] = SWP.panel, H = SWP.H, T = SWP.T, D = SWP.encl, nw = [0.13, 0.32, 0.72];
+      out.push([new THREE.BoxGeometry(p1 - p0, T, H).translate((p0 + p1) / 2, T / 2, 0), material([0.86, 0.68, 0.44], null, false, "ply"),
+        ud("SwitchPanel_Box", `Switch panel (5/8 in plywood, ${p1 - p0} x ${H} mm, under the front apron by the hub's end: the paddle switch, power lamp, router + vac toggles; GUESS)`,
+          at(0), { color: [0.86, 0.68, 0.44], grain: "ply", source: "made", group: "Table" })]);
+      out.push([boxesGeo([[SWP.estop - 30, T, -49, SWP.estop + 30, T + D, 49], [SWP.plate[0] - 75, T, -49, SWP.plate[0] + 75, T + D, 49]]), flat(nw, { roughness: 0.45 }),
+        ud("SwitchPanel_Boxes", "Switch boxes behind the panel (blue PVC new-work: a 1-gang for the paddle switch, a 3-gang for the lamp + toggles; GUESS)", at(0), { color: nw })]);
+    } else {
+      out.push([new THREE.BoxGeometry(SWP.w, SWP.d, SWP.h).translate(0, SWP.d / 2, 0), flat([0.13, 0.13, 0.14]),
+        ud("SwitchPanel_Box", "Switch panel box (e-stop, power lamp, router + vac toggles; GUESS: 250 x 124 x 60 mm)", at(0), { color: [0.13, 0.13, 0.14] })]);
+      out.push([new THREE.PlaneGeometry(SWP.w, SWP.h).rotateX(Math.PI / 2).translate(0, -0.3, 0), flat([1, 1, 1], { map: switchFace(), roughness: 0.7 }),
+        ud("SwitchPanel_Face", "Switch panel face (EMERGENCY STOP disc, labels)", at(0), { color: [0.13, 0.13, 0.14] })]);
+    }
     // the e-stop: bezel, the stem (shows between the bezel and the head while it's out), the red mushroom head
     out.push([ring(11, 15, 10), flat([0.05, 0.05, 0.05], { roughness: 0.4 }),
       ud("SwitchPanel_EStopBezel", "E-stop bezel (22 mm XB2-style, knurled)", at(SWP.estop), { color: [0.05, 0.05, 0.05] })]);
@@ -1200,33 +1229,61 @@ float lr4G(float x) { float s = 2.0 * fract(x) - 1.0; return floor(x) / 3.0 + (s
     // STOP (red, low, behind the paddle). The paddle hangs from a hinge at the top and springs back; a push anywhere on
     // it presses STOP. START energizes a coil that holds the contacts closed; STOP (or a power cut) drops it.
     // power.js nudges them on a click (paddleNudge). The paddle's parts sit at the hinge (base), the rest at the face.
+    // sizes from POWERTEC's 71007 drawing (user 2026-11-03): the paddle 81.7 wide x 121.05 tall, narrowing to the hinge
+    // at its top; its front 35.9 proud of the mounting face; a base flange on 2 x 4.5 mm holes 83.2 apart (here ~50 x 92);
+    // the body behind 41 x 74 (the panel's cut-out), 44.6 deep (80.5 overall) into the 1-gang box; START (37 x 22) in
+    // a window near the top, STOP lower down. Local: y = 0 the panel's face (-y out), z = 0 the panel's middle.
     const red = [0.78, 0.06, 0.05], pud = (n, label, color, extra, base) => ud(n, label, base || at(SWP.estop), Object.assign({ color }, extra));
-    const hinge = () => { const b = at(SWP.estop, -45); b.t[2] += 52; return b; };
-    out.push([new THREE.BoxGeometry(80, 32, 118).translate(0, -16, 0), flat([0.07, 0.07, 0.08], { roughness: 0.5 }),
-      pud("SwitchPanel_PaddleBox", "Paddle switch (magnetic START / STOP, no restart after a power cut; GUESS 80 x 118 mm - check its 120 V rating >= 20 A)", [0.07, 0.07, 0.08])]);
-    out.push([boxesGeo([[-26, -34, -32, 26, -32, 36]]), flat([0.03, 0.03, 0.035], { roughness: 0.45 }),
-      pud("SwitchPanel_PaddleFrame", "Button frame (START over STOP)", [0.03, 0.03, 0.035])]);
-    out.push([new THREE.CylinderGeometry(3, 3, 3, 12).translate(0, -35.5, 44), flat([0.7, 0.7, 0.72], { metalness: 0.7, roughness: 0.3 }),
+    const PD = { w: 81.7, top: 50, bot: -71.05, waist: 22, tw: 62, front: -35.9, t: 4, skirt: 14, win: [-25, 25, -11, 22], hz: 37 };
+    const hinge = () => { const b = at(SWP.estop, PD.front + 3); b.t[2] += PD.hz; return b; };   // the hinge: its screw's line
+    const toH = (g) => g.translate(0, -(PD.front + 3), -PD.hz);   // panel-local -> the hinge's frame
+    const outline = () => {                            // the paddle's outline (x, z)
+      const s = new THREE.Shape(), h = PD.w / 2;
+      s.moveTo(-h, PD.bot + 6); s.quadraticCurveTo(-h, PD.bot, -h + 6, PD.bot); s.lineTo(h - 6, PD.bot); s.quadraticCurveTo(h, PD.bot, h, PD.bot + 6);
+      s.lineTo(h, PD.waist); s.lineTo(PD.tw / 2, PD.top - 4); s.quadraticCurveTo(PD.tw / 2, PD.top, PD.tw / 2 - 4, PD.top);
+      s.lineTo(-PD.tw / 2 + 4, PD.top); s.quadraticCurveTo(-PD.tw / 2, PD.top, -PD.tw / 2, PD.top - 4); s.lineTo(-h, PD.waist);
+      return s;
+    };
+    const rect = (x0, x1, z0, z1) => { const p = new THREE.Path(); p.moveTo(x0, z0); p.lineTo(x0, z1); p.lineTo(x1, z1); p.lineTo(x1, z0); return p; };
+    const ext = (shape, d, y) => new THREE.ExtrudeGeometry(shape, { depth: d, bevelEnabled: false, curveSegments: 6 }).rotateX(Math.PI / 2).translate(0, y, 0);   // shape (x, z), depth out to -y from y
+    // the housing: flange + the raised body under the paddle + the body behind the panel (in its box)
+    out.push([boxesGeo([[-25, -9, -46, 25, 0, 46], [-23, -24, -40, 23, -9, 40], [-20.5, 0, -37, 20.5, 44.6, 37]]), flat([0.07, 0.07, 0.08], { roughness: 0.5 }),
+      pud("SwitchPanel_PaddleBox", "Paddle switch (POWERTEC 71007-style magnetic START / STOP, no restart after a power cut; 81.7 x 121 paddle, 41 x 74 x 44.6 body behind on a 1-gang box - check its 120 V rating >= 20 A)", [0.07, 0.07, 0.08])]);
+    out.push([boxesGeo([[-24, -26, -12, 24, -24, 23]]), flat([0.03, 0.03, 0.035], { roughness: 0.45 }),
+      pud("SwitchPanel_PaddleFrame", "Button frame (behind the paddle's window)", [0.03, 0.03, 0.035])]);
+    out.push([new THREE.CylinderGeometry(2.8, 2.8, 2, 12).translate(0, PD.front - 1, PD.hz), flat([0.7, 0.7, 0.72], { metalness: 0.7, roughness: 0.3 }),
       pud("SwitchPanel_PaddleScrew", "Paddle hinge screw", [0.7, 0.7, 0.72])]);
-    out.push([new THREE.BoxGeometry(40, 8, 26).translate(0, -36, 18), flat([0.1, 0.62, 0.22], { roughness: 0.35 }),
+    out.push([new THREE.BoxGeometry(37, 6, 22).translate(0, -29, 6), flat([0.1, 0.62, 0.22], { roughness: 0.35 }),
       pud("SwitchPanel_PaddleStart", "START button (green, momentary: click = power on, held on by the switch's coil)", [0.1, 0.62, 0.22], { click: "start" })]);
-    out.push([new THREE.PlaneGeometry(40, 26).rotateX(Math.PI / 2).translate(0, -40.1, 18), flat([1, 1, 1], { map: buttonFace("START", "#17a03a", 40, 26), roughness: 0.35 }),
+    out.push([new THREE.PlaneGeometry(37, 22).rotateX(Math.PI / 2).translate(0, -32.1, 6), flat([1, 1, 1], { map: buttonFace("START", "#17a03a", 37, 22), roughness: 0.35 }),
       pud("SwitchPanel_PaddleStartFace", "START button", [0.1, 0.62, 0.22], { click: "start" })]);
-    out.push([new THREE.BoxGeometry(40, 6, 26).translate(0, -35, -15), flat(red, { roughness: 0.35 }),
-      pud("SwitchPanel_PaddleStopBtn", "STOP button (right under START, behind the paddle: the paddle presses it)", red)]);
-    out.push([boxesGeo([[-37, -48, 38, 37, -42, 52], [-37, -48, -2, -23, -42, 38], [23, -48, -2, 37, -42, 38], [-37, -48, -60, 37, -42, -2]]).translate(0, 45, -52),
+    out.push([new THREE.BoxGeometry(36, 6, 20).translate(0, -27, -30), flat(red, { roughness: 0.35 }),
+      pud("SwitchPanel_PaddleStopBtn", "STOP button (behind the paddle, under START: the paddle presses it)", red)]);
+    // the paddle: a shell - its front with START's window, a skirt round its edge back toward the housing
+    const front = outline(); front.holes.push(rect(...PD.win));
+    const skirt = outline(); { const h = PD.w / 2 - 2.2; skirt.holes.push(Object.assign(new THREE.Path(), {}));
+      const p = skirt.holes[0]; p.moveTo(-h, PD.bot + 2.2); p.lineTo(h, PD.bot + 2.2); p.lineTo(h, PD.waist); p.lineTo(PD.tw / 2 - 2.2, PD.top - 2.2);
+      p.lineTo(-PD.tw / 2 + 2.2, PD.top - 2.2); p.lineTo(-h, PD.waist); }
+    const mergeNI = (gs) => {                         // non-indexed geometries (extrusions) -> one
+      const pos = [], nor = [];
+      for (const g of gs) { pos.push(...g.getAttribute("position").array); nor.push(...g.getAttribute("normal").array); g.dispose(); }
+      const m = new THREE.BufferGeometry(); m.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3)); m.setAttribute("normal", new THREE.Float32BufferAttribute(nor, 3));
+      return m;
+    };
+    out.push([toH(mergeNI([ext(front, PD.t, PD.front + PD.t), ext(skirt, PD.skirt, PD.front + PD.t + PD.skirt)])),
       flat(red, { roughness: 0.35 }), pud("SwitchPanel_Paddle", "STOP paddle (hinged at the top, springs back: a push presses the STOP button behind it - all power off)", red, { click: "stop" }, hinge())]);
-    out.push([new THREE.PlaneGeometry(74, 58).rotateX(Math.PI / 2).translate(0, -48.3 + 45, -31 - 52), flat([1, 1, 1], { map: stopFace(), roughness: 0.35 }),
+    out.push([toH(new THREE.PlaneGeometry(74, 54).rotateX(Math.PI / 2).translate(0, PD.front - 0.15, (PD.bot + PD.win[2]) / 2)), flat([1, 1, 1], { map: stopFace(), roughness: 0.35 }),
       pud("SwitchPanel_PaddleFace", "STOP paddle", red, { click: "stop" }, hinge())]);
     // the power lamp: a 22 mm pilot light, lit while the mains are on
+    const lz = hubOn ? -2 : 0;                        // (with the hub: on the plate's blank gang)
     out.push([ring(9, 14, 6), flat([0.05, 0.05, 0.05], { roughness: 0.4 }),
-      ud("SwitchPanel_LampBezel", "Power lamp bezel", at(SWP.lamp), { color: [0.05, 0.05, 0.05] })]);
+      ud("SwitchPanel_LampBezel", "Power lamp bezel", at(SWP.lamp, lz), { color: [0.05, 0.05, 0.05] })]);
     out.push([lathe([[0, 0], [9, 0], [9, 5], [7, 7.5], [4, 8.6], [0, 9]]), flat([0.1, 0.25, 0.12], { roughness: 0.25, emissive: 0x000000 }),
-      ud("SwitchPanel_Lamp", "Power lamp (green: lit = power on)", at(SWP.lamp), { color: [0.1, 0.25, 0.12], lens: [0.35, 1, 0.45] })]);
+      ud("SwitchPanel_Lamp", "Power lamp (22 mm 120 V LED pilot light, green: lit = power on)", at(SWP.lamp, lz), { color: [0.1, 0.25, 0.12], lens: [0.35, 1, 0.45] })]);
     // the toggles: a 2-gang toggle plate (stainless, labelled) and a red lighted handle each on its pivot (up = on)
     const [pc, pw, ph] = SWP.plate;
     out.push([new THREE.BoxGeometry(pw, 2, ph).translate(0, -1, 0), flat([0.72, 0.74, 0.76], { metalness: 0.6, roughness: 0.35 }),
-      ud("SwitchPanel_Plate", "Toggle plate (2-gang, stainless)", at(pc), { color: [0.72, 0.74, 0.76] })]);
+      ud("SwitchPanel_Plate", hubOn ? "Combination plate (3-gang stainless: a blank drilled 22 mm for the lamp, 2 toggles)" : "Toggle plate (2-gang, stainless)", at(pc), { color: [0.72, 0.74, 0.76] })]);
     out.push([new THREE.PlaneGeometry(pw, ph).rotateX(Math.PI / 2).translate(0, -2.1, 0),
       new THREE.MeshStandardMaterial({ map: togglePlateFace(), metalness: 0.5, roughness: 0.35, side: THREE.DoubleSide }),
       ud("SwitchPanel_PlateFace", "Toggle plate face (ROUTER / VAC, ON / OFF)", at(pc), { color: [0.72, 0.74, 0.76] })]);
@@ -1243,6 +1300,272 @@ float lr4G(float x) { float s = 2.0 * fract(x) - 1.0; return floor(x) / 3.0 + (s
       source: "made", color: [0.86, 0.68, 0.44], ownGeo: true, grain: "ply" }]);
     return out;
   }
+  // the hub's mains cables (user 2026-11-03: "12-2 or 12-3 as appropriate ... run cleanly with staples"): NM-B 12 AWG
+  // (yellow sheath), flat against the wood, stapled (NEC 334.30: within 12 in of a box, then every 4-1/2 ft - here every
+  // 300 mm); into each box through a cable clamp / knockout. Circuit (power.js): the inlet's line goes to the paddle
+  // switch and comes back switched; the toggles feed the router / vac halves of the duplex (tab broken).
+  //   inlet box -> the paddle switch's box, 12-3: black = line to the paddle, red = switched line back, white = neutral, bare = ground
+  //   the toggles' box -> outlet box, 12-3: black = router toggle's leg, red = vac toggle's leg, white = neutral, bare = ground
+  //   inlet box -> accessory box, 12-2: black = switched line, white = neutral, bare = ground
+  //   the paddle's box -> the toggles' box (side by side under the front), 12-2: switched line, neutral, ground
+  // Route (user 2026-11-03: "now that these panels are connected, the wires ... can stay on the panel"): up out of the
+  // hub box's top into the band above the boxes, flat against the side panel's back, along it to the corner, round onto
+  // the front panel's back, along it, then back over the switch box and down into its top. The paddle's cable lower, the
+  // toggles' above it (no crossing). The hub jumper: out of the boxes' bottoms, along the side panel's back. GUESS route.
+  function hubCables(tb, fx, T, zm, ys, flat) {
+    HUB.cables = null;
+    const HF = swpHubFrame(tb);
+    if (!HF) return [];
+    HUB.cables = { len: {}, pts: {}, staples: 0, hf: HF };   // (the BOM's rows, the Wiring layer's hub -> panel line)
+    const b = 3.2, w = 6.5;                            // NM 12-3 ~ 13 x 6.4 mm (12-2 ~ 11 x 5.8)
+    const bx = fx + T + HUB.encl / 2, top = zm + 49, bot = zm - 49;
+    const cx = HF.cx, sTop = HF.cz + 49;               // the switch boxes' tops
+    const xP = fx + T + b, yP = HF.bk + b, zTop = HF.uz;   // on the side panel's back, on the front panel's back; the panels' top
+    const V = (x, y, z) => new THREE.Vector3(x, y, z);
+    // the wood's face under the cable (its normal, into the room): the side panel's back, the front panel's back
+    const nAt = (p) => (p.z > zTop ? null : p.x < xP + 1 ? V(1, 0, 0) : p.y < yP + 1 && p.x < cx + SWP_H.panel[1] ? V(0, 1, 0) : null);
+    const runs = [
+      { n: "Paddle", w, u0: new THREE.Vector3(0, 1, 0), x: bx - 14, y: ys.I, tx: cx + SWP_H.estop + 8, zr: top + 12,
+        note: "inlet box -> the paddle switch's box: 12-3 NM-B - black = line to the paddle, red = switched line back, white = neutral, bare = ground" },
+      { n: "Toggles", w, u0: new THREE.Vector3(0, 1, 0), x: bx + 14, y: ys.O, tx: cx + SWP_H.plate[0] + 30, zr: top + 28,
+        note: "the toggles' box -> outlet box: 12-3 NM-B - black = router leg, red = vac leg, white = neutral, bare = ground" }];
+    const yE = HF.bk + 50;                             // into the switch box's top behind its devices
+    const paths = runs.map((r) => Object.assign(r, { pts: [V(r.x, r.y, top - 12), V(r.x, r.y, r.zr), V(xP, r.y, r.zr), V(xP, yP, r.zr),
+      V(r.tx, yP, r.zr), V(r.tx, yE, r.zr), V(r.tx, yE, sTop - 12)] }));
+    // the switch boxes' jumper, side to side through their knockouts
+    const xJ0 = cx + SWP_H.estop + 30, xJ1 = cx + SWP_H.plate[0] - 75, yJ = HF.bk + 48, zJ = HF.cz - 22;
+    paths.push({ n: "Jumper", w: 5.6, u0: new THREE.Vector3(0, 0, 1), note: "the paddle's box -> the toggles' box: 12-2 NM-B - black = switched line, white = neutral, bare = ground",
+      pts: [V(xJ0 - 12, yJ, zJ), V(xJ1 + 12, yJ, zJ)] });
+    HUB.cables.jumper = { x0: xJ0 - 12, x1: xJ1 + 12, y: yJ, z: zJ };
+    const xb = fx + T + b;                             // the jumper on the panel's back, under the boxes
+    paths.push({ n: "Accessory", w: 5.6, u0: new THREE.Vector3(0, 1, 0), note: "inlet box -> accessory box: 12-2 NM-B - black = switched line, white = neutral, bare = ground",
+      pts: [V(bx, ys.I, bot + 12), V(bx, ys.I, bot - 26), V(xb, ys.I, bot - 26), V(xb, ys.A, bot - 26), V(bx, ys.A, bot - 26), V(bx, ys.A, bot + 12)] });
+    const out = [], yel = [0.93, 0.78, 0.12], steel = [0.75, 0.76, 0.78], staples = [], T0 = { t: [0, 0, 0], s: [1, 1, 1] };
+    for (const r of paths) {
+      // the corners rounded (r 25, less on a short leg), the straights sampled every <= 25 mm (no bulging between)
+      const P = r.pts, cs = P.map((p, i) => {
+        if (i === 0 || i === P.length - 1) return { s: p, e: p, c: p };
+        const ra = Math.min(25, p.distanceTo(P[i - 1]) / 2, p.distanceTo(P[i + 1]) / 2);
+        return { s: p.clone().lerp(P[i - 1], ra / p.distanceTo(P[i - 1])), e: p.clone().lerp(P[i + 1], ra / p.distanceTo(P[i + 1])), c: p };
+      });
+      const dense = [P[0]];
+      for (let i = 1; i < P.length; i++) {
+        const a = cs[i - 1].e, z = cs[i].s, m = Math.max(1, Math.ceil(a.distanceTo(z) / 25));
+        for (let k = 1; k <= m; k++) dense.push(a.clone().lerp(z, k / m));
+        if (i < P.length - 1) {
+          const q = new THREE.QuadraticBezierCurve3(cs[i].s, cs[i].c, cs[i].e);
+          for (let k = 1; k <= 6; k++) dense.push(q.getPoint(k / 6));
+        }
+      }
+      const c = new THREE.CatmullRomCurve3(dense, false, "centripetal"), L = c.getLength(), N = Math.max(8, Math.ceil(L / 4));
+      HUB.cables.len[r.n] = L + 300; HUB.cables.pts[r.n] = dense;   // + 150 mm in each box
+      const pos = [], nor = [], idx = [], S = 12, h = r.w === w ? b : 2.9;
+      // a flat oval section, its wide side (u) carried along (no twist in the air: it bends flat-wise), easing onto
+      // each face it's stapled to (flat on the wood)
+      const u = r.u0.clone();
+      for (let i = 0; i <= N; i++) {
+        const p = c.getPointAt(i / N), t = c.getTangentAt(i / N), nw = nAt(p);
+        u.addScaledVector(t, -u.dot(t)).normalize();
+        if (nw) {
+          const k = new THREE.Vector3().crossVectors(t, nw).normalize();
+          if (k.dot(u) < 0) k.negate();
+          u.lerp(k, 0.25).addScaledVector(t, -u.dot(t)).normalize();
+        }
+        const n = new THREE.Vector3().crossVectors(u, t).normalize();
+        for (let j = 0; j < S; j++) {
+          const a = j / S * Math.PI * 2, cu = Math.cos(a), sn = Math.sin(a);
+          pos.push(...p.clone().addScaledVector(u, cu * r.w).addScaledVector(n, sn * h).toArray());
+          nor.push(...u.clone().multiplyScalar(cu * h).addScaledVector(n, sn * r.w).normalize().toArray());
+        }
+      }
+      for (let i = 0; i < N; i++) for (let j = 0; j < S; j++) {
+        const a = i * S + j, q = i * S + (j + 1) % S;
+        idx.push(a, q, a + S, q, q + S, a + S);
+      }
+      const g = new THREE.BufferGeometry();
+      g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute("normal", new THREE.Float32BufferAttribute(nor, 3)); g.setIndex(idx);
+      out.push([g, flat(yel, { roughness: 0.6 }), { name: `TableHub_Cable${r.n}`, label: `Cable, ${r.note} (~${(L / 1000 + 0.3).toFixed(1)} m with the ends in the boxes; stapled)`,
+        group: "Electronics", motion: "table", source: "hardware", ownGeo: true, base: T0, color: yel }]);
+      // staples where it lies straight on one face: the first >= 120 mm from an end, then every <= 300 mm
+      const on = [];
+      for (let s = 0; s <= L; s += 5) { const p = c.getPointAt(s / L), n = nAt(p); on.push({ s, p, n, t: c.getTangentAt(s / L) }); }
+      let last = -1e9;
+      for (let i = 4; i < on.length - 4; i++) {
+        const q = on[i];
+        if (!q.n || q.s < 120 || q.s > L - 120 || q.s - last < 300) continue;
+        if (!on[i - 4].n || !on[i + 4].n || !on[i - 4].n.equals(q.n) || !on[i + 4].n.equals(q.n) || on[i - 4].t.dot(on[i + 4].t) < 0.995) continue;
+        last = q.s; staples.push({ p: q.p, n: q.n, t: q.t, w: r.w, h });
+      }
+    }
+    const pos = [], nor = [];
+    for (const q of staples) {                         // an insulated cable staple: a crown over the cable, two legs into the wood
+      const u = new THREE.Vector3().crossVectors(q.t, q.n).normalize(), M = new THREE.Matrix4().makeBasis(u, q.t, q.n);
+      const base = q.p.clone().addScaledVector(q.n, -q.h);   // the wood's face
+      for (const [x, z, sx, sz] of [[0, 2 * q.h + 0.7, 2 * q.w + 4, 1.4], [-(q.w + 1.3), q.h + 0.35, 1.4, 2 * q.h + 0.7], [q.w + 1.3, q.h + 0.35, 1.4, 2 * q.h + 0.7]]) {
+        const g = new THREE.BoxGeometry(sx, 4, sz).translate(x, 0, z).applyMatrix4(M).translate(base.x, base.y, base.z).toNonIndexed();
+        pos.push(...g.getAttribute("position").array); nor.push(...g.getAttribute("normal").array); g.dispose();
+      }
+    }
+    HUB.cables.staples = staples.length;
+    if (pos.length) {
+      const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute("normal", new THREE.Float32BufferAttribute(nor, 3));
+      out.push([g, flat(steel, { metalness: 0.7, roughness: 0.35 }), { name: "TableHub_CableStaples",
+        label: `Cable staples (${staples.length}, for 12 AWG NM: within 12 in of each box, then <= 300 mm apart)`,
+        group: "Electronics", motion: "table", source: "hardware", ownGeo: true, base: T0, color: steel }]);
+    }
+    return out;
+  }
+  // the switch panel's wiring with the hub (user 2026-11-03: "see the wiring into the switches ... and the LED"): the
+  // devices' backs in the boxes behind the under-table panel (SWP_H; hide SwitchPanel_Boxes with H to see in).
+  //   paddle box (1-gang): 12-3 #1 in its top (from the inlet box), the 12-2 jumper out its side to the toggles' box
+  //     paddle switch (magnetic: its coil needs N): L in <- #1 black; L out -> nut {#1 red (switched, back to the hub),
+  //     the jumper's black}; nut {#1 white, the jumper's white, the coil's N}; nut {#1 bare, the jumper's bare, its G}
+  //   toggles' box (3-gang): the jumper in its side, 12-3 #2 in its top (to the outlet box)
+  //     nut {the jumper's black, the lamp, both toggles' line}; nut {the jumper's white, #2 white, the lamp's N, both
+  //     toggles' N (pilot lights)}; nut {the jumper's bare, #2 bare, both toggles' green}; ROUTER load -> #2 black,
+  //     VAC load -> #2 red
+  //   power lamp (22 mm 120 V LED pilot light: its resistor inside; 2 terminals): switched line + neutral - lit = power on
+  // GUESS layout / terminals.
+  function hubPanelWiring(flat) {
+    const HF = HUB.cables && HUB.cables.hf, J = HUB.cables && HUB.cables.jumper;
+    if (!HF || !J) return [];
+    const out = [], V = (x, y, z) => new THREE.Vector3(x, y, z), cx = HF.cx, cz = HF.cz, y0 = HF.y0, bk = HF.bk;
+    const T0 = { t: [0, 0, 0], s: [1, 1, 1] }, ud = (name, label, color) => ({ name, label, group: "Electronics", motion: "table", source: "hardware", ownGeo: true, base: T0, color });
+    const metal = (c) => flat(c, { metalness: 0.8, roughness: 0.3 });
+    const bodies = [], brass = [], silver = [], green = [], nuts = [];
+    const screw = (list, p, axis) => list.push(new THREE.CylinderGeometry(3.4, 3.4, 2.2, 14).applyMatrix4(new THREE.Matrix4().makeRotationFromQuaternion(
+      new THREE.Quaternion().setFromUnitVectors(V(0, 1, 0), axis))).translate(p.x, p.y, p.z));
+    const back = V(0, 1, 0);
+    const x1 = cx + SWP_H.estop, xL = cx + SWP_H.lamp, xR = cx + SWP_H.router, xV = cx + SWP_H.vac;
+    // the devices' backs through the panel into their boxes
+    bodies.push(new THREE.CylinderGeometry(10, 10, bk + 22 - y0, 20).translate(xL, (y0 + bk + 22) / 2, cz));
+    for (const x of [xR, xV]) bodies.push(new THREE.BoxGeometry(20, bk + 26 - y0, 56).translate(x, (y0 + bk + 26) / 2, cz));
+    const yP = y0 + 45.7;                              // on the back of the paddle switch's body (SwitchPanel_PaddleBox: 44.6 deep)
+    const P = { lin: V(x1 - 10, yP, cz + 12), lout: V(x1 + 10, yP, cz + 12), n: V(x1 - 10, yP, cz - 12), g: V(x1 + 10, yP, cz - 12) };
+    const Lm = { l: V(xL - 5, bk + 23, cz), n: V(xL + 5, bk + 23, cz) };
+    const Tg = (x) => ({ line: V(x - 11, bk + 14, cz + 14), load: V(x - 11, bk + 14, cz - 14), n: V(x + 11, bk + 14, cz + 14), g: V(x + 11, bk + 14, cz - 14) });
+    const TR = Tg(xR), TV = Tg(xV);
+    screw(brass, P.lin, back); screw(brass, P.lout, back); screw(silver, P.n, back); screw(green, P.g, back);
+    screw(brass, Lm.l, back); screw(silver, Lm.n, back);
+    for (const t of [TR, TV]) { screw(brass, t.line, V(-1, 0, 0)); screw(brass, t.load, V(-1, 0, 0)); screw(silver, t.n, V(1, 0, 0)); screw(green, t.g, V(1, 0, 0)); }
+    out.push([hrMerge(bodies), flat([0.12, 0.12, 0.13], { roughness: 0.5 }), ud("TableHub_PanelDevices", "Switch panel devices' backs (paddle switch terminals, power lamp, router + vac toggles)", [0.12, 0.12, 0.13])]);
+    out.push([hrMerge(brass), metal([0.8, 0.62, 0.25]), ud("TableHub_PanelTermBrass", "Switch panel brass terminals (line in / switched / loads)", [0.8, 0.62, 0.25])]);
+    out.push([hrMerge(silver), metal([0.8, 0.8, 0.82]), ud("TableHub_PanelTermSilver", "Switch panel silver terminals (neutral: the paddle's coil, the lamp, the pilot toggles)", [0.8, 0.8, 0.82])]);
+    out.push([hrMerge(green), metal([0.15, 0.5, 0.2]), ud("TableHub_PanelTermGround", "Switch panel green ground terminals", [0.15, 0.5, 0.2])]);
+    // the nuts low at the boxes' backs, open end up
+    const nut = (x) => V(x, bk + 62, cz - 32);
+    const nS1 = nut(x1 - 18), nN1 = nut(x1), nG1 = nut(x1 + 18), nS3 = nut(cx - 25), nN3 = nut(cx + 20), nG3 = nut(cx + 92);
+    for (const n of [nS1, nN1, nG1, nS3, nN3, nG3]) nuts.push(new THREE.CylinderGeometry(6.5, 4, 20, 16).rotateX(Math.PI / 2).translate(n.x, n.y, n.z - 6));
+    const W = { black: [], red: [], white: [], bare: [] }, R = { black: 1.5, red: 1.5, white: 1.5, bare: 1.05 };
+    const wire = (col, pts) => W[col].push(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts, false, "centripetal"), 40, R[col], 8, false));
+    const yD = HUB.cables.pts.Paddle[HUB.cables.pts.Paddle.length - 1].y, sTop = cz + 49;
+    const fromTop = (x, o) => [V(x + o, yD, sTop - 8), V(x + o, yD, sTop - 20)];   // out of a 12-3's sheath (it ends 12 mm in)
+    const fromJ = (left, o) => left ? [V(J.x0 + 4, J.y, J.z + o), V(J.x0 - 8, J.y, J.z + o)] : [V(J.x1 - 4, J.y, J.z + o), V(J.x1 + 8, J.y, J.z + o)];
+    const toBack = (t) => [V(t.x, t.y + 9, t.z), t];
+    const toSide = (t, s) => [V(t.x + s * 9, t.y + 4, t.z), t];
+    const into = (n) => [V(n.x, n.y, n.z + 16), V(n.x, n.y, n.z + 4)];
+    const mid = (a, b) => V((a.x + b.x) / 2, Math.max(a.y, b.y) + 6, (a.z + b.z) / 2);
+    const run = (col, s, end) => wire(col, [...s, mid(s[s.length - 1], end[0]), ...end]);
+    const c1 = HUB.cables.pts.Paddle[HUB.cables.pts.Paddle.length - 1].x, c2 = HUB.cables.pts.Toggles[HUB.cables.pts.Toggles.length - 1].x;
+    // the paddle's box
+    run("black", fromTop(c1, -4.5), toBack(P.lin));
+    run("red", fromTop(c1, 4.5), into(nS1));
+    run("white", fromTop(c1, 1.5), into(nN1));
+    run("bare", fromTop(c1, -1.5), into(nG1));
+    run("black", fromJ(true, 3), into(nS1)); run("white", fromJ(true, -3), into(nN1)); run("bare", fromJ(true, 0), into(nG1));
+    const pig = (col, t, n, side) => wire(col, [...(side ? toSide(t, side) : toBack(t)).reverse(), mid(t, n), ...into(n)]);
+    pig("black", P.lout, nS1); pig("white", P.n, nN1); pig("bare", P.g, nG1);
+    // the toggles' box
+    run("black", fromTop(c2, -4.5), toSide(TR.load, -1));
+    run("red", fromTop(c2, 4.5), toSide(TV.load, -1));
+    run("white", fromTop(c2, 1.5), into(nN3));
+    run("bare", fromTop(c2, -1.5), into(nG3));
+    run("black", fromJ(false, 3), into(nS3)); run("white", fromJ(false, -3), into(nN3)); run("bare", fromJ(false, 0), into(nG3));
+    pig("black", Lm.l, nS3); pig("white", Lm.n, nN3);
+    pig("black", TR.line, nS3, -1); pig("black", TV.line, nS3, -1);
+    pig("white", TR.n, nN3, 1); pig("white", TV.n, nN3, 1);
+    pig("bare", TR.g, nG3, 1); pig("bare", TV.g, nG3, 1);
+    const cols = { black: [0.05, 0.05, 0.06], red: [0.75, 0.08, 0.06], white: [0.92, 0.92, 0.9], bare: [0.78, 0.48, 0.25] };
+    for (const k of Object.keys(W)) out.push([hrMerge(W[k]), k === "bare" ? metal(cols[k]) : flat(cols[k], { roughness: 0.5 }),
+      ud(`TableHub_PanelWires${k[0].toUpperCase() + k.slice(1)}`, `Conductors in the switch boxes: ${{ black: "black (line / switched / loads)", red: "red (switched back to the hub; VAC)", white: "white (neutral)", bare: "bare copper (ground)" }[k]}`, cols[k])]);
+    out.push([hrMerge(nuts), flat([0.85, 0.15, 0.1], { roughness: 0.45 }), ud("TableHub_PanelWireNuts", "Wire nuts in the switch boxes: paddle box - switched (2), neutral (3), ground (3); toggles' box - switched (4), neutral (5: a big one), ground (4)", [0.85, 0.15, 0.1])]);
+    return out;
+  }
+  // the hub's devices behind the panel + their wiring (user 2026-11-03: "model a real outlet, and connect the right
+  // wires"; hide the blue boxes with H to see in). Each device's body goes through its cut-out in the panel into its
+  // box; terminals on the duplexes' sides (brass = line, -Y side; silver = neutral, +Y; green ground screw low on the
+  // back), on the inlet's back (L brass, N silver, G green). The cables' sheaths stop ~12 mm into the box (clamped).
+  //   inlet box: inlet L <- 12-3 black (line to the paddle); 12-3 red (switched, back) + 12-2 black -> a wire nut;
+  //     whites + a pigtail to N -> a nut; bares + a pigtail to G + the hose's ground lead -> a nut
+  //   outlet box (tab broken on the brass side): 12-3 black -> top brass (ROUTER), red -> bottom brass (VAC), white -> silver, bare -> green
+  //   accessory box: 12-2 black -> brass, white -> silver, bare -> green
+  // GUESS sizes (a 20 A duplex body ~33 x 66 x 31 mm deep behind its strap).
+  function hubDevices(fx, T, zm, ys, flat, ivory) {
+    const out = [], V = (x, y, z) => new THREE.Vector3(x, y, z), bx = fx + T + HUB.encl / 2, top = zm + 49, bot = zm - 49;
+    const T0 = { t: [0, 0, 0], s: [1, 1, 1] }, ud = (name, label, color) => ({ name, label, group: "Electronics", motion: "table", source: "hardware", ownGeo: true, base: T0, color });
+    const xB = fx + 28, xS = fx + T + 8;              // a duplex body's back, its side screws' x
+    const bodies = [], brass = [], silver = [], green = [];
+    const screw = (list, p, axis) => list.push(new THREE.CylinderGeometry(3.6, 3.6, 2.4, 14).applyMatrix4(new THREE.Matrix4().makeRotationFromQuaternion(
+      new THREE.Quaternion().setFromUnitVectors(V(0, 1, 0), axis))).translate(p.x, p.y, p.z));
+    for (const y of [ys.O, ys.A]) {                    // the duplexes: body + side screws (the outlet's brass pair split: tab broken)
+      bodies.push(new THREE.BoxGeometry(xB - fx + 3, 33, 66).translate((fx - 3 + xB) / 2, y, zm));
+      for (const dz of [19, -19]) { screw(brass, V(xS, y - 17.7, zm + dz), V(0, -1, 0)); screw(silver, V(xS, y + 17.7, zm + dz), V(0, 1, 0)); }
+      screw(green, V(xB + 1.2, y, zm - 26), V(1, 0, 0));
+      // the tabs joining each side's two screws (user 2026-11-03: "draw the tabs"): the outlet's brass tab broken off
+      // (two stubs, a gap: ROUTER top / VAC bottom fed apart), its silver tab whole (a shared neutral); the accessory's both whole
+      const tab = (list, s, z0, z1) => list.push(new THREE.BoxGeometry(6, 0.9, z1 - z0).translate(xS, y + s * 16.95, zm + (z0 + z1) / 2));
+      if (y === ys.O) { tab(brass, -1, 12, 19); tab(brass, -1, -19, -12); } else tab(brass, -1, -19, 19);
+      tab(silver, 1, -19, 19);
+    }
+    const iB = fx + T + 24;                            // the inlet's body (round, behind its flange) + its back terminals
+    bodies.push(new THREE.CylinderGeometry(19, 19, iB - fx, 28).rotateZ(Math.PI / 2).translate((fx + iB) / 2, ys.I, zm));
+    const tL = V(iB + 1.2, ys.I + 8, zm + 8), tN = V(iB + 1.2, ys.I - 8, zm + 8), tG = V(iB + 1.2, ys.I, zm - 9);
+    screw(brass, tL, V(1, 0, 0)); screw(silver, tN, V(1, 0, 0)); screw(green, tG, V(1, 0, 0));
+    out.push([hrMerge(bodies), flat([0.86, 0.84, 0.78], { roughness: 0.5 }), ud("TableHub_DeviceBodies", "Device bodies behind the panel (the inlet; the router / vac and accessory duplexes - 20 A, side-wired)", [0.86, 0.84, 0.78])]);
+    const metal = (c) => flat(c, { metalness: 0.8, roughness: 0.3 });
+    out.push([hrMerge(brass), metal([0.8, 0.62, 0.25]), ud("TableHub_TermBrass", "Brass terminal screws (line / hot: black, red)", [0.8, 0.62, 0.25])]);
+    out.push([hrMerge(silver), metal([0.8, 0.8, 0.82]), ud("TableHub_TermSilver", "Silver terminal screws (neutral: white)", [0.8, 0.8, 0.82])]);
+    out.push([hrMerge(green), metal([0.15, 0.5, 0.2]), ud("TableHub_TermGround", "Green ground screws (bare / ground)", [0.15, 0.5, 0.2])]);
+    // the conductors: from the sheath's end (spread across the flat cable) to their terminal / nut, a small hook round each screw
+    const W = { black: [], red: [], white: [], bare: [] }, R = { black: 1.5, red: 1.5, white: 1.5, bare: 1.05 };
+    const wire = (col, pts) => W[col].push(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts, false, "centripetal"), 40, R[col], 8, false));
+    const fromTop = (x, y, o) => [V(x + o, y, top + 4), V(x + o, y, top - 12)];   // the sheath's end in the box, its conductors' first bit
+    const fromBot = (x, y, o) => [V(x, y + o, bot - 4), V(x, y + o, bot + 12)];
+    const toSide = (s, side) => [V(xS + 10, s.y + side * 9, s.z), V(xS + 2, s.y + side * 5, s.z), s];   // round to a side screw
+    const toBack = (s) => [V(s.x + 10, s.y, s.z + 4), V(s.x + 3, s.y, s.z)];
+    // the outlet box (12-3 down from its top, at bx + 14)
+    { const y = ys.O, c = bx + 14, sb = (dz) => V(xS, y - 17.7, zm + dz), ss = (dz) => V(xS, y + 17.7, zm + dz);
+      wire("black", [...fromTop(c, y, -4.5), V(c - 12, y - 14, zm + 26), ...toSide(sb(19), -1)]);
+      wire("red", [...fromTop(c, y, 4.5), V(c - 6, y - 20, zm - 6), ...toSide(sb(-19), -1)]);
+      wire("white", [...fromTop(c, y, 1.5), V(c - 12, y + 14, zm + 26), ...toSide(ss(19), 1)]);
+      wire("bare", [...fromTop(c, y, -1.5), V(c, y + 6, zm - 10), ...toBack(V(xB + 1.2, y, zm - 26))]); }
+    // the accessory box (12-2 up from its bottom, at bx)
+    { const y = ys.A;
+      wire("black", [...fromBot(bx, y, -3), V(bx - 8, y - 14, zm + 2), ...toSide(V(xS, y - 17.7, zm - 19), -1)]);
+      wire("white", [...fromBot(bx, y, 3), V(bx - 8, y + 14, zm + 2), ...toSide(V(xS, y + 17.7, zm - 19), 1)]);
+      wire("bare", [...fromBot(bx, y, 0), V(bx + 6, y, zm - 34), ...toBack(V(xB + 1.2, y, zm - 26))]); }
+    // the inlet box: 12-3 down from its top (at bx - 14), 12-2 up from its bottom (at bx); three nuts at the back
+    const nuts = [], y = ys.I, nS = V(bx + 12, y - 16, zm + 22), nN = V(bx + 12, y + 2, zm + 30), nG = V(bx + 12, y + 16, zm - 22)   // (inside: they poked out of its back at bx + 24);
+    const into = (n) => [V(n.x - 14, n.y, n.z), V(n.x - 6, n.y, n.z)];   // up into a nut's open end (it points to the back)
+    { const c = bx - 14;
+      wire("black", [...fromTop(c, y, -4.5), V(c - 4, y + 10, zm + 18), ...toBack(tL)]);
+      wire("red", [...fromTop(c, y, 4.5), V(c + 6, y - 14, zm + 26), ...into(nS)]);
+      wire("white", [...fromTop(c, y, 1.5), V(c + 8, y + 2, zm + 32), ...into(nN)]);
+      wire("bare", [...fromTop(c, y, -1.5), V(c + 6, y + 14, zm + 6), V(nG.x - 22, nG.y, nG.z + 4), ...into(nG)]);
+      wire("black", [...fromBot(bx, y, -3), V(bx + 2, y - 18, zm - 10), V(nS.x - 22, nS.y, nS.z - 6), ...into(nS)]);
+      wire("white", [...fromBot(bx, y, 3), V(bx - 6, y + 4, zm + 2), V(nN.x - 22, nN.y, nN.z - 4), ...into(nN)]);
+      wire("bare", [...fromBot(bx, y, 0), V(bx + 6, y + 10, zm - 34), ...into(nG)]);
+      wire("white", [...toBack(tN).reverse(), V(tN.x + 12, tN.y + 4, tN.z + 14), ...into(nN)]);   // the pigtails
+      wire("bare", [...toBack(tG).reverse(), V(tG.x + 12, tG.y + 8, tG.z - 8), ...into(nG)]); }
+    for (const n of [nS, nN, nG]) nuts.push(new THREE.CylinderGeometry(4, 6.5, 20, 16).rotateZ(-Math.PI / 2).translate(n.x + 4, n.y, n.z));
+    HUB.groundNut = nG;                                // (the hose's ground lead ends in it)
+    const cols = { black: [0.05, 0.05, 0.06], red: [0.75, 0.08, 0.06], white: [0.92, 0.92, 0.9], bare: [0.78, 0.48, 0.25] };
+    const names = { black: "black (line / hot)", red: "red (the 12-3's second hot: switched back / VAC)", white: "white (neutral)", bare: "bare copper (ground)" };
+    for (const k of Object.keys(W)) out.push([hrMerge(W[k]), k === "bare" ? metal(cols[k]) : flat(cols[k], { roughness: 0.5 }),
+      ud(`TableHub_Wires${k[0].toUpperCase() + k.slice(1)}`, `Conductors in the hub's boxes: ${names[k]}`, cols[k])]);
+    out.push([hrMerge(nuts), flat([0.85, 0.15, 0.1], { roughness: 0.45 }), ud("TableHub_WireNuts", "Wire nuts (red, for 2-4 x 12 AWG): switched line, neutrals, grounds (inlet box)", [0.85, 0.15, 0.1])]);
+    return out;
+  }
   // ---- the table's hub (Part 52, an OPTION - off by default, My LR4 > Options): a panel set into the table's left
   // (Min X) end (user 2026-11-02: "a panel on the side that this and the outlets are set into"; layout "port left,
   // power right" looking at the end: the port toward the table's back, the power toward its front / the switch
@@ -1256,7 +1579,7 @@ float lr4G(float x) { float s = 2.0 * fract(x) - 1.0; return floor(x) / 3.0 + (s
   // HUB.port = the port's outside mouth (world mm) while the hub is drawn: hoseRoute brings the hose in along +X.
   // set: the panel's face this far in from the end (user 2026-11-02: plugs + cords out of reach of legs and the swinging
   // hose); the port's outside stub reaches back out to the end face, where the machine hose plugs in
-  const HUB = { port: null, T: 16, w: 450, h: 220, encl: 76, tube: 30, stub: 100, set: 100 };
+  const HUB = { port: null, T: 16, w: 450, h: 190, encl: 76, tube: 30, stub: 40, set: 100 };   // h, stub: 220, 100 until the user's 2026-11-03 trims
   function hubMeshes() {
     HUB.port = null;
     const tb = tableBox(true), lg = meshes.find((m) => m.userData.name === "TableLegs");
@@ -1272,7 +1595,10 @@ float lr4G(float x) { float s = 2.0 * fract(x) - 1.0; return floor(x) / 3.0 + (s
     const cylY = (r, y0, y1, x, z, n = 24) => new THREE.CylinderGeometry(r, r, Math.abs(y1 - y0), n).translate(x, (y0 + y1) / 2, z);
     const lathZ = (pts, x, y, n = 40) => new THREE.LatheGeometry(pts.map(([r, h]) => new THREE.Vector2(r, h)), n).rotateX(Math.PI / 2).translate(x, y, 0);
     const lathX = (pts, x, y, z, n = 40) => new THREE.LatheGeometry(pts.map(([r, h]) => new THREE.Vector2(r, h)), n).rotateZ(-Math.PI / 2).translate(x, y, z);   // axis +X
-    const out = [], T = HUB.T, ex = tb.min.x, fx = ex + HUB.set, r = HUB.tube, W = HUB.w, H = HUB.h;   // ex: the end face, fx: the panel's
+    // fx: the panel's face - in line with the front switch panel's left edge, just inboard of the front-left leg (user
+    // 2026-11-03: "slide the side panel up behind the front post so it meets the front panel at 90 degrees")
+    const HF0 = swpHubFrame(tb);
+    const out = [], T = HUB.T, ex = tb.min.x, fx = HF0 ? HF0.cx + SWP_H.panel[0] : ex + HUB.set, r = HUB.tube, W = HUB.w, H = HUB.h;   // ex: the end face
     const ap = meshes.find((m) => m.userData.name === "TableApron");   // the sheet table's apron hangs below its sheet
     const uz = ap ? Math.min(tb.min.z, new THREE.Box3().setFromObject(ap).min.z) : tb.min.z;
     // the port at the hose's drop (the table's mid-depth, S.TL / 2: the shortest hose; user 2026-11-02), the power toward the front;
@@ -1282,9 +1608,17 @@ float lr4G(float x) { float s = 2.0 * fract(x) - 1.0; return floor(x) / 3.0 + (s
     const ym = S.TL / 2 - (W / 2 - 105);              // yc with the port (y0 + W - 105) at S.TL / 2
     let yc = ym;
     for (let d = 0; d < 2000 && !clear(yc); d += 25) yc = clear(ym - d) ? ym - d : ym + d;
+    // with the front switch panel (user 2026-11-03: "slide everything on the side panel forward and make the panel
+    // shorter ... more room for storage under the table, which may become a cart"): the devices start just behind the
+    // front-left leg (the accessory plate 40 mm clear of it); a longer hose / cord to the port, the rest of the end left open
+    const fl = HF0 && LEG_BOXES.filter((l) => l[1] < tb.min.y + 150).sort((p, q) => p[0] - q[0])[0];
+    const ycVac = yc;                                 // (the vac + separator stay at mid-depth: their hoses reach the port)
+    if (fl) yc = fl[4] + 40 + 36 - 55 + W / 2;        // y0 + 55 (the accessory) - 36 (half its plate) = the leg's back + 40 (user: a little margin)
     const y0 = yc - W / 2, z0 = uz - H, zm = uz - H / 2;   // y0 = the panel's front end
-    out.push([box([fx, y0, z0, fx + T, y0 + W, uz]), material([0.86, 0.68, 0.44], null, false, "ply"), { name: "TableHub_Panel",
-      label: `Hub panel (5/8 in plywood, ${W} x ${H} mm, set ${HUB.set} mm in from the table's left end, under the ${ap ? "apron" : "torsion box"}; GUESS)`,
+    const pf = HF0 ? Math.min(HF0.bk, y0) : y0;      // its front end: butted to the front panel's back (a square corner)
+    out.push([box([fx, pf, z0, fx + T, y0 + W, uz]), material([0.86, 0.68, 0.44], null, false, "ply"), { name: "TableHub_Panel",
+      label: `Hub panel (5/8 in plywood, ${Math.round(y0 + W - pf)} x ${H} mm, ${Math.round(fx - ex)} mm in from the table's left end, inboard of the front leg, ` +
+        `meeting the switch panel at the front in a square corner; under the ${ap ? "apron" : "torsion box"}; GUESS)`,
       group: "Table", motion: "table", source: "made", color: [0.86, 0.68, 0.44], ownGeo: true, grain: "ply" }]);
     const grey = [0.55, 0.57, 0.58], ivory = [0.9, 0.88, 0.82], dark = [0.06, 0.06, 0.07];
     // the devices, each in a single-gang plate on the face (looking at the end: inlet, router / vac, accessory)
@@ -1292,7 +1626,7 @@ float lr4G(float x) { float s = 2.0 * fract(x) - 1.0; return floor(x) / 3.0 + (s
     out.push([boxesGeo([yI, yO, yA].map(plate)), flat(ivory), ud("TableHub_Plates", "Cover plates (3 single-gang)", ivory, "Electronics")]);
     // labels printed on the plates' margins (user 2026-11-02), facing out (-X): [plate y, top, bottom]
     const face = new THREE.Matrix4().makeBasis(new THREE.Vector3(0, -1, 0), new THREE.Vector3(0, 0, 1), new THREE.Vector3(-1, 0, 0));
-    for (const [y, top, bot, n] of [[yI, "POWER IN", "20 A", "Inlet"], [yO, "ROUTER", "VAC", "Outlet"], [yA, "ALWAYS ON", "ACCESSORY", "Accessory"]])
+    for (const [y, top, bot, n] of [[yI, "POWER IN", "20 A", "Inlet"], [yO, "ROUTER", "VAC", "Outlet"], [yA, "CONTROLLER", "ACCESSORY", "Accessory"]])
       out.push([new THREE.PlaneGeometry(72, 116).applyMatrix4(face).translate(fx - 3.15, y, zm),
         new THREE.MeshStandardMaterial({ map: plateLabels(top, bot), transparent: true, roughness: 0.5, side: THREE.DoubleSide }),
         ud(`TableHub_${n}Label`, `Label: ${top} / ${bot}`, ivory, "Electronics")]);
@@ -1304,14 +1638,17 @@ float lr4G(float x) { float s = 2.0 * fract(x) - 1.0; return floor(x) / 3.0 + (s
       ud("TableHub_Boxes", "Outlet boxes (3 single-gang new-work boxes, blue PVC, one behind each device; GUESS 60 x 98 x 76 mm)", nw, "Electronics")]);
     out.push([lathX([[0, 0], [21, 0], [21, -12], [18, -12], [18, -3], [0, -3]], fx - 3, yI, zm),   // sticks out (-X)
       flat(dark, { roughness: 0.4 }), ud("TableHub_Inlet", "Power inlet (flanged plug inlet, 20 A - or 15 A to suit your circuit): the extension cord plugs in here", dark, "Electronics")]);
-    const blades = [[-6.5, 0, 1.6, 6.5], [6.5, 0, 1.6, 7.8], [0, -9, 4.8, 4.8]];   // hot, neutral, ground (y, z, w, h)
+    // NEMA 5-20 (user 2026-11-03: "one of the prongs sideways"): the neutral blade turned 90 deg (a 15 A cord's
+    // plug won't fit; a 20 A cord's 5-20R end goes on)
+    const blades = [[6.5, 0, 1.6, 6.5], [-6.5, 0, 6.4, 1.6], [0, -9, 4.8, 4.8]];   // hot, neutral (sideways), ground (y, z, w, h): a plug's face, the outlet's mirrored
     out.push([boxesGeo(blades.map(([y, z, w, h]) => [fx - 21, yI + y - w / 2, zm + 4 + z - h / 2, fx - 6, yI + y + w / 2, zm + 4 + z + h / 2])),
-      flat([0.75, 0.7, 0.5], { metalness: 0.7, roughness: 0.35 }), ud("TableHub_InletPins", "Power inlet pins", [0.75, 0.7, 0.5], "Electronics")]);
+      flat([0.75, 0.7, 0.5], { metalness: 0.7, roughness: 0.35 }), ud("TableHub_InletPins", "Power inlet pins (NEMA 5-20P: the neutral blade sideways)", [0.75, 0.7, 0.5], "Electronics")]);
     const duplex = (y, name, label) => {               // a duplex receptacle's two faces + their slots
       const faces = [], slots = [];
       for (const dz of [19, -19]) {
         faces.push([fx - 7, y - 17, zm + dz - 15, fx - 3, y + 17, zm + dz + 15]);
-        for (const [sy, sz, w, h] of [[-6, 3, 2.2, 7], [6, 3, 2.2, 8.5], [0, -7, 4.5, 4.5]]) slots.push([fx - 7.6, y + sy - w / 2, zm + dz + sz - h / 2, fx - 6.9, y + sy + w / 2, zm + dz + sz + h / 2]);
+        // NEMA 5-20R: hot, the neutral's T (its upright + a sideways branch out from its middle: takes 15 A or 20 A plugs), ground
+        for (const [sy, sz, w, h] of [[-6, 3, 2.2, 7], [6, 3, 2.2, 8.5], [8.6, 3, 5.2, 2.2], [0, -7, 4.5, 4.5]]) slots.push([fx - 7.6, y + sy - w / 2, zm + dz + sz - h / 2, fx - 6.9, y + sy + w / 2, zm + dz + sz + h / 2]);
       }
       out.push([boxesGeo(faces), flat(ivory, { roughness: 0.4 }), ud(name, label, ivory, "Electronics")]);
       out.push([boxesGeo(slots), flat(dark), ud(name + "Slots", label.replace(/ \(.*$/, "") + " slots", dark, "Electronics")]);
@@ -1321,18 +1658,48 @@ float lr4G(float x) { float s = 2.0 * fract(x) - 1.0; return floor(x) / 3.0 + (s
     const plugGeo = (q) => boxesGeo([[q[0] - 31, q[1] - 15, q[2] - 13, q[0], q[1] + 15, q[2] + 13]]);
     out.push([plugGeo(HUB.outlet.router), flat([0.07, 0.07, 0.08], { roughness: 0.6 }),
       ud("TableHub_RouterPlug", "The router cord's plug (in the ROUTER socket - left plugged in)", [0.07, 0.07, 0.08], "Hose")]);
-    duplex(yA, "TableHub_Accessory", "Accessory outlet (duplex, always on while the table has power - lights, a laptop, chargers; cut by the e-stop)");
+    duplex(yA, "TableHub_Accessory", "Accessory outlet (duplex, on while the paddle switch is - its top socket CONTROLLER feeds the 24 V supply (the Jackpot), the bottom one ACCESSORY: lights / a laptop / chargers)");
+    // the 24 V supply's plug in its top socket, CONTROLLER (user 2026-11-03): its cord goes up to the gantry (wiring.js psu-ac)
+    HUB.outlet.psu = [fx - 7, yA, zm + 19];
+    out.push([plugGeo(HUB.outlet.psu), flat([0.07, 0.07, 0.08], { roughness: 0.6 }),
+      ud("TableHub_PsuPlug", "The 24 V supply's mains plug (in the CONTROLLER socket, the top of the accessory duplex; its cord runs up to the gantry and along the beam to the supply)", [0.07, 0.07, 0.08], "Electronics")]);
     // the dust port: a bulkhead through the panel - a flange outside, a lock nut inside, stubs both ways
-    const yP = y0 + W - 105, sx = fx - 40, ix = fx + T + HUB.stub, L = fx - sx;   // the mouth 40 mm out from the (set back) panel
+    // the port midway between the POWER IN plate's edge and the panel's end (user 2026-11-03)
+    const yP = (yI + 36 + y0 + W) / 2, sx = fx - 40, ix = fx + T + HUB.stub, L = fx - sx;   // the mouth 40 mm out from the (set back) panel
     out.push([lathX([[r - 2.5, 0], [r + 4, 0], [r + 4, 40], [r, 40], [r, L + T + HUB.stub], [r - 2.5, L + T + HUB.stub]], sx, yP, zm), flat(dark, { roughness: 0.45 }),
       ud("TableHub_Port", "Dust port (2-1/2 in bulkhead through the panel: the LR4's hose plugs in outside, level; the vac's hose fits the stub inside; GUESS)", dark, "Electronics")]);
     out.push([lathX([[r, 0], [r + 14, 0], [r + 14, 4], [r, 4]], fx - 4, yP, zm), flat(dark), ud("TableHub_PortFlange", "Dust port flange", dark, "Electronics")]);
     out.push([cylX(r + 12, fx + T, fx + T + 10, yP, zm, 6), flat(dark), ud("TableHub_PortNut", "Dust port lock nut (inside)", dark, "Electronics")]);
     HUB.port = [sx, yP, zm];                           // the hose comes in along +X
+    // the hose's ground (user 2026-11-03; V1E docs: "Vac Hoses need to be grounded at one end ... the ground port from your
+    // power source"; static can damage the board) - no outlet used: its steel wire bared at the end it plugs in with, a
+    // hose clamp over it + a ring terminal, a short green lead to a green binding post in the panel below the port (user's
+    // pick: NOYITO M5, 40 A, 4 mm banana; sizes GUESS from its photo; unplugs without tools); behind the panel, a green 14 AWG lead from the post into the inlet box's side (a knockout)
+    // to its ground nut (the cables' bares + the inlet's ground pigtail: hubDevices; PVC boxes have no ground screw). GUESS sizes / route.
+    const cx = sx + 20, hr = 34 + 1.5;                  // the hose (68 mm OD) is on the stub to ~sx + 35
+    out.push([new THREE.CylinderGeometry(hr, hr, 12, 40, 1, true).rotateZ(Math.PI / 2).translate(cx, yP, zm),
+      flat(grey, { metalness: 0.8, roughness: 0.3 }), ud("TableHub_HoseClamp", "Hose clamp (2-1/2 in) on the hose's bared steel wire + the ground lead's ring terminal", grey, "Electronics")]);
+    const gGreen = [0.1, 0.5, 0.18], yb = yP - 60, zb = zm - 54;   // the post: below the port, toward the front
+    const pGreen = [0.35, 0.85, 0.4];                  // its light green plastic: a ribbed knob, insulating washers each side of the panel
+    out.push([hrMerge([cylX(7, fx - 6, fx, yb, zb, 32), cylX(6, fx - 28, fx - 10, yb, zb, 28), cylX(7, fx + T, fx + T + 5, yb, zb, 32)]), flat(pGreen, { roughness: 0.45 }),
+      ud("TableHub_GroundPost", "Ground binding post (NOYITO M5, green, 4 mm banana; the hose's lead under its knob, the box's lead on its back stud; counterbore the 5/8 in panel from behind if its thread is short)", pGreen, "Electronics")]);
+    out.push([hrMerge([cylX(4.5, fx - 10, fx - 6, yb, zb, 20), cylX(2.5, fx + T, fx + T + 18, yb, zb, 12), cylX(4.6, fx + T + 5, fx + T + 9, yb, zb, 6),
+      cylX(4.6, fx + T + 9.5, fx + T + 13.5, yb, zb, 6), new THREE.TorusGeometry(3.6, 0.8, 6, 16).rotateY(Math.PI / 2).translate(fx - 8, yb, zb)]),
+      flat([0.78, 0.78, 0.76], { metalness: 0.85, roughness: 0.3 }),
+      ud("TableHub_GroundStud", "Ground post's nickel-plated collar, M5 stud + nuts, and the hose lead's ring terminal", [0.78, 0.78, 0.76], "Electronics")]);
+    const tube = (pts, r) => new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts.map((q) => new THREE.Vector3(...q)), false, "centripetal"), 48, r, 8, false);
+    out.push([hrMerge([
+      tube([[cx, yP - hr * 0.7, zm - hr * 0.7], [cx + 2, yb + 10, zb + 26], [fx - 8, yb, zb + 12], [fx - 8, yb, zb + 4.4]], 1.3),   // the hose's lead (~0.1 m)
+      tube([[fx + T + 16, yb, zb + 2.6], [fx + T + 22, yb - 6, zb + 4], [fx + T + 32, yI + 62, zm - 36],   // the box's (clear of its nailing flange)
+        [fx + T + 46, yI + 50, zm - 30], [fx + T + 46, yI + 30, zm - 30], [fx + T + 50, yI + 20, zm - 22], [fx + T + HUB.encl / 2 + 6, yI + 16, zm - 22]], 1.3)]), flat(gGreen),
+      ud("TableHub_HoseGround", "Hose ground leads (14 AWG green): the hose clamp to the ground post (~0.1 m), the post to the inlet box's ground nut (~0.3 m) - grounds the hose's steel wire without an outlet", gGreen, "Electronics")]);
+    out.push(...hubCables(tb, fx, T, zm, { I: yI, O: yO, A: yA }, flat));
+    out.push(...hubDevices(fx, T, zm, { I: yI, O: yO, A: yA }, flat));
+    out.push(...hubPanelWiring(flat));
     const ppx = ix, pb = zm;                           // the vac hose leaves the inside stub (along +X)
     // the shop vac + separator (an option on the hub): on the floor under the table (user 2026-11-02), between the legs
     const fz = lg ? new THREE.Box3().setFromObject(lg).min.z : tb.max.z - 34 * IN;
-    const xm = (tb.min.x + tb.max.x) / 2, sep = [xm, yc - 200], vac = [xm, yc + 330];
+    const xm = (tb.min.x + tb.max.x) / 2, sep = [xm, ycVac - 200], vac = [xm, ycVac + 330];
     const black = [0.08, 0.08, 0.09], drum = [0.32, 0.34, 0.37], pail = [0.86, 0.86, 0.83], hoseC = [0.18, 0.19, 0.2];
     const vud = (name, label, color) => ud(name, label, color, "Hose", { floor: true });
     const casters = (x, y, R) => boxesGeo([0, 1, 2, 3].map((k) => { const a = Math.PI / 4 + k * Math.PI / 2, cx = x + R * Math.cos(a), cy = y + R * Math.sin(a);
@@ -1356,10 +1723,24 @@ float lr4G(float x) { float s = 2.0 * fract(x) - 1.0; return floor(x) / 3.0 + (s
     const vacIn = [vac[0], vac[1] - 245, v1 - 70];   // faces the separator (-Y)
     out.push([cylY(r + 4, vacIn[1], vac[1] - 190, vacIn[0], vacIn[2]), flat(black), vud("ShopVac_Inlet", "Shop vac inlet", black)]);
     // the two hoses: port -> separator inlet (the vac's long hose), separator -> vac (the separator's short hose)
-    const hose = (name, label, pts) => {
-      const c = new THREE.CatmullRomCurve3(pts.map((p) => new THREE.Vector3(...p)), false, "centripetal");
+    // Part 53b: each a rope (js/cable_sim.js), settled once (nothing here moves): laid along pts a little longer, both
+    // ends pinned with their directions (the first / last two points), the rest hangs onto the floor, round the bucket,
+    // the drum, the legs, under the table and the hub panel (the bucket only to below its lid: the inlet hose comes in there)
+    const hcols = [{ floor: fz }, { cyl: [sep[0], sep[1], 156, fz, b1 - 20] }, { cyl: [vac[0], vac[1], 210, fz, v1 + 130] },
+      { box: [tb.min.x, tb.min.y, tb.min.z, tb.max.x, tb.max.y, tb.max.z] }, { box: [fx, y0, z0, fx + T, y0 + W, uz] }].concat(LEG_BOXES.map((b) => ({ box: b })));
+    const hose = (name, label, pts, slack = 1.08) => {
+      let c = new THREE.CatmullRomCurve3(pts.map((p) => new THREE.Vector3(...p)), false, "centripetal");
+      if (typeof LR4Cable !== "undefined") {
+        const L = c.getLength() * slack, n = Math.max(10, Math.round(L / 45) + 1), V = (q) => new THREE.Vector3(...q);
+        const rp = LR4Cable.make(c.getPoints(80).map((q) => [q.x, q.y, q.z]), { n, len: L, r: 36, stiff: 0.25, damp: 0.08, iters: 12 }), s = rp.seg;
+        const end = (a, b) => V(a).add(V(b).sub(V(a)).setLength(s)).toArray();   // a segment from a toward b
+        rp.pin(0, pts[0]); rp.pin(1, end(pts[0], pts[1]));
+        rp.pin(-1, pts[pts.length - 1]); rp.pin(-2, end(pts[pts.length - 1], pts[pts.length - 2]));
+        rp.settle(400, hcols);
+        c = new THREE.CatmullRomCurve3(rp.points().map(V), false, "centripetal");
+      }
       out.push([new THREE.TubeGeometry(c, Math.ceil(c.getLength() / 10), 36, 16, false), flat(hoseC, { roughness: 0.7 }),
-        vud(name, `${label}, ~${(c.getLength() / 1000).toFixed(1)} m drawn`, hoseC)]);
+        vud(name, `${label}, ~${(c.getLength() / 1000).toFixed(1)} m as it lies`, hoseC)]);
     };
     // the vac's cord: off its head, along the floor, up under the panel and round to the VAC socket (Part 52c)
     // a limp rope (js/cable_sim.js, Part 53a; user: it went through the floor as a drawn curve): out of the drum's side
@@ -1433,6 +1814,7 @@ float lr4G(float x) { float s = 2.0 * fract(x) - 1.0; return floor(x) / 3.0 + (s
     g.strokeStyle = "rgba(255,255,255,0.18)"; g.lineWidth = 1;
     for (let y = 0; y < c.height; y += 3) { g.beginPath(); g.moveTo(0, y); g.lineTo(c.width, y); g.stroke(); }
     g.fillStyle = "#16171a"; g.textAlign = "center"; g.textBaseline = "middle";
+    if (SWP.panel) { g.font = `bold ${5 * k}px sans-serif`; g.fillText("POWER", X(SWP.lamp), Z(38)); }   // (the hub's 3-gang: the lamp's gang)
     for (const [x, t] of [[SWP.router, "ROUTER"], [SWP.vac, "VAC"]]) {
       g.fillRect(X(x) - 5 * k, Z(12.5), 10 * k, 25 * k);   // the slot
       g.font = `bold ${5 * k}px sans-serif`; g.fillText(t, X(x), Z(38));
@@ -1442,11 +1824,16 @@ float lr4G(float x) { float s = 2.0 * fract(x) - 1.0; return floor(x) / 3.0 + (s
     tex.colorSpace = THREE.SRGBColorSpace;
     return tex;
   }
-  function switchPanelPlace() {                       // the hub option changed: slide the panel to its end (no rebuild)
-    const d = (optsOn().hub ? SWP.cxL : SWP.cxR) - SWP.cx;
-    if (!d || SWP.cx === undefined) return;
-    for (const m of meshes) if (/^SwitchPanel_/.test(m.userData.name || "") && m.userData.base) { m.userData.base.t[0] += d; m.position.x += d; }
-    SWP.cx += d;
+  function switchPanelPlace() {                       // the hub option changed: the panel rebuilt (on the table's front / under it)
+    if (SWP.cx === undefined) return;
+    if (selected && /^SwitchPanel_/.test(selected.userData.name || "")) select(null);
+    meshes = meshes.filter((m) => {
+      if (!/^SwitchPanel_/.test(m.userData.name || "")) return true;
+      scene.remove(m); m.geometry.dispose(); m.material.dispose();
+      return false;
+    });
+    for (const [geo, mat, ud] of switchPanelMeshes()) addMesh(geo, mat, ud);
+    if (typeof applyVisibility === "function") applyVisibility();
   }
   function switchFace() {                             // the panel's face: 4 px a mm, centre = the panel's centre
     const k = 4, c = document.createElement("canvas");

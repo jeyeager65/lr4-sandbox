@@ -123,6 +123,12 @@
     };
     if (meta.hose.cord) cordMesh = cable("Router_Cord_Run", `Router cord (${meta.hose.cord.d} mm), zip-tied along the hose`, [0.07, 0.07, 0.08], 0.6);
     if (meta.hose.cord) reliefMesh = cable("Router_Cord_Relief", "Router cord strain relief (bends with the cord)", [0.06, 0.06, 0.065], 0.5);
+    if (meta.hose.cord) {
+      wireMesh = cable("Core_Wires", "The core's wires, each drawn (X motor 4, X endstop 2, touch plate 2): up the core's -X face, along the router cord, into the Jackpot box's slot to their connectors (GUESS route)", [1, 1, 1], 0.5);
+      wireMesh.material.vertexColors = true;
+      sleeveMesh = cable("Cable_Sleeve", "Cable sleeve (3/8 in PET) over the core's wires, from the top of the core into the Jackpot box (Layers > See through sleeves)", [0.12, 0.12, 0.13], 0.75);
+      hrSleeveClear(HR.sleeveClear);
+    }
     // no cable sleeve for now (user 2026-11-02: "we'll worry about cable sleeves later")
     tieMesh = cable("Hose_ZipTies", "Zip ties (the hose to the upper router mount; hose + router cord to the core's two tie channels and the Min-end holder)", [0.1, 0.1, 0.11], 0.5);
   }
@@ -136,8 +142,11 @@
   // ties (on top of it), the hose a collider; past the clamp to ROUTER (hub) or along to the hose's end. hoseRoute
   // only lays them out and places the pins (and the BOM's lengths). Settles on a jump, a few steps a move.
   const HR = { key: "", hose: null, cord: null, ix: null, cx: null, last: null, segH: 45, segC: 25, slack: 1.05, stretch: 1.15, give: 0.4,
+    wire: null, wireP: null, wireFold: 0, wireD: 7,  // the core's wire bundle (Part 53b): ~7 mm (stepper + 2 two-wire leads; GUESS)
     gk: 0.3 };                                        // gk: the guide's pull a pass (GUESS: enough to keep the shape, loose enough to sag)
-  let reliefMesh = null;
+  let reliefMesh = null, wireMesh = null;
+  // phones (Part 53b): the ropes freeze while the machine moves and settle once when it stops (a move costs ~25 ms here)
+  const HR_PHONE = matchMedia("(pointer: coarse)").matches && Math.min(screen.width, screen.height) < 820;
   // where the cord starts: the strain relief's base on the router (its first segment straight out, the relief's stiff
   // part) - or the old tip (+ its lead) if the router gives no base
   function hrCordStart(dx, dy, dz) {
@@ -299,7 +308,7 @@
     if (!P) return null;
     const hub = hubOn(), key = JSON.stringify([meta.travel, !!hub, hub && HUB.port, U.base, !!cordMesh]);
     let jump = false;
-    if (HR.key !== key || !HR.hose) { HR.key = key; HR.cols = HR.holders = HR.core = null; hrBuild(route, w, dx, P); jump = true; }
+    if (HR.key !== key || !HR.hose) { HR.key = key; HR.cols = HR.holders = HR.core = HR.wire = HR.need = null; hrBuild(route, w, dx, P); jump = true; }
     const hc = HR.hose, s = hc.seg, Pn = w[w.length - 1], dirN = hub ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(0, 0, -1);
     // guided (Part 53, after it flopped off the beam unguided): from the shoe to the clamp each node is pulled softly
     // toward the drag-chain route's point at its share of the length - the shape a stiff hose + the tray walls keep;
@@ -352,19 +361,32 @@
         // takes up exactly the slack (bisection on its low point)
         const E = new THREE.Vector3(...G[G.length - 1]), Bq = new THREE.Vector3(HUB.outlet.router[0] - 31, HUB.outlet.router[1], HUB.outlet.router[2]);
         const lg = meshes.find((m) => m.userData.name === "TableLegs"), fl = lg ? new THREE.Box3().setFromObject(lg).min.z : Bq.z - 700;
-        const yr = Bq.y - 16, xi = Bq.x - 40, xo = Bq.x - 150;
-        const path = (zl) => new THREE.CatmullRomCurve3([E, new THREE.Vector3(xo, (E.y + yr) / 2, Math.max(zl + 80, (E.z + zl) / 2)),
-          new THREE.Vector3(xo, yr, zl + 60), new THREE.Vector3((xi + xo) / 2, yr, zl), new THREE.Vector3(xi, yr, zl + 60),
-          new THREE.Vector3(xi, yr, Bq.z - 70), new THREE.Vector3(Bq.x - 22, Bq.y, Bq.z - 8), Bq], false, "centripetal");
+        // close to the table (user 2026-11-03: "closer to the table instead of on the hose"), and a natural hang (user:
+        // "this point ... doesn't make sense" - a sharp fold at the U's bottom): the U in the panel's plane, along its
+        // face - down a leg toward the back, a round bottom (r 45), up into ROUTER; slack the U can't take (the gantry
+        // near the hub) lengthens its bottom along the floor
+        const yr = Bq.y - 16, xi = Bq.x - 20, cr2 = c.d / 2, RU = 45, s45 = 0.29;
+        const path = (zl, Lf = 0) => {
+          const yD = yr + 2 * RU + Lf, V3 = (y, z) => new THREE.Vector3(xi, y, z);
+          return new THREE.CatmullRomCurve3([E, new THREE.Vector3((E.x + xi) / 2, (E.y + yD) / 2, Math.max(zl + 140, (E.z + zl) / 2)),
+            V3(yD, zl + RU), V3(yD - s45 * RU, zl + s45 * RU), V3(yD - RU, zl), ...(Lf > 1 ? [V3(yr + RU, zl)] : []),
+            V3(yr + s45 * RU, zl + s45 * RU), V3(yr, zl + RU), V3(yr, Bq.z - 70), new THREE.Vector3(Bq.x - 22, Bq.y, Bq.z - 8), Bq], false, "centripetal");
+        };
         const gA = hrArc(G.map((q) => new THREE.Vector3(...q))), want = HR.cord.len * 0.997 - gA[gA.length - 1];
-        let lo = fl + 15, hi = Bq.z - 130;
+        let lo = fl + cr2, hi = Bq.z - 130;
         for (let it = 0; it < 22; it++) { const m = (lo + hi) / 2; if (path(m).getLength() > want) lo = m; else hi = m; }
         // no slack for a U (the far Y stop): straight in from the beam, up into the plug from below-front
-        const direct = new THREE.CatmullRomCurve3([E, new THREE.Vector3(xi, yr, Math.min(E.z, Bq.z) - 110), new THREE.Vector3(xi, yr, Bq.z - 70),
+        const direct = new THREE.CatmullRomCurve3([E, new THREE.Vector3(xi, yr + RU, Math.min(E.z, Bq.z) - 110), new THREE.Vector3(xi, yr, Bq.z - 70),
           new THREE.Vector3(Bq.x - 22, Bq.y, Bq.z - 8), Bq], false, "centripetal");
-        const cur = path(hi).getLength() > want ? direct : path(Math.max(fl + 15, (lo + hi) / 2));
+        let cur = path(hi).getLength() > want ? direct : path(Math.max(fl + cr2, (lo + hi) / 2));
+        if (path(fl + cr2).getLength() < want) {       // more than the U holds: the hairpin on the floor
+          let a0 = 0, a1 = 3000;
+          for (let it = 0; it < 22; it++) { const m = (a0 + a1) / 2; if (path(fl + cr2, m).getLength() < want) a0 = m; else a1 = m; }
+          cur = path(fl + cr2, (a0 + a1) / 2);
+        }
         G = G.concat(cur.getPoints(40).slice(1).map(hrV));
         HR.tailGuided = true;
+        HR.cordE = E.toArray();                       // (the supply's cord joins it here: hrPowerMeshes)
       }
       const CORE_SIDE = new THREE.Vector3(0, 0.62, -0.78).normalize(), cr = r + c.d / 2 + 0.5;   // low at the back: just over the core's back edge (user: lower)
       {                                                // the whole core run on that side (user: low along the back, blue line),
@@ -421,7 +443,7 @@
       if (!HR.cord) {                                   // laid along the path (+ down to the plug), a little slack
         const lay = G.map((q) => new THREE.Vector3(...q));
         // the guided part + a little slack; the hanging tail (hub) long enough for the far Y stop (it stretched 1.6x there)
-        const Ee = lay[tailFrom - 1], tl = B ? Math.max(...meta.travel.y.map((yv) => Math.hypot(Ee.x - B.x, Ee.y + (yv - dy) - B.y, Ee.z - B.z))) * 1.3 + 300 : 0;
+        const Ee = lay[tailFrom - 1], tl = B ? Math.max(...meta.travel.y.map((yv) => Math.hypot(Ee.x - B.x, Ee.y + (yv - dy) - B.y, Ee.z - B.z))) * 1.15 + 150 : 0;
         const la = hrArc(lay), L = B ? gArc[tailFrom - 1] * 1.03 + tl : la[la.length - 1] * 1.03, n = Math.max(20, Math.round(L / HR.segC) + 1);
         HR.cord = LR4Cable.make(lay.map(hrV), { n, len: L, r: c.d / 2, stiff: 0.3, damp: 0.08, iters: 8 });   // stiff enough for smooth, rounded bends only
         HR.cG = Math.round(gL / L * (n - 1));          // the guided nodes: 0 .. cG
@@ -462,8 +484,140 @@
       HR.cordJump = false;
       if (fresh && hub) { HR.cordJump = true; return hoseRopes(route, w, dx, dy, dz); }   // again, now with its tail's path (it needs the cord's length)
       cp = cc.points();
+      hrWires(hp, cp, dy, dz);
     }
     return { hp, cp };
+  }
+  // ---- Part 53b: the core's wires (X motor, X endstop, touch plate). Through the core as V1E's core assembly docs
+  // (cl-ct) and the Core STL (sections / ray maps 2026-11-02, user: "this isn't where the endstop and touchplate wires
+  // run"): the touch plate's wire in at its hole beside the tool mount (straight through the wall front to back at
+  // X 549, Z 134.5), along the TUNNEL in the back of the wall (a ~3 x 12 mm slot at Y 674, Z 133-146, X 425-545) to the
+  // -X end; the X endstop's (on the back face at that end) in there too; both out to the front through the OPENING under
+  // the stepper (X 431-444, Z 152-158, through the wall) - "guide the black plug through the opening at the front side
+  // of the core"; then "run all the wires together up from behind the stepper" (the 6-10 mm gap between its back and the
+  // wall), the motor's leads joining above it; over the top onto the router cord (V1E w6-w8: bundled with it), beside it
+  // on the hose (tied: the settled cord's shape, no sim) round the U-turn to the lower run just past the Jackpot box,
+  // then a limp rope into the box's wire slot in its +X wall (JP3_SLOT), settled once a scene in the beam's frame.
+  // HR.wireP: the opening's front -> the slot; HR.wireJ: where the motor's leads join (HR.wireMotor: its plug -> there);
+  // HR.wirePre.stop / .probe: each wire's way to the opening's front; HR.wireFold: where it leaves the cord. GUESS bits:
+  // the exact paths inside the tunnel / gap (no LR4 to check).
+  // WCORE: points in mm off the Core's bounding-box min (415.5, 609.8, 68.8 as built)
+  const WCORE = { holeF: [133.5, 40.2, 65.7], holeB: [133.5, 64.2, 65.7], tunE: [128, 64.2, 70.5], tunW: [24.5, 64.2, 71],
+    stopUp: [14.5, 64.2, 79], openB: [21.5, 62, 86.2], openF: [21.5, 40.2, 86.2],
+    // up behind the stepper (its back y 658 / the wall's front 664-668, z 170-215), out over its top, up the wall's
+    // sloping front to the core's top
+    up: [[21.5, 51.2, 99.5], [21.5, 52, 143.5], [21.5, 45.5, 157.5], [21.5, 50.5, 169.5], [21.5, 60, 181.5], [21.5, 72, 195]],
+    join: 2 };                                         // the motor's leads join at up[join] (just over the stepper)
+  // JP3_SLOT: the box's wire slot, ~10 x 18 mm in its +X wall, center mm off the box's min (y, z) (section_map 2026-11-02)
+  const JP3_SLOT = { y: 31, z: 19 };
+  function hrMerge(gs) {                               // indexed geometries with position / normal / uv -> one
+    const at = { position: [], normal: [], uv: [] }, idx = [];
+    if (gs.every((g) => g.getAttribute("color"))) at.color = [];
+    let base = 0;
+    for (const g of gs) {
+      for (const k in at) at[k].push(...g.getAttribute(k).array);
+      for (const i of g.index.array) idx.push(i + base);
+      base += g.getAttribute("position").count;
+      g.dispose();
+    }
+    const m = new THREE.BufferGeometry();
+    m.setAttribute("position", new THREE.Float32BufferAttribute(at.position, 3));
+    m.setAttribute("normal", new THREE.Float32BufferAttribute(at.normal, 3));
+    m.setAttribute("uv", new THREE.Float32BufferAttribute(at.uv, 2));
+    if (at.color) m.setAttribute("color", new THREE.Float32BufferAttribute(at.color, 3));
+    m.setIndex(idx);
+    return m;
+  }
+  function hrWires(hp, cp, dy, dz) {
+    HR.wireP = HR.wireMotor = HR.wirePre = null;
+    const mesh = (nm) => meshes.find((m) => m.userData.name === nm && m.visible !== false);
+    const box = mesh("Jackpot3_Box"), core = mesh("Core"), plug = mesh("X_Stepper_Plug");
+    if (!box || !core || !wireMesh || !HR.cx || !cp) return;
+    const R = meta.hose.od / 2, cd = meta.hose.cord.d, wr = HR.wireD / 2, rr = R + wr + 0.5, dl = (cd / 2 + wr) / (R + cd / 2);
+    const cb = new THREE.Box3().setFromObject(core), bx = new THREE.Box3().setFromObject(box);
+    const C0 = (q) => new THREE.Vector3(cb.min.x + q[0], cb.min.y + q[1], cb.min.z + q[2]);
+    const trunk = [C0(WCORE.openF)].concat(WCORE.up.map(C0)), J1 = trunk[trunk.length - 1];
+    // the cord nodes it rides: from the one nearest the core's top (round the core's corner) out, round the U-turn, back along the
+    // lower run to the one nearest just past the box (between it and the next brace)
+    const dJ = (k) => Math.hypot(cp[k][0] - J1.x, cp[k][1] - J1.y, cp[k][2] - J1.z);
+    let kj = 0, ku = HR.cx.t1;
+    for (let k = 1; k <= HR.cx.t1; k++) if (dJ(k) < dJ(kj)) kj = k;
+    for (let k = HR.cx.t1; k <= HR.cx.cl; k++) if (cp[k][0] > cp[ku][0]) ku = k;
+    // where it leaves the cord (user 2026-11-02: "drop down through the prior brace before going to the Jackpot box"): just
+    // past the brace on the box's far side (toward the core), then down through that brace's window to the box's slot
+    const brs = meshes.filter((m) => /^Brace_(\d+|Max)$/.test(m.userData.name || "") && m.visible !== false).map((m) => new THREE.Box3().setFromObject(m))
+      .filter((b) => b.min.x > bx.max.x).sort((p, q) => p.min.x - q.min.x), br = brs[0] || null;
+    // it leaves at the brace before that one (user: "start dropping at the prior brace") and slopes down from there
+    const br2 = brs[1] || null, Xl = br2 ? br2.min.x - 4 : br ? br.max.x + 22 : bx.max.x + 25;
+    let kl = ku;
+    for (let k = ku; k <= HR.cx.cl; k++) if (Math.abs(cp[k][0] - Xl) < Math.abs(cp[kl][0] - Xl)) kl = k;
+    const out = trunk.slice(), C = new THREE.Vector3(), A = new THREE.Vector3(), T = new THREE.Vector3(), a = new THREE.Vector3(), ab = new THREE.Vector3(), n = new THREE.Vector3();
+    for (let i = kj; i <= kl; i++) {
+      C.set(...cp[i]);
+      let bd = 1e9;                                    // the hose's axis nearest this cord node, and its way there
+      for (let k = 1; k < hp.length; k++) {
+        a.set(...hp[k - 1]); ab.set(...hp[k]).sub(a);
+        const u = Math.max(0, Math.min(1, n.copy(C).sub(a).dot(ab) / (ab.lengthSq() || 1)));
+        n.copy(a).addScaledVector(ab, u);
+        const d = n.distanceTo(C);
+        if (d < bd) { bd = d; A.copy(n); T.copy(ab).normalize(); }
+      }
+      const e = C.clone().sub(A); e.addScaledVector(T, -e.dot(T));
+      if (bd > R + cd + 4 || e.lengthSq() < 1e-6) { out.push(C.clone().add(new THREE.Vector3(0, 0, cd / 2 + wr))); continue; }   // off the hose (on the core): on top of the cord
+      e.normalize();
+      const s = T.clone().cross(e); if (s.z < 0) s.negate();   // beside the cord, on its upper side
+      out.push(A.clone().add(e.multiplyScalar(Math.cos(dl)).addScaledVector(s, Math.sin(dl)).multiplyScalar(rr)));
+    }
+    for (let pass = 0; pass < 3; pass++)              // smooth (the on-hose / on-core offsets meet at the corner: lumps)
+      for (let i = trunk.length; i < out.length - 1; i++) out[i] = out[i - 1].clone().add(out[i + 1]).multiplyScalar(0.25).addScaledVector(out[i], 0.5);
+    const Lv = out[out.length - 1], H =new THREE.Vector3(bx.max.x - 2, bx.min.y + JP3_SLOT.y, bx.min.z + JP3_SLOT.z);
+    if (!HR.wire) {                                    // the drop, once a scene: through the brace's window, into the slot square to the wall (-X)
+      // the window (Brace_x, rays along X 2026-11-02): open over y min+36..min+88, z min+38..min+98 (a plate with an arched
+      // opening); the wire through its middle, pinned there
+      // it lies on the window's bottom edge (user 2026-11-03: "more gradual and less droopy ... lay on the bottom of the
+      // brace"): a straight slope down from the brace before to there (a taut rope sagged 4 mm below it between the
+      // braces), then a smooth curve, level into the slot
+      const Wb = br ? new THREE.Vector3(br.min.x, br.min.y + 64, br.min.z + 38 + wr + 0.5) : Lv.clone().lerp(H, 0.6);
+      const sl = Wb.clone().sub(Lv), pts = [];
+      for (let i = 0, m = Math.max(2, Math.round(sl.length() / 12)); i < m; i++) pts.push(Lv.clone().addScaledVector(sl, i / m));
+      const c1 = Wb.clone().addScaledVector(sl.clone().normalize(), Math.min(30, Wb.distanceTo(H) / 2)), c2 = H.clone().add(new THREE.Vector3(Math.min(30, Wb.distanceTo(H) / 2), 0, 0));
+      const bz = new THREE.CubicBezierCurve3(Wb, c1, c2, H);
+      for (let i = 0, m = Math.max(3, Math.round(bz.getLength() / 8)); i <= m; i++) pts.push(bz.getPoint(i / m));
+      HR.wire = { pts, dy, dz };
+    }
+    const o = new THREE.Vector3(0, dy - HR.wire.dy, dz - HR.wire.dz);
+    HR.wireP = out.concat(HR.wire.pts.slice(1).map((q) => q.clone().add(o)));
+    HR.wireFold = out.length - 1;
+    HR.wireJ = 1 + WCORE.join;
+    if (plug) {                                        // the motor's lead: out of its plug, up and back over the stepper to the join
+      const P = new THREE.Box3().setFromObject(plug).getCenter(new THREE.Vector3()), Jn = HR.wireP[HR.wireJ];
+      HR.wireMotor = [P, P.clone().add(new THREE.Vector3(-3, 0, 14)), Jn.clone().add(new THREE.Vector3(-14, -6, 3)), Jn];
+      // its 4 leads (the build's 12 mm stubs, hidden while these draw - panel.js): each wire starts at its stub's base and
+      // carries on its way (up), so they come out of the plug (user 2026-11-02: "deal with the short wires on the steppers")
+      // each stub's own shape (hw.nema17: out of the bushing 1.5, a quarter bend r 3, then up the body; the stepper sits a
+      // little turned): its root = the mean of its vertices nearest the body, its tip = of those at its far end (world)
+      const first = !HR.wireLeads;
+      HR.wireLeads = {};
+      for (const c of ["Red", "Green", "Blue", "Black"]) {
+        const lm = meshes.find((m) => m.userData.name === "X_Stepper_Lead_" + c);   // (hidden: these draw instead)
+        if (!lm) continue;
+        lm.updateMatrixWorld();
+        const pa = lm.geometry.getAttribute("position"), vs = [], v = new THREE.Vector3();
+        for (let i = 0; i < pa.count; i++) vs.push(v.fromBufferAttribute(pa, i).clone().applyMatrix4(lm.matrixWorld));
+        const P = HR.wireP[0], mean = (f) => { const q = vs.filter(f); return q.reduce((a, b) => a.add(b), new THREE.Vector3()).multiplyScalar(1 / (q.length || 1)); };
+        const zt = Math.max(...vs.map((q) => q.z)), zb = Math.min(...vs.map((q) => q.z));
+        const tip = mean((q) => q.z > zt - 0.4), lowEnd = vs.filter((q) => q.z < zb + 1.4);
+        const far = Math.max(...lowEnd.map((q) => q.distanceTo(tip)));   // the root: the low end farthest from the tip
+        const root = mean((q) => q.z < zb + 1.4 && q.distanceTo(tip) > far - 0.6);
+        root.z = Math.min(...lowEnd.map((q) => q.z)) + 0.6;   // on its axis (the wire's r 0.6)
+        HR.wireLeads[c] = { root, tip };
+      }
+      if (first && typeof applyVisibility === "function") applyVisibility();   // the stubs off (panel.js), once known
+    }
+    const es = mesh("Endstop_X"), oB = C0(WCORE.openB);
+    HR.wirePre = {                                     // each one's way to the opening's front (HR.wireP[0]), not incl. it
+      stop: es ? [new THREE.Box3().setFromObject(es).getCenter(new THREE.Vector3()), C0(WCORE.stopUp), oB] : [oB],
+      probe: [C0(WCORE.holeF), C0(WCORE.holeB), C0(WCORE.tunE), C0(WCORE.tunW), oB] };
   }
   // the strain relief: a tube tapering r0 -> r1 over the curve's first L mm (it bends with the cord; user 2026-11-02)
   function hrTaper(curve, L, r0, r1) {
@@ -521,12 +675,22 @@
   }
   function hrStrapFlat(C, r, M) {                      // C: the hose axis at the tie height; M.path: the channel's ends ([x, y] off it)
     const Z = new THREE.Vector3(0, 0, 1), [E, F] = M.path, pts = [], P = (x, y) => C.clone().add(new THREE.Vector3(x, y, 0));
-    const aF = Math.atan2(F[1], F[0]), aE = Math.atan2(E[1], E[0]);   // the channel's out end, its in end
+    // like a real zip tie (user 2026-11-03: "a zip tie doesn't do right angles"): out of each channel end along the
+    // channel, a smooth curve tangent to it AND to the hose, then round the hose's far side (the long way, angle rising)
+    const R = r + ZT.t / 2 + 0.3, u = new THREE.Vector2(F[0] - E[0], F[1] - E[1]).normalize();
+    const tg = (q, s) => { const d = Math.hypot(q[0], q[1]); return Math.atan2(q[1], q[0]) + s * Math.acos(Math.min(1, R / Math.max(d, R))); };
+    const aF = tg(F, 1), aE = tg(E, -1);                 // where it meets the hose, past the out end / before the in end
+    const on = (a) => [R * Math.cos(a), R * Math.sin(a)], dir = (a) => [-Math.sin(a), Math.cos(a)];
+    const bz = (p0, t0, p1, t1) => {                    // p0 -> p1, leaving along t0, arriving along t1
+      const L = Math.hypot(p1[0] - p0[0], p1[1] - p0[1]) / 3, c = new THREE.CubicBezierCurve(new THREE.Vector2(...p0),
+        new THREE.Vector2(p0[0] + t0[0] * L, p0[1] + t0[1] * L), new THREE.Vector2(p1[0] - t1[0] * L, p1[1] - t1[1] * L), new THREE.Vector2(...p1));
+      return c.getPoints(10).slice(1, -1).map((v) => P(v.x, v.y));
+    };
+    let span = aE - aF; while (span <= 0) span += 2 * Math.PI;
     pts.push(P(E[0], E[1]), P(F[0], F[1]));             // through the channel
-    for (let k = 0; k <= 40; k++) {                     // round the hose the long way (its far side), back to the channel
-      const a = aF + (aE + 2 * Math.PI - aF) * k / 40, R = r + ZT.t / 2 + 0.3;
-      pts.push(P(R * Math.cos(a), R * Math.sin(a)));
-    }
+    pts.push(...bz(F, [u.x, u.y], on(aF), dir(aF)));
+    for (let k = 0; k <= 40; k++) pts.push(P(...on(aF + span * k / 40)));
+    pts.push(...bz(on(aE), dir(aE), E, [u.x, u.y]));
     return hrSweep(pts, Z, null);
   }
   function hrSweep(raw, W, head) {                      // a closed strap along raw (smoothed: it rounds into / out of the slots), its width along W
@@ -571,6 +735,11 @@
     return g;
   }
   function updateHose(dx, dy, dz) {
+    if (HR_PHONE && HR.hose && !HR.quick && !HR.now) {   // phones: frozen while it moves, settled once 250 ms after it stops
+      HR.pend = [dx, dy, dz]; clearTimeout(HR.timer);
+      HR.timer = setTimeout(() => { HR.now = true; try { if (hoseMesh) updateHose(...HR.pend); } finally { HR.now = false; } }, 250);
+      return;
+    }
     const route = hoseRoute(meta.hose, dx, dz), w = hrWorld(route, dy, dz), R = hoseRopes(route, w, dx, dy, dz);
     const pts = R ? R.hp.map((q) => new THREE.Vector3(...q)) : w;
     const curve = new THREE.CatmullRomCurve3(pts, false, "centripetal");
@@ -586,11 +755,167 @@
       if (reliefMesh && rl && meta.hose.cord.base) { reliefMesh.geometry.dispose(); reliefMesh.geometry = hrTaper(cc, rl.l + 5, rl.d / 2, rl.cd / 2 + 0.6); }
     }
     if (tieMesh && R) { tieMesh.geometry.dispose(); tieMesh.geometry = hrTies(R.hp); }
+    if (wireMesh) hrWireMeshes(R && HR.wireP);
+    hrPowerMeshes(R && R.cp);
+  }
+  // ---- the core's wires drawn one by one (user 2026-11-02: "run separately", see through the sleeves): each wire its
+  // own tube in its colour, at its own place across the bundle (packed in the sleeve), from its own start (the motor's
+  // 4 off its plug up behind the stepper; the endstop's pair off the switch; the touch plate's pair out of the tunnel)
+  // along the bundle's path, out of the slot inside the box to its own connector. The sleeve (3/8" PET, V1E's): over the
+  // bundle from the top of the core's -X face into the box's slot; Layers > See through sleeves makes it clear.
+  const WIRE_SET = [   // run, colour, r (mm), [across, up] in the bundle (mm)
+    // the motor's 4 in the stubs' order (hw.nema17: red, green, blue, black side by side; user: "the same color order")
+    ["motor", [0.8, 0.1, 0.1], 0.6, [-1.9, 0.6], "Red"], ["motor", [0.1, 0.6, 0.25], 0.6, [-0.6, 0.6], "Green"],
+    ["motor", [0.12, 0.3, 0.85], 0.6, [0.6, 0.6], "Blue"], ["motor", [0.05, 0.05, 0.05], 0.6, [1.9, 0.6], "Black"],
+    ["stop", [0.8, 0.1, 0.1], 0.6, [3.4, 0.6]], ["stop", [0.05, 0.05, 0.05], 0.6, [3.4, -0.9]],
+    ["probe", [0.85, 0.12, 0.12], 1.0, [-3.3, 0.6]], ["probe", [0.05, 0.05, 0.05], 1.0, [-1.0, -3.3]]];
+  const WIRE_TO = { motor: "jp3.motor.X", stop: "jp3.in.25", probe: "jp3.in.36" };
+  const SLEEVE_R = 4.9;                                 // 3/8" sleeve over the wires
+  // ---- the 24 V supply's cables, drawn (user 2026-11-03: "I still don't see the wires"): its mains cord and its 24 V
+  // lead. With the hub: the cord from the CONTROLLER plug tied along the router cord - up its tail to the beam's end,
+  // to the Min-end clamp, then along the hose's lower run in the holders past the middle one (Hose_Holder_Shorty_2,
+  // by the brick's far end), then a loop back under into the side of the brick's far end (user: "run with the router
+  // cord past the middle hose guide, then loop around under to the side of the power brick"); else the Wiring layer's
+  // route as it hangs (wrDrawn). The lead: one black cable out of the brick's near end to the box's +X slot, split into
+  // red + black inside to the power terminal (user: "comes out of the brick as a black wire before splitting").
+  let PWR_MESH = null;                                 // { cord, red, black }
+  function hrPowerMeshes(cp) {
+    if (typeof wrPath !== "function" || typeof LR4Wiring === "undefined") return;
+    const V = (x, y, z) => new THREE.Vector3(x, y, z), hub = optsOn().hub, runs = LR4Wiring.runsFor(hub);
+    const ac = runs.find((r) => r.id === "psu-ac"), dc = runs.find((r) => r.id === "psu-dc");
+    if (!PWR_MESH) {
+      const mk = (name, label, c) => { const m = addMesh(new THREE.BufferGeometry(), material(c), { name, label, group: "Electronics", motion: "hose", source: "hardware", color: c }); return m; };
+      PWR_MESH = { cord: mk("PSU_MainsCord", "24 V supply's mains cord (with the hub: from the CONTROLLER socket, tied along the router cord to the beam's end, then along the braces to the supply's far end)", [0.06, 0.06, 0.065]),
+        red: mk("PSU_Lead24V", "24 V lead (+, red): the supply's near end into the Jackpot's power terminal", [0.75, 0.08, 0.06]),
+        black: mk("PSU_Lead0V", "24 V lead (-, black)", [0.05, 0.05, 0.06]),
+        lead: mk("PSU_LeadCable", "24 V lead: the supply's own 2-core cable (black jacket) to the Jackpot box, split into red / black inside", [0.07, 0.07, 0.075]) };
+    }
+    const tube = (m, pts, r) => {
+      const q = pts.filter((p, i) => i === 0 || p.distanceTo(pts[i - 1]) > 1);
+      m.geometry.dispose();
+      if (q.length < 2) { m.geometry = new THREE.BufferGeometry(); m.geometry.setAttribute("position", new THREE.Float32BufferAttribute([], 3)); m.visible = false; return; }
+      const c = new THREE.CatmullRomCurve3(q, false, "centripetal");
+      m.geometry = new THREE.TubeGeometry(c, Math.max(8, Math.ceil(c.getLength() / 6)), r, 8, false);
+      m.visible = true;
+    };
+    const p = ac && wrPath(ac);
+    let pts = null;
+    const brick = meshes.find((m) => m.userData.name === "PSU_24V"), guide = meshes.find((m) => m.userData.name === "Hose_Holder_Shorty_2");
+    if (p && hub && cp && HR.cordE && HR.cx && HR.cx.cl !== undefined && brick && typeof HUB !== "undefined" && HUB.outlet && HUB.outlet.psu) {
+      const E = V(...HR.cordE), pb = new THREE.Box3().setFromObject(brick), F = wrEnd(ac.to);   // F: the brick's far end
+      const xg = guide ? new THREE.Box3().setFromObject(guide).max.x + 8 : F.x + 40;          // just past the middle guide
+      let kE = HR.cx.cl; cp.forEach((q, i) => { if (i > HR.cx.cl && V(...q).distanceTo(E) < V(...cp[kE]).distanceTo(E)) kE = i; });
+      // the hose's lower run back from the clamp (its x rising, toward the U-turn), as far as the middle guide
+      let kS = HR.cx.cl;
+      while (kS > 0 && cp[kS - 1][0] >= cp[kS][0] - 1 && cp[kS][0] < xg) kS--;
+      const run = cp.slice(kS, kE + 1).map((q) => V(...q).add(V(0, 0, 8)));          // on top of the router cord, along the beam
+      if (run[0].x < xg) run.unshift(V(xg, run[0].y, run[0].z));                      // (the U-turn short of it: on along the holders)
+      const S = run[0];
+      // a wide, gradual loop past the guide, back into the brick's end level - above the bottom strut plate it sits on
+      // (user 2026-11-03: "goes down at a sharp angle and goes through the bottom strut plate")
+      // and through the window of the brace between them (open y min+36..88, z min+38..98: the core wires' sleeve's too)
+      const zF = Math.max(F.z, pb.min.z + 8);
+      const bw = meshes.filter((m) => /^Brace_(\d+|Max)$/.test(m.userData.name || "")).map((m) => new THREE.Box3().setFromObject(m))
+        .find((b) => b.min.x > F.x - 1 && b.max.x < xg + 10);
+      const win = bw ? [bw.min.x - 10, bw.min.x + 2, bw.max.x - 2, bw.max.x + 10].map((x) => V(x, bw.min.y + 62, bw.min.z + 60)) : [];   // straight through it
+      const W1 = win.length ? win[1] : V(F.x + 30, F.y, zF + 10);
+      const loop = [V(F.x, F.y, zF), V(F.x + 6, F.y - 4, zF + 2), ...win, V(xg + 30, (W1.y + S.y) / 2, (W1.z + S.z) / 2), V(xg + 18, S.y, S.z - 12)];
+      const tail = cp.slice(kE).map((q) => V(...q).add(V(-11, 0, 0)));               // beside it, outside (away from the panel)
+      // with it down and round the bottom of its U (in the panel's plane), on along the bottom past where it turns up
+      // into ROUTER, then its own round turn up into CONTROLLER (further toward the front) - user 2026-11-03
+      const zMin = Math.min(...tail.map((q) => q.z));
+      let kB = tail.length - 1; while (kB > 1 && tail[kB].z > zMin + 3) kB--;            // the bottom's last point (it rises after)
+      const t2 = tail.slice(1, kB + 1), B0 = t2[t2.length - 1], P = V(...HUB.outlet.psu).add(V(-31, 0, 0)), xu = B0.x, R2 = 40;
+      const yT = Math.min(B0.y - 10, P.y + R2);
+      pts = [...loop, ...run, ...t2, V(xu, yT, B0.z), V(xu, P.y + 0.29 * R2, B0.z + 0.29 * R2), V(xu, P.y, B0.z + R2),
+        V(xu, P.y, P.z - 70), V(P.x - 12, P.y, P.z - 8), P];
+    } else if (p) pts = typeof wrDrawn === "function" && typeof wrLen === "function" ? wrDrawn(ac, p, wrLen(p)) : p;
+    tube(PWR_MESH.cord, pts || [], 3.5);
+    const d = dc && wrPath(dc);                       // [near end, outside the slot, in the slot, ..., the terminal]
+    tube(PWR_MESH.lead, d ? d.slice(0, 3).concat(d[2].clone().add(V(-6, 0, 0))) : [], 2.4);
+    const pr = d ? [d[2].clone().add(V(-6, 0, 0)), ...d.slice(3)] : [];
+    tube(PWR_MESH.red, pr.map((q, i) => q.clone().add(V(0, 0, i ? 1.4 : 0.6))), 1.1);
+    tube(PWR_MESH.black, pr.map((q, i) => q.clone().add(V(0, 0, i ? -1.4 : -0.6))), 1.1);
+  }
+  function hrWireMeshes(on) {
+    const empty = () => new THREE.BufferGeometry().setAttribute("position", new THREE.Float32BufferAttribute([], 3));
+    wireMesh.geometry.dispose();
+    if (sleeveMesh) sleeveMesh.geometry.dispose();
+    if (!on) { wireMesh.geometry = empty(); if (sleeveMesh) sleeveMesh.geometry = empty(); return; }
+    if (typeof wrBoard === "function") wrBoard();      // the stand-in board + the ESP32's keep-out under the wires' ends
+    const V = (...a) => new THREE.Vector3(...a), P = HR.wireP, trunk = new THREE.CatmullRomCurve3(P, false, "centripetal");
+    const N = Math.max(8, Math.ceil(trunk.getLength() / 10)), S = trunk.getSpacedPoints(N), F = trunk.computeFrenetFrames(N, false);
+    let k1 = 0;                                       // the trunk's sample where the motor's leads join (the sleeve starts there)
+    S.forEach((q, i) => { if (q.distanceTo(P[HR.wireJ]) < S[k1].distanceTo(P[HR.wireJ])) k1 = i; });
+    const off = (i, o) => S[i].clone().addScaledVector(F.normals[i], o[0]).addScaledVector(F.binormals[i], o[1]);
+    const box = meshes.find((m) => m.userData.name === "Jackpot3_Box"), bq = box ? box.getWorldQuaternion(new THREE.Quaternion()) : new THREE.Quaternion();
+    // each wire to its own pin (user 2026-11-02): the header's pins 2.54 mm apart, centred on the spot - along the PCB's
+    // x for a motor's 4 (wiring.js wrBoard's blocks: 10.2 mm that way), along its y for an input's 2. Pin order: the
+    // WIRE_SET order (GUESS - the stepper's colour order varies; match your lead to the board's A+ A- B+ B- label)
+    const PCB = LR4Wiring.JP3.pcb, seen = {}, up = V(...PCB.n).applyQuaternion(bq);   // up: off the board's top
+    const spot = (id, k) => { const s = LR4Wiring.JP3.spots[id], at = wrEnd({ board: id }); if (!at) return null;
+      const ax = V(...(/motor/.test(id) ? PCB.x : PCB.y)).applyQuaternion(bq);
+      return { at: at.addScaledVector(ax, (k - (s.pins - 1) / 2) * 2.54), out: V(...s.out).applyQuaternion(bq) }; };
+    const geos = [];
+    for (const [run, rgb, r, o, lead] of WIRE_SET) {
+      const k = seen[run] = (seen[run] === undefined ? 0 : seen[run] + 1);   // this wire's pin on its header
+      let pts = [];
+      const lb = lead && HR.wireLeads && HR.wireLeads[lead];
+      if (run === "motor" && lb) {                    // out of the side like the stubs (user): out 1.5, the bend, up - in a row
+        const d = lb.tip.clone().sub(lb.root).setZ(0).normalize(), p1 = lb.root.clone().addScaledVector(d, 5), pc = p1.clone().add(V(0, 0, 3));
+        pts = [lb.root, lb.root.clone().addScaledVector(d, 2.5), p1];   // out of the plug's outer face, level
+        for (const t of [0.3, 0.6, 0.9, 1.2, Math.PI / 2]) pts.push(pc.clone().addScaledVector(d, 3 * Math.sin(t)).add(V(0, 0, -3 * Math.cos(t))));
+        const p2 = pts[pts.length - 1], up = lb.tip.clone().sub(p2).normalize(), Jn = P[HR.wireJ];
+        for (const h of [6, 12, 18]) pts.push(p2.clone().addScaledVector(up, h));   // up the body's side, still side by side
+        void Jn;                                       // then on to the bundle at the join (its next points)
+      }
+      else if (run === "motor" && HR.wireMotor) pts = HR.wireMotor.slice(0, 2).map((q) => q.clone().add(V(0, o[0] * 0.6, o[1] * 0.6)));
+      else if ((run === "stop" || run === "probe") && HR.wirePre) pts = HR.wirePre[run].map((q) => q.clone().add(V(o[0] * 0.25, 0, o[1] * 0.25)));   // through the tunnel / opening
+      for (let i = run === "motor" ? k1 : 0; i <= N; i++) pts.push(off(i, o));
+      const sp = spot(WIRE_TO[run], k), end = pts[pts.length - 1];
+      // straight down into the connector's top (user 2026-11-02), each onto its own pin: square to the board
+      if (sp) pts.push(end.clone().add(V(-14, 0, 0)), ...hrBoxRoute(run, o), sp.at.clone().addScaledVector(up, 14), sp.at.clone().addScaledVector(up, 6), sp.at.clone().addScaledVector(up, 1), sp.at);
+      const c = new THREE.CatmullRomCurve3(pts, false, "centripetal"), g = new THREE.TubeGeometry(c, Math.max(6, Math.ceil(c.getLength() / (lb ? 4 : 10))), r, 6, false);
+      const col = new THREE.Color().setRGB(...rgb).convertSRGBToLinear(), n = g.getAttribute("position").count, ca = new Float32Array(n * 3);
+      for (let j = 0; j < n; j++) col.toArray(ca, j * 3);
+      g.setAttribute("color", new THREE.BufferAttribute(ca, 3));
+      geos.push(g);
+    }
+    wireMesh.geometry = hrMerge(geos);
+    if (sleeveMesh) {
+      const sc = new THREE.CatmullRomCurve3(S.slice(k1 + 2, N - 1), false, "centripetal");
+      sleeveMesh.geometry = new THREE.TubeGeometry(sc, Math.ceil(sc.getLength() / 8), SLEEVE_R, 12, false);
+    }
+  }
+  { const c = document.getElementById("lay-sleeve"); if (c) c.addEventListener("change", () => hrSleeveClear(c.checked)); }
+  // inside the Jackpot box, from the slot (its +X wall, in front of the board's motor edge) to each header - round the
+  // board's edges, not across it: the ESP32's antenna hangs off the +y edge by the inputs (user 2026-11-02: keep wires
+  // off it). Board frame (wiring.js wrBoardPt): the motor's along the front
+  // edge to its header; the inputs' along the front, up the -X end (the box's open end) and along the back edge from
+  // that side - the headers are at x 8-24, the antenna at x 44-62 (>= 20 mm off); then straight down onto the pins. GUESS.
+  // [x, y, z] board frame; inside the box + lid (user: "stay within the bounds of the Jackpot box, including the lid";
+  // section 2026-11-02: floor z 113, back wall y 832, the lid's top sloping 176 -> 146 front to back, its fan down to
+  // z 162 at the front): the front run low under the fan, corners rounded in (a sharp one overshot the walls)
+  const JP3_ROUTE = { motor: [[62, -7, 20], [22, -7, 20]],
+    in: [[62, -7, 20], [6, -7, 20], [0, -1, 21], [0, 40, 22], [0, 74, 24], [4, 80, 24]] };
+  function hrBoxRoute(run, o) {
+    if (typeof wrBoardPt !== "function" || typeof LR4Wiring === "undefined") return [];
+    const d = 0.7;                                    // the wires side by side
+    return (run === "motor" ? JP3_ROUTE.motor : JP3_ROUTE.in).map(([x, y, z]) => wrBoardPt(x + o[0] * d, y + o[1] * d, z + o[1] * d)).filter(Boolean);
+  }
+  function hrSleeveClear(on) {                         // Layers > See through sleeves
+    HR.sleeveClear = !!on;
+    if (!sleeveMesh) return;
+    const m = sleeveMesh.material;
+    m.transparent = HR.sleeveClear; m.opacity = HR.sleeveClear ? 0.22 : 1; m.depthWrite = !HR.sleeveClear; m.needsUpdate = true;
+    sleeveMesh.renderOrder = HR.sleeveClear ? 2 : 0;
   }
   // Part 52b: the hose length this size needs - the route's longest over the travel's corners (the span from the
-  // beam's end to the fixed end - the hub's port, or the floor point - stretches as the gantry runs in Y)
+  // beam's end to the fixed end - the hub's port, or the floor point - stretches as the gantry runs in Y).
+  // Part 53b: along the settled rope (HR.need: the wiring report's corner moves measure it), else the taut route
   function hoseNeed() {
     if (!meta || !meta.hose) return null;
+    if (HR.need) return HR.need;
     const t = meta.travel, L = [];
     for (const dx of t.x) for (const dy of t.y) for (const dz of [t.z[0], t.z[1]]) {
       const pts = hoseRoute(meta.hose, dx, dz).map(([x, y, z, f]) => (f === "table" ? new THREE.Vector3(x, y, z) : new THREE.Vector3(x, y + dy, z + dz)));
@@ -599,7 +924,7 @@
     return { max: Math.max(...L), min: Math.min(...L) };
   }
   // cordRoute mirrors lr4.cord_route (Python) - keep the two in step
-  let cordMesh = null, sleeveMesh = null;   // sleeveMesh: none for now (Part 53)
+  let cordMesh = null, sleeveMesh = null;   // sleeveMesh: over the core's wires (Part 53b)
   function cordRoute(curve, h, c, tip, tip2, dx, pose) {
     const dist = (p, q) => Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2]);
     const xStart = h.port[0] + dx + h.turn + 10.0, xe = h.port[0] + dx + h.core_end_dx;
@@ -713,11 +1038,28 @@
           if (pr && !pr.reaches && /^V1E Tiny Touch Plate/.test(r[1] || "")) return [[r[0], r[1], `${r[2]}; its 2 m wire is ${pr.short} mm short at this size: extend it`]];
           if (/^2-1\/2" x 20 ft clear PVC/.test(r[1] || "") && hn) {   // Part 52b: the length this size needs
             const spare = 20 * 12 * IN - hn.max, to = optsOn().hub ? "the table hub's dust port" : "the floor off the Min end";
-            return [[r[0], r[1], `${r[2]}; this size needs ~${m(hn.max)} m from the shoe to ${to} (gantry at the far Y stop): ` +
-              (spare >= 0 ? `~${m(spare)} m to spare` : `${m(-spare)} m SHORT - a longer hose`)]];
+            return [[r[0], r[1], `${r[2]}; this size needs ~${m(hn.max)} m from the shoe to ${to} (${hn.rope ? "as it hangs, the longest over the travel" : "gantry at the far Y stop"}): ` +
+              (spare >= 0 ? `~${m(spare)} m to spare` : `${m(-spare)} m SHORT - a longer hose`)],
+              // its ground (user 2026-11-03; V1E docs: one end, to your power source's ground): the hub's inlet box, no outlet
+              optsOn().hub ? [1, "Hose ground: a green panel binding post (e.g. NOYITO M5, 4 mm banana), 14 AWG green wire ~0.4 m, 2 ring terminals, a 2-1/2\" hose clamp",
+                "bare the hose's steel wire at its port end, clamp a ring terminal to it; its short lead under the post's knob (unplugs without tools); the post in the " +
+                "hub panel below the port (counterbore the 5/8\" plywood from behind if its thread is short), its back stud to the inlet box's ground nut (with the cables' bares and the inlet's ground pigtail) - no outlet used"]
+                : [1, "Hose ground: 14 AWG green wire, a ring terminal, a 2-1/2\" hose clamp", "bare the hose's steel wire at one end, clamp the ring terminal to it; " +
+                  "the lead to a grounded screw (the switch panel's box, or the 24 V supply's earth terminal) - no outlet used"],
+              // the hub's mains cables (user 2026-11-03; scene.js hubCables: the drawn runs + 150 mm in each box)
+              ...(optsOn().hub && HUB.cables && HUB.cables.len.Paddle ? [
+                [1, `12-3 NM-B cable (12 AWG, yellow), ~${m(HUB.cables.len.Paddle + HUB.cables.len.Toggles + 300)} m`, "two runs stapled to the panels' backs: inlet box <-> paddle switch " +
+                  `(~${m(HUB.cables.len.Paddle)} m: black = line out, red = switched back, white = neutral, bare = ground) and the router + vac toggles -> outlet box ` +
+                  `(~${m(HUB.cables.len.Toggles)} m: black = router, red = vac); along the side and front panels' backs above the boxes; + spare`],
+                [1, `12-2 NM-B cable (12 AWG, yellow), ~${m(HUB.cables.len.Accessory + HUB.cables.len.Jumper + 150)} m`, "jumpers: inlet box -> accessory box (stapled to the hub panel's back), " +
+                  "the paddle's box -> the toggles' box (switched line, neutral, ground)"],
+                [1, "Switch panel: 5/8\" plywood ~305 x 190 mm (the hub panel's height: a flush corner), a 1-gang + a 3-gang new-work box, a 3-gang combination plate (blank + 2 toggles)",
+                  "hangs under the front apron by the hub's end; the paddle switch covers its 1-gang box; drill the plate's blank 22 mm for the power lamp"],
+                [HUB.cables.staples + 4, "Insulated cable staples for 12 AWG NM", "within 12 in of each box, then <= 300 mm apart (+ spares)"],
+                [5, "NM cable clamps / connectors for the box knockouts", "where each cable enters a box (the PVC boxes' built-in clamps may do)"]] : [])];
           }
           if (R["psu-ac"] && R["psu-ac"].cut && /^24 V power supply/.test(r[1] || ""))
-            return [[r[0], r[1], `${r[2]}; on the gantry: its mains cord from the ${optsOn().hub ? "table hub" : "switch panel"} ~${m(R["psu-ac"].cut)} m, into the beam along the braces (V1E docs; GUESS route)`]];
+            return [[r[0], r[1], `${r[2]}; on the gantry: its mains cord ${optsOn().hub ? "plugged into the hub's CONTROLLER socket (the accessory duplex's top)" : "from the switch panel"} ~${m(R["psu-ac"].cut)} m, into the beam along the braces (V1E docs; GUESS route)`]];
           return [r];
         }) }));
       }

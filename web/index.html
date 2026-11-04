@@ -154,7 +154,7 @@
 </aside>
 
 <aside class="panel">
-  <div class="colhead p-head"><span class="lbl">Configure</span><button type="button" class="col-btn" id="col-p" aria-expanded="true" aria-controls="steps" title="Fold the panel (H)" aria-label="Fold the Configure panel">«</button></div>
+  <div class="colhead p-head"><span class="lbl">Configure</span><button type="button" class="col-btn" id="col-p" aria-expanded="true" aria-controls="steps" title="Fold the panel" aria-label="Fold the Configure panel">«</button></div>
   <div class="col-strip p-strip" id="p-strip" aria-label="Configure (folded)"></div>
   <div class="sub" id="sub">V1E LowRider 4, built to your cutting area. Every printed part is the official STL, placed from its holes.</div>
 
@@ -546,7 +546,9 @@
     <dt>M</dt><dd>Measure (Esc ends it)</dd>
     <dt>P</dt><dd>Save the view as a picture</dd>
     <dt>Space</dt><dd>Play / pause the job's Preview</dd>
-    <dt>H</dt><dd>Fold / unfold the left panel</dd>
+    <dt>I</dt><dd>Inspect the selected part</dd>
+    <dt>H</dt><dd>Hide the selected part (H again brings it back)</dd>
+    <dt>Shift+H</dt><dd>Show all hidden parts</dd>
     <dt>V</dt><dd>Only the view (Esc brings the panels back)</dd>
     <dt>L</dt><dd>Layers: what the view shows</dd>
     <dt>Double-click</dt><dd>Inspect an assembly (Esc goes back)</dd>
@@ -721,6 +723,7 @@
     <div class="layers-head"><h2 id="h-show">Layers</h2><button type="button" id="layers-x" aria-label="Close" title="Close (Esc)">✕</button></div>
     <p class="foot">The view only - the BOM keeps every part. A bolt joining two assemblies is under both and shows with either.</p>
     <label class="check lay-extra" title="The wiring list: a line per run from end to end (motors, endstops, the touch plate, power), over the parts - hover one for its name and ends"><input type="checkbox" id="lay-wiring"> Wiring</label>
+    <label class="check lay-extra" title="The cable sleeve over the core's wires drawn clear, to see each wire inside it"><input type="checkbox" id="lay-sleeve"> See through sleeves</label>
     <div class="presets" id="show-presets" role="group" aria-label="Presets"></div>
     <div class="tree" id="show-tree" role="group" aria-label="Parts shown"></div>
     <button type="button" id="unhide" hidden></button>
@@ -732,7 +735,7 @@
     <div class="buttons"><button type="button" class="pri" id="alarm-unlock">Unlock ($X)</button><button type="button" id="alarm-home">Home all</button><button type="button" id="alarm-x" aria-label="Dismiss" title="Dismiss">✕</button></div></div></div>
   <div class="mini-dro" id="mini-dro" aria-label="Work position, mm"><span><em>X</em><b id="md-x">–</b></span><span><em>Y</em><b id="md-y">–</b></span><span><em>Z</em><b id="md-z">–</b></span></div>
   <div class="pick" id="pick" role="status" hidden><div><strong></strong><p></p><div class="pick-fil" id="pick-fil" hidden><span>Printed in</span><span class="fil-dd"><button type="button" class="fil-dd-btn" aria-haspopup="listbox"></button><span class="fil-dd-menu" role="listbox" hidden></span></span></div></div>
-    <button type="button" id="pick-insp" title="Inspect it on its own (double-click a part does too)">Inspect</button><button type="button" id="pick-clear" aria-label="Clear the selection" title="Clear">✕</button></div>
+    <button type="button" id="pick-insp" title="Inspect it on its own (I; double-click a part does too)">Inspect</button><button type="button" id="pick-hide" title="Hide this part (H; H again, or Layers: Show N hidden parts, brings it back; in Inspect, its list)">Hide</button><button type="button" id="pick-clear" aria-label="Clear the selection" title="Clear">✕</button></div>
   <div class="insp" id="insp" hidden>
     <div class="insp-top"><button type="button" id="insp-min" aria-expanded="true" title="Fold the tools and the parts list away (again to bring them back)">Hide panels</button>
       <button type="button" id="insp-back">← Back to the machine</button></div>

@@ -9,6 +9,26 @@
     fitView([d.x, d.y, d.z]);
   });
   document.getElementById("pick-clear").addEventListener("click", () => select(null));
+  // Hide (user 2026-11-02): the selected part off - on the machine into the Show tree's hidden parts (Layers: "Show N
+  // hidden parts" brings them back); in Inspect, unticked in its parts list (this view only)
+  // H (user 2026-11-02): hide the selected part; H again with nothing selected brings the last hidden one back (selected)
+  let hideLast = null;                                 // { id, insp: hidden in Inspect's list }
+  function hidePart(m) {
+    const id = partId(m);
+    select(null);
+    hideLast = { id, insp: !!INSPECT };
+    if (INSPECT) { INSPECT.hide.add(id); applyVisibility(); inspectScene(); } else showSet(id, false);
+  }
+  function unhideLast() {
+    const h = hideLast;
+    hideLast = null;
+    if (!h || !!INSPECT !== h.insp) return false;
+    if (INSPECT) { INSPECT.hide.delete(h.id); applyVisibility(); inspectScene(); } else showSet(h.id, true);
+    const m = meshes.find((q) => partId(q) === h.id && q.visible);
+    if (m) select(m);
+    return true;
+  }
+  document.getElementById("pick-hide").addEventListener("click", () => { if (selected) hidePart(selected); });
 
   // ---- Design's steps (Part 37): six <details> that open in any order, one at a time (the open one kept per
   // browser); a closed step shows a one-line summary, step 1 a red dot while its warnings say something; "Next: ..."
@@ -631,7 +651,13 @@
     else if (k === "f") click("v-fit");
     else if (k === "m") click("v-meas");
     else if (k === "p") saveImage();
-    else if (k === "h") click(document.documentElement.dataset.mode === "run" ? "col-l" : "col-p");
+    else if (k === "h" && e.shiftKey) {               // Shift+H (user 2026-11-02): every hidden part back (Inspect: its list's)
+      hideLast = null;
+      if (INSPECT) { INSPECT.hide.clear(); applyVisibility(); inspectScene(); } else click("unhide");
+    }
+    else if (k === "h" && selected) hidePart(selected);
+    else if (k === "h" && hideLast) unhideLast();
+    else if (k === "i" && selected) click("pick-insp");
     else if (k === "v") click("v-only");
     else if (k === "l") click("v-layers");
     else if (k === "?") $("keys-dlg").showModal();
