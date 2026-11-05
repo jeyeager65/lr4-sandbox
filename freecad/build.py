@@ -352,8 +352,10 @@ for side, plate in (("Min", pl_yz_min), ("Max", pl_yz_max)):
     # Z stepper face on the plate's mounting wall's underside (2026-10-19: the fastener check found the motor
     # 3.8 mm up inside the 6.0 mm wall its M3s go through; was 173.85)
     zface = my(177.67)
+    # leads toward the plate's back (V1E yzz2: out the back channel, "notice what side of the hole this goes in from";
+    # user 2026-11-05: turn the steppers so the wires run into their channels - the default 90 faced the inner face)
     add_stepper(f"Z_Stepper_{side}", plate.multiply(hw.along((lr4.LEADSCREW_PX, zface, lr4.LEADSCREW_PZ), up)),
-                f"YZ_{side}", shaft=Z_SHAFT)
+                f"YZ_{side}", shaft=Z_SHAFT, lead_deg=180.0 if side == "Min" else 0.0)
     # 5-8 mm helical coupler (D19 x 25), its bottom Z_COUPLER_ABOVE over the motor face (V1E yzz1: the plate's
     # guide; 2026-10-21: was centred on the shaft's end, 5 mm higher, which stopped Z 5 mm short); the leadscrew
     # sits on the motor shaft's end inside it (V1E yzz6a: "fully seated and touching the stepper shaft"), 2 set
@@ -368,8 +370,10 @@ for side, plate in (("Min", pl_yz_min), ("Max", pl_yz_max)):
                         r_major=4.0, r_minor=3.0))
     # Y stepper face on the wall's top (shaft points down to the belt; 2026-10-19: was 202.1, 2.3 mm inside it)
     yface = my(199.77)
+    # leads toward the plate's back, by the front channel's hole (V1E yzs2: "mounting the stepper with the wires nearest
+    # the channel / hole")
     add_stepper(f"Y_Stepper_{side}", plate.multiply(hw.along((lr4.YSTEP_PX, yface, lr4.YSTEP_PZ), (0, s, 0))),
-                f"YZ_{side}")
+                f"YZ_{side}", lead_deg=0.0 if side == "Min" else 180.0)
     m.add(f"Y_Pulley_{side}", hw.gt2_pulley(plate.multiply(hw.along((lr4.YSTEP_PX, my(lr4.Y_BELT_PY), lr4.YSTEP_PZ),
                                                                      (0, s, 0))), bore=5.0), group=f"YZ_{side}", colour=hw.ALUMINIUM)
     for k, px in enumerate(lr4.Y_IDLER_PX):
@@ -569,7 +573,7 @@ xn.normalize()
 xc = V(*lr4.X_MOTOR_LINE)
 x_on = lambda np_: xc + xn * (np_ - xn.dot(xc))                      # point on the stepper axis at n.p
 add_stepper("X_Stepper", pl_core.multiply(hw.along(tuple(x_on(lr4.X_MOTOR_FACE)), tuple(xn))), "Core",
-            lead_deg=270.0)          # leads toward the Min end (at the default 90 they ran into the router cord)
+            lead_deg=0.0)            # leads out of the rear cap's side facing the core (user; was 270: toward the Min end)
 m.add("X_Pulley", hw.gt2_pulley(pl_core.multiply(hw.along(tuple(x_on(lr4.X_BELT_NP[1])), tuple(xn * -1))), bore=5.0),
       group="Core", colour=hw.ALUMINIUM)
 ia, ib = lr4.X_IDLER_LINE

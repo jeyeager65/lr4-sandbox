@@ -971,6 +971,7 @@
   }
   function hrSleeveClear(on) {                         // Layers > See through sleeves
     HR.sleeveClear = !!on;
+    if (typeof bwSleeveClear === "function") bwSleeveClear();   // (the beam's sleeves too: wiring.js, Part 51c)
     if (!sleeveMesh) return;
     const m = sleeveMesh.material;
     m.transparent = HR.sleeveClear; m.opacity = HR.sleeveClear ? 0.22 : 1; m.depthWrite = !HR.sleeveClear; m.needsUpdate = true;

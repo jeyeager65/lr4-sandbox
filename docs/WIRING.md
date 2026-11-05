@@ -56,10 +56,19 @@ Source: V1E docs, LowRider "Wire Routing" (docs/lowrider/index.md, photos img/lr
 D:\GitHub\V1EngineeringInc-Docs). What the docs say:
 
 - The board goes on the **YZ_Min side, first bay** (wiring + SD access) - the model's Jackpot box placement.
-- Y / Z wires leave the YZ assembly low on its inner face (w1), go **into the beam at full height** and are tied
-  **at each brace - top or bottom, both fine** (w4, w5b: top helps with dust). The model: brace bottoms.
+- **Inside each YZ plate** (YZ assembly steps yze3-yzz2; the model since Part 51c, 2026-11-05, from sections of the
+  plate STL): the Z endstop's wire down the front channel from the Z stop's slot; the Y stepper mounted with its leads
+  toward the plate's back, by the front channel's hole ("wires nearest the channel / hole"), its wire into that
+  channel; the Y endstop's through the flat slot inside the plate's front ("the first channel") into the channel's
+  bottom; all of them along the wire keeper under the bottom face's tab, then up the back channel. The Z stepper,
+  its leads also toward the back, through the thin branch from its pocket into the back channel ("notice what side
+  of the hole this goes in from"). Out of the plate's back face just over the back wheel (w1).
+- From there **into the beam at full height** (w1: slack at every Z position) and tied **at each brace - top or
+  bottom, both fine** (w4, w5b: top helps with dust). The model: through the braces' window, over the 24 V supply
+  where it's on that side, a zip tie beside each brace, in a sleeve (V1E: "nice but not needed").
 - YZ_Max's motors + endstops and the core's runs use **extensions**; each join folded back and taped (strain relief),
-  labelled (w2, w3). The spare length is pulled to the furthest section and folded into a bundle (w4, w5).
+  labelled (w2, w3). The spare length is pulled to the furthest section and folded into a bundle (w4, w5) - not drawn
+  (the model's wires run straight).
 - The core's wires: tied at the core's top (first position) with the core at X_Max, a small loop there; along the
   router cord / vac hose through the hose hooks to the **brace just past halfway**, then into the braces with the
   others (w7, w8, w8b). The wires pass under the hose at the middle; a partial twist if it tracks badly.
@@ -79,5 +88,5 @@ D:\GitHub\V1EngineeringInc-Docs). What the docs say:
   for the circuit (20 A at 120 V); router 9 A + vac 9 A + supply < 1 A is under a 20 A breaker, but nothing else on
   that circuit while it runs. A relay from FluidNC for the vac (M8) is planned, not built: its own box.
 
-Still GUESS (the user's machine): the exact exit point on the YZ plate, the tie points' heights, and the core
+Still GUESS (the user's machine): the wires' exact paths in the plate's wider spaces, the tie points' heights, and the core
 bundle's sag / loop size. The model's "+75 mm per end" allowance covers the joins and the loops.
