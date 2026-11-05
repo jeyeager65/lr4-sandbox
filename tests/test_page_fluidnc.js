@@ -38,6 +38,8 @@ function server(mode, port) {
 
 async function chromePage(cport, o = {}) {           // o.gpu: the real GPU (live help videos), not SwiftShader
   const P = require("../tools/chrome_profile.js").profile("fluidnc_test_"), prof = P.dir;   // (deleted for sure, even on exit)
+  // LR4_TEST_GPU=1: every page test on the real GPU (SwiftShader draws the ~5M-triangle scene on the CPU, every frame)
+  if (process.env.LR4_TEST_GPU === "1") o = Object.assign({}, o, { gpu: true });
   const gl = o.gpu ? ["--use-angle=d3d11", "--ignore-gpu-blocklist", "--enable-gpu-rasterization"] : ["--use-angle=swiftshader", "--enable-unsafe-swiftshader"];
   const chrome = spawn(CHROME, ["--headless=new", ...gl,
     `--remote-debugging-port=${cport}`, `--user-data-dir=${prof}`, "--window-size=1500,1000", "about:blank"], { stdio: "ignore" });

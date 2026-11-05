@@ -816,6 +816,20 @@
   // gullies), run unchanged against a stand-in gl that keeps the arrays, and shaded like it too: its tool shader
   // (light from the camera, sky term, highlight), the cutting part in the tool's colour (its palette), shank grey
   const TOOL_RGB = ["#00ccff", "#00ff88", "#ff4dff", "#ffff00", "#ff8800", "#8888ff", "#ff0088", "#00ffff"];   // controller.js
+  // shader keepers (Part 53c, user 2026-11-04): three frees a program when its last material is disposed, so each job's
+  // new bit / stock material (the old one disposed) compiled again - mid-job, when the bit first showed: ~10 s frozen on
+  // SwiftShader (the slip test lost its samples: FluidNC ran on, the slips + carve went unsampled), a hitch on a GPU.
+  // One of each (+ the heat FX particles, made on the first smoke) kept in a scene never drawn, compiled at load.
+  let SHADER_KEEP = null;
+  function shaderKeepers() {
+    if (SHADER_KEEP) return SHADER_KEEP;
+    const s = new THREE.Scene(), g = new THREE.BufferGeometry();
+    g.setAttribute("position", new THREE.Float32BufferAttribute(new Array(9).fill(0), 3));
+    g.setAttribute("normal", new THREE.Float32BufferAttribute([0, 0, 1, 0, 0, 1, 0, 0, 1], 3));
+    s.add(new THREE.Mesh(g, jobToolMaterial([1, 1, 1])), new THREE.Mesh(g, jobStockMaterial(0, -10, -10, false, null, null, null)));
+    if (typeof heatPoints === "function") for (const add of [false, true]) { const h = heatPoints(add, 1); scene.remove(h.pts); s.add(h.pts); }
+    return (SHADER_KEEP = s);
+  }
   function jobToolMaterial(rgb) {
     const m = new THREE.ShaderMaterial({
       side: THREE.DoubleSide,                        // its triangles wind the other way (drawn without culling there)

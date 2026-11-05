@@ -81,7 +81,9 @@ JP3_BOARD = True       # the Jackpot3 board itself (user's OBJ, ~550k triangles)
 JP3_BOARD_FLIP = True  # turned 180 deg on its lugs (user 2026-10-19: stepper headers toward the box's low lip side)
 JP3_BOARD_RECOLOUR = (((0.62, 0.62, 0.36), (0.10, 0.33, 0.72)),   # (OBJ colour, shown as): khaki PCB -> V1E blue,
                       ((0.29, 0.66, 0.33), (0.07, 0.07, 0.08)))   # green terminal plugs -> black (user photo 2026-10-19)
-STEPPER_LEADS = 12.0   # mm of the 4 stepper leads drawn past their bushing (0 = none; real ones are 1 m)
+STEPPER_LEADS = 0.0    # mm of the 4 stepper leads drawn past their bushing - none since Part 53c (user 2026-11-04:
+                       # the page draws the wiring; the X motor's from X_LEAD_STUB's points, hose.json x_leads)
+X_LEAD_STUB = 12.0     # the X motor's lead stubs, NOT built: their root / tip points only (where its drawn wires start)
 Z_SHAFT = 24.0         # Z stepper shaft length from its face (V1E: 20 mm+; hw.nema17 default 24) - MEASURE YOURS
                        # (only where the leadscrew's end sits inside the coupler; the coupler goes by the plate)
 Z_COUPLER_ABOVE = 6.5  # Z coupler bottom above the motor face: V1E yzz1 lines it up on the YZ plate's guide, just
@@ -315,6 +317,32 @@ def add_stepper(name, pl, group, **kw):
     for k, sh in hw.nema17(pl, parts=True, leads=STEPPER_LEADS, **kw).items():
         nm = name if k == "body" else name + "_" + "_".join(w.capitalize() for w in k.split("_"))
         m.add(nm, sh, group=group, colour=hw.NEMA17_COLOURS[k])
+    if name == "X_Stepper":
+        X_LEADS.update(lead_points(hw.nema17(pl, parts=True, leads=X_LEAD_STUB, **kw)))
+
+
+X_LEADS = {}   # the X motor's 4 leads: {"Red": {"root": [x, y, z], "tip": [...]}, ...} mm from X_Stepper_Plug's bbox min
+
+
+def lead_points(parts):
+    """Each lead stub's root (on its axis where it leaves the bushing) and tip (its far end's centre), as the page
+    took them from the stub meshes in 53b (hose_bom.js hrWires): the tip = the mean of the vertices within 0.4 of the
+    top, the root = of the low end's farthest from the tip, at the low end + 0.6 (the wire's r). Relative to the
+    plug's bbox min: the page adds them to X_Stepper_Plug's (it moves with the core)."""
+    b = parts["plug"].BoundBox
+    o = (b.XMin, b.YMin, b.ZMin)
+    out = {}
+    for c in ("Red", "Green", "Blue", "Black"):
+        vs = [tuple(v) for v in parts["lead_" + c.lower()].tessellate(0.05)[0]]
+        mean = lambda q: [sum(a) / len(q) for a in zip(*q)]   # noqa: E731
+        zt, zb = max(v[2] for v in vs), min(v[2] for v in vs)
+        tip = mean([v for v in vs if v[2] > zt - 0.4])
+        low = [v for v in vs if v[2] < zb + 1.4]
+        far = max(math.dist(v, tip) for v in low)
+        root = mean([v for v in low if math.dist(v, tip) > far - 0.6])
+        root[2] = min(v[2] for v in low) + 0.6
+        out[c] = {k: [round(p[i] - o[i], 3) for i in range(3)] for k, p in (("root", root), ("tip", tip))}
+    return out
 
 
 for side, plate in (("Min", pl_yz_min), ("Max", pl_yz_max)):
@@ -916,8 +944,8 @@ hose_curve = lr4.catmull_rom(hose_pts, 12)
 hose_len = sum(math.dist(a, b) for a, b in zip(hose_curve, hose_curve[1:]))
 # (the hose, the router cord + cable sleeve along it aren't in the model since Part 45b: the page sweeps them from
 # build/hose.json; hosecheck.py sweeps the hose through every pose)
-# router cord + cable sleeve tied along the hose: on the core's top behind it, then between the runs (lr4.cord_route,
-# lr4.cable_places)
+# router cord + cable sleeve tied along the hose: on the core's top behind it, then between the runs (the page's
+# cordRoute + rope; lr4.cable_places)
 cord_tip = [tuple(v) for v in rt_cord]
 places = lr4.cable_places(HOSE, lr4.CORD["d"], lr4.SLEEVE["d"])
 HOSE["cord"] = dict(lr4.CORD, tip=cord_tip[0], tip2=cord_tip[1], **places["cord"])
@@ -941,7 +969,7 @@ braces = sorted((o["name"] for o in m.parts if o["name"].startswith("Brace_") an
 mid_brace = m.shape(braces[len(braces) // 2]).BoundBox
 HOSE["sleeve"]["exit"] = dict(x=mid_brace.XMin - 5.0, p=tuple(jp), d=tuple(jd), via=via)
 os.makedirs(os.path.join(ROOT, "build"), exist_ok=True)
-json.dump(dict(HOSE, x_pos=X_POS), open(os.path.join(ROOT, "build", "hose.json"), "w"), indent=1)   # for export_web
+json.dump(dict(HOSE, x_pos=X_POS, x_leads=X_LEADS), open(os.path.join(ROOT, "build", "hose.json"), "w"), indent=1)   # for export_web
 json.dump(threads, open(os.path.join(ROOT, "build", "threads.json"), "w"), indent=0)        # for export_web
 json.dump(belt_runs, open(os.path.join(ROOT, "build", "belts.json"), "w"), indent=0)
 

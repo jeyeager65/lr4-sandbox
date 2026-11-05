@@ -20,7 +20,7 @@ import FreeCAD as App                             # noqa: E402
 
 DECIMATE_ABOVE = None      # decimate meshes with more facets than this (None = full detail)
 TESSELLATE = 0.05          # mm deviation for solids
-STEPPER_BITS = ("_Face", "_Shaft", "_Screws", "_Lead_Red", "_Lead_Green", "_Lead_Blue", "_Lead_Black")
+STEPPER_BITS = ("_Face", "_Shaft", "_Screws")   # (no lead stubs since Part 53c: the page draws the wiring)
 TESSELLATE_FASTENERS = 0.12   # bolts/screws/nuts (names with '__'): Phillips heads are many small faces
 
 # what moves with what: lr4.motion (shared with hosecheck.py)

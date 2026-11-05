@@ -339,11 +339,13 @@
   }
   function wrSet(on) {
     WR.on = !!on;
-    if (WR.on) WR.report = wrReport();               // (the lengths over the travel: once, as it's shown)
+    if (typeof hrWiresSet === "function") hrWiresSet();   // Part 53c: the drawn wires show with it (hose_bom.js) - drawn first,
+    if (WR.on) WR.report = wrReport();               // the report's X runs follow them (the lengths over the travel: once, as it's shown)
     const c = document.getElementById("lay-wiring"); if (c) c.checked = WR.on;
     if (!WR.on) wrTip(null);
     wrEspKeep();
     wrLines();
+    if (typeof applyVisibility === "function") applyVisibility();
   }
   // hover / tap: the nearest run within 8 px of the pointer
   function wrPick(cx, cy) {

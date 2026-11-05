@@ -37,7 +37,7 @@ const steps = [
   // tools: explode, section, measure, then Back
   `LR4Inspect.open('yz-min'); const T = LR4Inspect.tools; T.explode(0.6); const ex = T.offsets();
    T.explode(0); const ex0 = Object.keys(T.offsets()).length; T.explode(0.6);
-   const stepper = [T.offsets().Y_Stepper_Min, T.offsets().Y_Stepper_Min_Shaft, T.offsets().Y_Stepper_Min_Lead_Red].map(String);
+   const stepper = [T.offsets().Y_Stepper_Min, T.offsets().Y_Stepper_Min_Shaft, T.offsets().Y_Stepper_Min_Face].map(String);
    LR4Inspect.open('Core'); T.explode(0.6); const nuts = T.nuts().filter((x) => x[1] && x[2] > 1).map((x) => x[0]); LR4Inspect.open('yz-min');
    T.section('x', 0.5); const sec = { x: document.querySelector('#insp-sec [data-v=x]').getAttribute('aria-pressed'), cut: !document.getElementById('insp-cut').hidden,
      caps: T.state().caps };

@@ -81,8 +81,12 @@
     function collide(i, cols) {
       const R = o.r, P = prepare(cols);
       if (P.n) {                                         // the balls near this node only
-        const gx = Math.floor(p[3 * i] / P.cell), gy = Math.floor(p[3 * i + 1] / P.cell), gz = Math.floor(p[3 * i + 2] / P.cell);
-        for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) for (let c = -1; c <= 1; c++) {
+        // a cell is >= 2x a ball's reach, so a ball touching the node is in its own cell or the neighbour on its nearer
+        // side, per axis: 8 cells, not 27 (Part 53c perf: collide was the top cost of a move)
+        const fx = p[3 * i] / P.cell, fy = p[3 * i + 1] / P.cell, fz = p[3 * i + 2] / P.cell;
+        const gx = Math.floor(fx), gy = Math.floor(fy), gz = Math.floor(fz);
+        const ax0 = fx - gx < 0.5 ? -1 : 0, by0 = fy - gy < 0.5 ? -1 : 0, cz0 = fz - gz < 0.5 ? -1 : 0;
+        for (let a = ax0; a <= ax0 + 1; a++) for (let b = by0; b <= by0 + 1; b++) for (let c = cz0; c <= cz0 + 1; c++) {
           const list = P.grid.get(P.key(gx + a, gy + b, gz + c));
           if (!list) continue;
           for (const [cx, cy, cz, cr] of list) {

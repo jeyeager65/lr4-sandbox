@@ -285,6 +285,10 @@
   const PROBE_OFF = /^(Dust_Skirt|Bristles_TPU)/;
   // the cord + sleeve routes don't follow a magnified rack / tilt (machine.js abPose): hidden while it's drawn so (user 2026-10-26)
   const RACK_OFF = /^(Router_Cord_Run|Core_Wires|Cable_Sleeve)$/;
+  // Part 53c (user 2026-11-04): the drawn wires show only with Layers > Wiring on (Inspect too: off,
+  // they aren't redrawn as it moves) - the hose always
+  const WIRES_OFF = /^(Router_Cord_Run|Router_Cord_Relief|Core_Wires|Cable_Sleeve|PSU_(MainsCord|Lead24V|Lead0V|LeadCable)|TableHub_(Panel)?(Wires[A-Z][a-z]+|WireNuts|Term(Brass|Silver|Ground))|TableHub_HoseGround)$/;
+  const wiresShown = () => !!(window.LR4WiringView && LR4WiringView.on());
   function applyVisibility() {
     const listed = meshes.filter((m) => m.userData.name && fitted(m) && variantOK(m) && !m.userData.missingHw);   // Part 38: not with its missing part
     const key = listed.map((m) => m.userData.name).join();
@@ -298,10 +302,10 @@
     for (const m of meshes) {
       m.userData.shown = inTree.has(m) && LR4ShowTree.on(tree, showOff, partId(m))
         && (!INSPECT || (INSPECT.set.has(partId(m)) && !INSPECT.hide.has(partId(m))))   // inspect: its set, less the list's unticked rows
-        && !(TOUCH_ANIM.skirt >= 1 && PROBE_OFF.test(m.userData.name)) && !(AB.magnified && RACK_OFF.test(m.userData.name)) && !(jobBit && m.userData.name === "Router_Bit");   // off once it's slid out (job.js)
+        && !(TOUCH_ANIM.skirt >= 1 && PROBE_OFF.test(m.userData.name)) && !(AB.magnified && RACK_OFF.test(m.userData.name)) && !(jobBit && m.userData.name === "Router_Bit")   // off once it's slid out (job.js)
+        && !(WIRES_OFF.test(m.userData.name || "") && !wiresShown());
       m.visible = m.userData.shown && !ROPE_STUB.test(m.userData.name)   // the touch plate's wire stubs: rope.js draws the wires
-        && !(/^Router_(StrainRelief|Cord)$/.test(m.userData.name) && cordMesh && fitted(cordMesh) && meta.hose && meta.hose.cord && meta.hose.cord.base)   // Part 53: the cord rope draws them, bending
-        && !(/^X_Stepper_Lead_/.test(m.userData.name) && !INSPECT && wireMesh && HR.wireLeads && optsOn().hose);   // 53b: the drawn wires carry on from them
+        && !(/^Router_(StrainRelief|Cord)$/.test(m.userData.name) && cordMesh && fitted(cordMesh) && meta.hose && meta.hose.cord && meta.hose.cord.base);   // Part 53: the cord rope draws them, bending
     }
     const rb = meshes.find((m) => m.userData.name === "Router_Bit");
     bitOK = !!rb && inTree.has(rb) && LR4ShowTree.on(tree, showOff, partId(rb)) && (!INSPECT || (INSPECT.set.has(partId(rb)) && !INSPECT.hide.has(partId(rb))));

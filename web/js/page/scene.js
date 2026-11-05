@@ -2054,7 +2054,9 @@ float lr4G(float x) { float s = 2.0 * fract(x) - 1.0; return floor(x) / 3.0 + (s
       [`Placing the ${cfg.parts.length} parts`, setupSize],
       ["Bill of materials", () => { setupVariants(); setupBristles(); setupBom(); setupAbout(); }],
       ["Workshop and lights", () => { setupScenery(); setupLighting(); updateShop(); fitView([1, -1.15, 0.85]); }],
-      ["Compiling shaders (first frame)", async () => { lighting(); await renderer.compileAsync(scene, camera); renderer.render(scene, camera); }]];   // compileAsync: the programs in parallel (KHR_parallel_shader_compile), the page not frozen meanwhile
+      ["Compiling shaders (first frame)", async () => { lighting(); await renderer.compileAsync(scene, camera);
+        if (typeof shaderKeepers === "function") await renderer.compileAsync(shaderKeepers(), camera, scene);   // job.js: the job's bit / stock + heat FX, kept
+        renderer.render(scene, camera); }]];   // compileAsync: the programs in parallel (KHR_parallel_shader_compile), the page not frozen meanwhile
     const times = window.LR4LoadTimes = [["Download + unpack", performance.now()]];   // ms per stage (tools/three_shots.js)
     for (const [i, [what, run]] of stages.entries()) {
       progress("Building the machine…", i / stages.length, what);

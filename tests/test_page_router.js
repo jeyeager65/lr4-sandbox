@@ -88,6 +88,7 @@ const JOBTXT = ["(LR4 router test)", STOCK, "(ToolDef 1: SHAPE=flat D=6.35 FLUTE
     }
     const b = await page.val(`(async () => {
       // Part 45b: the model from the preset, swapped mid-job (Carbide: motor cap 75 wide)
+      LR4WiringView.set(true);                       // (Part 53c: the cord is drawn only with Layers > Wiring on)
       const look = () => {
         const m = (n) => meshes.find((q) => q.userData.name === n), h = new THREE.Box3().setFromObject(m("Router_MotorCap"));
         const ring = m("Router_Dial").userData.ring, ax = new THREE.Vector3(0, 0, 1).applyQuaternion(ring.getWorldQuaternion(new THREE.Quaternion()));

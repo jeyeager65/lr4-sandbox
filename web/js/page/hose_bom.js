@@ -114,7 +114,8 @@
     scene.add(hoseMesh);
     meshes.push(hoseMesh);
     const cable = (name, label, rgb, rough) => {
-      const mm = new THREE.Mesh(new THREE.BufferGeometry(), new THREE.MeshStandardMaterial({
+      const g0 = new THREE.BufferGeometry().setAttribute("position", new THREE.Float32BufferAttribute([], 3));   // (empty till drawn: wiring off)
+      const mm = new THREE.Mesh(g0, new THREE.MeshStandardMaterial({
         color: new THREE.Color(...rgb).convertSRGBToLinear(), roughness: rough, metalness: 0.0 }));
       mm.userData = { name, label, source: "hardware", group: "Hose", motion: "hose" };
       scene.add(mm);
@@ -302,6 +303,14 @@
     for (let i = k + 1; i < hp.length; i++) out.push(new THREE.Vector3(...hp[i]).add(hrUp(hp, i).multiplyScalar(r + c.d / 2)));
     return out;
   }
+  // Part 53c (user 2026-11-04): the drawn wires (router cord + relief, the core's wires + sleeve, the supply's cords, the hub's
+  // mains wiring) only with Layers > Wiring on - off, their sims + meshes are skipped (a move ~2x faster); the hose always.
+  // HR.quick (the wiring report's corner moves) runs only with it on.
+  const hrWiresOn = () => !!(window.LR4WiringView && LR4WiringView.on());
+  function hrWiresSet() {                             // Wiring toggled: the cord re-settles from its route, then all redrawn
+    HR.cordJump = true;
+    if (hoseMesh && typeof move === "function") move();
+  }
   function hoseRopes(route, w, dx, dy, dz) {           // settle both for this pose; null: fall back to the route
     if (typeof LR4Cable === "undefined") return null;
     const h = meta.hose, P = hrPoints(route, w, dx);
@@ -336,7 +345,7 @@
     hc.settle(jump ? (HR.quick ? 25 : 90) : 10, cols);   // quick: the wiring report's corner moves (lengths, not looks)                  // (no head box: the guide holds the arc round it; the box fought it - stretched 1.6x)   // + the router's head + the core's top: it wraps round them
     const hp = hc.points();
     let cp = null;
-    if (cordMesh && meta.hose.cord) {
+    if (cordMesh && meta.hose.cord && hrWiresOn()) {
       // the cord where it always was (user 2026-11-02: "look where the router cord was before... not on top of the
       // hose"): cordRoute run over the SETTLED hose gives its path round the hose (its angles along it); that path,
       // from the strain relief's base, is the cord rope's guide to the beam's end (with the hub: then it hangs to
@@ -403,14 +412,16 @@
       }
       {                                                // never through the hose (user 2026-11-02), and smooth: push each path point
         const near = (q) => {                          // out to the hose's surface (+ the cord), smooth, again
-          let best = null, bd = 1e9;
+          let bd2 = Infinity, bx = 0, by = 0, bz = 0;    // (no arrays per segment: Part 53c perf, it ran ~8 ms a move)
+          const q0 = q[0], q1 = q[1], q2 = q[2];
           for (let i = 1; i < hp.length; i++) {
-            const a0 = hp[i - 1], ab = [0, 1, 2].map((k) => hp[i][k] - a0[k]), L2 = ab[0] ** 2 + ab[1] ** 2 + ab[2] ** 2;
-            const u = Math.max(0, Math.min(1, ((q[0] - a0[0]) * ab[0] + (q[1] - a0[1]) * ab[1] + (q[2] - a0[2]) * ab[2]) / (L2 || 1)));
-            const n = [0, 1, 2].map((k) => a0[k] + ab[k] * u), d = Math.hypot(q[0] - n[0], q[1] - n[1], q[2] - n[2]);
-            if (d < bd) { bd = d; best = n; }
+            const a0 = hp[i - 1], a1 = hp[i], ax = a1[0] - a0[0], ay = a1[1] - a0[1], az = a1[2] - a0[2], L2 = ax * ax + ay * ay + az * az;
+            let u = ((q0 - a0[0]) * ax + (q1 - a0[1]) * ay + (q2 - a0[2]) * az) / (L2 || 1);
+            u = u < 0 ? 0 : u > 1 ? 1 : u;
+            const nx = a0[0] + ax * u, ny = a0[1] + ay * u, nz = a0[2] + az * u, dx = q0 - nx, dy = q1 - ny, dz = q2 - nz, d2 = dx * dx + dy * dy + dz * dz;
+            if (d2 < bd2) { bd2 = d2; bx = nx; by = ny; bz = nz; }
           }
-          return [best, bd];
+          return [[bx, by, bz], Math.sqrt(bd2)];
         };
         const out = (q) => { const [n, d] = near(q); if (d >= cr) return q; const k = d > 1e-6 ? cr / d : 0; return d > 1e-6 ? n.map((v, j) => v + (q[j] - v) * k) : [q[0], q[1], q[2] + cr]; };
         for (let pass = 0; pass < 4; pass++) {
@@ -528,6 +539,63 @@
     m.setIndex(idx);
     return m;
   }
+  // ---- tubes along curves, rebuilt every move (Part 53c perf): the same vertices as THREE.TubeGeometry (its frames,
+  // getPointAt, ring order, uv, index) but written straight into typed arrays, several tubes in one geometry (each its
+  // own colour, if given), and the old geometry's buffers reused in place when the layout (segments per tube) is the same
+  // - no new GPU buffers, index or garbage per move. specs: [{ curve, segs, r, radial, rgb? }]
+  const HR_TV = new THREE.Vector3(), HR_TN = new THREE.Vector3();
+  function hrTubes(old, specs) {
+    const sig = specs.map((s) => `${s.segs}/${s.radial}${s.rgb ? "c" + s.rgb.join() : ""}`).join(",");
+    let g = old;
+    if (!old || !old.userData || old.userData.tubeSig !== sig) {
+      if (old) old.dispose();
+      let nv = 0, ni = 0;
+      for (const s of specs) { nv += (s.segs + 1) * (s.radial + 1); ni += s.segs * s.radial * 6; }
+      const uv = new Float32Array(nv * 2), idx = nv > 65535 ? new Uint32Array(ni) : new Uint16Array(ni);
+      const col = specs.some((s) => s.rgb) ? new Float32Array(nv * 3) : null;
+      let v0 = 0, u = 0, w = 0;
+      for (const s of specs) {
+        const S = s.segs, R1 = s.radial + 1, c = s.rgb ? new THREE.Color().setRGB(...s.rgb).convertSRGBToLinear() : null;
+        for (let i = 0; i <= S; i++) for (let j = 0; j <= s.radial; j++) {
+          uv[u++] = i / S; uv[u++] = j / s.radial;
+          if (col && c) { const k = 3 * (v0 + i * R1 + j); col[k] = c.r; col[k + 1] = c.g; col[k + 2] = c.b; }
+        }
+        for (let i = 1; i <= S; i++) for (let j = 1; j <= s.radial; j++) {
+          const a = v0 + R1 * (i - 1) + (j - 1), b = v0 + R1 * i + (j - 1), cc = v0 + R1 * i + j, d = v0 + R1 * (i - 1) + j;
+          idx[w++] = a; idx[w++] = b; idx[w++] = d; idx[w++] = b; idx[w++] = cc; idx[w++] = d;
+        }
+        v0 += (S + 1) * R1;
+      }
+      g = new THREE.BufferGeometry();
+      g.setAttribute("position", new THREE.BufferAttribute(new Float32Array(nv * 3), 3));
+      g.setAttribute("normal", new THREE.BufferAttribute(new Float32Array(nv * 3), 3));
+      g.setAttribute("uv", new THREE.BufferAttribute(uv, 2));
+      if (col) g.setAttribute("color", new THREE.BufferAttribute(col, 3));
+      g.setIndex(new THREE.BufferAttribute(idx, 1));
+      g.userData.tubeSig = sig;
+    }
+    const pa = g.getAttribute("position"), na = g.getAttribute("normal"), P = pa.array, N = na.array;
+    let o = 0;
+    for (const s of specs) {
+      const S = s.segs, F = s.curve.computeFrenetFrames(S, false), sn = [], cs = [];
+      for (let j = 0; j <= s.radial; j++) { const t = j / s.radial * Math.PI * 2; sn.push(Math.sin(t)); cs.push(-Math.cos(t)); }
+      for (let i = 0; i <= S; i++) {
+        const c = s.curve.getPointAt(i / S, HR_TV), n = F.normals[i], b = F.binormals[i];
+        for (let j = 0; j <= s.radial; j++) {
+          HR_TN.set(cs[j] * n.x + sn[j] * b.x, cs[j] * n.y + sn[j] * b.y, cs[j] * n.z + sn[j] * b.z).normalize();
+          N[o] = HR_TN.x; N[o + 1] = HR_TN.y; N[o + 2] = HR_TN.z;
+          P[o] = c.x + s.r * HR_TN.x; P[o + 1] = c.y + s.r * HR_TN.y; P[o + 2] = c.z + s.r * HR_TN.z;
+          o += 3;
+        }
+      }
+    }
+    pa.needsUpdate = na.needsUpdate = true;
+    g.boundingBox = null; g.computeBoundingSphere();
+    // as TubeGeometry's (wiring.js reads the hose's / cord's .path: the carrier its runs follow)
+    const s0 = specs[0];
+    g.parameters = s0 ? { path: s0.curve, tubularSegments: s0.segs, radius: s0.r, radialSegments: s0.radial, closed: false } : {};
+    return g;
+  }
   function hrWires(hp, cp, dy, dz) {
     HR.wireP = HR.wireMotor = HR.wirePre = null;
     const mesh = (nm) => meshes.find((m) => m.userData.name === nm && m.visible !== false);
@@ -592,27 +660,17 @@
     if (plug) {                                        // the motor's lead: out of its plug, up and back over the stepper to the join
       const P = new THREE.Box3().setFromObject(plug).getCenter(new THREE.Vector3()), Jn = HR.wireP[HR.wireJ];
       HR.wireMotor = [P, P.clone().add(new THREE.Vector3(-3, 0, 14)), Jn.clone().add(new THREE.Vector3(-14, -6, 3)), Jn];
-      // its 4 leads (the build's 12 mm stubs, hidden while these draw - panel.js): each wire starts at its stub's base and
-      // carries on its way (up), so they come out of the plug (user 2026-11-02: "deal with the short wires on the steppers")
-      // each stub's own shape (hw.nema17: out of the bushing 1.5, a quarter bend r 3, then up the body; the stepper sits a
-      // little turned): its root = the mean of its vertices nearest the body, its tip = of those at its far end (world)
-      const first = !HR.wireLeads;
-      HR.wireLeads = {};
-      for (const c of ["Red", "Green", "Blue", "Black"]) {
-        const lm = meshes.find((m) => m.userData.name === "X_Stepper_Lead_" + c);   // (hidden: these draw instead)
-        if (!lm) continue;
-        lm.updateMatrixWorld();
-        const pa = lm.geometry.getAttribute("position"), vs = [], v = new THREE.Vector3();
-        for (let i = 0; i < pa.count; i++) vs.push(v.fromBufferAttribute(pa, i).clone().applyMatrix4(lm.matrixWorld));
-        const P = HR.wireP[0], mean = (f) => { const q = vs.filter(f); return q.reduce((a, b) => a.add(b), new THREE.Vector3()).multiplyScalar(1 / (q.length || 1)); };
-        const zt = Math.max(...vs.map((q) => q.z)), zb = Math.min(...vs.map((q) => q.z));
-        const tip = mean((q) => q.z > zt - 0.4), lowEnd = vs.filter((q) => q.z < zb + 1.4);
-        const far = Math.max(...lowEnd.map((q) => q.distanceTo(tip)));   // the root: the low end farthest from the tip
-        const root = mean((q) => q.z < zb + 1.4 && q.distanceTo(tip) > far - 0.6);
-        root.z = Math.min(...lowEnd.map((q) => q.z)) + 0.6;   // on its axis (the wire's r 0.6)
-        HR.wireLeads[c] = { root, tip };
+      // its 4 leads: each wire starts where its lead leaves the plug's bushing and carries on its way (up), so they come
+      // out of the plug (user 2026-11-02: "deal with the short wires on the steppers"). The build makes no lead stubs
+      // (Part 53c): meta.hose.x_leads = each one's root / tip (build.py lead_points: the 12 mm stub hw.nema17 would draw),
+      // mm from the plug's bbox min - it moves with the core
+      HR.wireLeads = null;
+      const XL = meta.hose && meta.hose.x_leads;
+      if (XL && XL.Red) {
+        const o = new THREE.Box3().setFromObject(plug).min;
+        HR.wireLeads = {};
+        for (const [c, q] of Object.entries(XL)) HR.wireLeads[c] = { root: o.clone().add(new THREE.Vector3(...q.root)), tip: o.clone().add(new THREE.Vector3(...q.tip)) };
       }
-      if (first && typeof applyVisibility === "function") applyVisibility();   // the stubs off (panel.js), once known
     }
     const es = mesh("Endstop_X"), oB = C0(WCORE.openB);
     HR.wirePre = {                                     // each one's way to the opening's front (HR.wireP[0]), not incl. it
@@ -712,13 +770,13 @@
     return { pos, nor };
   }
   function hrTies(hp) {
-    const r = meta.hose.od / 2, d = meta.hose.cord && cordMesh ? meta.hose.cord.d : 0, pos = [], nor = [];
+    const r = meta.hose.od / 2, wo = hrWiresOn(), d = meta.hose.cord && cordMesh && wo ? meta.hose.cord.d : 0, pos = [], nor = [];   // wiring off: round the hose only
     for (const k of ["t1", "t2", "cl"]) {
       const i = HR.ix[k], a = hp[Math.max(0, i - 1)], b = hp[Math.min(hp.length - 1, i + 1)];
       const X = new THREE.Vector3(1, 0, 0);            // the channels / slots are square to X: the strap stays upright (user: not angled)
       const C = new THREE.Vector3(...hp[i]);
       if (k === "cl") C.x = TIE.clamp.x;              // the holder's slots, a little past the clamp point (the hose is straight there)
-      const S = hrStrap(C, X, r, d, HR.cordAt && HR.cordAt[k], k === "cl" ? TIE.clamp : TIE.core);
+      const S = hrStrap(C, X, r, d, wo && HR.cordAt && HR.cordAt[k], k === "cl" ? TIE.clamp : TIE.core);
       pos.push(...S.pos); nor.push(...S.nor);
     }
     const S0 = new THREE.Vector3(...hp[0]), zt = S0.z + TIE.mount.dz;   // the upper mount's: round the hose where it is at that height
@@ -744,17 +802,16 @@
     const pts = R ? R.hp.map((q) => new THREE.Vector3(...q)) : w;
     const curve = new THREE.CatmullRomCurve3(pts, false, "centripetal");
     const len = curve.getLength();
-    hoseMesh.geometry.dispose();
-    hoseMesh.geometry = new THREE.TubeGeometry(curve, Math.ceil(len / 4), meta.hose.od / 2, 28, false);
+    hoseMesh.geometry = hrTubes(hoseMesh.geometry, [{ curve, segs: Math.ceil(len / 4), r: meta.hose.od / 2, radial: 28 }]);
     hoseWire.repeat.set(len / 10, 1);                    // wire pitch ~10 mm
     if (cordMesh && R && R.cp) {
       const cc = new THREE.CatmullRomCurve3(R.cp.map((p) => new THREE.Vector3(...p)), false, "centripetal");
-      cordMesh.geometry.dispose();
-      cordMesh.geometry = new THREE.TubeGeometry(cc, Math.ceil(cc.getLength() / 12), meta.hose.cord.d / 2, 8, false);
+      cordMesh.geometry = hrTubes(cordMesh.geometry, [{ curve: cc, segs: Math.ceil(cc.getLength() / 12), r: meta.hose.cord.d / 2, radial: 8 }]);
       const rl = meta.hose.cord.relief;
       if (reliefMesh && rl && meta.hose.cord.base) { reliefMesh.geometry.dispose(); reliefMesh.geometry = hrTaper(cc, rl.l + 5, rl.d / 2, rl.cd / 2 + 0.6); }
     }
     if (tieMesh && R) { tieMesh.geometry.dispose(); tieMesh.geometry = hrTies(R.hp); }
+    if (!hrWiresOn()) return;                         // (hidden: kept as they were, redrawn when it's turned on)
     if (wireMesh) hrWireMeshes(R && HR.wireP);
     hrPowerMeshes(R && R.cp);
   }
@@ -792,10 +849,9 @@
     }
     const tube = (m, pts, r) => {
       const q = pts.filter((p, i) => i === 0 || p.distanceTo(pts[i - 1]) > 1);
-      m.geometry.dispose();
-      if (q.length < 2) { m.geometry = new THREE.BufferGeometry(); m.geometry.setAttribute("position", new THREE.Float32BufferAttribute([], 3)); m.visible = false; return; }
+      if (q.length < 2) { m.geometry.dispose(); m.geometry = new THREE.BufferGeometry(); m.geometry.setAttribute("position", new THREE.Float32BufferAttribute([], 3)); m.visible = false; return; }
       const c = new THREE.CatmullRomCurve3(q, false, "centripetal");
-      m.geometry = new THREE.TubeGeometry(c, Math.max(8, Math.ceil(c.getLength() / 6)), r, 8, false);
+      m.geometry = hrTubes(m.geometry, [{ curve: c, segs: Math.max(8, Math.ceil(c.getLength() / 6)), r, radial: 8 }]);
       m.visible = true;
     };
     const p = ac && wrPath(ac);
@@ -839,9 +895,7 @@
   }
   function hrWireMeshes(on) {
     const empty = () => new THREE.BufferGeometry().setAttribute("position", new THREE.Float32BufferAttribute([], 3));
-    wireMesh.geometry.dispose();
-    if (sleeveMesh) sleeveMesh.geometry.dispose();
-    if (!on) { wireMesh.geometry = empty(); if (sleeveMesh) sleeveMesh.geometry = empty(); return; }
+    if (!on) { wireMesh.geometry.dispose(); wireMesh.geometry = empty(); if (sleeveMesh) { sleeveMesh.geometry.dispose(); sleeveMesh.geometry = empty(); } return; }
     if (typeof wrBoard === "function") wrBoard();      // the stand-in board + the ESP32's keep-out under the wires' ends
     const V = (...a) => new THREE.Vector3(...a), P = HR.wireP, trunk = new THREE.CatmullRomCurve3(P, false, "centripetal");
     const N = Math.max(8, Math.ceil(trunk.getLength() / 10)), S = trunk.getSpacedPoints(N), F = trunk.computeFrenetFrames(N, false);
@@ -875,16 +929,13 @@
       const sp = spot(WIRE_TO[run], k), end = pts[pts.length - 1];
       // straight down into the connector's top (user 2026-11-02), each onto its own pin: square to the board
       if (sp) pts.push(end.clone().add(V(-14, 0, 0)), ...hrBoxRoute(run, o), sp.at.clone().addScaledVector(up, 14), sp.at.clone().addScaledVector(up, 6), sp.at.clone().addScaledVector(up, 1), sp.at);
-      const c = new THREE.CatmullRomCurve3(pts, false, "centripetal"), g = new THREE.TubeGeometry(c, Math.max(6, Math.ceil(c.getLength() / (lb ? 4 : 10))), r, 6, false);
-      const col = new THREE.Color().setRGB(...rgb).convertSRGBToLinear(), n = g.getAttribute("position").count, ca = new Float32Array(n * 3);
-      for (let j = 0; j < n; j++) col.toArray(ca, j * 3);
-      g.setAttribute("color", new THREE.BufferAttribute(ca, 3));
-      geos.push(g);
+      const c = new THREE.CatmullRomCurve3(pts, false, "centripetal");
+      geos.push({ curve: c, segs: Math.max(6, Math.ceil(c.getLength() / (lb ? 4 : 10))), r, radial: 6, rgb });
     }
-    wireMesh.geometry = hrMerge(geos);
+    wireMesh.geometry = hrTubes(wireMesh.geometry, geos);
     if (sleeveMesh) {
       const sc = new THREE.CatmullRomCurve3(S.slice(k1 + 2, N - 1), false, "centripetal");
-      sleeveMesh.geometry = new THREE.TubeGeometry(sc, Math.ceil(sc.getLength() / 8), SLEEVE_R, 12, false);
+      sleeveMesh.geometry = hrTubes(sleeveMesh.geometry, [{ curve: sc, segs: Math.ceil(sc.getLength() / 8), r: SLEEVE_R, radial: 12 }]);
     }
   }
   { const c = document.getElementById("lay-sleeve"); if (c) c.addEventListener("change", () => hrSleeveClear(c.checked)); }
@@ -923,7 +974,7 @@
     }
     return { max: Math.max(...L), min: Math.min(...L) };
   }
-  // cordRoute mirrors lr4.cord_route (Python) - keep the two in step
+  // cordRoute: the cord's path round the hose (the rope's guide; lr4.cable_places' seats come in meta.hose)
   let cordMesh = null, sleeveMesh = null;   // sleeveMesh: over the core's wires (Part 53b)
   function cordRoute(curve, h, c, tip, tip2, dx, pose) {
     const dist = (p, q) => Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2]);

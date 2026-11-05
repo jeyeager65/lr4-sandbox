@@ -938,8 +938,8 @@ def hose_route(h, dx=0.0, dz=0.0):
 # crosses over the cord on the way, lifted by `lift`), round the inside of the U-turn, and lie on the lower run toward
 # the beam. Each cable's place round the hose: offsets (y, z) from the hose's axis on the core (CORE_TOP_SEATS:
 # resting on the core's sloped top behind the ridge the hose sits on, measured from Core.stl at X 485-532), and
-# directions + radii in the pocket / lower run from hose_pocket. Low-poly tubes; the viewer rebuilds them with the
-# hose (cordRoute in the page mirrors cord_route).
+# directions + radii in the pocket / lower run (cable_places). The page draws the cord (hose_bom.js cordRoute +
+# its rope); Python's cord_route went in Part 53c (unused since 45b).
 CORE_TOP_SEATS = {"cord": (10.0, -39.3), "sleeve": (19.5, -44.5)}   # (y, z) from the hose axis on the core's top
 CORD = dict(d=7.4,                 # Kobalt cord OD (user-measured 2026-10-19)
             step=15.0,             # spacing of its points along the hose
@@ -961,108 +961,8 @@ SLEEVE = dict(CORD, d=13.0,        # braided sleeve over the core's wires (GUESS
                                        # cord's diameter + clearance
 
 
-def cord_route(curve, h, c, tip=None, tip2=None, dx=0.0, pose=(0.0, 0.0, 0.0)):
-    """Control points of a cable tied along the hose: `curve` = the hose's sampled centre line (dense [(x, y, z)],
-    at the pose), h = the hose dict (port, turn, od, core_end_dx), c = the cable (CORD / SLEEVE + core_side / core_r,
-    up_dir / up_r, lo_dir / lo_r: its direction + distance from the hose's axis on the core's top, in the pocket and
-    on the lower run). By length along the hose: core from the start of the run along the core's top, blended over
-    `wrap` after the core's +X end to the pocket (lifted by `lift` mid-way), across the U-turn's tip to the lower run.
-    tip / tip2 (the router's cord stub end and a point further along it): it starts there, runs `lead` on, then
-    straight back (+Y) to the first tied point; without them it starts on the hose (the sleeve, out of the core).
-    c["exit"] = {x, p, d, via} (the sleeve): it leaves the lower run where it passes x, eases down to and through the
-    `via` points
-    (a brace's hole) and on to the opening at p (all at the build pose; moved by `pose` = the beam's (0, dy, dz)),
-    stopping at the wall (the wires go in along d)."""
-    x_start = h["port"][0] + dx + h["turn"] + 10.0
-    xe = h["port"][0] + dx + h["core_end_dx"]
-    i0 = next(i for i, p in enumerate(curve) if p[0] >= x_start)
-    i_turn = max(range(len(curve)), key=lambda i: curve[i][0])
-    i_end = next((i for i in range(i0, i_turn) if curve[i][0] >= xe), i_turn)
-    arc = [0.0]
-    for i in range(1, len(curve)):
-        arc.append(arc[-1] + math.dist(curve[i], curve[i - 1]))
-
-    def square(v, t):                              # v made square to the unit tangent t, unit length (or None)
-        k = sum(x * y for x, y in zip(v, t))
-        w = [x - k * y for x, y in zip(v, t)]
-        wl = math.sqrt(sum(x * x for x in w))
-        return [x / wl for x in w] if wl > 1e-6 else None
-    # a frame carried along the hose from the start of the core-top run (e1 up there), turning with it: each
-    # cable's place is an angle in it, so they follow the hose round the U-turn and down the drop in order
-    tans, e1s = {}, {}
-    e1 = None
-    for i in range(i0, len(curve)):
-        a, b = curve[max(i - 1, 0)], curve[min(i + 1, len(curve) - 1)]
-        tn = math.dist(a, b) or 1.0
-        t = [(q - p) / tn for p, q in zip(a, b)]
-        e1 = square(e1 if e1 is not None else (0.0, 0.0, 1.0), t) or e1
-        tans[i], e1s[i] = t, e1
-
-    def ang(v, i):                                 # angle of world direction v round the hose at sample i
-        t, e = tans[i], e1s[i]
-        e2 = (t[1] * e[2] - t[2] * e[1], t[2] * e[0] - t[0] * e[2], t[0] * e[1] - t[1] * e[0])
-        return math.atan2(sum(x * y for x, y in zip(v, e2)), sum(x * y for x, y in zip(v, e)))
-    at = lambda s_: min(range(i0, len(curve)), key=lambda i: abs(arc[i] - s_))
-    a1, a2 = arc[i_end], arc[i_turn]
-    keys = [a1, a1 + c["wrap"], a2 - c["turn_blend"], a2 + c["turn_blend"]]
-    for k in range(1, len(keys)):                  # (core near +X: squeeze the blends, keep them in order)
-        keys[k] = max(keys[k], keys[k - 1])
-    th = [ang(c["core_side"], i0), ang(c["up_dir"], at(keys[1])), None, ang(c["lo_dir"], at(keys[3]))]
-    th[2] = th[1]
-    for k in range(1, len(th)):                    # (no jumps across +-180)
-        while th[k] - th[k - 1] > math.pi:
-            th[k] -= 2 * math.pi
-        while th[k] - th[k - 1] < -math.pi:
-            th[k] += 2 * math.pi
-    rads = [c["core_r"], c["up_r"], c["up_r"], c["lo_r"]]
-    pts, acc = [], c["step"]
-    for i in range(i0, len(curve)):
-        if i > i0:
-            acc += arc[i] - arc[i - 1]
-        if acc < c["step"] and i != len(curve) - 1:
-            continue
-        acc = 0.0
-        s = arc[i]
-        k = next((k for k in range(len(keys)) if s < keys[k]), len(keys))
-        if k == 0:
-            q, r = th[0], rads[0]
-        elif k == len(keys):
-            q, r = th[-1], rads[-1]
-        else:
-            w = (s - keys[k - 1]) / ((keys[k] - keys[k - 1]) or 1.0)
-            q = (1 - w) * th[k - 1] + w * th[k]
-            r = (1 - w) * rads[k - 1] + w * rads[k] + (c["lift"] * math.sin(math.pi * w) if k == 1 else 0.0)
-        t, e = tans[i], e1s[i]
-        e2 = (t[1] * e[2] - t[2] * e[1], t[2] * e[0] - t[0] * e[2], t[0] * e[1] - t[1] * e[0])
-        m = [math.cos(q) * x + math.sin(q) * y for x, y in zip(e, e2)]
-        pts.append(tuple(p + v * r for p, v in zip(curve[i], m)))
-        if c.get("exit") and i > i_turn and pts[-1][0] < c["exit"]["x"]:
-            break
-    if c.get("exit"):                              # off the lower run, down into the box's opening
-        e = [a + b for a, b in zip(c["exit"]["p"], pose)]
-        d = c["exit"]["d"]
-        via = [tuple(a + b for a, b in zip(v, pose)) for v in c["exit"].get("via", ())]
-        last = pts[-1]
-        p_out = tuple(a - b * 12.0 for a, b in zip(e, d))
-        first = via[0] if via else p_out
-        n = max(1, int(math.dist(last, first) / 35.0))    # a gradual descent (eased) to the first via point
-        for k in range(1, n + 1):
-            f = k / (n + 1)
-            e_ = (1 - math.cos(math.pi * f)) / 2
-            pts.append((last[0] + (first[0] - last[0]) * f, last[1] + (first[1] - last[1]) * e_,
-                        last[2] + (first[2] - last[2]) * e_))
-        pts += via
-        pts += [p_out, tuple(a - b * 1.0 for a, b in zip(e, d))]   # the sleeve stops at the wall, the wires go in
-    if tip is not None:                            # from the router: out of the stub, then straight back
-        td = [b - a for a, b in zip(tip, tip2)]
-        tl = math.sqrt(sum(v * v for v in td))
-        p1 = tuple(t + v / tl * c["lead"] for t, v in zip(tip, td))
-        pts = [tuple(tip), p1, (p1[0], pts[0][1], (p1[2] + pts[0][2]) / 2)] + pts
-    return pts
-
-
 def cable_places(h, cord_d, sleeve_d):
-    """Each cable's place round the hose for cord_route: {"cord": {core_side, core_r, up_dir, up_r, lo_dir, lo_r},
+    """Each cable's place round the hose (hose.json -> the page's cordRoute): {"cord": {core_side, core_r, up_dir, up_r, lo_dir, lo_r},
     "sleeve": {...}}. Core: CORE_TOP_SEATS. Pocket (where the upper run rests on the lower one against the upper X
     rail, as hose_route's nest): the cord in the circle touching both hoses on the rail side; the sleeve touching the
     cord and the upper hose (away from the lower) / the cord and the lower hose (away from the upper, toward the beam)."""

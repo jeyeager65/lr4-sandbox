@@ -24,8 +24,22 @@ const ok = (cond, msg) => { checks++; console.log((cond ? "  ok   " : "  FAIL ")
       return { board: LR4WiringView.board(), parts: sb ? sb.children.length : 0, own: !!meshes.find((m) => m.userData.name === "Jackpot3_PCB"), on: LR4WiringView.on(), spots: Object.keys(LR4Wiring.JP3.spots).length }; })()`);
     ok(a.board && !a.own && a.parts === a.spots + 1, `the stand-in board in the box: the PCB + a block per connector (${a.parts})`);
     ok(!a.on, "Wiring off at first");
+    // Part 53c: the drawn wires only with Wiring on (the hose always), and a move's time kept (a budget, ~2-3x today's:
+    // more drawn wiring shouldn't creep it back up; ms medians of 20 moves across the travel, the pose put back)
+    const DRAWN = /^(Router_Cord_Run|Core_Wires|Cable_Sleeve|PSU_MainsCord|PSU_LeadCable)$/;
+    const moveMs = `(() => { const t = meta.travel, ts = [];
+      for (let i = 0; i < 20; i++) { const f = i / 19, a = performance.now(); move([t.x[0] + (t.x[1] - t.x[0]) * f, t.y[0] + (t.y[1] - t.y[0]) * (1 - f), t.z[1]]); ts.push(performance.now() - a); }
+      move([HOME.pose.x, HOME.pose.y, HOME.pose.z]); ts.sort((p, q) => p - q); return +ts[10].toFixed(1); })()`;
+    const shownNow = `(() => { const v = (re) => meshes.filter((m) => re.test(m.userData.name || "")).map((m) => m.visible);
+      return { drawn: v(${DRAWN}), hose: v(/^Vacuum_Hose$/) }; })()`;
+    const off0 = await page.val(shownNow), ms0 = await page.val(moveMs);
+    ok(off0.drawn.length >= 3 && off0.drawn.every((x) => !x) && off0.hose.length === 1 && off0.hose[0], `Wiring off: the drawn wires hidden (${off0.drawn.length}), the hose shown`);
+    ok(ms0 < 15, `Wiring off: a move ${ms0} ms (budget 15)`);
     await page.val(`(() => { const c = document.getElementById("lay-wiring"); c.checked = true; c.dispatchEvent(new Event("change")); return true; })()`);
     await sleep(600);
+    const on1 = await page.val(shownNow), ms1 = await page.val(moveMs);
+    ok(on1.drawn.every((x) => x) && on1.hose[0], `Wiring on: the drawn wires shown (${on1.drawn.length}) + the hose`);
+    ok(ms1 < 40, `Wiring on: a move ${ms1} ms (budget 40)`);
     const b = await page.val(`(() => { const r = LR4WiringView.runs(), by = Object.fromEntries(r.map((q) => [q.id, q])); return { n: r.length, shown: r.filter((q) => q.shown).length, by }; })()`);
     ok(b.n === 15 && b.shown === 14 && !b.by.mains.shown, `Layers > Wiring: a line per run, the mains (to the wall) not drawn (${b.shown} of ${b.n})`);
     ok(b.by["x-motor"].len > 2 * b.by["y0-motor"].len, `the core's X motor along the cord / hose (${b.by["x-motor"].len} mm) - longer than the near Y0's straight line (${b.by["y0-motor"].len})`);
@@ -70,6 +84,7 @@ const ok = (cond, msg) => { checks++; console.log((cond ? "  ok   " : "  FAIL ")
     ok(bom.ms < 2000, `the BOM with the wiring fit: ${bom.ms} ms (cached per scene after the first)`);
     await page.val(`(LR4WiringView.set(false), true)`);
     ok(await page.val("!WR.lines && !document.getElementById('lay-wiring').checked"), "off: the lines gone, the box unticked");
+    { const s = await page.val(shownNow); ok(s.drawn.every((x) => !x) && s.hose[0], "off: the drawn wires hidden again, the hose shown"); }
     ok(!(await page.val("window.__errors && window.__errors.length")), "no page errors");
   } finally { page.close(); srv.kill(); console.log(fails ? `${fails} of ${checks} failed` : `${checks}/${checks} checks passed`); process.exit(fails ? 1 : 0); }
 })();
