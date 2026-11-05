@@ -89,8 +89,8 @@ const PASSES = (() => {
       out.drawn1 = LR4AsBuilt.drawn();
       return out;
     })()`);
-    const want = (e) => Math.atan2(e * 50, a.drawn.span);
-    ok(near(a.drawn.rack, want(1.5), 1e-4) && near(a.drawn.tilt, want(1), 1e-4), `drawn x50: rack ${a.drawn.rack.toFixed(4)} / tilt ${a.drawn.tilt.toFixed(4)} rad (span ${a.drawn.span.toFixed(0)} mm)`);
+    const want = (e, span = a.drawn.span) => Math.atan2(e * 50, span);
+    ok(near(a.drawn.rack, want(1.5), 1e-4) && near(a.drawn.tilt, want(1, a.drawn.zspan), 1e-4), `drawn x50: rack ${a.drawn.rack.toFixed(4)} / tilt ${a.drawn.tilt.toFixed(4)} rad (span ${a.drawn.span.toFixed(0)} mm; the tilt on the Z screws, ${a.drawn.zspan.toFixed(0)} mm apart)`);
     ok(a.geo.span > 500 && /racked 1\.50 mm/.test(a.note) && /diagonals would differ/.test(a.note), `note: ${a.note}`);
     ok(a.stops.from.y === "guess" && near(a.home.y, 0.8, 0.02) && near(a.home.z, 0.5, 0.02), `FluidNC $H with V1E's pulloffs: out by the stops ${JSON.stringify(a.home)}`);
     ok(/\$H leaves it racked 0\.80 mm/.test(a.after), `after: ${a.after}`);
@@ -120,27 +120,6 @@ const PASSES = (() => {
     const ridge = 10.16 * Math.tan(0.5 * Math.PI / 180);
     ok(Math.abs(b.tram.hi - b.tram.lo - ridge) < 0.03, `0.5 deg out of tram: ridges ${(b.tram.hi - b.tram.lo).toFixed(3)} mm (~${ridge.toFixed(3)})`);
     ok(b.flat.hi - b.flat.lo < 0.01, `trammed: flat ${(b.flat.hi - b.flat.lo).toFixed(4)} mm ${b.flat.hi - b.flat.lo < 0.01 ? "" : JSON.stringify(b.flatWhy)}`);
-
-    // two bits, racked and off level, a probe first: the second bit's pass is cut with that bit, full width. (The bug
-    // it was written for - T1's V-bit carving the 1in passes thin, 2026-10-26 - only showed in a help video's frame
-    // clock: test_page_help_all checks the As built video's surfacing. This one passes with or without that fix.)
-    const tb = await page.val(`(async () => {
-      document.getElementById("hs-new").click(); await T.sleep(300);
-      LR4AsBuilt.set({ tram: { x: 0, y: 0 }, stop: { y: 1.5, z: 0.5 } });
-      LR4AsBuilt.setE({ y: 4, z: 2 });                // racked + off level at power-up, as the help video
-      await A.homeNC();
-      await A.play(${JSON.stringify(["(LR4 two bits)", "(Stock: XMIN=-10 XMAX=300 YMIN=-10 YMAX=260 ZMIN=-12.7 ZMAX=0)",
-        "(ToolDef 1: SHAPE=vbit D=12.7 ANGLE=60 NAME=V)", "(ToolDef 2: SHAPE=flat D=25.4 NAME=surfacing)",
-        "G21 G90", "T1", "G10 L20 P0 X0 Y0 Z0", "G0 X-5 Y-5", "M0 (MSG, Attach Probe)", "G38.2 Z-110 F200 P0.5", "G0 Z5",
-        "M0 (MSG, Remove Probe and Turn On Router at Dial 4)", "G0 X10 Y10 Z3", "G1 Z-1 F300", "G1 X60 F1500", "G0 Z15",
-        "T2", "G0 X60 Y60", "G0 Z3", "G1 Z-1.5 F300", "G1 Y220 F1500", "G0 Z20", "M30", ""].join("\n"))}, "two_bits.gcode");
-      const why = { status: document.getElementById("job-status").textContent, src: LR4Job.src() && LR4Job.src().name };
-      const s = LR4Job.sim(), j = Math.round((140 - s.stock.ymin) / s.dy); let n = 0;   // the stock across the pass
-      for (let x = 30; x <= 90; x += s.dx) if (s.heights[j * s.vx + Math.round((x - s.stock.xmin) / s.dx)] < -0.3) n++;
-      LR4AsBuilt.set({ stop: { y: null, z: null } });
-      return { wide: n * s.dx, why };
-    })()`);
-    ok(tb.wide > 22 && tb.wide < 28, `switches apart, T1 then T2: the 1in pass is ${tb.wide.toFixed(1)} mm wide ${tb.wide > 22 ? "" : JSON.stringify(tb.why)}`);
 
     // follow-ups: the drawn tip moves by tipErr (X shift too); a warp change lays an uncut board again, asks for a cut
     // one; the stock follows the board (or not); the squareness test read off the cut, racked vs square
@@ -193,6 +172,29 @@ const PASSES = (() => {
     ok(d.racked && !d.racked.missing && Math.abs(d.racked.diff - d.wantR) < 0.15, `measured racked: ${d.racked.diff && d.racked.diff.toFixed(3)} vs ${d.wantR.toFixed(3)} (${d.depth} mm deep) - ${d.noteR}`);
     ok(d.none.missing && d.none.missing.length === 4, "new board: nothing to measure");
     ok(d.square && !d.square.missing && Math.abs(d.square.diff) < 0.1 && near(d.homedE.y, 0, 0.02), `measured after $H: ${d.square.diff && d.square.diff.toFixed(3)} - ${d.noteS}`);
+
+    // (after the follow-ups: it lays a new board and cuts only its stock, so their warp check would find the board
+    // uncut and lay it again without asking - the failure 2026-11-04)
+    // two bits, racked and off level, a probe first: the second bit's pass is cut with that bit, full width. (The bug
+    // it was written for - T1's V-bit carving the 1in passes thin, 2026-10-26 - only showed in a help video's frame
+    // clock: test_page_help_all checks the As built video's surfacing. This one passes with or without that fix.)
+    const tb = await page.val(`(async () => {
+      document.getElementById("hs-new").click(); await T.sleep(300);
+      LR4AsBuilt.set({ tram: { x: 0, y: 0 }, stop: { y: 1.5, z: 0.5 } });
+      LR4AsBuilt.setE({ y: 4, z: 2 });                // racked + off level at power-up, as the help video
+      await A.homeNC();
+      await A.play(${JSON.stringify(["(LR4 two bits)", "(Stock: XMIN=-10 XMAX=300 YMIN=-10 YMAX=260 ZMIN=-12.7 ZMAX=0)",
+        "(ToolDef 1: SHAPE=vbit D=12.7 ANGLE=60 NAME=V)", "(ToolDef 2: SHAPE=flat D=25.4 NAME=surfacing)",
+        "G21 G90", "T1", "G10 L20 P0 X0 Y0 Z0", "G0 X-5 Y-5", "M0 (MSG, Attach Probe)", "G38.2 Z-110 F200 P0.5", "G0 Z5",
+        "M0 (MSG, Remove Probe and Turn On Router at Dial 4)", "G0 X10 Y10 Z3", "G1 Z-1 F300", "G1 X60 F1500", "G0 Z15",
+        "T2", "G0 X60 Y60", "G0 Z3", "G1 Z-1.5 F300", "G1 Y220 F1500", "G0 Z20", "M30", ""].join("\n"))}, "two_bits.gcode");
+      const why = { status: document.getElementById("job-status").textContent, src: LR4Job.src() && LR4Job.src().name };
+      const s = LR4Job.sim(), j = Math.round((140 - s.stock.ymin) / s.dy); let n = 0;   // the stock across the pass
+      for (let x = 30; x <= 90; x += s.dx) if (s.heights[j * s.vx + Math.round((x - s.stock.xmin) / s.dx)] < -0.3) n++;
+      LR4AsBuilt.set({ stop: { y: null, z: null } });
+      return { wide: n * s.dx, why };
+    })()`);
+    ok(tb.wide > 22 && tb.wide < 28, `switches apart, T1 then T2: the 1in pass is ${tb.wide.toFixed(1)} mm wide ${tb.wide > 22 ? "" : JSON.stringify(tb.why)}`);
 
     // FluidNC: boots racked, reads it back from the motors, $H leaves the stops' residual
     const c = await page.val(`(async () => {

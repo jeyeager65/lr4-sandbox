@@ -61,7 +61,16 @@ async function chromePage(cport, o = {}) {           // o.gpu: the real GPU (liv
     else if (m.method === "Runtime.consoleAPICalled" && m.params.type === "error")
       console.log("  [console.error]", m.params.args.map((a) => a.value ?? a.description).join(" "));
   });
-  const send = (method, params = {}) => new Promise((res, rej) => { const n = ++id; pending.set(n, { res, rej }); ws.send(JSON.stringify({ id: n, method, params })); });
+  // LR4_TEST_NCSPEED=5 (or o.ncspeed): the page's FluidNC starts at that Speed (?ncspeed=, the Speed select's values)
+  // - tests that wait on machine motion (homing, jobs) finish sooner; a test that needs real time passes o.ncspeed = 1
+  const ncs = o.ncspeed ?? process.env.LR4_TEST_NCSPEED;
+  const withSpeed = (u) => (!ncs || String(ncs) === "1" || !/\/web\/index\.html/.test(u) || /[?&]ncspeed=/.test(u) ? u
+    : u.replace(/^([^#]*?)(\?[^#]*)?(#.*)?$/, (m, a, q, h) => `${a}${q ? q + "&" : "?"}ncspeed=${ncs}${h || ""}`));
+  const send = (method, params = {}) => new Promise((res, rej) => {
+    const n = ++id; pending.set(n, { res, rej });
+    if (method === "Page.navigate" && params.url) params = Object.assign({}, params, { url: withSpeed(params.url) });
+    ws.send(JSON.stringify({ id: n, method, params }));
+  });
   const val = async (expr) => {
     const r = await send("Runtime.evaluate", { expression: expr, awaitPromise: true, returnByValue: true });
     if (r.exceptionDetails) throw new Error(r.exceptionDetails.exception?.description || r.exceptionDetails.text);

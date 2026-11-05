@@ -122,7 +122,7 @@
       const cx = lead.map((m) => { const g = m.geometry, base = m.userData.base || { t: [0, 0, 0], s: [1, 1, 1] };
         if (!g.boundingBox) g.computeBoundingBox();
         return (g.boundingBox.min.x + g.boundingBox.max.x) / 2 * base.s[0] + base.t[0]; });
-      AB.geo.zA = cx[0] - fr[0]; AB.geo.zspan = cx[1] - cx[0]; AB.piv.zspan = AB.geo.zspan;
+      AB.geo.zA = cx[0] - fr[0]; AB.geo.zspan = cx[1] - cx[0]; AB.piv.zspan = AB.geo.zspan; AB.piv.zx = cx[0];
     }
   }
   // the model bit's tip (its axis at the bottom: a plain cylinder's box centre / min Z), world mm - as drawn now, or at
@@ -135,8 +135,8 @@
     rb.updateMatrixWorld();
     return p.applyMatrix4(rb.matrixWorld);
   }
-  // the gantry racked (about Z) and the beam + core tilted (about Y) by AB.E, x the drawing's exaggeration, about the
-  // Min end's carriage (side 1 stays put; at pose dy / dz); then the router out of tram (user 2026-10-26: so the cause
+  // the gantry racked (about Z) and the beam + core tilted (about Y) by AB.E, x the drawing's exaggeration: the rack
+  // about the Min end's carriage, the tilt about the Min Z leadscrew (as Imperfect.tipErr; side 1 stays put; at pose dy / dz); then the router out of tram (user 2026-10-26: so the cause
   // shows next to its grooves): the router body, nut and bit leaned by As built's tram angles - true size (TRAM_EX 1:
   // magnifying it was tried 2026-10-26 and dropped - the user: it breaks the router mounts' look, and a real tram error
   // only shows when surfacing or with a big bit) - about the bit's tip, which stays where the cut model has it
@@ -160,7 +160,7 @@
     if (!rack && !tilt && !tx && !ty && !AB.posed) return;
     AB.posed = !!(rack || tilt || tx || ty);
     const qr = new THREE.Quaternion().setFromAxisAngle(ZUP, rack), qt = new THREE.Quaternion().setFromAxisAngle(AB_Y, -tilt);
-    const pr = new THREE.Vector3(P ? P.x : 0, P ? P.y + dy : 0, 0), pt = new THREE.Vector3(P ? P.x : 0, 0, P ? P.z + dz : 0);
+    const pr = new THREE.Vector3(P ? P.x : 0, P ? P.y + dy : 0, 0), pt = new THREE.Vector3(P ? P.zx ?? P.x : 0, 0, P ? P.z + dz : 0);
     const about = (q, p) => new THREE.Matrix4().makeTranslation(p.x, p.y, p.z).multiply(new THREE.Matrix4().makeRotationFromQuaternion(q))
       .multiply(new THREE.Matrix4().makeTranslation(-p.x, -p.y, -p.z));
     const coreM = about(qr, pr).multiply(about(qt, pt));   // tilt, then rack: as the loop below

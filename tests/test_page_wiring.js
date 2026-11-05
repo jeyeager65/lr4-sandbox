@@ -17,7 +17,8 @@ const ok = (cond, msg) => { checks++; console.log((cond ? "  ok   " : "  FAIL ")
     await sleep(800);
     await page.send("Page.navigate", { url: `http://127.0.0.1:${port}/web/index.html?parts=/parts/#26x50` });
     let up = false;
-    for (let i = 0; i < 160 && !up; i++) { await sleep(500); try { up = await page.val("document.getElementById('status').hidden && !!HOME.pose && !!window.LR4WiringView"); } catch (e) { /* loading */ } }
+    // (up to 4 min to load: 80 s timed out now and then with a busy CPU, 2026-11-04)
+    for (let i = 0; i < 480 && !up; i++) { await sleep(500); try { up = await page.val("document.getElementById('status').hidden && !!HOME.pose && !!window.LR4WiringView"); } catch (e) { /* loading */ } }
     ok(up, "page loaded");
     if (!up) return;
     const a = await page.val(`(() => { const sb = meshes.find((m) => m.userData.name === "Jackpot3_Box").children.find((c) => c.name === "Jackpot3_StandIn");

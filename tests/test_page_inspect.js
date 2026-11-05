@@ -111,7 +111,11 @@ try {
   const args = [path.join(ROOT, "tools", "page_shot.js"), `http://127.0.0.1:${PORT}/web/index.html?parts=/parts/#26x50`,
     path.join(os.tmpdir(), "lr4_page_inspect.png"), "--size", "1200x800"];
   for (const js of steps) args.push("--eval", js.replace(/\s*\n\s*/g, " "));
-  out = execFileSync("node", args, { cwd: ROOT, encoding: "utf8", timeout: 180000 });
+  // (usually ~40 s; 180 s timed out now and then with a busy CPU - a size build alongside, 2026-11-04)
+  out = execFileSync("node", args, { cwd: ROOT, encoding: "utf8", timeout: 600000 });
+} catch (e) {
+  out = (e.stdout || "") + "";
+  console.log(`  FAIL page_shot.js: ${e.code === "ETIMEDOUT" || e.signal ? "timed out after 600 s" : e.message.split("\n")[0]}`);
 } finally { server.kill(); }
 
 const ev = out.split("\n").filter((l) => l.startsWith("eval: ")).map((l) => JSON.parse(l.slice(6)));

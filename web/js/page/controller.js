@@ -710,6 +710,10 @@
     for (const b of document.querySelectorAll("#ctl-box [data-ctl]")) b.addEventListener("click", () => ctlSend(b.dataset.ctl));
     setInterval(() => { if (CTL.sim && !document.hidden) CTL.sim.realtime("?"); }, 500);   // auto reports only come on a change
     $("ctl-speed").addEventListener("change", () => ncScale(Number($("ctl-speed").value)));
+    {                                                 // ?ncspeed=5: start at that Speed (the page tests: LR4_TEST_NCSPEED)
+      const k = new URLSearchParams(location.search).get("ncspeed"), sp = $("ctl-speed");
+      if (k && [...sp.options].some((o) => o.value === k)) sp.value = k;
+    }
     for (const b of document.querySelectorAll("#pos-jog [data-jog]"))
       b.addEventListener("click", () => ctlJogPad(b.dataset.jog[0], b.dataset.jog[1] === "+" ? 1 : -1));
     $("jog-stop").addEventListener("click", () => CTL.sim && CTL.sim.realtime(0x85));

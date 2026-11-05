@@ -148,11 +148,13 @@ const ok = (cond, msg) => { checks++; console.log((cond ? "  ok   " : "  FAIL ")
       ev("pointerdown", 0); ev("pointermove", -20); ev("pointermove", -40); ev("pointerup", -40);
       await T.sleep(400);
       out.rx.H = [H0, LR4Routers.ROUTERS.testbox.model.motor_cap.H];
-      document.querySelector('.rbx-views [data-v="iso"]').click(); await T.sleep(500);
+      // (the snaps land by a 400 ms timer at the latest - a slow SwiftShader frame holds that up: wait for it, not a fixed
+      // sleep - the flaky "camera snaps", 2026-11-04)
+      document.querySelector('.rbx-views [data-v="iso"]').click(); await T.sleep(100); await T.until(() => !RX.anim, 5000);
       out.rx.v3d = [camera.fov, controls.enableRotate, RX.face];
       document.querySelector('.rbx-views [data-v="top"]').click(); await T.sleep(100);
       out.rx.mid = RX.face;                           // still turning: the numbers wait for the snap
-      await T.sleep(400); out.rx.top = [camera.fov, !!nb("cap-Lt"), !!nb("cap-W"), [...document.querySelectorAll(".rbx-n")].map((e) => e.dataset.id).join(" "), RX.face];
+      await T.until(() => !RX.anim, 5000); out.rx.top = [camera.fov, !!nb("cap-Lt"), !!nb("cap-W"), [...document.querySelectorAll(".rbx-n")].map((e) => e.dataset.id).join(" "), RX.face];
       $$("rbx-flat").click(); await T.sleep(50);
       out.rx.flat = [camera.fov, $$("rbx-flat").getAttribute("aria-pressed")];
       $$("rbx-flat").click(); await T.sleep(50);

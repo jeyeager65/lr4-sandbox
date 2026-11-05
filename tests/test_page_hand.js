@@ -142,19 +142,23 @@ const TWO = ["G21 G90", "T1", "G0 Z5", "G0 X20 Y40", "G1 Z-1 F600", "G1 X80 F150
       const out = { stock: !!LR4Job.tl().stock, bit: LR4Job.tl().tools.get(1).diameter };
       H.speed(20);                                    // a long job: FluidNC at 20x
       document.getElementById("job-play").click();
+      const t0 = performance.now();
       await T.until(() => LR4Job.running(), 20000);
       await T.until(H.done, 600000);
       await T.sleep(2000);                            // the note follows the save
       const s = LR4Job.spoil();
       out.min = H.min(s);
+      // (flaky 2026-11-04: "Done." with nothing cut - this says why next time: how much it cut, the job's own words)
+      out.why = { cut: s.heights.reduce((n, v) => n + (v < -1.4 ? 1 : 0), 0), cells: s.heights.length, s: Math.round((performance.now() - t0) / 1000),
+        status: document.getElementById("job-status").textContent, log: [...document.querySelectorAll("#ctl-log > div")].slice(-12).map((d) => d.textContent) };
       out.note = document.getElementById("hs-spoil-note").textContent;
       const m = /Level now ([\\d.]+) mm below/.exec(out.note);
       out.level = m ? -Number(m[1]) : 0;
       document.getElementById("hs-show-stock").click();
       return out;
     })()`);
-    ok(!e.stock && e.bit === 25.4, `surfacing job: bare spoilboard, 25.4 mm bit: ${JSON.stringify(e)}`);
-    ok(Math.abs(e.level + 1.5) < 0.01 && Math.abs(e.min + 1.5) < 0.01, `surfaced to -1.5, the mark gone: level ${e.level}, min ${e.min}`);
+    ok(!e.stock && e.bit === 25.4, `surfacing job: bare spoilboard, 25.4 mm bit: ${JSON.stringify({ stock: e.stock, bit: e.bit, note: e.note })}`);
+    ok(Math.abs(e.level + 1.5) < 0.01 && Math.abs(e.min + 1.5) < 0.01, `surfaced to -1.5, the mark gone: level ${e.level}, min ${e.min}${Math.abs(e.min + 1.5) < 0.01 ? "" : " " + JSON.stringify(e.why)}`);
     const shot = await page.send("Page.captureScreenshot", { format: "png" });
     const out = path.join(ROOT, "build", "hand_spoilboard.png");
     fs.mkdirSync(path.dirname(out), { recursive: true });

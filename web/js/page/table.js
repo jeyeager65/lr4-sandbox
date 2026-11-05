@@ -533,7 +533,7 @@
     note: () => $("ab-now").textContent,
     drawn() {                                        // the drawing's rack (gantry, about Z) and tilt (beam, about Y), radians
       const q = (k) => { const m = meshes.find((n) => n.userData.motion === k); return m ? m.quaternion : null; }, g = q("gantry"), b = q("beam");
-      return { rack: g ? 2 * Math.atan2(g.z, g.w) : null, tilt: b ? -2 * Math.atan2(b.y, b.w) : null, span: AB.piv && AB.piv.span };
+      return { rack: g ? 2 * Math.atan2(g.z, g.w) : null, tilt: b ? -2 * Math.atan2(b.y, b.w) : null, span: AB.piv && AB.piv.span, zspan: AB.piv && (AB.piv.zspan || AB.piv.span) };
     } };
   const clock = (s) => (s >= 3600 ? `${Math.floor(s / 3600)}:${String(Math.floor(s / 60) % 60).padStart(2, "0")}` : `${Math.floor(s / 60)}`) +
     `:${String(Math.floor(s % 60)).padStart(2, "0")}`;
