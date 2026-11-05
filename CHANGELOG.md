@@ -3,6 +3,23 @@
 The version is the sandbox page's (`VERSION` in `web/js/page/job.js`, shown in its footer). The footer also shows
 the date the model data was built and the Printables file set it was solved for.
 
+## 0.68.0 - 2026-11-05
+- **Hoses and cords hang like ropes:** the vacuum hose sags and rolls in the holders' trays, zip-tied only at the upper
+  router mount, the core's two channels and the Min-end holder (the ties go through the parts' real slots); the router
+  cord rides on the hose from its strain relief and, with the table hub, drops off the beam's end in a round U to
+  ROUTER, slack on the floor. The shop vac's two hoses hang too.
+- **The wiring drawn wire by wire** (Layers > Wiring, off at load - a move is ~3x faster without it): the core's eight
+  wires in colour inside a cable sleeve (Layers > See through sleeves) to their header pins in the Jackpot box, the 24 V
+  supply's mains cord and its 24 V lead, the hub's mains cables, devices, terminals and wire nuts; the X motor's wires
+  leave its plug. The hose is grounded at the hub (a binding post) or to a grounded screw without it.
+- With the hub, the switch panel hangs under the front apron against the front-left leg (paddle switch + a lamp and
+  two toggles); the hub's side panel meets it in a square corner; both 190 mm tall.
+- The BOM's hose and wiring lengths come from the hanging ropes (the longest over the travel).
+- As built: the beam's drawn tilt pivots on the Z leadscrews (as the cuts), so the drawn bit tip matches the cut.
+- Select a part: the chip has a Hide button. Keys: H hides the selected part (again: back), Shift+H shows every hidden
+  part, I inspects the selected part.
+- `?ncspeed=5` starts the machine at that Speed.
+
 ## 0.67.0 - 2026-11-02
 - **Table power hub + dust port** (Options, off by default): a panel set into the table's left end, under it - the
   dust port where the hose drops (a bulkhead: the machine hose in outside, the vac's inside), a 20 A power inlet for

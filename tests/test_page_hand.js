@@ -61,7 +61,7 @@ const TWO = ["G21 G90", "T1", "G0 Z5", "G0 X20 Y40", "G1 Z-1 F600", "G1 X80 F150
   const load = async () => {
     await page.send("Page.navigate", { url: `http://127.0.0.1:${port}/web/index.html?parts=/parts/#26x50` });
     let up = false;
-    for (let i = 0; i < 120 && !up; i++) {
+    for (let i = 0; i < 480 && !up; i++) {
       await sleep(500);
       try { up = await page.val("window.crossOriginIsolated === true && !!window.LR4Job && !!LR4Ctl.travel() && document.getElementById('status').hidden && !!LR4Job.spoil()"); } catch (e) { /* loading */ }
     }

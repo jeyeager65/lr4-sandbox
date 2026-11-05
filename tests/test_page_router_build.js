@@ -19,7 +19,7 @@ const ok = (cond, msg) => { checks++; console.log((cond ? "  ok   " : "  FAIL ")
   const load = async () => {
     await page.send("Page.navigate", { url: `http://127.0.0.1:${port}/web/index.html?parts=/parts/#26x50` });
     let up = false;
-    for (let i = 0; i < 120 && !up; i++) {
+    for (let i = 0; i < 480 && !up; i++) {           // (up to 4 min: 60 s timed out on the first load after a data refresh)
       await sleep(500);
       try { up = await page.val("window.crossOriginIsolated === true && !!window.LR4RouterBuild && !!LR4Ctl.travel() && document.getElementById('status').hidden"); } catch (e) { /* loading */ }
     }

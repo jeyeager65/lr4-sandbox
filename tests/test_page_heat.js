@@ -59,7 +59,7 @@ const VIDEO = HEAD.concat(["G0 X120 Y50", "G1 Z-3 F300", "G4 P6", "G0 Z5", "M5",
     await sleep(800);
     await page.send("Page.navigate", { url: `http://127.0.0.1:${port}/web/index.html?parts=/parts/#26x50` });
     let up = false;
-    for (let i = 0; i < 120 && !up; i++) {
+    for (let i = 0; i < 480 && !up; i++) {
       await sleep(500);
       try { up = await page.val("window.crossOriginIsolated === true && !!window.LR4Heat && !!LR4Ctl.travel() && document.getElementById('status').hidden && !!LR4AsBuilt.geo()"); } catch (e) { /* loading */ }
     }

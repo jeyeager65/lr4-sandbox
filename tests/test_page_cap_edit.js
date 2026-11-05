@@ -22,7 +22,7 @@ const SHOT = process.env.CE_SHOT;                    // a folder: screenshots of
     await sleep(800);
     await page.send("Page.navigate", { url: `http://127.0.0.1:${port}/web/index.html?parts=/parts/#26x50` });
     let up = false;
-    for (let i = 0; i < 120 && !up; i++) {
+    for (let i = 0; i < 480 && !up; i++) {
       await sleep(500);
       try { up = await page.val("!!window.LR4RouterBuild && !!window.capEditOpen && document.getElementById('status').hidden"); } catch (e) { /* loading */ }
     }

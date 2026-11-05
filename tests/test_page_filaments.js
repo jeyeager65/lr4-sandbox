@@ -33,7 +33,7 @@ const STATE = `(() => {
     await sleep(800);
     await page.send("Page.navigate", { url: `http://127.0.0.1:${port}/web/index.html?parts=/parts/#26x50` });
     let up = false;
-    for (let i = 0; i < 120 && !up; i++) {
+    for (let i = 0; i < 480 && !up; i++) {
       await sleep(500);
       try { up = await page.val("document.getElementById('status').hidden && !!window.LR4Job && !!LR4Job.spoil()"); } catch (e) { /* loading */ }
     }
@@ -155,7 +155,7 @@ const STATE = `(() => {
     await page.val(`MS.set("lr4-filaments", JSON.stringify(LR4Filaments.defaults())); true`);
     await page.send("Page.navigate", { url: `http://127.0.0.1:${port}/web/index.html?parts=/parts/&fresh=1#26x50&preset=single&spools=PETG_1f5fbf~PLA_cc1f1a&parts=Core.2~Brace_1.2&layer=0.28&plates=acrylic_e8eef0~plywood_dbad70&ab=1&abx=m0_max~wx_-0.3` });
     let up2 = false;
-    for (let i = 0; i < 120 && !up2; i++) { await sleep(500); try { up2 = await page.val("location.hash.includes('preset=single') && !!window.LR4Job && document.getElementById('status').hidden && !!LR4Job.spoil()"); } catch (e) { /* loading */ } }
+    for (let i = 0; i < 480 && !up2; i++) { await sleep(500); try { up2 = await page.val("location.hash.includes('preset=single') && !!window.LR4Job && document.getElementById('status').hidden && !!LR4Job.spoil()"); } catch (e) { /* loading */ } }
     await sleep(1500);
     const lk = await page.val(`JSON.stringify({ preset: FIL.s.preset, sp: FIL.s.spools.length, parts: FIL.s.parts, layer: FIL.s.layer, front: FIL.s.plates.front.mat,
       core: FIL.map.get("Core"), brace: FIL.map.get("Brace_1"), y: FIL.map.get("Y_Clip_1"),

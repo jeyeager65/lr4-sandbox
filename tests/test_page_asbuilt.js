@@ -65,7 +65,7 @@ const PASSES = (() => {
     await sleep(800);
     await page.send("Page.navigate", { url: `http://127.0.0.1:${port}/web/index.html?parts=/parts/#26x50` });
     let up = false;
-    for (let i = 0; i < 120 && !up; i++) {
+    for (let i = 0; i < 480 && !up; i++) {
       await sleep(500);
       try { up = await page.val("window.crossOriginIsolated === true && !!window.LR4AsBuilt && !!LR4Ctl.travel() && document.getElementById('status').hidden && !!LR4Job.spoil() && !!LR4AsBuilt.geo()"); } catch (e) { /* loading */ }
     }
