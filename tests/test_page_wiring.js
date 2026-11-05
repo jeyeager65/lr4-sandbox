@@ -71,7 +71,8 @@ const ok = (cond, msg) => { checks++; console.log((cond ? "  ok   " : "  FAIL ")
     ok(jn.n === 3 && jn.vis && jn.far.every((d) => d > 100 && d < 700), `3 taped joins (lead meets extender), each 100-700 mm in a straight line from its motor (the core's loops back with the hose) (${jn.far.join(", ")})`);
     // 51c: the beam's runs drawn wire by wire - each wire from its part to its pin (or the join), a zip tie per brace,
     // none inside the YZ plates (their channels: V1E's route), steppers, wheels, rail strips, braces / strut plate /
-    // box / lid / XZ plates / supply / hose holders (ray parity); a Y move only moves them, a Z move rebuilds only the spans plate -> beam
+    // box / lid / XZ plates / supply / hose holders (ray parity; each piece + its mesh's offset now: the curves are in the build
+    // pose's frame, the page's load pose); a Y move only moves them, a Z move rebuilds only the spans plate -> beam
     const bw = await page.val(`(() => { wrTick(); const b = LR4WiringView.beam(), want = { "y0-motor": 4, "z0-motor": 4, "y0-stop": 2, "z0-stop": 2, "y1-motor": 8, "z1-motor": 8, "y1-stop": 4, "z1-stop": 4 };
       const bad = [], ends = [];
       for (const [id, n] of Object.entries(want)) { const q = b.info[id]; if (!q || q.wires !== n) bad.push(id + " " + (q ? q.wires : 0));
@@ -79,20 +80,40 @@ const ok = (cond, msg) => { checks++; console.log((cond ? "  ok   " : "  FAIL ")
       const solid = meshes.filter((m) => m.visible !== false && /^(Brace_|StrutPlate_|Jackpot3_(Box|Lid)$|(XZ|YZ)_Plate_(Min|Max)$|[YZ]_Stepper_(Min|Max)$|PSU_24V$|Hose_Holder|(Back|Front)Wheel_|RailStrip_)/.test(m.userData.name || "") && !/~thread/.test(m.userData.name));
       const boxes = solid.map((m) => new THREE.Box3().setFromObject(m));
       const rc = new THREE.Raycaster(), dir = new THREE.Vector3(0.31, 0.53, 0.79).normalize(), inside = {};
-      for (const c of BW.curves.concat(BW.tieCurves, BW.sleeveCurves)) for (const q of c.getSpacedPoints(Math.ceil(c.getLength() / 4))) {   // (4 mm: the plates' meshes are big)
+      const nb = BW.baseCurves.length - BW.plateCurves.length, dB = BW.mesh.position, dP = BW.span.position;
+      for (const [cs, d] of [[BW.baseCurves.slice(0, nb).concat(BW.tieCurves, BW.sleeveCurves), dB], [BW.plateCurves.concat(BW.spanCurves, BW.sleeveSpanCurves), dP]])
+      for (const c of cs) for (const q of c.getSpacedPoints(Math.ceil(c.getLength() / 4)).map((v) => v.add(d))) {   // (4 mm: the plates' meshes are big)
         solid.forEach((m, k) => { if (!boxes[k].containsPoint(q)) return; rc.set(q, dir); if (rc.intersectObject(m, false).length % 2) inside[m.userData.name] = (inside[m.userData.name] || 0) + 1; });
       }
       const P = [HOME.pose.x, HOME.pose.y, HOME.pose.z], t = meta.travel, k0 = BW.key;
       move([P[0], P[1] + 150, P[2]]); wrTick(); const yKept = BW.key === k0;
       const s0 = BW.spanKey; move([P[0], P[1], t.z[0]]); wrTick(); const zSpan = BW.key === k0 && BW.spanKey !== s0;
+      // 51d: the span a rope a side - at the travel's bottom / top its ends on their pins, its length held (<= 10 % over
+      // its rest: the solver gives a little against the colliders), no wire / sleeve of it inside a solid there
+      const rope = { n: Object.keys(BW.ropes || {}).length, worst: 0, end: 0, inside: {} };
+      for (const z of [t.z[0], t.z[1]]) {
+        move([P[0], P[1], z]); wrTick();
+        for (const R of Object.values(BW.ropes)) {
+          const q = R.cable.points(), w = R.ss.w.clone().add(R.rel);
+          rope.worst = Math.max(rope.worst, +(R.cable.length() / R.len).toFixed(3));
+          rope.end = Math.max(rope.end, +Math.hypot(q[0][0] - R.ss.a.x, q[0][1] - R.ss.a.y, q[0][2] - R.ss.a.z).toFixed(2), +w.distanceTo(new THREE.Vector3(...q[q.length - 1])).toFixed(2));
+        }
+        const bx = solid.map((m) => new THREE.Box3().setFromObject(m)), off = BW.span.position;
+        for (const c of BW.spanCurves.concat(BW.sleeveSpanCurves)) for (const q0 of c.getSpacedPoints(Math.ceil(c.getLength() / 2))) {
+          const q = q0.clone().add(off);
+          solid.forEach((m, k) => { if (!bx[k].containsPoint(q)) return; rc.set(q, dir); if (rc.intersectObject(m, false).length % 2) rope.inside[m.userData.name] = (rope.inside[m.userData.name] || 0) + 1; });
+        }
+      }
       move(P); wrTick();
-      return { bad, maxEnd: Math.max(...ends), n: ends.length, ties: b.ties, braces: wrBraces().length, inside, yKept, zSpan,
+      return { bad, maxEnd: Math.max(...ends), n: ends.length, ties: b.ties, braces: wrBraces().length, inside, yKept, zSpan, rope,
         shown: meshes.filter((m) => /^Beam_(Wires|ZipTies|Sleeve)/.test(m.userData.name || "")).every((m) => m.visible), sleeves: BW.sleeveCurves.length }; })()`);
     ok(!bw.bad.length && bw.maxEnd <= 2 && bw.shown, `51c: the beam's runs wire by wire, each from its part to its pin within 2 mm (${bw.n} ends, worst ${bw.maxEnd} mm${bw.bad.length ? "; wrong: " + bw.bad.join(", ") : ""})`);
     ok(bw.ties === bw.braces, `a zip tie beside each brace the bundle passes (${bw.ties} of ${bw.braces} braces)`);
     ok(!Object.keys(bw.inside).length, `no wire / tie / sleeve inside a YZ plate (through its channels), a stepper, a wheel, a rail strip, a brace, the strut plate, the box, its lid, an XZ plate, the supply or a hose holder (${JSON.stringify(bw.inside)})`);
     ok(bw.sleeves === 2, `a sleeve over each side's bundle, plate -> box (${bw.sleeves})`);
     ok(bw.yKept && bw.zSpan, `a Y move only moves the beam's wires (${bw.yKept}); a Z move rebuilds only the spans (${bw.zSpan})`);
+    ok(bw.rope.n === 2 && bw.rope.end <= 0.5 && bw.rope.worst <= 1.1, `51d: the span plate -> beam a rope a side (${bw.rope.n}), at Z's bottom / top its ends on their pins (${bw.rope.end} mm), its length within 10 % of its rest (worst x${bw.rope.worst})`);
+    ok(!Object.keys(bw.rope.inside).length, `the span's wires / sleeve inside no solid at Z's bottom / top (${JSON.stringify(bw.rope.inside)})`);
     // Inspect a YZ assembly (user 2026-11-05): its plate's wires in its channels shown, Wiring on or off (X-ray ghosts the plate)
     const ins = await page.val(`(async () => { LR4WiringView.set(false); inspect(asmOf(wrMesh("YZ_Plate_Min"))); await new Promise((r) => setTimeout(r, 400));
       const m = wrMesh("Beam_WiresPlate_Min"), r = { inSet: INSPECT.set.has(partId(m)), vis: m.visible, tris: m.geometry.index ? m.geometry.index.count / 3 : 0, other: wrMesh("Beam_Wires").visible };

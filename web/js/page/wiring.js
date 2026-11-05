@@ -497,11 +497,19 @@
       m.position.copy(dp); if (pl && pl.userData.ex) m.position.add(WR_V(pl.userData.ex));
     }
     const sk = rel.toArray().map((a) => a.toFixed(2)).join();
-    if (sk !== BW.spanKey) {                           // the span: plate's end -> beam's end, straight (51d: a rope)
+    if (sk !== BW.spanKey) {                           // the span: plate's end -> beam's end, a rope a side (51d)
       BW.spanKey = sk;
-      const L = (s) => new THREE.LineCurve3(s.a, s.w.clone().add(rel));
-      BW.span.geometry = BW.spans.length ? hrTubes(BW.span.geometry, BW.spans.map((s) => ({ curve: L(s), segs: 1, r: s.r, radial: 6, rgb: s.rgb }))) : bwEmpty();
-      BW.sleeveSpan.geometry = BW.sleeveSpans.length ? hrTubes(BW.sleeveSpan.geometry, BW.sleeveSpans.map((s) => ({ curve: L(s), segs: 1, r: BW_SLEEVE_R, radial: 14 }))) : bwEmpty();
+      const L = (s) => new THREE.LineCurve3(s.a, s.w.clone().add(rel)), ws = [], sl = [], done = new Set();
+      for (const R of Object.values(BW.ropes || {})) {
+        const q = bwRope(R, rel);
+        sl.push({ curve: q.axis, segs: 3 * BW_SPAN_N, r: BW_SLEEVE_R, radial: 14 });
+        for (const x of q.wires) { ws.push({ curve: x.curve, segs: 3 * BW_SPAN_N, r: x.s.r, radial: 6, rgb: x.s.rgb }); done.add(x.s); }
+      }
+      for (const s of BW.spans) if (!done.has(s)) ws.push({ curve: L(s), segs: 1, r: s.r, radial: 6, rgb: s.rgb });   // (a side with no sleeve: straight)
+      BW.span.geometry = ws.length ? hrTubes(BW.span.geometry, ws) : bwEmpty();
+      BW.sleeveSpan.geometry = sl.length ? hrTubes(BW.sleeveSpan.geometry, sl) : bwEmpty();
+      BW.spanCurves = ws.map((s) => s.curve); BW.sleeveSpanCurves = sl.map((s) => s.curve);   // (tests: in the plate's frame - + BW.span.position)
+      BW.curves = (BW.baseCurves || []).concat(BW.spanCurves);
     }
     if (WR.lines) for (const ln of WR.lines.children) {   // the taped joins (wrLines' cylinders) onto the drawn splice
       const j = BW.joins[ln.userData.run.id], m = ln.userData.join;
@@ -528,7 +536,7 @@
         const put = (q, to) => { const c = curve(q, rgb, r, to); if (c && stripe) curve(q.map((v, i) => v.clone().add(stripe[i] || stripe[stripe.length - 1])), BW_C.white, 0.2, to); return c; };
         if (!split) { const c = put(pts, specs); return c && { c0: c, c1: c }; }
         const [iA, iW] = split, c0 = put(pts.slice(0, iA + 1), plateSpecs[side]), c1 = put(pts.slice(iW), specs);
-        BW.spans.push({ a: pts[iA].clone(), w: pts[iW].clone(), r, rgb });
+        BW.spans.push({ a: pts[iA].clone(), w: pts[iW].clone(), r, rgb, side });
         return c0 && c1 && { c0, c1 };
       };
       // the Min entry: through the lid's end slot (world z 116..122; the box mesh's frame = its geometry's min, 6.3 mm
@@ -592,7 +600,8 @@
           const end = last.clone().addScaledVector(g.normalize(), Math.max(0, last.distanceTo(e0) - 12));
           const q = D.slice(iW, iT + 1).filter((v) => v !== vJ).concat([end]);
           if (q.length >= 2) sleeves.push({ curve: new THREE.CatmullRomCurve3(q, false, "centripetal"), segs: Math.ceil(wrLen(q) / 6), r: BW_SLEEVE_R, radial: 14 });
-          BW.sleeveSpans.push({ a: D[iA].clone(), w: D[iW].clone() });
+          BW.sleeveSpans.push({ a: D[iA].clone(), w: D[iW].clone(), side,   // + the ways the bundle leaves the plate / goes on into the beam
+            da: D[iA].clone().sub(D[iA - 1]).normalize(), dw: D[Math.min(D.length - 1, iW + 1)].clone().sub(D[iW]).normalize() });
         }
         lane += r.group === "motor" && iJ >= 0 ? 6 : iJ >= 0 ? 0 : wires.length;
         curves.push(...ends.map((e) => e.c.c1));
@@ -626,7 +635,49 @@
     // (tests: every piece at the build's pose - the beam's, the plates', the spans)
     BW.info = info; BW.tieN = ts.length; BW.tieCurves = tieAt; BW.sleeveCurves = sleeves.map((s) => s.curve);
     BW.plateCurves = [].concat(...Object.values(plateSpecs).map((a) => a.map((s) => s.curve)));
-    BW.curves = specs.map((s) => s.curve).concat(BW.plateCurves, BW.spans.map((s) => new THREE.LineCurve3(s.a, s.w)));
+    BW.baseCurves = specs.map((s) => s.curve).concat(BW.plateCurves);
+    BW.curves = BW.baseCurves.concat(BW.spans.map((s) => new THREE.LineCurve3(s.a, s.w)));   // (the ropes' once bwTick has settled them)
+    // 51d: a rope a side (the sleeve's middle), its length the longest the span gets over the Z travel + a little (set
+    // here, at no pose of the moment: the plate exit doesn't move in Z, the beam's end does - the chord's longest is at an end)
+    const zb = box.position.z - ((box.userData.base && box.userData.base.t[2]) || 0) - ((box.userData.ex && box.userData.ex[2]) || 0), tz = meta.travel.z;
+    const bxOf = (n) => { const m = wrMesh(n); if (!m) return null; const b = new THREE.Box3().setFromObject(m); return [b.min.x, b.min.y, b.min.z, b.max.x, b.max.y, b.max.z]; };
+    BW.ropes = {};
+    for (const ss of BW.sleeveSpans) {
+      const s = ss.side, chord = (dz) => ss.a.distanceTo(ss.w.clone().add(V(0, 0, dz - zb)));
+      const pl = bxOf("YZ_Plate_" + s), wh = bxOf("BackWheel_" + s);   // (the wheel's box cut to the plate's x: its bolt / nut reach in to the beam's end)
+      if (pl && wh) { wh[0] = Math.max(wh[0], pl[0]); wh[3] = Math.min(wh[3], pl[3]); }
+      BW.ropes[s] = { ss, len: Math.max(chord(tz[0]), chord(tz[1])) + BW_SPAN_EXTRA, cable: null, rel: null,
+        fixed: [pl, wh].filter(Boolean), beam: [bxOf("XZ_Plate_" + s), bxOf("StrutPlate_Bottom")].filter(Boolean),
+        wires: BW.spans.filter((w) => w.side === s).map((w) => ({ w, oa: w.a.clone().sub(ss.a), ow: w.w.clone().sub(ss.w) })) };
+    }
+  }
+  // 51d: the span plate exit -> beam as an LR4Cable rope (pinned + its direction at both ends, gravity; the YZ plate +
+  // back wheel ride the gantry, the XZ plate + bottom strut plate the beam: shifted by rel). Re-settled only as Z moves:
+  // a short settle from the last shape, laid fresh + a long one after a jump. Each wire rides it at its own offset
+  // (its ends' offsets from the bundle's middle, blended along, kept square to the rope). Plate frame (BW.span's).
+  const BW_SPAN_EXTRA = 10, BW_SPAN_N = 16, BW_SPAN_IT = 10;         // mm over the longest (GUESS: "a little"); the rope's nodes
+  function bwRope(R, rel) {
+    const V = (x, y, z) => new THREE.Vector3(x, y, z), arr = (v) => [v.x, v.y, v.z], a = R.ss.a, w = R.ss.w.clone().add(rel);
+    const cols = R.fixed.map((b) => ({ box: b })).concat(R.beam.map((b) => ({ box: [b[0] + rel.x, b[1] + rel.y, b[2] + rel.z, b[3] + rel.x, b[4] + rel.y, b[5] + rel.z] })));
+    const jump = !R.cable || R.rel.distanceTo(rel) > 15;
+    if (jump) {                                        // laid as a parabola that long (wrDrawn's depth), then settled
+      const ch = a.distanceTo(w), d = Math.sqrt(3 * ch * Math.max(0, R.len - ch) / 8), lay = [];
+      for (let k = 0; k <= 12; k++) { const t = k / 12; lay.push(arr(a.clone().lerp(w, t).add(V(0, 0, -4 * d * t * (1 - t))))); }
+      R.cable = LR4Cable.make(lay, { n: BW_SPAN_N, len: R.len, r: BW_SLEEVE_R, stiff: 0.3, damp: 0.1, iters: BW_SPAN_IT });
+    }
+    const c = R.cable, g = c.seg;
+    c.pin(0, arr(a)); c.pin(1, arr(a.clone().addScaledVector(R.ss.da, g))); c.pin(-1, arr(w)); c.pin(-2, arr(w.clone().addScaledVector(R.ss.dw, -g)));
+    c.settle(jump ? 100 : 20, cols);
+    R.rel = rel.clone();
+    const P = c.points().map((q) => V(q[0], q[1], q[2])), axis = new THREE.CatmullRomCurve3(P, false, "centripetal"), arc = [0];
+    for (let i = 1; i < P.length; i++) arc.push(arc[i - 1] + P[i].distanceTo(P[i - 1]));
+    const wires = R.wires.map(({ w: s, oa, ow }) => {
+      const q = P.map((p, i) => { const t = arc[i] / arc[arc.length - 1], o = oa.clone().lerp(ow, t), tg = axis.getTangent(t);
+        if (i > 0 && i < P.length - 1) o.addScaledVector(tg, -o.dot(tg));
+        return p.clone().add(o); });
+      return { curve: new THREE.CatmullRomCurve3(q, false, "centripetal"), s };
+    });
+    return { axis, wires, cols };
   }
   function wrSet(on) {
     WR.on = !!on;
