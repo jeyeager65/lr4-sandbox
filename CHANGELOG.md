@@ -15,6 +15,8 @@ the date the model data was built and the Printables file set it was solved for.
 - With the hub, the switch panel hangs under the front apron against the front-left leg (paddle switch + a lamp and
   two toggles); the hub's side panel meets it in a square corner; both 190 mm tall.
 - The BOM's hose and wiring lengths come from the hanging ropes (the longest over the travel).
+- With the table hub, the supply's mains cord in the BOM follows its drawn route (with the router cord, past the
+  middle hose guide): ~2.8 m at 26 x 50, was 1.9 m. The router cord's length is set once, at the middle of the travel.
 - As built: the beam's drawn tilt pivots on the Z leadscrews (as the cuts), so the drawn bit tip matches the cut.
 - Select a part: the chip has a Hide button. Keys: H hides the selected part (again: back), Shift+H shows every hidden
   part, I inspects the selected part.

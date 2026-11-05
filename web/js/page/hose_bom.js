@@ -306,7 +306,11 @@
   // Part 53c (user 2026-11-04): the drawn wires (router cord + relief, the core's wires + sleeve, the supply's cords, the hub's
   // mains wiring) only with Layers > Wiring on - off, their sims + meshes are skipped (a move ~2x faster); the hose always.
   // HR.quick (the wiring report's corner moves) runs only with it on.
-  const hrWiresOn = () => !!(window.LR4WiringView && LR4WiringView.on());
+  // HR.force: the wiring report's moves (wrReport) run the cord sim with the layer off too - its rest length at the fixed
+  // pose (HR.fixing: HR.cordL, user 2026-11-05 - it was set when Wiring went on, so it varied with the pose then) and
+  // the drawn mains cord's length at each corner (HR.mainsLen)
+  const hrShown = () => !!(window.LR4WiringView && LR4WiringView.on());
+  const hrWiresOn = () => !!HR.force || hrShown();
   function hrWiresSet() {                             // Wiring toggled: the cord re-settles from its route, then all redrawn
     HR.cordJump = true;
     if (hoseMesh && typeof move === "function") move();
@@ -335,7 +339,7 @@
     hc.pin(HR.ix.cl, hrV(P.cl.p));                                                        // the Min-end holder's zip tie, lying in its tray
     hc.pin(HR.ix.cl - 1, hrV(P.cl.p.clone().add(new THREE.Vector3(s, 0, 0)))); hc.pin(HR.ix.cl + 1, hrV(P.cl.p.clone().add(new THREE.Vector3(-s, 0, 0))));
     hc.pin(-1, hrV(Pn)); hc.pin(-2, hrV(Pn.clone().addScaledVector(dirN, -s)));
-    if (HR.last && HR.last.distanceTo(P.t2.p) > 150) jump = true;
+    if ((HR.last && HR.last.distanceTo(P.t2.p) > 150) || HR.fixing) jump = true;   // (the fixed pose: from the guide, not the last shape)
     HR.last = P.t2.p.clone();
     const cols = hrColliders().concat(hrBeamCols(dy, dz));
     const rel = [];                                    // the strain relief (last drawn): the hose rides over it
@@ -455,7 +459,9 @@
         const lay = G.map((q) => new THREE.Vector3(...q));
         // the guided part + a little slack; the hanging tail (hub) long enough for the far Y stop (it stretched 1.6x there)
         const Ee = lay[tailFrom - 1], tl = B ? Math.max(...meta.travel.y.map((yv) => Math.hypot(Ee.x - B.x, Ee.y + (yv - dy) - B.y, Ee.z - B.z))) * 1.15 + 150 : 0;
-        const la = hrArc(lay), L = B ? gArc[tailFrom - 1] * 1.03 + tl : la[la.length - 1] * 1.03, n = Math.max(20, Math.round(L / HR.segC) + 1);
+        const la = hrArc(lay), L0 = B ? gArc[tailFrom - 1] * 1.03 + tl : la[la.length - 1] * 1.03;
+        if (HR.fixing) HR.cordL = { key: HR.key, L: L0 };   // the fixed pose's (wrReport): this scene's cord from now on
+        const L = HR.cordL && HR.cordL.key === HR.key ? HR.cordL.L : L0, n = Math.max(20, Math.round(L / HR.segC) + 1);
         HR.cord = LR4Cable.make(lay.map(hrV), { n, len: L, r: c.d / 2, stiff: 0.3, damp: 0.08, iters: 8 });   // stiff enough for smooth, rounded bends only
         HR.cG = Math.round(gL / L * (n - 1));          // the guided nodes: 0 .. cG
         HR.cx = {}; for (const k of ["t1", "t2", "cl"]) HR.cx[k] = Math.round(tArc(k) / L * (n - 1));
@@ -804,14 +810,15 @@
     const len = curve.getLength();
     hoseMesh.geometry = hrTubes(hoseMesh.geometry, [{ curve, segs: Math.ceil(len / 4), r: meta.hose.od / 2, radial: 28 }]);
     hoseWire.repeat.set(len / 10, 1);                    // wire pitch ~10 mm
-    if (cordMesh && R && R.cp) {
+    if (cordMesh && R && R.cp && hrShown()) {          // (not the report's forced sims: the relief's box is the hose's collider)
       const cc = new THREE.CatmullRomCurve3(R.cp.map((p) => new THREE.Vector3(...p)), false, "centripetal");
       cordMesh.geometry = hrTubes(cordMesh.geometry, [{ curve: cc, segs: Math.ceil(cc.getLength() / 12), r: meta.hose.cord.d / 2, radial: 8 }]);
       const rl = meta.hose.cord.relief;
       if (reliefMesh && rl && meta.hose.cord.base) { reliefMesh.geometry.dispose(); reliefMesh.geometry = hrTaper(cc, rl.l + 5, rl.d / 2, rl.cd / 2 + 0.6); }
     }
     if (tieMesh && R) { tieMesh.geometry.dispose(); tieMesh.geometry = hrTies(R.hp); }
-    if (!hrWiresOn()) return;                         // (hidden: kept as they were, redrawn when it's turned on)
+    if (HR.force) { const m = R && R.cp && hrMainsPts(R.cp); HR.mainsLen = m ? hrArc(m)[m.length - 1] : 0; }
+    if (!hrShown()) return;                           // (hidden: kept as they were, redrawn when it's turned on)
     if (wireMesh) hrWireMeshes(R && HR.wireP);
     hrPowerMeshes(R && R.cp);
   }
@@ -855,9 +862,22 @@
       m.visible = true;
     };
     const p = ac && wrPath(ac);
+    const pts = (hub && hrMainsPts(cp, ac)) || (p && typeof wrDrawn === "function" && typeof wrLen === "function" ? wrDrawn(ac, p, wrLen(p)) : p);
+    tube(PWR_MESH.cord, pts || [], 3.5);
+    const d = dc && wrPath(dc);                       // [near end, outside the slot, in the slot, ..., the terminal]
+    tube(PWR_MESH.lead, d ? d.slice(0, 3).concat(d[2].clone().add(V(-6, 0, 0))) : [], 2.4);
+    const pr = d ? [d[2].clone().add(V(-6, 0, 0)), ...d.slice(3)] : [];
+    tube(PWR_MESH.red, pr.map((q, i) => q.clone().add(V(0, 0, i ? 1.4 : 0.6))), 1.1);
+    tube(PWR_MESH.black, pr.map((q, i) => q.clone().add(V(0, 0, i ? -1.4 : -0.6))), 1.1);
+  }
+  // the hub's mains cord as drawn (with the router cord: cp = its settled points), or null; also the wiring report's
+  // length for it (wiring.js wrReport: each travel corner - Part 53c, it was the Wiring layer's route, ~10 cm short)
+  function hrMainsPts(cp, ac) {
+    const V = (x, y, z) => new THREE.Vector3(x, y, z);
+    if (!ac) ac = LR4Wiring.runsFor(true).find((r) => r.id === "psu-ac");
     let pts = null;
     const brick = meshes.find((m) => m.userData.name === "PSU_24V"), guide = meshes.find((m) => m.userData.name === "Hose_Holder_Shorty_2");
-    if (p && hub && cp && HR.cordE && HR.cx && HR.cx.cl !== undefined && brick && typeof HUB !== "undefined" && HUB.outlet && HUB.outlet.psu) {
+    if (ac && optsOn().hub && cp && HR.cordE && HR.cx && HR.cx.cl !== undefined && brick && typeof HUB !== "undefined" && HUB.outlet && HUB.outlet.psu) {
       const E = V(...HR.cordE), pb = new THREE.Box3().setFromObject(brick), F = wrEnd(ac.to);   // F: the brick's far end
       const xg = guide ? new THREE.Box3().setFromObject(guide).max.x + 8 : F.x + 40;          // just past the middle guide
       let kE = HR.cx.cl; cp.forEach((q, i) => { if (i > HR.cx.cl && V(...q).distanceTo(E) < V(...cp[kE]).distanceTo(E)) kE = i; });
@@ -885,13 +905,8 @@
       const yT = Math.min(B0.y - 10, P.y + R2);
       pts = [...loop, ...run, ...t2, V(xu, yT, B0.z), V(xu, P.y + 0.29 * R2, B0.z + 0.29 * R2), V(xu, P.y, B0.z + R2),
         V(xu, P.y, P.z - 70), V(P.x - 12, P.y, P.z - 8), P];
-    } else if (p) pts = typeof wrDrawn === "function" && typeof wrLen === "function" ? wrDrawn(ac, p, wrLen(p)) : p;
-    tube(PWR_MESH.cord, pts || [], 3.5);
-    const d = dc && wrPath(dc);                       // [near end, outside the slot, in the slot, ..., the terminal]
-    tube(PWR_MESH.lead, d ? d.slice(0, 3).concat(d[2].clone().add(V(-6, 0, 0))) : [], 2.4);
-    const pr = d ? [d[2].clone().add(V(-6, 0, 0)), ...d.slice(3)] : [];
-    tube(PWR_MESH.red, pr.map((q, i) => q.clone().add(V(0, 0, i ? 1.4 : 0.6))), 1.1);
-    tube(PWR_MESH.black, pr.map((q, i) => q.clone().add(V(0, 0, i ? -1.4 : -0.6))), 1.1);
+    }
+    return pts;
   }
   function hrWireMeshes(on) {
     const empty = () => new THREE.BufferGeometry().setAttribute("position", new THREE.Float32BufferAttribute([], 3));

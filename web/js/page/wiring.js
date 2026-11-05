@@ -227,14 +227,23 @@
     if (typeof LR4Wiring === "undefined" || !meta || !meta.travel || !HOME.pose) return [];
     const t = meta.travel, back = [HOME.pose.x, HOME.pose.y, HOME.pose.z], worst = {};
     const hr = typeof HR !== "undefined" && HR, hl = [];
-    if (hr) HR.quick = true;                          // the ropes settle briefly at each corner (Part 53 perf: ~3 s of the load)
+    let mains = 0;
+    // the ropes settle briefly at each corner (Part 53 perf: ~3 s of the load); the router cord's sim runs with the
+    // Wiring layer off too (HR.force), first at a fixed pose - the travel's middle, Z up - which sets its rest length
+    // (user 2026-11-05: it was set when Wiring went on, so it varied with the pose then)
+    if (hr) { HR.force = true; HR.hose = HR.cord = null; HR.fixing = true; }   // (both laid fresh: the hose's free span kept its last shape)
     try {
+      // (the fixed pose: a full settle from the guide - the same shape whatever pose came before)
+      if (hr) { const mid = (a) => (a[0] + a[a.length - 1]) / 2; move([mid(t.x), mid(t.y), t.z[t.z.length - 1]]); HR.fixing = false; HR.quick = true; }
       for (const x of t.x) for (const y of t.y) for (const z of t.z) {
+        if (hr) HR.mainsLen = 0;
         move([x, y, z]);
         for (const r of wrRuns()) { const p = wrPath(r); if (p) worst[r.id] = Math.max(worst[r.id] || 0, wrLen(p)); }
         if (hr && HR.hose) hl.push(HR.hose.length());   // the hose as it hangs (Part 53b: the BOM's length, hoseNeed)
+        if (hr && HR.mainsLen) mains = Math.max(mains, HR.mainsLen);   // the hub's mains cord as drawn (with the router cord)
       }
-    } finally { if (hr) HR.quick = false; }
+    } finally { if (hr) { HR.quick = false; HR.force = false; HR.fixing = false; } }
+    if (mains) worst["psu-ac"] = mains;               // (not the Wiring layer's route: ~10 cm short)
     if (hl.length) HR.need = { max: Math.max(...hl), min: Math.min(...hl), rope: true };
     move(back);
     const need = {};
@@ -248,7 +257,7 @@
   // hose are there) - the report moves the machine through the travel's corners
   function wrFit(now) {
     if (typeof LR4Wiring === "undefined" || !meta || !meta.travel || !HOME.pose || !wrMesh("Jackpot3_Box")) return null;
-    const key = JSON.stringify([meta.travel, !!wrMesh("Router_Cord_Run"), !!wrMesh("Vacuum_Hose"), wrHub()]);
+    const key = JSON.stringify([meta.travel, !!wrMesh("Router_Cord_Run"), !!wrMesh("Vacuum_Hose"), wrHub(), typeof HR !== "undefined" && HR.key]);   // HR.key: a new cord scene -> its fixed-pose length again
     if (WR.fitKey !== key) {
       // (load perf, Part 53: ~0.4 s - the report moves the machine and its ropes through the travel's corners) not in the
       // BOM's first draw: just after, then the BOM again with the wiring rows. Called with now = true (tests, the probes): at once
