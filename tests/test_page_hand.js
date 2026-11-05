@@ -45,6 +45,18 @@ const H_HELPERS = `
       document.getElementById("job-play").click();
       await T.until(() => LR4Job.running(), 20000);  // started (a stale "Done." from the last job isn't this one's)
     },
+    // (diagnostic, 2026-11-05: the surfacing job's feed hold in full suite runs - who sent it?) every realtime byte the
+    // page sends FluidNC but "?" (with its caller) + each state FluidNC reports; printed when the surfacing check fails
+    rt: [],
+    trace() {
+      if (!H.poll) { let last = ""; H.poll = setInterval(() => { const st = CTL.state || ""; if (st !== last) { H.rt.push([Math.round(performance.now()), "state " + st]); last = st; } }, 25); }
+      const s = CTL.sim; if (!s || s.__traced) return; s.__traced = true;
+      const rt = s.realtime.bind(s);
+      s.realtime = (b) => {
+        if (b !== "?") H.rt.push([Math.round(performance.now()), "rt " + JSON.stringify(b), (new Error().stack || "").split("\\n").slice(2, 6).map((l) => l.trim().replace(/^at /, "").replace(/https?:[^ ]*\\/js\\//, "")).join(" < ")]);
+        return rt(b);
+      };
+    },
     pop: () => !document.getElementById("job-pop").hidden,
     done: () => !LR4Job.running() && /^Done\\./.test(document.getElementById("job-status").textContent),
   };
@@ -121,6 +133,7 @@ const TWO = ["G21 G90", "T1", "G0 Z5", "G0 X20 Y40", "G1 Z-1 F600", "G1 X80 F150
     const d = await page.val(`(async () => {
       document.getElementById("t-run").click();
       await H.home();
+      H.rt = []; H.trace();
       await H.play(${JSON.stringify(TWO)}, "two.nc");
       await T.until(H.pop, 120000);
       const out = { h: document.getElementById("job-pop-h").textContent, bit: !document.getElementById("job-pop-bit").hidden };
@@ -141,6 +154,7 @@ const TWO = ["G21 G90", "T1", "G0 Z5", "G0 X20 Y40", "G1 Z-1 F600", "G1 X80 F150
       await T.until(() => LR4Job.src() && LR4Job.src().name === "/LR4_surfacing.gcode" && LR4Job.tl(), 15000);
       const out = { stock: !!LR4Job.tl().stock, bit: LR4Job.tl().tools.get(1).diameter };
       H.speed(20);                                    // a long job: FluidNC at 20x
+      H.trace(); H.rt.push([Math.round(performance.now()), "surfacing: Run"]);
       document.getElementById("job-play").click();
       const t0 = performance.now();
       await T.until(() => LR4Job.running(), 20000);
@@ -150,7 +164,8 @@ const TWO = ["G21 G90", "T1", "G0 Z5", "G0 X20 Y40", "G1 Z-1 F600", "G1 X80 F150
       out.min = H.min(s);
       // (flaky 2026-11-04: "Done." with nothing cut - this says why next time: how much it cut, the job's own words)
       out.why = { cut: s.heights.reduce((n, v) => n + (v < -1.4 ? 1 : 0), 0), cells: s.heights.length, s: Math.round((performance.now() - t0) / 1000),
-        status: document.getElementById("job-status").textContent, log: [...document.querySelectorAll("#ctl-log > div")].slice(-12).map((d) => d.textContent) };
+        status: document.getElementById("job-status").textContent, log: [...document.querySelectorAll("#ctl-log > div")].slice(-12).map((d) => d.textContent),
+        trace: H.rt.slice(-60) };
       out.note = document.getElementById("hs-spoil-note").textContent;
       const m = /Level now ([\\d.]+) mm below/.exec(out.note);
       out.level = m ? -Number(m[1]) : 0;
@@ -158,7 +173,7 @@ const TWO = ["G21 G90", "T1", "G0 Z5", "G0 X20 Y40", "G1 Z-1 F600", "G1 X80 F150
       return out;
     })()`);
     ok(!e.stock && e.bit === 25.4, `surfacing job: bare spoilboard, 25.4 mm bit: ${JSON.stringify({ stock: e.stock, bit: e.bit, note: e.note })}`);
-    ok(Math.abs(e.level + 1.5) < 0.01 && Math.abs(e.min + 1.5) < 0.01, `surfaced to -1.5, the mark gone: level ${e.level}, min ${e.min}${Math.abs(e.min + 1.5) < 0.01 ? "" : " " + JSON.stringify(e.why)}`);
+    ok(Math.abs(e.level + 1.5) < 0.01 && Math.abs(e.min + 1.5) < 0.01, `surfaced to -1.5, the mark gone: level ${e.level}, min ${e.min}${Math.abs(e.min + 1.5) < 0.01 && !process.env.HAND_TRACE ? "" : " " + JSON.stringify(e.why)}`);
     const shot = await page.send("Page.captureScreenshot", { format: "png" });
     const out = path.join(ROOT, "build", "hand_spoilboard.png");
     fs.mkdirSync(path.dirname(out), { recursive: true });

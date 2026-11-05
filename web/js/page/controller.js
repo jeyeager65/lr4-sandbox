@@ -378,6 +378,7 @@
       const m = ev.MPos || (ev.WPos && CTL.wco ? ev.WPos.map((v, i) => v + CTL.wco[i]) : null);
       if (m) CTL.mpos = m;
       CTL.state = ev.state;
+      CTL.sub = ev.sub;                              // Hold:1 = still slowing down (ctlResume waits for Hold:0)
       runState();
       if ($("con-status").checked) ctlAdd(ev.line, "dim");
       if (FT.homing && ev.state === "Home") FT.homing = "on";
@@ -770,9 +771,22 @@
     if (CTL.alarm != null && st === "Alarm") CTL.alarmSeen = true;   // (the ALARM line can beat the state's report)
     if (CTL.alarm != null && CTL.alarmSeen && st && st !== "Alarm") alarmShow(null);   // unlocked / reset: the card goes
   }
+  // cycle start (~) once the hold is complete: FluidNC ignores ~ while a feed hold is still slowing down (Hold:1 -
+  // Protocol.cpp protocol_do_cycle_start: only on holdComplete), so a quick Resume was lost and the machine stayed
+  // held - the next job then started held (2026-11-05: test_page_hand's surfacing "Held. Resume to carry on." in
+  // loaded suite runs: the T2 popup's Resume 17 ms after the hold). Asks for a status till Hold:0; 15 s at most.
+  function ctlResume() {
+    const t0 = performance.now();
+    const go = () => {
+      if (!CTL.sim) return;
+      if (/^Hold/.test(CTL.state || "") && CTL.sub === 1 && performance.now() - t0 < 15000) { CTL.sim.realtime("?"); setTimeout(go, 50); return; }
+      CTL.sim.realtime("~");
+    };
+    go();
+  }
   function runHold() {
     if (!CTL.sim || !FJ.job) return;
-    if (FJ.job.held || /^Hold/.test(CTL.state)) resumeWhenSettled(() => CTL.sim && CTL.sim.realtime("~"));
+    if (FJ.job.held || /^Hold/.test(CTL.state)) resumeWhenSettled(ctlResume);
     else CTL.sim.realtime("!");
   }
   function runStop() {                               // Stop = soft reset: FluidNC drops the job (ALARM:3 if it was moving)

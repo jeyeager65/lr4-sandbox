@@ -62,7 +62,7 @@ window.LR4Director = (() => {
         if (want && CTL.sim && FJ.job && !FJ.job.held && !/^Hold/.test(CTL.state)) { CTL.sim.realtime("!"); ours = true; }
         else if (want) ncScale(0.02);
         else {
-          if (ours && CTL.sim) CTL.sim.realtime("~");
+          if (ours && CTL.sim) ctlResume();
           ours = false;
           ncScale(Math.min(kmax, rate));
         }

@@ -18,6 +18,9 @@ the date the model data was built and the Printables file set it was solved for.
 - With the table hub, the supply's mains cord in the BOM follows its drawn route (with the router cord, past the
   middle hose guide): ~2.8 m at 26 x 50, was 1.9 m. The router cord's length is set once, at the middle of the travel.
 - As built: the beam's drawn tilt pivots on the Z leadscrews (as the cuts), so the drawn bit tip matches the cut.
+- Resume right after a pause (a bit change, M0, Hold) no longer gets lost: FluidNC ignores a cycle start while the
+  hold is still slowing down, so the page now waits for the hold to finish (Hold:0) before sending it. Before, the
+  machine could stay held and the next job start held.
 - Select a part: the chip has a Hide button. Keys: H hides the selected part (again: back), Shift+H shows every hidden
   part, I inspects the selected part.
 - `?ncspeed=5` starts the machine at that Speed.

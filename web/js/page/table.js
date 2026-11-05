@@ -700,7 +700,7 @@
     if (!JOB.tl) return;
     if (!JOB.preview) {                              // Run / Hold / Resume on FluidNC
       if (!FJ.job) fjRun();
-      else if (CTL.sim) { if (FJ.job.held) resumeWhenSettled(() => CTL.sim && CTL.sim.realtime("~")); else CTL.sim.realtime("!"); }
+      else if (CTL.sim) { if (FJ.job.held) resumeWhenSettled(ctlResume); else CTL.sim.realtime("!"); }
       return;
     }
     if (!JOB.playing && JOB.t >= JOB.tl.total) { jobSeek(0); JOB.k = 0; }
@@ -723,7 +723,7 @@
     resumeWhenSettled(() => {                        // the popup stays up (saying so) while the touch plate moves
       $("job-pop").hidden = true;
       if (JOB.preview) jobPlaying(true);
-      else if (CTL.sim && FJ.job) CTL.sim.realtime("~");
+      else if (CTL.sim && FJ.job) ctlResume();
     });
   });
   {                                                  // drag the pause popup anywhere over the view (kept till reload)
