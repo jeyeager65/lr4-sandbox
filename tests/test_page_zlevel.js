@@ -15,7 +15,7 @@ const STOP = 0.6;
 (async () => {
   if (!CHROME) { console.log("Chrome not found (set CHROME)"); process.exit(1); }
   const port = 9190 + Math.floor(Math.random() * 100), srv = server("headers", port);
-  const page = await chromePage(9800 + Math.floor(Math.random() * 100));
+  const page = await chromePage(9800 + Math.floor(Math.random() * 100), { ncspeed: process.env.LR4_TEST_NCSPEED ?? 5 });   // FluidNC at 5x (2026-11-05: measured faster, still passes)
   try {
     await sleep(800);
     await page.send("Page.navigate", { url: `http://127.0.0.1:${port}/web/index.html?parts=/parts/#26x50` });

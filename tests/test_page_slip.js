@@ -53,7 +53,7 @@ const SLOT = (depth, feed, hard) => ["(LR4 slip test)", "(Stock: XMIN=0 XMAX=200
 (async () => {
   if (!CHROME) { console.log("Chrome not found (set CHROME)"); process.exit(1); }
   const port = 9190 + Math.floor(Math.random() * 100), srv = server("headers", port);
-  const page = await chromePage(9800 + Math.floor(Math.random() * 100));
+  const page = await chromePage(9800 + Math.floor(Math.random() * 100), { ncspeed: 1 });   // real time (2026-11-05: timing-sensitive)
   try {
     await sleep(800);
     await page.send("Page.navigate", { url: `http://127.0.0.1:${port}/web/index.html?parts=/parts/#26x50` });

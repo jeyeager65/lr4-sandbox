@@ -57,7 +57,7 @@ const TWO = ["G21 G90", "T1", "G0 Z5", "G0 X20 Y40", "G1 Z-1 F600", "G1 X80 F150
 (async () => {
   if (!CHROME) { console.log("Chrome not found (set CHROME)"); process.exit(1); }
   const port = 9090 + Math.floor(Math.random() * 100), srv = server("headers", port);
-  const page = await chromePage(9700 + Math.floor(Math.random() * 100));
+  const page = await chromePage(9700 + Math.floor(Math.random() * 100), { ncspeed: process.env.LR4_TEST_NCSPEED ?? 5 });   // FluidNC at 5x (2026-11-05: measured faster, still passes)
   const load = async () => {
     await page.send("Page.navigate", { url: `http://127.0.0.1:${port}/web/index.html?parts=/parts/#26x50` });
     let up = false;

@@ -60,7 +60,7 @@ function savePng(dataUrl, name) {
   for (const f of ["fluidnc/program.wasm", "fluidtouch/fluidtouch.wasm"])
     if (!fs.existsSync(path.join(ROOT, "web", f))) { console.log(`web/${f} missing`); process.exit(1); }
   const port = 8990 + Math.floor(Math.random() * 100), srv = server("headers", port);
-  const page = await chromePage(9600 + Math.floor(Math.random() * 100));
+  const page = await chromePage(9600 + Math.floor(Math.random() * 100), { ncspeed: 1 });   // real time (2026-11-05: slower at 5x on SwiftShader)
   const click = async ([x, y]) => {               // a real mouse click (CDP), so the page's own listeners see it
     for (const type of ["mouseMoved", "mousePressed", "mouseReleased"]) {
       await page.send("Input.dispatchMouseEvent", { type, x, y, button: type === "mouseMoved" ? "none" : "left", buttons: type === "mousePressed" ? 1 : 0, clickCount: 1 });

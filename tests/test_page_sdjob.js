@@ -69,7 +69,7 @@ const RUN = (k) => `(async () => {
   if (!CHROME) { console.log("Chrome not found (set CHROME)"); process.exit(1); }
   if (!fs.existsSync(path.join(ROOT, "web", "fluidnc", "program.wasm"))) { console.log("web/fluidnc/program.wasm missing"); process.exit(1); }
   const port = 8890 + Math.floor(Math.random() * 100), srv = server("headers", port);
-  const page = await chromePage(9800 + Math.floor(Math.random() * 100));
+  const page = await chromePage(9800 + Math.floor(Math.random() * 100), { ncspeed: 1 });   // real time (2026-11-05: slower at 5x on SwiftShader)
   try {
     await sleep(800);
     await page.send("Page.navigate", { url: `http://127.0.0.1:${port}/web/index.html?parts=/parts/#26x50` });
