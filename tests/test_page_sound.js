@@ -11,7 +11,7 @@ const ok = (cond, msg) => { checks++; console.log((cond ? "  ok   " : "  FAIL ")
 (async () => {
   if (!CHROME) { console.log("Chrome not found (set CHROME)"); process.exit(1); }
   const port = 8690 + Math.floor(Math.random() * 100), srv = server("headers", port);
-  const page = await chromePage(9500 + Math.floor(Math.random() * 100));
+  const page = await chromePage(9500 + Math.floor(Math.random() * 100), { ncspeed: 1 });   // real time: the voices follow the motion
   try {
     await sleep(800);
     await page.send("Page.navigate", { url: `http://127.0.0.1:${port}/web/index.html?parts=/parts/#26x50` });

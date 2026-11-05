@@ -40,7 +40,7 @@ def main():
     da, db = sys.argv[1], sys.argv[2]
     tol = float(sys.argv[sys.argv.index("--tol") + 1]) if "--tol" in sys.argv else 0.05
     (a, ga), (b, gb) = load(da), load(db)
-    out = []
+    out, notes = [], []
     pa = {(p["key"], p.get("struts")): p for p in a["parts"]}
     pb = {(p["key"], p.get("struts")): p for p in b["parts"]}
     for k in sorted(set(pa) - set(pb), key=str):
@@ -65,7 +65,9 @@ def main():
                 out.append(f"part {k}: mesh {len(ma)} vs {len(mb)} vertices")
             elif len(ma) and np.abs(ma - mb).max() > 1e-4:
                 out.append(f"part {k}: mesh vertices differ by {np.abs(ma - mb).max():.4f} mm")
-        for f in ("anchor", "jp3", "from_temp", "hose_j"):
+        if p.get("anchor") != q.get("anchor"):        # how it was placed (an incremental fit's guess): a note, not a difference
+            notes.append(f"note: part {k}: anchor {p.get('anchor')} vs {q.get('anchor')}")
+        for f in ("jp3", "from_temp", "hose_j"):
             if p.get(f) != q.get(f):
                 out.append(f"part {k}: {f} {p.get(f)} vs {q.get(f)}")
 
@@ -105,7 +107,7 @@ def main():
     boms("temp.bom_fit", ta.get("bom_fit"), tb.get("bom_fit"))
     for f in ("hose", "bom_ref", "nclips_ref", "sizes"):
         same(f"temp.{f}", ta.get(f), tb.get(f))
-    print("\n".join(out))
+    print("\n".join(notes + out))
     print("SAME (within tol)" if not out else f"DIFFERENT: {len(out)} items")
 
 

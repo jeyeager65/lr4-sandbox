@@ -41,6 +41,7 @@ const JOBTXT = ["(LR4 tool change test)", STOCK, "(ToolDef 1: SHAPE=flat D=3.175
       const errs = []; window.addEventListener("error", (e) => errs.push(e.message));
       LR4Router.set({ router: ${JSON.stringify(router)} }); await T.sleep(300);
       TC_ON.hold = ${JSON.stringify(hold)}; TC_ON.nuts = ${JSON.stringify(nuts)};
+      LR4ToolChange.speed(${Number(process.env.TC_SPEED) || 3});   // (2026-11-04: 3x, sampled every 50 ms - was 1x, ~200 s a run)
       handBit({ shape: "flat", d: 3.175, len: 38, flen: 12 }); await T.sleep(100);   // a 1/8" in: the change to 1/4" swaps the collet
       const m = (n) => meshes.find((q) => q.userData.name === n), wc = (q) => new THREE.Box3().setFromObject(q).getCenter(new THREE.Vector3());
       const nut0 = wc(m("Router_ColletNut")), lock = m("Router_ShaftLock"), lock0 = lock && lock.position.clone();
@@ -58,6 +59,7 @@ const JOBTXT = ["(LR4 tool change test)", STOCK, "(ToolDef 1: SHAPE=flat D=3.175
         await T.sleep(50);
       }
       await done;
+      LR4ToolChange.speed(1);
       const nut1 = wc(m("Router_ColletNut"));
       out.back = +nut1.distanceTo(nut0).toFixed(3);
       out.lockBack = lock ? +lock.position.distanceTo(lock0).toFixed(3) : 0;
