@@ -14,14 +14,14 @@ let fails = 0;
 const ok = (cond, msg) => { if (!cond) { fails++; console.log("FAIL " + msg); } };
 
 const steps = [
-  // the Core assembly from its row: the set only, the list
-  `document.getElementById('v-layers').click(); const all = LR4Inspect.shown().length;
-   document.querySelector('#show-tree .ins[data-id=core]').click();
+  // the Core assembly (the Show tree's row is gone, 2026-11-05: I on a selected part, or LR4Inspect.open): the set only, the list
+  `document.getElementById('v-show').click(); const all = LR4Inspect.shown().length;
+   LR4Inspect.open('core');
    const rows = [...document.querySelectorAll('#insp-list tr')].map((r) => [r.cells[0].textContent, r.cells[1].textContent]);
    return { all, id: LR4Inspect.id(), shown: LR4Inspect.shown(), overlay: !document.getElementById('insp').hidden,
      head: document.getElementById('insp-h').textContent, rows }`,
-  // a checkbox in it: Core's hardware off hides the bolts; back on
-  `const box = document.querySelector('#show-tree input[data-id="core.hardware"]'); box.click();
+  // Show's Hardware chip: off hides the bolts (in every area, Core's too); back on
+  `const box = document.querySelector('#show-kinds button[data-kind="hardware"]'); box.click();
    const off = LR4Inspect.shown(); box.click(); return { off, on: LR4Inspect.shown().length }`,
   // a double-click inside: the part under the pointer (the view is framed on the core, so its centre hits something)
   `const c = document.querySelector('canvas'), r = c.getBoundingClientRect();
@@ -142,9 +142,9 @@ else {
   const row = (l) => (a.rows.find((r) => r[1] === l) || [])[0];
   ok(row("M8 x 40 mm hex head bolt") === "8" && row("M5 x 30 mm button head screw") === "6" && row("Bearing Core Lower") === "4",
     "parts list: " + JSON.stringify(a.rows));
-  // bolts also listed under another assembly (tool mount -> router, X endstop -> electronics) stay: shown with either
-  ok(!has(b.off, /^(Bearing_Core|X_Idler|Core__)/) && has(b.off, /^Tool_Mount_T_Kobalt__M5_to_Core$/) && b.on === a.shown.length,
-    `Core's hardware box works in it (${b.off.length} / ${b.on})`);
+  // (the chip is hardware in every area: a bolt also listed under another assembly - the tool mount's, under the router - goes too)
+  ok(!has(b.off, /^(Bearing_Core|X_Idler|Core__|Tool_Mount_T_Kobalt__M5_to_Core$)/) && b.off.length > 0 && b.on === a.shown.length,
+    `Show's Hardware chip works in it (${b.off.length} / ${b.on})`);
   ok(c.id && c.id !== "core" && c.shown < a.shown.length, "double-click inside: down to a part: " + JSON.stringify(c));
   ok(d.id === null && !d.overlay && d.shown === a.all, "Esc: back to the whole machine");
   const exN = Object.keys(t.ex).length, plate = t.ex.YZ_Plate_Min || [], moved = Object.values(t.ex).filter((v) => Math.hypot(...v) > 1).length;

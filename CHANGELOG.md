@@ -4,14 +4,24 @@ The version is the sandbox page's (`VERSION` in `web/js/page/job.js`, shown in i
 the date the model data was built and the Printables file set it was solved for.
 
 ## 0.69.0 - 2026-11-05
-- **All the wiring drawn** (Layers > Wiring): the Y / Z motors' and endstops' wires through the YZ plates' channels
-  (V1E's routing; the steppers turned so their leads face the plate's back), out over the back wheel, hanging as a rope
-  into the beam as Z moves, then a bundle in a sleeve through the braces (a zip tie at each) into the Jackpot box to
-  their pins; V1E's extenders as black ribbons from taped joins. The lid fan's lead leaves the blower under its
-  sticker in a channel, runs along the lid and in at the box's +X end to the power terminal. The endstops' wires are
-  soldered to their outer tabs (COM + NC) under heatshrink, as in V1E's kit. Plugs on the board's headers (Molex-style on the motors, Dupont on the inputs; GUESS).
-- Hover a drawn wire for its run's name, ends and length. The old straight end-to-end lines are now an option:
-  Layers > Wiring > Rat's nest (off).
+- **Show** (was Layers; L, or the toolbar): Parts (Printed / Cut / Hardware / Electronics) and Areas (Table, the YZ
+  sides, Beam, Core, ...) as on / off buttons that combine freely, Reset, and the explanation behind "?". Hidden parts
+  (H) show as a "N hidden · Show all" chip on the view (Shift+H brings them back). The parts tree and the presets are gone.
+- **All the wiring drawn** (Show > Wiring > Wires): the Y / Z motors' and endstops' wires through the YZ plates'
+  channels (V1E's routing; the steppers turned so their leads face the plate's back), out over the back wheel, hanging
+  as a rope into the beam as Z moves, then a bundle in a braided sleeve through the braces (a zip tie at each) into the
+  Jackpot box to their pins; V1E's extenders as black ribbons, each lead's plug in the extender's socket under tape.
+  The lid fan's lead leaves the blower under its sticker in a channel, runs along the lid and in at the box's +X end to
+  the power terminal. The endstops' wires are soldered to their outer tabs (COM + NC) under heatshrink, as in V1E's kit.
+  Plugs on the board's headers (Molex-style on the motors, Dupont on the inputs; GUESS).
+- **X-ray parts** (on with the wires): the machine see-through, so the wires show inside the plates, the beam and the
+  sleeves. The run list traces a run end to end (its wires outlined, its ends / length / extender below); hover a wire
+  for the same.
+- Without the table hub, the hose and router cord hang a short way off the beam's end, and the supply's mains cord
+  isn't drawn (the BOM still lists their lengths).
+- Steppers, endstops and the lid fan are whole components (one row in Inspect's list; H hides the whole thing); the
+  endstops are in the core's / YZ sides' Inspect views. Exploded: an MGN12 carriage stays on its rail, the YZ wheels'
+  bearings drop out of their holes. Short part names (details on the selection card).
 
 ## 0.68.0 - 2026-11-05
 - **Hoses and cords hang like ropes:** the vacuum hose sags and rolls in the holders' trays, zip-tied only at the upper

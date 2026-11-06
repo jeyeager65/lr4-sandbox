@@ -3,11 +3,14 @@
 //   - the stand-in board (51a.3): the Jackpot 3 drawn as a plain blue PCB + its connector blocks at the list's spots,
 //     inside the box (a child of Jackpot3_Box: it rides the beam) - only when the user's own board model isn't there
 //     (it never is in the public page: LOCAL_ONLY);
-//   - the rat's nest (51a.5): a line per run from end to end, coloured by its group, drawn over the parts - since 51e an
-//     option (Layers > Wiring > Rat's nest, off); hover / tap a drawn wire (or a line): its run's name, from -> to, how far.
-  const WR = { on: false, nest: false, board: null, lines: null, tip: null, hover: null, plugs: null, fan: null };
+//   - the rat's nest (51a.5): a line per run from end to end, coloured by its group, built hidden:
+//     not drawn (the wires all are: 2026-11-05) - kept for the runs' lengths + the joins; hover / tap a drawn wire: its run's name, from -> to, how far.
+  const WR = { on: false, xray: true, trace: null, board: null, lines: null, tip: null, hover: null, plugs: null, fan: null };
   const WR_V = (a) => new THREE.Vector3(...a);
   const wrMesh = (n) => meshes.find((m) => m.userData.name === n);
+  // a mesh's own bounds (world), not its children's - Box3.setFromObject takes them in, and the Jackpot box carries the
+  // stand-in board, the plugs and the drawn fan lead (which leaves the box: it stretched the routes' box to x 255)
+  function wrBB(m) { m.updateMatrixWorld(); const g = m.geometry; if (!g.boundingBox) g.computeBoundingBox(); return g.boundingBox.clone().applyMatrix4(m.matrixWorld); }
   function wrBoxLocal(box, at) {                      // a spot (mm from the box's bounding-box min) in the box mesh's frame
     const g = box.geometry; if (!g.boundingBox) g.computeBoundingBox();
     return g.boundingBox.min.clone().add(WR_V(at));
@@ -25,8 +28,8 @@
     return box.localToWorld(wrBoardLocal(box, x, y, z));
   }
   // ---- the ESP32 (user 2026-11-02: "we want to avoid routing wires over the wifi antenna"): the WROOM-32E module on
-  // the stand-in board (the user's own board model has its own), and its antenna's keep-out - a clear amber zone over
-  // the antenna end (past the board's +y edge), JP3.esp.keep mm round it; shown only with Wiring > Rat's nest (user 2026-11-03 / -05) ----
+  // the stand-in board (the user's own board model has its own). (Its antenna's keep-out zone went with the rat's nest,
+  // 2026-11-05: the wires are all drawn, routed clear of it) ----
   function wrEsp(box, own) {
     if (WR.esp && WR.esp.parent !== box) { WR.esp.parent && WR.esp.parent.remove(WR.esp); WR.esp = null; }
     if (!box || WR.esp || typeof LR4Wiring === "undefined" || !LR4Wiring.JP3.esp) return;
@@ -47,17 +50,8 @@
       for (let k = 0; k < 5; k++) block(x0 + 2 + k * 3, E.ant + 1.2, top + 0.8, 0.6, 4.8, 0.05, gold);   // the antenna's meander
       for (let k = 0; k < 4; k++) block(x0 + 2 + k * 3, E.ant + (k % 2 ? 1.2 : 5.4), top + 0.8, 3.6, 0.6, 0.05, gold);
     }
-    const K = E.keep, zm = new THREE.MeshBasicMaterial({ color: 0xffa31a, transparent: true, opacity: 0.2, depthWrite: false });
-    block(x0 - K, E.ant, top - K, sx + 2 * K, y0 + sy - E.ant + K, 2 * K, zm);   // the keep-out round the antenna end
-    { const z = g.children[g.children.length - 1];      // + its edges, so it reads against a dark box
-      z.add(new THREE.LineSegments(new THREE.EdgesGeometry(z.geometry), new THREE.LineBasicMaterial({ color: 0xffa31a, transparent: true, opacity: 0.8 }))); }
-    g.traverse((o) => { if (o.isMesh) o.userData.espKeep = o.material === zm; });
     box.add(g);
     WR.esp = g;
-    wrEspKeep();
-  }
-  function wrEspKeep() {
-    if (WR.esp) WR.esp.traverse((o) => { if (o.userData.espKeep) o.visible = !!(WR.on && WR.nest); });
   }
   // ---- the stand-in board ----
   function wrBoard() {
@@ -84,7 +78,7 @@
     WR.board = g;
   }
   // ---- 51e: inside the box - the plugs on the headers wires land on, the lid fan's lead (children of the box: they ride
-  // it; shown with Layers > Wiring, the user's own board model or the stand-in). GUESS: V1E docs (jackpot3.md "open 2.54
+  // it; shown with Show > Wiring, the user's own board model or the stand-in). GUESS: V1E docs (jackpot3.md "open 2.54
   // male headers"; skrpro.md "the V1 Engineering wiring kits have the Molex style terminations"): a Molex KK-style housing
   // on each motor header, a 2-pin Dupont on each input (they sit 2.54 apart: nothing wider fits), the power in a screw
   // terminal (two screws on top, the wires in from its +X side) ----
@@ -189,8 +183,7 @@
     box.add(m);
     WR.fan = m;
   }
-  function wrInBox() {                                // the box's wiring bits: with the Wiring layer
-    wrEspKeep();
+  function wrInBox() {                                // the box's wiring bits: with Show > Wiring
     for (const g of [WR.plugs, WR.fan]) if (g) g.visible = !!WR.on;
   }
   // ---- the endstops' wires on their tabs (user 2026-11-05, with V1E's kit photo): soldered to the two OUTER tabs (COM +
@@ -285,7 +278,7 @@
     const bb = new THREE.Box3().setFromObject(m), c = bb.getCenter(new THREE.Vector3());
     if (e.at === "near" || e.at === "far") {          // an end of its long axis, nearer / farther from the Jackpot box
       const s = bb.getSize(new THREE.Vector3()), ax = s.x >= s.y && s.x >= s.z ? "x" : s.y >= s.z ? "y" : "z";
-      const jb = wrMesh("Jackpot3_Box"), jc = jb ? new THREE.Box3().setFromObject(jb).getCenter(new THREE.Vector3()) : c;
+      const jb = wrMesh("Jackpot3_Box"), jc = jb ? wrBB(jb).getCenter(new THREE.Vector3()) : c;
       const p1 = c.clone(), p2 = c.clone(); p1[ax] = bb.min[ax]; p2[ax] = bb.max[ax];
       return (e.at === "near") === (p1.distanceTo(jc) < p2.distanceTo(jc)) ? p1 : p2;
     }
@@ -305,7 +298,7 @@
     if (r.id === "psu-dc") {                          // the brick's near end -> in through the box's +X wall slot (the core's wires'),
       const bx = wrMesh("Jackpot3_Box"), s = bx && LR4Wiring.JP3.spots[r.to.board];   // along that wall's inside, into the
       if (bx && s) {                                   // terminal from its open side (it faces +X: side entry)
-        const bb = new THREE.Box3().setFromObject(bx), q = bx.getWorldQuaternion(new THREE.Quaternion());
+        const bb = wrBB(bx), q = bx.getWorldQuaternion(new THREE.Quaternion());
         const out = WR_V(s.out).applyQuaternion(q), hin = new THREE.Vector3(bb.max.x - 2, bb.min.y + 31, bb.min.z + 19), nr = b.clone().addScaledVector(out, 10);
         return [a, new THREE.Vector3(hin.x + 14, (a.y + hin.y) / 2, hin.z), hin, new THREE.Vector3(Math.min(hin.x - 4, nr.x + 4), (hin.y + nr.y) / 2, (hin.z + nr.z) / 2), nr, b];
       }
@@ -335,7 +328,7 @@
       if (!box || !braces.length) return [...head, ...s, b];
       // V1E docs (w7, w8): tied along the cord / hose to the brace just past halfway (toward the box), off there into
       // the braces with the others, along them to the box (or the part: the supply's mains, w9e)
-      const bx = new THREE.Box3().setFromObject(box), cx = (bb) => (bb.min.x + bb.max.x) / 2;
+      const bx = wrBB(box), cx = (bb) => (bb.min.x + bb.max.x) / 2;
       const mid = (braces[0].min.x + braces[braces.length - 1].max.x) / 2, hi = mid > cx(bx), wall = hi ? bx.max.x : bx.min.x;
       const past = braces.filter((bb) => (cx(bb) - mid) * (hi ? -1 : 1) >= -1);    // halfway or past it, toward the box
       const mb = (past.length ? past : braces).reduce((p, q) => (Math.abs(cx(q) - mid) < Math.abs(cx(p) - mid) ? q : p));
@@ -398,7 +391,7 @@
   // channels (BW_CH), out its back face over the back wheel, behind the XZ plate into the beam at the bundle's level,
   // through each brace's window (bwTies), to the box. Without (the supply's mains): the old plate exit, the braces' corners
   function wrBeamPath(a, b, side, box, kind) {
-    const plate = wrMesh("YZ_Plate_" + side), bx = new THREE.Box3().setFromObject(box);
+    const plate = wrMesh("YZ_Plate_" + side), bx = wrBB(box);
     const pts = [a];
     const max = side === "Max", wall = max ? bx.max.x : bx.min.x;
     if (plate && kind && BW_CH.join[kind] !== undefined) {
@@ -475,7 +468,7 @@
   }
   // ---- the rat's nest ----
   function wrLines() {
-    for (const k of ["lines", "joins"]) if (WR[k]) { scene.remove(WR[k]); WR[k].traverse((o) => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); }); WR[k] = null; }
+    for (const k of ["lines", "joins"]) if (WR[k]) { scene.remove(WR[k]); WR[k].traverse((o) => { if (o.geometry) o.geometry.dispose(); if (o.material && !Object.values(WR_JOIN_MAT).includes(o.material)) o.material.dispose(); }); WR[k] = null; }
     if (!WR.on || typeof LR4Wiring === "undefined") return;
     WR.lines = new THREE.Group(); WR.joins = new THREE.Group();
     for (const r of wrRuns()) {
@@ -483,12 +476,12 @@
       ln.renderOrder = 20; ln.userData.run = r; ln.frustumCulled = false;
       WR.lines.add(ln);
       if (r.group === "motor" && r.segs[0].len && r.segs.some((g) => g.kind === "ribbon")) {   // the lead's plug meets the extender's
-        const j = new THREE.Mesh(new THREE.CylinderGeometry(6, 6, 45, 12), new THREE.MeshStandardMaterial({ color: 0xe8e8e0, roughness: 0.7 }));
+        const j = wrJoinModel();
         j.userData = { run: r.id, at: r.segs[0].len - WR_ALLOW };
         ln.userData.join = j; WR.joins.add(j);
       }
     }
-    WR.lines.visible = !!WR.nest;                     // (51e: the rat's nest is an option; the joins are the drawn wires')
+    WR.lines.visible = false;                         // (never drawn now - the runs' routed lengths + the taped joins come from them; the joins are the drawn wires')
     scene.add(WR.lines, WR.joins);
     wrTick();
   }
@@ -517,6 +510,19 @@
       }
     }
     return out;
+  }
+  // a join drawn (user 2026-11-05, was a plain white cylinder: "I don't understand these"): the stepper lead's 4-pin plug
+  // pushed into V1E's extender's 6-pin socket, a wrap of black tape over the seam (V1E docs w2-w3: taped). Local y along
+  // the run (the motor's side at -y). Housing sizes: 2.54 mm pitch, GUESS
+  const WR_JOIN_MAT = {};
+  function wrJoinModel() {
+    const g = new THREE.Group(), M = (k, c, r) => WR_JOIN_MAT[k] || (WR_JOIN_MAT[k] = material(null, { c, r }));   // (the page's materials: as the stand-in board's)
+    const box = (w, t, y0, y1, mat) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, y1 - y0, t), mat); m.position.y = (y0 + y1) / 2; g.add(m); };
+    box(4 * 2.54 + 0.3, 2.6, -13, 1, M("plug", [0.05, 0.05, 0.055], 0.6));           // the stepper lead's plug (its 4 wires in at -y)
+    box(6 * 2.54 + 0.3, 3.4, -2, 12, M("socket", [0.12, 0.12, 0.13], 0.6));          // the extender's socket (the ribbon out at +y)
+    const tape = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 9, 20), M("tape", [0.02, 0.02, 0.022], 0.35));   // the tape round the seam
+    tape.scale.set(9.0, 1, 2.6); tape.position.y = -1; g.add(tape);
+    return g;
   }
   // a join (V1E docs w2-w3: "Fold the wires, leaving the connection straight", taped, labelled): the motor's lead
   // ends its length along the route (less the plug end's allowance); the endstop's own wire is spliced in there too
@@ -553,6 +559,7 @@
       g.computeBoundingSphere();
     }
     bwTick();
+    if (WR.trace || WR_HL.objs.length) wrTraceDraw();   // (the traced run's outline follows its rebuilt wires)
   }
   // ---- 51c (2026-11-05): the beam's runs drawn wire by wire (as the core's, hose_bom.js WIRE_SET) - the Y / Z motors'
   // leads (4 loose wires), V1E's extender (a flat 6-wire black ribbon, the end wire's white line) from the taped join on,
@@ -562,7 +569,7 @@
   // wires: it fits the plate's channels and a sleeve) through each brace's window (a zip tie beside each), straight (no
   // fold drawn - user), into the box (Min: the lid's end slot; Max: the +X wall's slot over the core's wires), then each
   // wire in its own lane above the core's (board frame +4 mm) to its pin. A sleeve over the bundle from the plate to the
-  // box (Layers > See through sleeves). Pieces: the plate's (rides the plate; a mesh per side in its YZ group - Inspect
+  // box (Show > Wiring > X-ray parts). Pieces: the plate's (rides the plate; a mesh per side in its YZ group - Inspect
   // shows them, X-ray look ghosts the plate), the span (rebuilt on Z), the beam's (rides the beam) ----
   // the plate's channels (V1E docs yze3-yzz2; sections 2026-11-05, private/page_tools/slice_dump.js + slice_png.py):
   // points in the Min plate's frame [mm in from its outer face, from its front (y min), up from its bottom] (the Max
@@ -617,18 +624,19 @@
     if (typeof addMesh !== "function") return false;
     const mk = (name, label, mat, c, group) => addMesh(bwEmpty(), mat, { name, label, group: group || "Electronics", motion: "hose", source: "hardware", color: c });
     const vc = () => new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.5 });
-    BW.mesh = mk("Beam_Wires", "The beam's wires, each drawn (Y0 / Z0 / Y1 / Z1 motors' leads, V1E's extenders as black ribbons, the endstops' pairs): from the YZ plates into the beam, through the braces, into the Jackpot box to their connectors", vc(), [0.6, 0.6, 0.6]);
-    for (const s of ["Min", "Max"]) BW.plates[s] = mk("Beam_WiresPlate_" + s, `The ${s} YZ plate's wires in its channels (V1E docs): down the front channel, along the wire keeper under its tab, up the back channel and out its back face`, vc(), [0.6, 0.6, 0.6], "YZ_" + s);
-    BW.span = mk("Beam_WiresSpan", "The beam's wires from the YZ plates into the beam (the span the beam's Z moves)", vc(), [0.6, 0.6, 0.6]);
-    BW.ties = mk("Beam_ZipTies", "Zip ties: the beam's wire bundle beside each brace", new THREE.MeshStandardMaterial({ color: 0x1a1a1c, roughness: 0.5 }), [0.1, 0.1, 0.11]);
-    BW.sleeve = mk("Beam_Sleeve", "Cable sleeve over the beam's wires, from the YZ plate's back into the beam to the Jackpot box (Layers > See through sleeves)", new THREE.MeshStandardMaterial({ color: new THREE.Color().setRGB(0.12, 0.12, 0.13), roughness: 0.75 }), [0.12, 0.12, 0.13]);
-    BW.sleeveSpan = mk("Beam_SleeveSpan", "Cable sleeve over the beam's wires from the YZ plate into the beam", new THREE.MeshStandardMaterial({ color: new THREE.Color().setRGB(0.12, 0.12, 0.13), roughness: 0.75 }), [0.12, 0.12, 0.13]);
+    BW.mesh = mk("Beam_Wires", "Beam wires::Y0 / Z0 / Y1 / Z1 motors' leads, V1E's extenders as black ribbons, the endstops' pairs: from the YZ plates into the beam, through the braces, into the Jackpot box to their connectors", vc(), [0.6, 0.6, 0.6]);
+    for (const s of ["Min", "Max"]) BW.plates[s] = mk("Beam_WiresPlate_" + s, `${s} YZ plate wires::in its channels (V1E docs): down the front channel, along the wire keeper under its tab, up the back channel and out its back face`, vc(), [0.6, 0.6, 0.6], "YZ_" + s);
+    BW.span = mk("Beam_WiresSpan", "Beam wires (plate to beam)::from the YZ plates into the beam - the span the beam's Z moves", vc(), [0.6, 0.6, 0.6]);
+    BW.ties = mk("Beam_ZipTies", "Zip ties (beam)::the beam's wire bundle beside each brace", new THREE.MeshStandardMaterial({ color: 0x1a1a1c, roughness: 0.5 }), [0.1, 0.1, 0.11]);
+    BW.sleeve = mk("Beam_Sleeve", "Cable sleeve (beam)::braided PET over the beam's wires, from the YZ plate's back into the beam to the Jackpot box", new THREE.MeshStandardMaterial({ color: new THREE.Color().setRGB(0.12, 0.12, 0.13), roughness: 0.75 }), [0.12, 0.12, 0.13]);
+    BW.sleeveSpan = mk("Beam_SleeveSpan", "Cable sleeve (plate to beam)::braided PET over the beam's wires from the YZ plate into the beam", new THREE.MeshStandardMaterial({ color: new THREE.Color().setRGB(0.12, 0.12, 0.13), roughness: 0.75 }), [0.12, 0.12, 0.13]);
+    if (typeof hrBraid === "function") { hrBraid(BW.sleeve.material); hrBraid(BW.sleeveSpan.material); }   // (woven, as the core's)
     bwSleeveClear();
     BW.key = null;
     if (typeof applyVisibility === "function") applyVisibility();   // (hidden with Wiring off from the start)
     return true;
   }
-  function bwSleeveClear() {                          // Layers > See through sleeves (hose_bom.js HR.sleeveClear: the core's sleeve too)
+  function bwSleeveClear() {                          // Show > Wiring > X-ray parts (hose_bom.js HR.sleeveClear: the core's sleeve too)
     const on = typeof HR !== "undefined" && !!HR.sleeveClear;
     for (const m of [BW.sleeve, BW.sleeveSpan]) if (m) {
       Object.assign(m.material, { transparent: on, opacity: on ? 0.22 : 1, depthWrite: !on }); m.material.needsUpdate = true; m.renderOrder = on ? 2 : 0;
@@ -690,7 +698,7 @@
       const L = (s) => new THREE.LineCurve3(s.a, s.w.clone().add(rel)), ws = [], sl = [], done = new Set();
       for (const R of Object.values(BW.ropes || {})) {
         const q = bwRope(R, rel);
-        sl.push({ curve: q.axis, segs: 3 * BW_SPAN_N, r: BW_SLEEVE_R, radial: 14 });
+        sl.push({ curve: q.axis, segs: 3 * BW_SPAN_N, r: BW_SLEEVE_R, radial: 14, uv: hrBraidUv(R.len, BW_SLEEVE_R) });
         for (const x of q.wires) { ws.push({ curve: x.curve, segs: 3 * BW_SPAN_N, r: x.s.r, radial: 6, rgb: x.s.rgb, run: x.s.run }); done.add(x.s); }
       }
       for (const s of BW.spans) if (!done.has(s)) ws.push({ curve: L(s), segs: 1, r: s.r, radial: 6, rgb: s.rgb, run: s.run });   // (a side with no sleeve: straight)
@@ -702,12 +710,12 @@
     }
     if (WR.lines) for (const ln of WR.lines.children) {   // the taped joins (wrLines' cylinders) onto the drawn splice
       const j = BW.joins[ln.userData.run.id], m = ln.userData.join;
-      if (j && m) { m.position.copy(j.p).add(d); m.quaternion.copy(j.q); m.scale.set(0.75, 1, 0.75); }
+      if (j && m) { m.position.copy(j.p).add(d); m.quaternion.copy(j.q); }
     }
   }
   function bwBuild(runs, paths, box) {
     const specs = [], V = (x, y, z) => new THREE.Vector3(x, y, z), info = {}, tieAt = [], plateSpecs = { Min: [], Max: [] }, sleeves = [];
-    const bx = new THREE.Box3().setFromObject(box);
+    const bx = wrBB(box);
     const boxPt = (x, y, z) => box.localToWorld(wrBoxLocal(box, [x, y, z]));
     BW.joins = {}; BW.spans = []; BW.sleeveSpans = [];
     let cur = null;                                   // (51e: the run each wire is drawn for - hover picks it)
@@ -797,7 +805,7 @@
           const iT = D.indexOf(p2[p2.length - ent.length - 1]), last = D[iT], e0 = ent[0], g = e0.clone().sub(last);
           const end = last.clone().addScaledVector(g.normalize(), Math.max(0, last.distanceTo(e0) - 12));
           const q = D.slice(iW, iT + 1).filter((v) => v !== vJ).concat([end]);
-          if (q.length >= 2) sleeves.push({ curve: new THREE.CatmullRomCurve3(q, false, "centripetal"), segs: Math.ceil(wrLen(q) / 6), r: BW_SLEEVE_R, radial: 14 });
+          if (q.length >= 2) sleeves.push({ curve: new THREE.CatmullRomCurve3(q, false, "centripetal"), segs: Math.ceil(wrLen(q) / 6), r: BW_SLEEVE_R, radial: 14, uv: hrBraidUv(wrLen(q), BW_SLEEVE_R) });   // (braided: hose_bom.js hrBraid)
           BW.sleeveSpans.push({ a: D[iA].clone(), w: D[iW].clone(), side,   // + the ways the bundle leaves the plate / goes on into the beam
             da: D[iA].clone().sub(D[iA - 1]).normalize(), dw: D[Math.min(D.length - 1, iW + 1)].clone().sub(D[iW]).normalize() });
         }
@@ -879,26 +887,80 @@
     });
     return { axis, wires, cols };
   }
+  // ---- Show > Wiring (2026-11-05, with the user; was Layers > Wiring / Rat's nest / See through sleeves): Wires draws
+  // them all; X-ray parts (on by default with them) makes the rest see-through + the sleeves clear, so the wires show
+  // inside the plates, the beam and the sleeves; the run list traces one run end to end ----
   function wrSet(on) {
     WR.on = !!on;
+    if (!WR.on) WR.trace = null;
     if (typeof hrWiresSet === "function") hrWiresSet();   // Part 53c: the drawn wires show with it (hose_bom.js) - drawn first,
     if (WR.on) WR.report = wrReport();               // the report's X runs follow them (the lengths over the travel: once, as it's shown)
-    const c = document.getElementById("lay-wiring"); if (c) c.checked = WR.on;
-    { const n = document.getElementById("lay-nest"); if (n && n.parentElement) n.parentElement.style.display = WR.on ? "" : "none"; }   // (only with Wiring)
     if (!WR.on) wrTip(null);
     wrInBox();
     wrLines();
-    if (typeof applyVisibility === "function") applyVisibility();
+    wrShowSync();
+    if (typeof applyVisibility === "function") applyVisibility();   // (+ wrXrayApply)
   }
-  // 51e: the rat's nest (the straight lines end to end, over the parts) - Layers > Wiring > Rat's nest, off by default
-  // now everything is drawn; the lines are still built with Wiring on (the runs' routed lengths, the taped joins)
-  function wrNest(on) {
-    WR.nest = !!on;
-    const c = document.getElementById("lay-nest"); if (c) c.checked = WR.nest;
-    if (WR.lines) WR.lines.visible = WR.nest;
-    wrEspKeep();                                     // (the antenna keep-out: with the rat's nest - user 2026-11-05)
+  function wrShowReset() { WR.xray = true; if (WR.on) wrSet(false); else wrShowSync(); }   // (Show > Reset: panel.js)
+  function wrXraySet(on) { WR.xray = !!on; wrShowSync(); if (typeof applyVisibility === "function") applyVisibility(); }
+  // the machine see-through (not the wires / sleeves / the electronics they land on / the table), as Inspect's X-ray (inspect.js setLook:
+  // materials changed in place, put back) - off in Inspect (its own looks); re-applied when the parts / materials change
+  const WR_X = { saved: new Map(), key: "" };
+  function wrXrayApply() {
+    const want = !!(WR.on && WR.xray && !INSPECT), key = want ? meshes.map((m) => m.material && m.material.uuid).join() : "";
+    if (typeof hrSleeveClear === "function" && (typeof HR === "undefined" || !!HR.sleeveClear !== want)) hrSleeveClear(want);
+    if (key === WR_X.key) return;
+    WR_X.key = key;
+    for (const [mat, o] of WR_X.saved) Object.assign(mat, o, { needsUpdate: true });
+    WR_X.saved.clear();
+    if (!want) return;
+    const save = (mat, o) => { if (!WR_X.saved.has(mat)) WR_X.saved.set(mat, Object.fromEntries(Object.keys(o).map((k) => [k, mat[k]]))); Object.assign(mat, o, { needsUpdate: true }); };
+    for (const m of meshes) {
+      const n = m.userData.name || "", k = tree.kind[partId(m)], asm = ((tree.place[partId(m)] || [])[0] || [])[0];
+      if (!m.material || WIRES_OFF.test(n) || k === "electronics" || asm === "table") continue;   // (the table stays solid: no wires in it)
+      save(m.material, { transparent: true, opacity: k === "hardware" ? 0.3 : 0.16, depthWrite: false });
+    }
   }
-  // hover / tap: the nearest drawn wire (51e) - or rat's nest line - within 8 px of the pointer -> its run's id.
+  // the run list (under the Wiring chips, while Wires is on): grouped; a run's button traces it - its drawn wires
+  // outlined bright through everything, its details below (as the hover tip)
+  const WR_GROUPS = [["motor", "Motors"], ["switch", "Endstops"], ["probe", "Touch plate"], ["power", "Power"]];
+  // the list's short labels (user 2026-11-05: the heading says motor / endstop; the power runs' full names were long) - the
+  // full name stays in the hover / traced details and the BOM
+  const WR_SHORT = { probe: "Plate + clip", "psu-ac": "AC In", "psu-dc": "24V", fan: "Lid fan", "hub-panel": "Hub to panel" };
+  const wrRunLabel = (r) => WR_SHORT[r.id] || r.name.replace(/ (motor|endstop)$/, "");
+  function wrShowSync() {
+    const w = document.getElementById("show-wiring"), x = document.getElementById("show-xray"), list = document.getElementById("show-runs");
+    if (!w) return;
+    w.setAttribute("aria-pressed", String(WR.on));
+    x.hidden = !WR.on; x.setAttribute("aria-pressed", String(!!WR.xray));
+    list.hidden = !WR.on;
+    if (!WR.on) { list.textContent = ""; return; }
+    const drawn = new Set(wrPickSrc().map((s) => s[0]));
+    list.innerHTML = WR_GROUPS.map(([g, label]) => {
+      const rs = wrRuns().filter((r) => r.group === g && drawn.has(r.id));
+      return rs.length ? `<div class="runs-g"><span>${label}</span>${rs.map((r) => `<button type="button" data-run="${r.id}" aria-pressed="${WR.trace === r.id}" title="${r.name}"${wrRunLabel(r).length > 4 ? ' class="wide"' : ""}>${wrRunLabel(r)}</button>`).join("")}</div>` : "";
+    }).join("") + (WR.trace ? `<div class="wr-info">${wrInfo(WR.trace)}</div>` : `<p class="foot">Pick a run to trace it, or hover a wire.</p>`);
+  }
+  function wrTrace(id) { WR.trace = WR.trace === id ? null : id; wrTraceDraw(); wrShowSync(); }
+  // the traced run: a bright see-through outline over each of its drawn curves (a child of the mesh it's drawn in, so it
+  // rides it), redrawn when those curves are rebuilt (a move redraws the core's / the spans' wires)
+  const WR_HL = { objs: [], refs: [] };
+  function wrTraceDraw() {
+    const src = WR.on && WR.trace ? wrPickSrc().filter((s) => s[0] === WR.trace) : [];
+    const refs = src.map((s) => s[2]);
+    if (refs.length === WR_HL.refs.length && refs.every((c, i) => c === WR_HL.refs[i])) return;
+    for (const o of WR_HL.objs) { o.parent && o.parent.remove(o); o.geometry.dispose(); }
+    WR_HL.objs = []; WR_HL.refs = refs;
+    if (!src.length) return;
+    const mat = WR_HL.mat = WR_HL.mat || new THREE.MeshBasicMaterial({ color: 0xffc23d, transparent: true, opacity: 0.55, depthTest: false, depthWrite: false });
+    for (const [, obj, c] of src) {
+      const cv = Array.isArray(c) ? new THREE.CatmullRomCurve3(c, false, "centripetal") : c;
+      const t = new THREE.Mesh(new THREE.TubeGeometry(cv, Math.max(8, Math.ceil(cv.getLength() / 4)), 1.6, 6, false), mat);
+      t.renderOrder = 30; t.frustumCulled = false; t.raycast = () => {};
+      obj.add(t); WR_HL.objs.push(t);
+    }
+  }
+  // hover / tap: the nearest drawn wire (51e) within 8 px of the pointer -> its run's id.
   // Sources: [run id, the mesh it's drawn in (its matrixWorld maps the points; hidden: skipped), curves or points]
   function wrPickSrc() {
     const out = [], add = (id, obj, c) => { if (id && obj && c) out.push([id, obj, c]); };
@@ -908,7 +970,6 @@
     if (typeof HR !== "undefined" && HR.corePick) for (const [id, obj, c] of HR.corePick) add(id, obj, c);
     if (typeof PWR_MESH !== "undefined" && PWR_MESH) for (const [k, m] of Object.entries(PWR_MESH)) add(k === "cord" ? "psu-ac" : "psu-dc", m, m.userData.pick);
     if (typeof HUB !== "undefined" && HUB.cables && wrHub()) for (const [n, p] of Object.entries(HUB.cables.pts)) add("hub-panel", wrMesh("TableHub_Cable" + n), p);
-    if (WR.lines && WR.nest) for (const ln of WR.lines.children) if (ln.userData.p) add(ln.userData.run.id, ln, ln.userData.p);
     return out;
   }
   const WR_PV = new THREE.Vector3();
@@ -938,17 +999,23 @@
   }
   const wrEndName = (e) => (!e ? "the wall" : e.board ? LR4Wiring.JP3.spots[e.board].label : e.probe ? "the touch plate (the core's hole)"
     : (wrMesh(e.part) && wrMesh(e.part).userData.label) || e.part.replace(/_/g, " "));
-  function wrTip(id, cx, cy) {
-    let el = WR.tip;
+  // a run's details (the hover tip, the traced run's panel): its name, ends, segments, length now, over the travel
+  function wrInfo(id) {
     const ln = id && WR.lines && WR.lines.children.find((l) => l.userData.run.id === id);   // (its routed length: the run's line, built with Wiring on)
-    if (!ln) { if (el) el.hidden = true; WR.hover = null; return; }
-    if (!el) { el = WR.tip = document.createElement("div"); el.className = "wr-tip"; canvas.parentElement.appendChild(el); }
+    if (!ln) return "";
     const r = ln.userData.run, segs = r.segs.map((s) => `${s.kind === "ribbon" ? "V1E extender" : s.kind}${s.len ? ` ${(s.len / 1000).toFixed(2)} m` : ""}`).join(" + ");
     const q = (WR.report || []).find((x) => x.id === r.id), m = (v) => (v / 1000).toFixed(2) + " m";
     const fit = !q || !q.need ? "" : q.reaches === null ? `<span>longest over the travel ${m(q.worst)} (+ ${WR_ALLOW * 2} mm at the ends)</span>`
       : `<span>longest over the travel ${m(q.worst)} + ends: ${m(q.need)}${q.ext ? `; ${q.ext} extender${q.ext > 1 ? "s" : ""}` : ""}${q.cut ? `; your wire ${m(q.cut)}` : ""}` +
         ` - ${q.reaches ? `reaches${q.have - q.need > 50 ? `, ${m(q.have - q.need)} spare folded at a brace` : ""}` : `<em>${q.short} mm short: extend it</em>`}</span>`;
-    el.innerHTML = `<b>${r.name}</b><span>${wrEndName(r.from)} → ${wrEndName(r.to)}</span><span>${segs}</span><span>routed now: ${m(ln.userData.len)} (GUESS route)</span>${fit}`;
+    return `<b>${r.name}</b><span>${wrEndName(r.from)} → ${wrEndName(r.to)}</span><span>${segs}</span><span>routed now: ${m(ln.userData.len)} (GUESS route)</span>${fit}`;
+  }
+  function wrTip(id, cx, cy) {
+    let el = WR.tip;
+    const html = wrInfo(id);
+    if (!html) { if (el) el.hidden = true; WR.hover = null; return; }
+    if (!el) { el = WR.tip = document.createElement("div"); el.className = "wr-tip"; canvas.parentElement.appendChild(el); }
+    el.innerHTML = html;
     const b = canvas.parentElement.getBoundingClientRect();
     el.style.left = `${cx - b.left + 14}px`; el.style.top = `${cy - b.top + 14}px`; el.hidden = false;
     WR.hover = id;
@@ -960,9 +1027,11 @@
       if (go) requestAnimationFrame(() => { const [x, y] = at; at = null; if (WR.on) wrTip(wrPick(x, y), x, y); });
     }); }
   canvas.addEventListener("pointerleave", () => wrTip(null));
-  { const c = document.getElementById("lay-wiring"); if (c) c.addEventListener("change", () => wrSet(c.checked)); }
-  { const c = document.getElementById("lay-nest"); if (c) c.addEventListener("change", () => wrNest(c.checked)); }
+  { const w = document.getElementById("show-wiring"), x = document.getElementById("show-xray"), list = document.getElementById("show-runs");
+    if (w) w.addEventListener("click", () => wrSet(!WR.on));
+    if (x) x.addEventListener("click", () => wrXraySet(!WR.xray));
+    if (list) list.addEventListener("click", (e) => { const b = e.target.closest("button[data-run]"); if (b) wrTrace(b.dataset.run); }); }
   wrBoard();
   // tests / videos
-  window.LR4WiringView = { report: () => (WR.report = wrReport()), fit: wrFit, set: wrSet, nest: wrNest, on: () => WR.on, board: () => !!WR.board, runs: () => (WR.lines ? WR.lines.children.map((l) => ({ id: l.userData.run.id, shown: l.visible, len: Math.round(l.userData.len || 0) })) : []),
+  window.LR4WiringView = { report: () => (WR.report = wrReport()), fit: wrFit, set: wrSet, xray: wrXraySet, trace: (id) => { if (WR.trace !== id) wrTrace(id); }, traced: () => WR.trace, on: () => WR.on, board: () => !!WR.board, runs: () => (WR.lines ? WR.lines.children.map((l) => ({ id: l.userData.run.id, shown: l.visible, len: Math.round(l.userData.len || 0) })) : []),
     pick: wrPick, beam: () => ({ info: BW.info, ties: BW.tieN, key: !!BW.key }) };

@@ -1049,10 +1049,13 @@ float lr4G(float x) { float s = 2.0 * fract(x) - 1.0; return floor(x) / 3.0 + (s
     hoseMesh = cordMesh = sleeveMesh = hoseWire = tieMesh = reliefMesh = wireMesh = null;
     if (typeof PWR_MESH !== "undefined") PWR_MESH = null;
   }
+  // a label "Short name::a longer note" (user 2026-11-05: "why are there long descriptions like this?"): the short name
+  // in the lists, the hover and the BOM's views; the note on the selection card (hose_bom.js select)
+  function labelNote(ud) { const i = String(ud.label || "").indexOf("::"); if (i >= 0) { ud.note = ud.label.slice(i + 2); ud.label = ud.label.slice(0, i); } return ud; }
   function addMesh(geo, mat, ud) {
     const m = new THREE.Mesh(geo, mat);
     m.castShadow = m.receiveShadow = true;
-    m.userData = ud;
+    m.userData = labelNote(ud);
     scene.add(m);
     meshes.push(m);
     return m;
@@ -1122,7 +1125,7 @@ float lr4G(float x) { float s = 2.0 * fract(x) - 1.0; return floor(x) / 3.0 + (s
     // the spacer: the stand's length, from the apron's bottom (or the stand's base) to the stand's top
     const sx = base.t[0], sz = base.t[2];
     if (mount) out.push([boxesGeo([mount.block]), material([0.86, 0.68, 0.44], null, false, "ply"), { name: "Pendant_mount",
-      label: "Pendant mount block (5/8 in plywood, glued + screwed under the Max rail strip's front end)", group: "Pendant",
+      label: "Pendant mount block::5/8 in plywood, glued + screwed under the Max rail strip's front end", group: "Pendant",
       motion: "table", source: "made", color: [0.86, 0.68, 0.44], ownGeo: true, grain: "ply" }]);
     const fy = mount ? mount.front : bb.min.y, sp = mount ? mount.sp : PENDANT.spacer, sBot = mount ? sz + stand[2] : Math.max(sz + stand[2], bottom);
     out.push([boxesGeo([[sx + stand[0], fy - sp, sBot, sx + stand[3], fy, sz + stand[5]]]),
@@ -1296,7 +1299,7 @@ float lr4G(float x) { float s = 2.0 * fract(x) - 1.0; return floor(x) / 3.0 + (s
           lens: [1, 0.2, 0.12], click: k })]);
     }
     if (mount) out.push([boxesGeo([mount]), material([0.86, 0.68, 0.44], null, false, "ply"), { name: "SwitchPanel_Mount",
-      label: "Switch panel mount block (5/8 in plywood, under the Min rail strip's front end)", group: "Electronics", motion: "table",
+      label: "Switch panel mount block::5/8 in plywood, under the Min rail strip's front end", group: "Electronics", motion: "table",
       source: "made", color: [0.86, 0.68, 0.44], ownGeo: true, grain: "ply" }]);
     return out;
   }
@@ -1384,7 +1387,7 @@ float lr4G(float x) { float s = 2.0 * fract(x) - 1.0; return floor(x) / 3.0 + (s
       }
       const g = new THREE.BufferGeometry();
       g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute("normal", new THREE.Float32BufferAttribute(nor, 3)); g.setIndex(idx);
-      out.push([g, flat(yel, { roughness: 0.6 }), { name: `TableHub_Cable${r.n}`, label: `Cable, ${r.note} (~${(L / 1000 + 0.3).toFixed(1)} m with the ends in the boxes; stapled)`,
+      out.push([g, flat(yel, { roughness: 0.6 }), { name: `TableHub_Cable${r.n}`, label: `NM-B cable (${r.n === "Paddle" ? "paddle switch" : r.n === "Toggles" ? "toggles" : r.n.toLowerCase()})::${r.note} (~${(L / 1000 + 0.3).toFixed(1)} m with the ends in the boxes; stapled)`,
         group: "Electronics", motion: "table", source: "hardware", ownGeo: true, base: T0, color: yel }]);
       // staples where it lies straight on one face: the first >= 120 mm from an end, then every <= 300 mm
       const on = [];
@@ -1410,7 +1413,7 @@ float lr4G(float x) { float s = 2.0 * fract(x) - 1.0; return floor(x) / 3.0 + (s
     if (pos.length) {
       const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute("normal", new THREE.Float32BufferAttribute(nor, 3));
       out.push([g, flat(steel, { metalness: 0.7, roughness: 0.35 }), { name: "TableHub_CableStaples",
-        label: `Cable staples (${staples.length}, for 12 AWG NM: within 12 in of each box, then <= 300 mm apart)`,
+        label: `Cable staples::${staples.length}, for 12 AWG NM: within 12 in of each box, then <= 300 mm apart`,
         group: "Electronics", motion: "table", source: "hardware", ownGeo: true, base: T0, color: steel }]);
     }
     return out;
@@ -1617,8 +1620,8 @@ float lr4G(float x) { float s = 2.0 * fract(x) - 1.0; return floor(x) / 3.0 + (s
     const y0 = yc - W / 2, z0 = uz - H, zm = uz - H / 2;   // y0 = the panel's front end
     const pf = HF0 ? Math.min(HF0.bk, y0) : y0;      // its front end: butted to the front panel's back (a square corner)
     out.push([box([fx, pf, z0, fx + T, y0 + W, uz]), material([0.86, 0.68, 0.44], null, false, "ply"), { name: "TableHub_Panel",
-      label: `Hub panel (5/8 in plywood, ${Math.round(y0 + W - pf)} x ${H} mm, ${Math.round(fx - ex)} mm in from the table's left end, inboard of the front leg, ` +
-        `meeting the switch panel at the front in a square corner; under the ${ap ? "apron" : "torsion box"}; GUESS)`,
+      label: `Hub panel::5/8 in plywood, ${Math.round(y0 + W - pf)} x ${H} mm, ${Math.round(fx - ex)} mm in from the table's left end, inboard of the front leg, ` +
+        `meeting the switch panel at the front in a square corner; under the ${ap ? "apron" : "torsion box"}; GUESS`,
       group: "Table", motion: "table", source: "made", color: [0.86, 0.68, 0.44], ownGeo: true, grain: "ply" }]);
     const grey = [0.55, 0.57, 0.58], ivory = [0.9, 0.88, 0.82], dark = [0.06, 0.06, 0.07];
     // the devices, each in a single-gang plate on the face (looking at the end: inlet, router / vac, accessory)

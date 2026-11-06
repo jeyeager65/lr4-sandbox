@@ -182,7 +182,7 @@
     <details class="step" id="st-opts">
       <summary><span class="st-n">2</span><span class="st-t" id="h-opts">Options</span><span class="st-dot" id="dot-opts" hidden aria-label="needs a look"></span><span class="st-sum" id="sum-opts"></span></summary>
       <div class="st-body">
-        <p class="foot">What you're building: off = not on the machine and not in the BOM. To hide parts from the view only, use Layers (on the view).</p>
+        <p class="foot">What you're building: off = not on the machine and not in the BOM. To hide parts from the view only, use Show (on the view) or H.</p>
         <div class="opts" id="opts">
           <label class="check"><input type="checkbox" id="opt-router" checked> Router + dust shoe (Kobalt mount)</label>
           <label class="check sub"><input type="checkbox" id="opt-skirt" checked> Dust skirt + bristles</label>
@@ -550,7 +550,7 @@
     <dt>H</dt><dd>Hide the selected part (H again brings it back)</dd>
     <dt>Shift+H</dt><dd>Show all hidden parts</dd>
     <dt>V</dt><dd>Only the view (Esc brings the panels back)</dd>
-    <dt>L</dt><dd>Layers: what the view shows</dd>
+    <dt>L</dt><dd>Show: which parts and wiring the view draws</dd>
     <dt>Double-click</dt><dd>Inspect an assembly (Esc goes back)</dd>
     <dt>?</dt><dd>This list</dd>
   </dl>
@@ -681,7 +681,7 @@
     back to the view. Turn it off to draw in this panel instead, with more room for tracing a photo.</p></div>
   <div class="status" id="status" role="status" aria-live="polite"><div id="status-title">Loading model…</div><div class="bar"><div id="status-bar"></div></div><div class="detail" id="status-detail">&nbsp;</div></div>
   <div class="toolbar" role="toolbar" aria-label="View">
-    <button id="v-layers" type="button" aria-expanded="false" aria-controls="layers-pop" title="Layers: what the view shows (L)">Layers</button>
+    <button id="v-show" type="button" aria-expanded="false" aria-controls="show-pop" title="Show: which parts and wiring the view draws (L)">Show</button>
     <select id="v-views" aria-label="View"><option value="" hidden selected>View</option><option value="v-iso">Iso</option>
       <option value="v-front">Front</option><option value="v-top">Top</option><option value="v-side">Side</option><option value="v-back">Back</option></select>
     <button id="v-iso" type="button">Iso</button>
@@ -719,16 +719,22 @@
     <div class="buttons wc-foot"><button type="button" id="wc-skip">Skip for now</button></div>
   </section>
   <div class="drop-over" id="drop" aria-hidden="true"><div>Drop the zips, a folder or the STL / DXF files<br><small>read in this browser only</small></div></div>
-  <section class="layers-pop" id="layers-pop" aria-labelledby="h-show" hidden>
-    <div class="layers-head"><h2 id="h-show">Layers</h2><button type="button" id="layers-x" aria-label="Close" title="Close (Esc)">✕</button></div>
-    <p class="foot">The view only - the BOM keeps every part. A bolt joining two assemblies is under both and shows with either.</p>
-    <label class="check lay-extra" title="The wiring, each wire drawn: the motors', endstops' and touch plate's (through the YZ plates and along the beam or the router cord into the Jackpot box), the router cord, the 24 V supply's cords, the lid fan's lead, the plugs on the board, the table hub's mains wiring - hover a wire for its run's name, ends and length. Off, they're hidden (the gantry moves faster); the hose always shows"><input type="checkbox" id="lay-wiring"> Wiring</label>
-    <label class="check lay-extra" style="display: none; margin-left: 18px" title="With Wiring on: a straight line per run from end to end, drawn over the parts (the old overview) - hover one for its name and ends"><input type="checkbox" id="lay-nest"> Rat's nest</label>
-    <label class="check lay-extra" title="The cable sleeves (over the core's wires and the beam's) drawn clear, to see each wire inside them"><input type="checkbox" id="lay-sleeve"> See through sleeves</label>
-    <div class="presets" id="show-presets" role="group" aria-label="Presets"></div>
-    <div class="tree" id="show-tree" role="group" aria-label="Parts shown"></div>
-    <button type="button" id="unhide" hidden></button>
+  <section class="show-pop" id="show-pop" aria-labelledby="h-show" hidden>
+    <div class="show-head"><h2 id="h-show">Show <button type="button" class="q" data-help="help-show" aria-label="About Show" title="About Show">?</button></h2><span class="show-tools"><button type="button" id="show-reset" title="Everything back: all parts and areas, the hidden parts, wires off">Reset</button><button type="button" id="show-x" aria-label="Close" title="Close (Esc)">✕</button></span></div>
+    <div class="help" id="help-show" hidden><p>What the view draws - the BOM always keeps every part. <b>Parts</b> and <b>Areas</b> each turn a kind of part
+      or a part of the machine on or off; a part shows when both its kind and its area are on (a bolt joining two areas shows with either).
+      <b>Wiring</b> draws every wire, cord and sleeve (moves are slower with it on); <b>X-ray parts</b> makes the rest see-through so the
+      wires show inside the plates, the beam and the sleeves; pick a run in the list to trace it end to end (or hover a wire). Keys: <b>H</b> hides the selected part, <b>Shift+H</b> shows every hidden part again,
+      <b>I</b> inspects the selected part's assembly, <b>L</b> opens this.</p></div>
+    <div class="show-row"><span>Parts</span><div class="show-opts c4" id="show-kinds" role="group" aria-label="Kinds of parts shown"></div></div>
+    <div class="show-row"><span>Areas</span><div class="show-opts c3" id="show-areas" role="group" aria-label="Areas shown"></div></div>
+    <div class="show-row"><span>Wiring</span><div class="show-opts c2" role="group" aria-label="Wiring">
+      <button type="button" id="show-wiring" aria-pressed="false">Wires</button>
+      <button type="button" id="show-xray" aria-pressed="true" hidden>X-ray parts</button>
+      </div></div>
+    <div class="show-runs" id="show-runs" hidden></div>
   </section>
+  <button type="button" class="hidden-chip" id="unhide" hidden></button>
   <button type="button" class="v-only" id="v-only" aria-pressed="false" title="Only the view: hide the panels (Esc brings them back)" aria-label="Only the view">⛶</button>
   <div class="pv-banner" id="pv-banner" hidden>Preview only · FluidNC isn't running it · cuts go on a copy of the stock</div>
   <div class="alarm-card" id="alarm-card" role="alert" hidden><span class="bang">!</span><div>
@@ -736,7 +742,7 @@
     <div class="buttons"><button type="button" class="pri" id="alarm-unlock">Unlock ($X)</button><button type="button" id="alarm-home">Home all</button><button type="button" id="alarm-x" aria-label="Dismiss" title="Dismiss">✕</button></div></div></div>
   <div class="mini-dro" id="mini-dro" aria-label="Work position, mm"><span><em>X</em><b id="md-x">–</b></span><span><em>Y</em><b id="md-y">–</b></span><span><em>Z</em><b id="md-z">–</b></span></div>
   <div class="pick" id="pick" role="status" hidden><div><strong></strong><p></p><div class="pick-fil" id="pick-fil" hidden><span>Printed in</span><span class="fil-dd"><button type="button" class="fil-dd-btn" aria-haspopup="listbox"></button><span class="fil-dd-menu" role="listbox" hidden></span></span></div></div>
-    <button type="button" id="pick-insp" title="Inspect it on its own (I; double-click a part does too)">Inspect</button><button type="button" id="pick-hide" title="Hide this part (H; H again, or Layers: Show N hidden parts, brings it back; in Inspect, its list)">Hide</button><button type="button" id="pick-clear" aria-label="Clear the selection" title="Clear">✕</button></div>
+    <button type="button" id="pick-insp" title="Inspect it on its own (I; double-click a part does too)">Inspect</button><button type="button" id="pick-hide" title="Hide this part (H; H again, or Shift+H / the view's N hidden chip, brings it back; in Inspect, its list)">Hide</button><button type="button" id="pick-clear" aria-label="Clear the selection" title="Clear">✕</button></div>
   <div class="insp" id="insp" hidden>
     <div class="insp-top"><button type="button" id="insp-min" aria-expanded="true" title="Fold the tools and the parts list away (again to bring them back)">Hide panels</button>
       <button type="button" id="insp-back">← Back to the machine</button></div>

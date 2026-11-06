@@ -26,6 +26,11 @@
   const PRESETS = [["all", "All"], ["no-hardware", "No hardware"], ["printed", "Printed parts only"], ["frame", "Frame only"]];
 
   const isBolt = (p) => p.name.includes("__");
+  // bought components drawn as several meshes (user 2026-11-05: "the endstops and stepper motors are components" - not
+  // hidden piece by piece; their own mounting screws are separate fasteners): a stepper's face / plug / case screws /
+  // shaft, an endstop's lever, the lid fan's sticker / leads -> the component's own part name
+  const COMP = /^([XYZ]_Stepper(?:_(?:Min|Max))?|Endstop_(?:X|[YZ]_(?:Min|Max))|Jackpot3_Fan)_(Face|Plug|Screws|Shaft|Lever|Label|Lead_[A-Za-z]+)$/;
+  const compOf = (name) => { const m = COMP.exec(name || ""); return m ? m[1] : name; };
   const partId = (p) => p.name.replace(/~thread$/, "");   // not p.of: some threads name a merged screw set
   function asmOf(p) {                                 // a part that isn't a bolt
     if (p.group === "Belts") return /^Belt_X/.test(p.name) ? "beam" : "table";
@@ -132,8 +137,11 @@
     secs.splice(2, 0, ["hardware", "Hardware"]);
     const by = {}, fast = new Map(), unknown = [], ids = new Map();
     const idsOf = (k, id) => { if (!ids.has(k)) ids.set(k, new Set()); ids.get(k).add(id); };
+    const label = new Map(parts.map((p) => [p.name, p]));
     for (const p of parts) {
       if (/~thread$/.test(p.name)) continue;
+      const base = compOf(p.name) !== p.name && label.get(compOf(p.name));   // a component's piece: in its row, not counted
+      if (base) { const k = kindOf(base), l = String(base.label || base.name); idsOf(k + ":" + l, partId(p)); continue; }
       if (isBolt(p)) {
         if (p.fast) for (const [n, it] of p.fast) { fast.set(it, (fast.get(it) || 0) + n); idsOf("fast:" + it, partId(p)); }
         else unknown.push([boltLabel(p), partId(p)]);
@@ -192,7 +200,8 @@
     const ids = [...set].filter((id) => !isBolt(id)), up = {};
     for (const id of ids) {
       const p = ids.filter((q) => q !== id && id.startsWith(q + "_") && !/^\d+$/.test(id.slice(q.length + 1)))
-        .sort((a, b) => b.length - a.length)[0] || (/^Router_/.test(id) && id !== "Router_Housing" && set.has("Router_Housing") ? "Router_Housing" : null);
+        .sort((a, b) => b.length - a.length)[0] || (/^Router_/.test(id) && id !== "Router_Housing" && set.has("Router_Housing") ? "Router_Housing" : null)
+        || (/^MGN12H_/.test(id) && set.has(id.replace(/^MGN12H_/, "MGN12_Rail_")) ? id.replace(/^MGN12H_/, "MGN12_Rail_") : null);   // a carriage stays on its rail (user 2026-11-05)
       if (p) up[id] = p;
     }
     const top = (id) => { let q = id; while (up[q]) q = up[q]; return q; };
@@ -242,7 +251,7 @@
     return off;
   }
 
-  const api = { SLIDE, explode, build, on, preset, presetOf, members, inspectSet, partsList, ASM, KINDS, PRESETS };
+  const api = { SLIDE, explode, build, on, preset, presetOf, members, inspectSet, partsList, compOf, ASM, KINDS, PRESETS };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.LR4ShowTree = api;
 })(typeof window !== "undefined" ? window : this);

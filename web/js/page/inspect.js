@@ -175,6 +175,7 @@
         for (const h of held) {                       // each bearing on the screw line through it (meta.axes)
           const hm = byName.get(h);
           if (!hm || !host || info.slide[h]) continue;
+          if (/^Bearing_(Front|Back)Wheel_/.test(h)) { info.slide[h] = [0, 0, -1]; continue; }   // the YZ wheels': straight down out of their hole (user 2026-11-05)
           let axis = ud.axis;
           if (ud.axes) {
             const c = m.worldToLocal(centreOf(hm).add(exVec(m)));

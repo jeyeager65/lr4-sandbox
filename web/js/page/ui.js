@@ -12,18 +12,20 @@
   // Hide (user 2026-11-02): the selected part off - on the machine into the Show tree's hidden parts (Layers: "Show N
   // hidden parts" brings them back); in Inspect, unticked in its parts list (this view only)
   // H (user 2026-11-02): hide the selected part; H again with nothing selected brings the last hidden one back (selected)
-  let hideLast = null;                                 // { id, insp: hidden in Inspect's list }
+  let hideLast = null;                                 // { id, ids, insp: hidden in Inspect's list }
+  // a component (a stepper, an endstop, the lid fan: LR4ShowTree.compOf) hides whole - its pieces' ids
+  const compIds = (id) => { const c = LR4ShowTree.compOf(id); return [...new Set(meshes.map(partId).filter((x) => LR4ShowTree.compOf(x) === c))]; };
   function hidePart(m) {
-    const id = partId(m);
+    const id = partId(m), ids = compIds(id);
     select(null);
-    hideLast = { id, insp: !!INSPECT };
-    if (INSPECT) { INSPECT.hide.add(id); applyVisibility(); inspectScene(); } else showSet(id, false);
+    hideLast = { id: LR4ShowTree.compOf(id), ids, insp: !!INSPECT };
+    if (INSPECT) { for (const x of ids) INSPECT.hide.add(x); applyVisibility(); inspectScene(); } else { for (const x of ids) showOff.add(x); applyVisibility(); }
   }
   function unhideLast() {
     const h = hideLast;
     hideLast = null;
     if (!h || !!INSPECT !== h.insp) return false;
-    if (INSPECT) { INSPECT.hide.delete(h.id); applyVisibility(); inspectScene(); } else showSet(h.id, true);
+    if (INSPECT) { for (const x of h.ids) INSPECT.hide.delete(x); applyVisibility(); inspectScene(); } else { for (const x of h.ids) showOff.delete(x); applyVisibility(); }
     const m = meshes.find((q) => partId(q) === h.id && q.visible);
     if (m) select(m);
     return true;
@@ -72,12 +74,13 @@
     for (const id of ["strut-variant", "peter-variant"]) new MutationObserver(stepSums).observe($(id), { attributes: true, subtree: true });
     stepSums();
   }
-  // ---- Layers (Part 37): the parts tree (show / hide per group, ⤢ = Inspect) in a popover on the view ----
-  const layersPop = $("layers-pop"), layersBtn = $("v-layers");
-  function showLayers(on) { layersPop.hidden = !on; layersBtn.setAttribute("aria-expanded", String(on)); }
-  layersBtn.addEventListener("click", () => showLayers(layersPop.hidden));
-  $("layers-x").addEventListener("click", () => showLayers(false));
-  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !layersPop.hidden) { showLayers(false); layersBtn.focus(); } });
+  // ---- Show (was Layers, Part 37; reworked 2026-11-05 with the user): which kinds of parts / areas / wiring the view
+  // draws, in a popover on the view (panel.js renderShow / wiring.js for the wiring row) ----
+  const showPop = $("show-pop"), showBtn = $("v-show");
+  function showShow(on) { showPop.hidden = !on; showBtn.setAttribute("aria-expanded", String(on)); }
+  showBtn.addEventListener("click", () => showShow(showPop.hidden));
+  $("show-x").addEventListener("click", () => showShow(false));
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !showPop.hidden) { showShow(false); showBtn.focus(); } });
   const viewPop = document.getElementById("view-pop"), viewMore = document.getElementById("v-more");
   function showViewPop(on) { viewPop.hidden = !on; viewMore.setAttribute("aria-expanded", String(on)); }
   viewMore.addEventListener("click", () => showViewPop(viewPop.hidden));
@@ -392,9 +395,11 @@
 
   // ---- VR (js/vr.js): the same scene and page state; its menu drives the page's controls ----
   const vr = LR4VR.setup({ THREE, scene, renderer, camera, controls, meshes: () => meshes, select, background: paintBackground, resize,
-    hidePart: (m) => showSet(partId(m), false),
+    hidePart: (m) => { for (const x of compIds(partId(m))) showOff.add(x); applyVisibility(); },   // (a component whole)
     showHidden: () => document.getElementById("unhide").click(),
-    hiddenCount: () => partHides().length,
+    hiddenCount: () => new Set(partHides().map(LR4ShowTree.compOf)).size,   // (a component counts once)
+    groups: () => tree.asms.map((a) => ({ id: a.id, label: a.label, on: !showOff.has(a.id) })),   // Show's areas
+    toggleGroup: (id) => showSet(id, showOff.has(id)), hideGroup: (id) => showSet(id, false),
     asmOf, groupLabel: asmLabel,
     scenery: (on) => { shopVR = on; updateShop(); return !!shop; },
     room: () => (shop ? shopRoom : null),       // the workshop at 1:1, not on the tabletop
@@ -659,7 +664,7 @@
     else if (k === "h" && hideLast) unhideLast();
     else if (k === "i" && selected) click("pick-insp");
     else if (k === "v") click("v-only");
-    else if (k === "l") click("v-layers");
+    else if (k === "l") click("v-show");
     else if (k === "?") $("keys-dlg").showModal();
     else if (k === " " && JOB.preview && !$("job-on").hidden) click("job-play");
     else if (k === "Escape" && MEAS.main) mainMeasure(false);

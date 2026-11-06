@@ -82,6 +82,16 @@ ok(row("Fasteners", "M8 x 40 mm hex head bolt") === 8 && row("Fasteners", "M8 ny
   "Core's fasteners from meta.fast");
 const yl = T.partsList(parts.filter((p) => T.members(tree, "yz-min").includes(p.name.replace(/~thread$/, ""))));
 ok(yl.find((q) => q.title === "Hardware").rows.some((r) => r[1] === "MGN12 Rail Min 85"), "rail lengths not merged");
+// components (user 2026-11-05): a stepper / an endstop is one row (its pieces' ids in it, not rows of their own); its
+// mounting screws stay fasteners
+{
+  const el = (yl.find((q) => q.title === "Electronics") || { rows: [] }).rows, lab = (n) => (parts.find((p) => p.name === n) || {}).label || n;
+  const st = el.find((r) => r[1] === lab("Y_Stepper_Min")), es = el.find((r) => r[1] === lab("Endstop_Y_Min"));
+  ok(st && st[0] === 1 && ["Y_Stepper_Min", "Y_Stepper_Min_Face", "Y_Stepper_Min_Shaft"].every((id) => st[2].includes(id))
+    && es && es[0] === 1 && es[2].includes("Endstop_Y_Min_Lever") && !el.some((r) => /Face|Shaft|Plug|Lever|Screws$/.test(r[1])),
+    "Y Min stepper / endstop: one row each, their pieces in it: " + JSON.stringify(el.map((r) => r[1])));
+  ok(T.compOf("Z_Stepper_Max_Plug") === "Z_Stepper_Max" && T.compOf("Endstop_X_Lever") === "Endstop_X" && T.compOf("Core__M3_to_X_Stepper") === "Core__M3_to_X_Stepper", "compOf");
+}
 
 // exploded view (Part 28): along the bolt lines from the anchor; bolts out past their heads; the rest straight out
 {
@@ -130,6 +140,12 @@ ok(yl.find((q) => q.title === "Hardware").rows.some((r) => r[1] === "MGN12 Rail 
     slide: { Bearing_1: [0, 0.6, 0.8] } });
   ok(e.Y_Stepper_Min.join() === "-1,0,0" && e.Y_Stepper_Min_Face.join() === "-1,0,0", "Y motor (Min) slides out -X: " + JSON.stringify(e));
   ok(e.Bearing_1.join() === "0,0.6,0.8", "bearing out of its slot's opening");
+}
+{ // an MGN12 carriage stays on its rail (user 2026-11-05): the rail's offset, wherever the carriage's own bolt would take it
+  const set = new Set(["XZ_Plate_Min", "MGN12_Rail_Min_85", "MGN12H_Min_85", "Bolt"]);
+  const e = T.explode(set, { bolts: { Bolt: { axis: [0, 1, 0], chain: ["XZ_Plate_Min", "MGN12H_Min_85"] } }, size: { XZ_Plate_Min: 100 },
+    centre: { XZ_Plate_Min: [0, 0, 0], MGN12_Rail_Min_85: [0, 20, 0], MGN12H_Min_85: [0, 12, 0], Bolt: [0, 5, 0] } });
+  ok(e.MGN12H_Min_85 && e.MGN12H_Min_85.join() === e.MGN12_Rail_Min_85.join(), "MGN12 carriage + rail together: " + JSON.stringify(e));
 }
 // real data: every bolt with an axis has it as a unit vector and a chain
 for (const p of parts) if (p.axis) ok(Math.abs(Math.hypot(...p.axis) - 1) < 1e-3 && p.chain.length && p.holes.length, "axis + chain + holes: " + p.name);

@@ -273,7 +273,7 @@
   // kind > part, stable ids) with presets; showOff = the ids turned off (an assembly, "asm.kind" or a part name).
   // Not kept: every load shows everything. Part hides from VR / the card are part ids here too. ----
   let tree = { asms: [], place: {} }, treeKey = "";
-  const showOff = new Set(), treeOpen = new Set();
+  const showOff = new Set();
   const partId = (m) => (m.userData.name || "").replace(/~thread$/, "");
   const isGroupId = (id) => tree.asms.some((a) => a.id === id || a.kinds.some((k) => k.id === id));
   const partHides = () => [...showOff].filter((id) => !isGroupId(id));
@@ -285,7 +285,7 @@
   const PROBE_OFF = /^(Dust_Skirt|Bristles_TPU)/;
   // the cord + sleeve routes don't follow a magnified rack / tilt (machine.js abPose): hidden while it's drawn so (user 2026-10-26)
   const RACK_OFF = /^(Router_Cord_Run|Core_Wires|Cable_Sleeve)$/;
-  // Part 53c (user 2026-11-04): the drawn wires show only with Layers > Wiring on (Inspect too: off,
+  // Part 53c (user 2026-11-04): the drawn wires show only with Show > Wiring on (Inspect too: off,
   // they aren't redrawn as it moves) - the hose always
   const WIRES_OFF = /^(Router_Cord_Run|Router_Cord_Relief|Core_Wires|Cable_Sleeve|Beam_(Wires(Plate_(Min|Max)|Span)?|ZipTies|Sleeve(Span)?)|PSU_(MainsCord|Lead24V|Lead0V|LeadCable)|TableHub_(Panel)?(Wires[A-Z][a-z]+|WireNuts|Term(Brass|Silver|Ground))|TableHub_HoseGround)$/;
   const wiresShown = () => !!(window.LR4WiringView && LR4WiringView.on());
@@ -327,87 +327,52 @@
     if (HAND.mesh) HAND.mesh.visible = !JOB.stock && $("hs-show-stock").checked;
     if (JOB.stock) JOB.stock.visible = $("hs-show-stock").checked;
     syncShow();
+    if (typeof wrXrayApply === "function") wrXrayApply();   // Show > Wiring > X-ray parts (wiring.js)
     inspectScene();
     if (selected && !selected.visible) select(null);
   }
-  function setupShow() {                              // once: presets, the tree's clicks
-    const pre = document.getElementById("show-presets");
-    for (const [id, label] of LR4ShowTree.PRESETS) {
-      const b = document.createElement("button");
-      b.type = "button"; b.dataset.v = id; b.textContent = label;
-      b.addEventListener("click", () => showPreset(id));
-      pre.appendChild(b);
-    }
-    const host = document.getElementById("show-tree");
-    host.addEventListener("change", (e) => { const id = e.target.dataset.id; if (id) showSet(id, e.target.checked); });
-    host.addEventListener("click", (e) => {
-      const ins = e.target.closest(".ins");
-      if (ins) return inspect(ins.dataset.id);
-      const tw = e.target.closest(".tw");
-      if (!tw) return;
-      const id = tw.dataset.id, open = !treeOpen.has(id);
-      if (open) treeOpen.add(id); else treeOpen.delete(id);
-      tw.setAttribute("aria-expanded", String(open));
-      tw.textContent = open ? "▾" : "▸";
-      host.querySelector(`[data-kids="${CSS.escape(id)}"]`).hidden = !open;
-    });
+  // ---- Show (2026-11-05, with the user - was the Layers tree + presets): two rows of on / off chips. Parts = the kinds
+  // (each turns that kind off in every area: "asm.kind" ids in showOff), Areas = the assemblies (their ids). A part
+  // shows when its kind and its area are on (LR4ShowTree.on). Single parts hidden with H stay in showOff (the view's
+  // "N hidden" chip / Shift+H bring them back). The wiring row: wiring.js ----
+  function setupShow() {                              // once: the chips' clicks
+    document.getElementById("show-kinds").addEventListener("click", (e) => { const b = e.target.closest("button[data-kind]"); if (b) showKind(b.dataset.kind, b.getAttribute("aria-pressed") !== "true"); });
+    document.getElementById("show-areas").addEventListener("click", (e) => { const b = e.target.closest("button[data-asm]"); if (b) showSet(b.dataset.asm, b.getAttribute("aria-pressed") !== "true"); });
     document.getElementById("unhide").addEventListener("click", () => { for (const id of partHides()) showOff.delete(id); applyVisibility(); });
+    document.getElementById("show-reset").addEventListener("click", showReset);
+  }
+  // Reset (user 2026-11-05): everything back as on load - every kind and area on, the hidden parts back, the wires off
+  // (X-ray parts back on for next time), no traced run
+  function showReset() {
+    showOff.clear();
+    if (typeof wrShowReset === "function") wrShowReset();
+    applyVisibility();
   }
   function showSet(id, on) { if (on) showOff.delete(id); else showOff.add(id); applyVisibility(); }
-  function showPreset(name) { showOff.clear(); for (const id of LR4ShowTree.preset(tree, name)) showOff.add(id); applyVisibility(); }
-  function renderShow() {                             // the tree's rows (when the parts on the machine change)
-    const host = document.getElementById("show-tree");
-    host.textContent = "";
-    const row = (into, cls, id, label, n, kids) => {
-      const r = document.createElement("div");
-      r.className = "row " + cls;
-      r.innerHTML = (kids ? `<button type="button" class="tw"></button>` : "") + `<label><input type="checkbox"><span></span></label><em></em>`
-        + `<button type="button" class="ins">⤢</button>`;
-      const i = r.querySelector("input");
-      i.dataset.id = id;
-      if (cls === "a") i.id = "g-" + id;              // vr.js: the assembly toggles
-      r.querySelector("span").textContent = label;
-      r.querySelector("em").textContent = n;
-      const ins = r.querySelector(".ins");
-      ins.dataset.id = id;
-      ins.title = "Inspect: " + label;
-      ins.setAttribute("aria-label", "Inspect " + label);
-      into.appendChild(r);
-      if (!kids) return null;
-      const tw = r.querySelector(".tw");
-      tw.dataset.id = id;
-      tw.setAttribute("aria-expanded", String(treeOpen.has(id)));
-      tw.setAttribute("aria-label", "Parts in " + label);
-      tw.textContent = treeOpen.has(id) ? "▾" : "▸";
-      const k = document.createElement("div");
-      k.dataset.kids = id;
-      k.hidden = !treeOpen.has(id);
-      into.appendChild(k);
-      return k;
-    };
-    for (const a of tree.asms) {
-      const ak = row(host, "a", a.id, a.label, a.n, true);
-      for (const k of a.kinds) {
-        const kk = row(ak, "k", k.id, k.label, k.n, true);
-        for (const q of k.parts) row(kk, "p", q.id, q.label, q.n > 1 ? "×" + q.n : "", false);
-      }
-    }
+  function showKind(kind, on) {
+    for (const a of tree.asms) for (const k of a.kinds) if (k.kind === kind) { if (on) showOff.delete(k.id); else showOff.add(k.id); }
+    applyVisibility();
   }
-  function syncShow() {                               // checkboxes from showOff; a part row greyed when it isn't drawn
-    const host = document.getElementById("show-tree");
-    for (const i of host.querySelectorAll("input[data-id]")) {
-      const id = i.dataset.id, r = i.closest(".row");
-      i.checked = !showOff.has(id);
-      if (r.classList.contains("p")) { r.classList.toggle("dim", !LR4ShowTree.on(tree, showOff, id)); continue; }
-      const a = tree.asms.find((x) => x.id === id), k = !a && tree.asms.flatMap((x) => x.kinds).find((x) => x.id === id);
-      const kids = a ? a.kinds.flatMap((x) => [x.id, ...x.parts.map((q) => q.id)]) : k ? k.parts.map((q) => q.id) : [];
-      i.indeterminate = i.checked && kids.some((x) => showOff.has(x));
+  const SHOW_SHORT = { "Table + Y rail": "Table", "Router + dust shoe": "Router", "Touch plate + clip": "Touch plate", "Vacuum hose + cables": "Hose",
+    "Electronics + switches": "Electronics", "FluidTouch pendant": "Pendant", "YZ Min side": "YZ Min", "YZ Max side": "YZ Max" };
+  function renderShow() {                             // the chips (when the parts on the machine change)
+    const chip = (host, data, v, label, title) => { const b = document.createElement("button"); b.type = "button"; b.dataset[data] = v; b.textContent = label; b.title = title; host.appendChild(b); };
+    const kh = document.getElementById("show-kinds"), ah = document.getElementById("show-areas");
+    kh.textContent = ""; ah.textContent = "";
+    for (const [k, label] of LR4ShowTree.KINDS) if (tree.asms.some((a) => a.kinds.some((x) => x.kind === k))) chip(kh, "kind", k, label, `${label} parts, in every area`);
+    for (const a of tree.asms) chip(ah, "asm", a.id, SHOW_SHORT[a.label] || a.label, `${a.label} (${a.n} parts)`);
+  }
+  function syncShow() {                               // the chips from showOff (a kind chip: on unless it's off in every area)
+    for (const b of document.querySelectorAll("#show-kinds button")) {
+      const ks = tree.asms.flatMap((a) => a.kinds).filter((k) => k.kind === b.dataset.kind);
+      b.setAttribute("aria-pressed", String(!ks.every((k) => showOff.has(k.id))));
     }
-    const p = LR4ShowTree.presetOf(tree, showOff);
-    document.querySelectorAll("#show-presets button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.v === p)));
-    const un = document.getElementById("unhide"), n = partHides().length;
+    for (const b of document.querySelectorAll("#show-areas button")) b.setAttribute("aria-pressed", String(!showOff.has(b.dataset.asm)));
+    document.getElementById("show-reset").disabled = !showOff.size && !(window.LR4WiringView && LR4WiringView.on());   // (nothing to reset)
+    const un = document.getElementById("unhide"), n = new Set(partHides().map(LR4ShowTree.compOf)).size;   // (a component counts once)
     un.hidden = !n;
-    un.textContent = `Show ${n} hidden part${n === 1 ? "" : "s"}`;
+    un.textContent = `${n} hidden · Show all`;
+    un.title = `Show the ${n} part${n === 1 ? "" : "s"} you hid (Shift+H)`;
   }
 
   // ---- Part 40: filaments. The printed parts are in filaments (material + color: js/filaments.js; "spools" in the

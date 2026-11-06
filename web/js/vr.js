@@ -213,8 +213,7 @@
       const pv = $("peter-variant");
       const peter = pv && !pv.hidden ? [...pv.querySelectorAll("button")].map((b) => ({ v: b.dataset.v, label: b.textContent,
         on: b.getAttribute("aria-pressed") === "true" })) : [];
-      const groups = [...document.querySelectorAll("#show-tree .row.a")].map((l) => ({   // the Show tree's assemblies
-        id: l.querySelector("input").id, label: l.querySelector("span").textContent, on: l.querySelector("input").checked }));
+      const groups = api.groups ? api.groups() : [];   // the page's areas (Show's Areas chips)
       const [cutX, cutY] = cut();
       return { unit: unit(), cutX, cutY, mode: mode === "table" ? "table" : "one", peter, groups, hidden: api.hiddenCount(),
         braces: { label: opt ? opt.textContent : "" }, homing: !!$("home") && /^Stop/.test($("home").textContent),
@@ -228,7 +227,7 @@
         const sel = $("braces"), i = Math.min(sel.options.length - 1, Math.max(0, sel.selectedIndex + a.d));
         if (i !== sel.selectedIndex) { sel.selectedIndex = i; sel.dispatchEvent(new Event("change")); }
       } else if (a.a === "peter") { const b = $("peter-variant").querySelector(`button[data-v="${a.v}"]`); if (b) b.click(); }
-      else if (a.a === "group") $(a.id).click();
+      else if (a.a === "group") api.toggleGroup(a.id);
       else if (a.a === "mode") { mode = mode === "table" ? "one" : "table"; place(true); }
       else if (a.a === "recenter") place(true);
       else if (a.a === "unhide") api.showHidden();
@@ -236,8 +235,8 @@
       else if (a.a === "sound") $("v-sound").click();  // the Sound toggle under ⚙ (a trigger press counts as the click audio needs)
       else if (a.a === "hide") { if (cardPart) api.hidePart(cardPart); closeCard(); }
       else if (a.a === "hidegroup") {
-        const g = cardPart && $("g-" + api.asmOf(cardPart));
-        if (g && g.checked) g.click();
+        const id = cardPart && api.asmOf(cardPart);
+        if (id) api.hideGroup(id);
         closeCard();
       } else if (a.a === "close") closeCard();
       else if (a.a === "exit") { const s = xr.getSession(); if (s) s.end(); else leave(); }

@@ -1,7 +1,7 @@
 // Part 51a in headless Chrome: the wiring. The stand-in Jackpot board inside the box (the user's own board is never in
 // the public data), Layers > Wiring: a line per run (but the mains to the wall), the core's runs along the cable
 // cord / hose, the ends riding their parts (the gantry moves: the X motor's end moves with it, the board's stays), hover
-// picks a run (51e: the drawn wire; the lines are the Rat's nest option), the lid fan's lead + the plugs, off = gone.
+// picks a run (51e: the drawn wire), Show > Wiring (Wires, X-ray parts, trace a run), the lid fan's lead + the plugs, off = gone.
 //   node tests/test_page_wiring.js   (not in npm test: needs Chrome + Python + parts/; ~1 min)
 "use strict";
 const { CHROME, sleep, server, chromePage } = require("./test_page_fluidnc.js");
@@ -27,7 +27,7 @@ const ok = (cond, msg) => { checks++; console.log((cond ? "  ok   " : "  FAIL ")
     ok(!a.on, "Wiring off at first");
     // Part 53c: the drawn wires only with Wiring on (the hose always), and a move's time kept (a budget, ~2-3x today's:
     // more drawn wiring shouldn't creep it back up; ms medians of 20 moves across the travel, the pose put back)
-    const DRAWN = /^(Router_Cord_Run|Core_Wires|Cable_Sleeve|PSU_MainsCord|PSU_LeadCable|Beam_Wires|Beam_ZipTies)$/;
+    const DRAWN = /^(Router_Cord_Run|Core_Wires|Cable_Sleeve|PSU_LeadCable|Beam_Wires|Beam_ZipTies)$/;   // (the supply's mains cord: only with the hub)
     const moveMs = `(() => { const t = meta.travel, ts = [];
       for (let i = 0; i < 20; i++) { const f = i / 19, a = performance.now(); move([t.x[0] + (t.x[1] - t.x[0]) * f, t.y[0] + (t.y[1] - t.y[0]) * (1 - f), t.z[1]]); ts.push(performance.now() - a); }
       move([HOME.pose.x, HOME.pose.y, HOME.pose.z]); ts.sort((p, q) => p - q); return +ts[10].toFixed(1); })()`;
@@ -36,7 +36,7 @@ const ok = (cond, msg) => { checks++; console.log((cond ? "  ok   " : "  FAIL ")
     const off0 = await page.val(shownNow), ms0 = await page.val(moveMs);
     ok(off0.drawn.length >= 3 && off0.drawn.every((x) => !x) && off0.hose.length === 1 && off0.hose[0], `Wiring off: the drawn wires hidden (${off0.drawn.length}), the hose shown`);
     ok(ms0 < 15, `Wiring off: a move ${ms0} ms (budget 15)`);
-    await page.val(`(() => { const c = document.getElementById("lay-wiring"); c.checked = true; c.dispatchEvent(new Event("change")); return true; })()`);
+    await page.val(`(() => { document.getElementById("show-wiring").click(); return true; })()`);   // Show > Wiring > Wires
     await sleep(600);
     const on1 = await page.val(shownNow), ms1 = await page.val(moveMs);
     ok(on1.drawn.every((x) => x) && on1.hose[0], `Wiring on: the drawn wires shown (${on1.drawn.length}) + the hose`);
@@ -51,16 +51,28 @@ const ok = (cond, msg) => { checks++; console.log((cond ? "  ok   " : "  FAIL ")
       return { before, after: ends() };
     })()`);
     ok(c.before[0] !== c.after[0] && Math.abs(c.before[1] - c.after[1]) < 1, `ends ride their parts: the X motor's run changes as X moves (${c.before[0]} -> ${c.after[0]}), the supply's to the board stays (${c.before[1]} -> ${c.after[1]})`);
-    // 51e: hover picks the drawn wire (the rat's nest lines are an option, off): a wire's middle on screen -> its run
+    // 51e: hover picks the drawn wire (the straight lines are built hidden): a wire's middle on screen -> its run
     const d = await page.val(`(() => {
       const r = canvas.getBoundingClientRect(), at = (p, obj) => { const v = p.clone().applyMatrix4(obj.matrixWorld).project(camera); return LR4WiringView.pick(r.left + (v.x + 1) / 2 * r.width, r.top + (1 - v.y) / 2 * r.height); };
       wrTick(); const lead = meshes.find((m) => m.userData.name === "PSU_LeadCable"), cord = meshes.find((m) => m.userData.name === "PSU_MainsCord");
       const fanOk = !!WR.fan && WR.fan.visible && at(WR.fan.userData.curves[0].getPoint(0.55), WR.fan);
-      return { dc: at(lead.userData.pick.getPoint(0.5), lead), ac: at(cord.userData.pick.getPoint(0.5), cord), fan: fanOk,
-        lines: WR.lines.visible, nest: (() => { const keep = () => { let k = null; WR.esp.traverse((o) => { if (o.userData.espKeep) k = o.visible; }); return k; };   // (+ the antenna keep-out: only with it)
-          const k0 = keep(); LR4WiringView.nest(true); const v = WR.lines.visible && keep(); LR4WiringView.nest(false); return !k0 && v && !WR.lines.visible && !keep(); })() }; })()`);
-    ok(d.dc === "psu-dc" && d.ac === "psu-ac" && d.fan === "fan", `51e: hover picks the drawn wire: the 24 V lead (${d.dc}), the supply's mains cord (${d.ac}), the lid fan's lead (${d.fan})`);
-    ok(!d.lines && d.nest, `51e: the rat's nest lines off by default (Wiring on), Rat's nest shows / hides them + the ESP32 antenna keep-out (${d.nest})`);
+      return { dc: at(lead.userData.pick.getPoint(0.5), lead), ac: cord.visible || !!cord.userData.pick, fan: fanOk,
+        lines: WR.lines.visible }; })()`);
+    ok(d.dc === "psu-dc" && !d.ac && d.fan === "fan", `51e: hover picks the drawn wire: the 24 V lead (${d.dc}), the lid fan's lead (${d.fan}); no hub: no mains cord drawn from the e-stop panel (user 2026-11-05) (${d.ac})`);
+    ok(!d.lines, "the straight lines (the old rat's nest) not drawn");
+    // Show > Wiring (2026-11-05): X-ray parts on with the wires - the machine see-through (printed parts), the table and the
+    // electronics solid, the sleeves clear; off puts them back. The run list: one button per drawn run; tracing one
+    // outlines its wires (a tube per drawn curve), its details shown; again = off
+    const xr = await page.val(`(() => { const m = (n) => wrMesh(n), op = () => [m("YZ_Plate_Min").material.opacity, m("TableBase") ? m("TableBase").material.opacity : 1, m("Y_Stepper_Min").material.opacity, HR.sleeveClear];
+      const on = op(); LR4WiringView.xray(false); const off = op(); LR4WiringView.xray(true);
+      const btns = [...document.querySelectorAll("#show-runs button[data-run]")].map((b) => b.dataset.run);
+      LR4WiringView.trace("y1-motor"); wrTick(); const t = { id: LR4WiringView.traced(), hl: WR_HL.objs.length, info: /Y1 motor/.test(document.querySelector("#show-runs .wr-info").textContent) };
+      LR4WiringView.trace(null); wrTick();
+      return { on, off, btns, t, cleared: WR_HL.objs.length, chip: document.getElementById("show-xray").getAttribute("aria-pressed") }; })()`);
+    ok(xr.on[0] < 0.5 && xr.on[1] === 1 && xr.on[2] === 1 && xr.on[3] && xr.off[0] === 1 && !xr.off[3] && xr.chip === "true",
+      `X-ray parts: the YZ plate see-through (${xr.on[0]}), the table + a stepper solid, the sleeves clear; off: back (${xr.off[0]})`);
+    ok(xr.btns.length >= 13 && xr.btns.includes("fan") && xr.t.id === "y1-motor" && xr.t.hl >= 4 && xr.t.info && !xr.cleared,
+      `the run list (${xr.btns.length} runs); tracing Y1 outlines its ${xr.t.hl} drawn pieces + shows its details; off clears it`);
     // 51e: the lid fan's lead - each wire from the fan's top center to the power terminal's pin, inside nothing (the box, its
     // lid, the fan, the supply); a plug on each header a wire lands on (+ the terminal's 2 screws), with Wiring
     const fan = await page.val(`(() => { const out = { ends: [], inside: {} }, box = wrMesh("Jackpot3_Box"); box.updateMatrixWorld();
@@ -172,8 +184,15 @@ const ok = (cond, msg) => { checks++; console.log((cond ? "  ok   " : "  FAIL ")
       `BOM at 26 x 50: 3 extenders (X / Y1 / Z1 one each), the endstops' own wire listed (${bom.ext.slice(0, 60)} | ${bom.own.slice(0, 50)})`);
     ok(bom.ms < 2000, `the BOM with the wiring fit: ${bom.ms} ms (cached per scene after the first)`);
     await page.val(`(LR4WiringView.set(false), true)`);
-    ok(await page.val("!WR.lines && !document.getElementById('lay-wiring').checked"), "off: the lines gone, the box unticked");
+    ok(await page.val("!WR.lines && document.getElementById('show-wiring').getAttribute('aria-pressed') === 'false' && document.getElementById('show-runs').hidden && wrMesh('YZ_Plate_Min').material.opacity === 1"),
+      "off: the lines gone, the Wires chip off, the run list hidden, the parts solid again");
     { const s = await page.val(shownNow); ok(s.drawn.every((x) => !x) && s.hose[0], "off: the drawn wires hidden again, the hose shown"); }
+    // Show > Reset (2026-11-05): wires on + a kind off + an area off + a part hidden -> all back, wires off, Reset greyed
+    const rs = await page.val(`(() => { const reset = document.getElementById("show-reset"), d0 = reset.disabled;
+      LR4WiringView.set(true); document.querySelector('#show-kinds button[data-kind="hardware"]').click(); document.querySelector('#show-areas button[data-asm="beam"]').click();
+      hidePart(wrMesh("Core")); const d1 = reset.disabled; reset.click();
+      return { d0, d1, d2: reset.disabled, off: showOff.size, wires: LR4WiringView.on(), core: wrMesh("Core").visible, chip: document.getElementById("unhide").hidden }; })()`);
+    ok(rs.d0 && !rs.d1 && rs.d2 && !rs.off && !rs.wires && rs.core && rs.chip, `Show > Reset: kinds, areas, hidden parts back, wires off (${JSON.stringify(rs)})`);
     ok(!(await page.val("window.__errors && window.__errors.length")), "no page errors");
   } finally { page.close(); srv.kill(); console.log(fails ? `${fails} of ${checks} failed` : `${checks}/${checks} checks passed`); process.exit(fails ? 1 : 0); }
 })();
