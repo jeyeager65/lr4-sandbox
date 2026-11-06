@@ -3,6 +3,16 @@
 The version is the sandbox page's (`VERSION` in `web/js/page/job.js`, shown in its footer). The footer also shows
 the date the model data was built and the Printables file set it was solved for.
 
+## 0.69.0 - 2026-11-05
+- **All the wiring drawn** (Layers > Wiring): the Y / Z motors' and endstops' wires through the YZ plates' channels
+  (V1E's routing; the steppers turned so their leads face the plate's back), out over the back wheel, hanging as a rope
+  into the beam as Z moves, then a bundle in a sleeve through the braces (a zip tie at each) into the Jackpot box to
+  their pins; V1E's extenders as black ribbons from taped joins. The lid fan's lead leaves the blower under its
+  sticker in a channel, runs along the lid and in at the box's +X end to the power terminal. The endstops' wires are
+  soldered to their outer tabs (COM + NC) under heatshrink, as in V1E's kit. Plugs on the board's headers (Molex-style on the motors, Dupont on the inputs; GUESS).
+- Hover a drawn wire for its run's name, ends and length. The old straight end-to-end lines are now an option:
+  Layers > Wiring > Rat's nest (off).
+
 ## 0.68.0 - 2026-11-05
 - **Hoses and cords hang like ropes:** the vacuum hose sags and rolls in the holders' trays, zip-tied only at the upper
   router mount, the core's two channels and the Min-end holder (the ties go through the parts' real slots); the router

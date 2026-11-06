@@ -1,7 +1,7 @@
 // Part 51a in headless Chrome: the wiring. The stand-in Jackpot board inside the box (the user's own board is never in
 // the public data), Layers > Wiring: a line per run (but the mains to the wall), the core's runs along the cable
 // cord / hose, the ends riding their parts (the gantry moves: the X motor's end moves with it, the board's stays), hover
-// picks a run, off = gone.
+// picks a run (51e: the drawn wire; the lines are the Rat's nest option), the lid fan's lead + the plugs, off = gone.
 //   node tests/test_page_wiring.js   (not in npm test: needs Chrome + Python + parts/; ~1 min)
 "use strict";
 const { CHROME, sleep, server, chromePage } = require("./test_page_fluidnc.js");
@@ -51,13 +51,42 @@ const ok = (cond, msg) => { checks++; console.log((cond ? "  ok   " : "  FAIL ")
       return { before, after: ends() };
     })()`);
     ok(c.before[0] !== c.after[0] && Math.abs(c.before[1] - c.after[1]) < 1, `ends ride their parts: the X motor's run changes as X moves (${c.before[0]} -> ${c.after[0]}), the supply's to the board stays (${c.before[1]} -> ${c.after[1]})`);
-    // hover: the middle of the 24 V run on screen picks it
+    // 51e: hover picks the drawn wire (the rat's nest lines are an option, off): a wire's middle on screen -> its run
     const d = await page.val(`(() => {
-      const ln = WR.lines.children.find((l) => l.userData.run.id === "psu-dc"), a = ln.geometry.getAttribute("position"), v = new THREE.Vector3();
-      v.fromBufferAttribute(a, 0).add(new THREE.Vector3().fromBufferAttribute(a, a.count - 1)).multiplyScalar(0.5).project(camera);
-      const r = canvas.getBoundingClientRect(); return LR4WiringView.pick(r.left + (v.x + 1) / 2 * r.width, r.top + (1 - v.y) / 2 * r.height);
-    })()`);
-    ok(d === "psu-dc" || typeof d === "string", `hover picks a run there (${d})`);
+      const r = canvas.getBoundingClientRect(), at = (p, obj) => { const v = p.clone().applyMatrix4(obj.matrixWorld).project(camera); return LR4WiringView.pick(r.left + (v.x + 1) / 2 * r.width, r.top + (1 - v.y) / 2 * r.height); };
+      wrTick(); const lead = meshes.find((m) => m.userData.name === "PSU_LeadCable"), cord = meshes.find((m) => m.userData.name === "PSU_MainsCord");
+      const fanOk = !!WR.fan && WR.fan.visible && at(WR.fan.userData.curves[0].getPoint(0.55), WR.fan);
+      return { dc: at(lead.userData.pick.getPoint(0.5), lead), ac: at(cord.userData.pick.getPoint(0.5), cord), fan: fanOk,
+        lines: WR.lines.visible, nest: (() => { const keep = () => { let k = null; WR.esp.traverse((o) => { if (o.userData.espKeep) k = o.visible; }); return k; };   // (+ the antenna keep-out: only with it)
+          const k0 = keep(); LR4WiringView.nest(true); const v = WR.lines.visible && keep(); LR4WiringView.nest(false); return !k0 && v && !WR.lines.visible && !keep(); })() }; })()`);
+    ok(d.dc === "psu-dc" && d.ac === "psu-ac" && d.fan === "fan", `51e: hover picks the drawn wire: the 24 V lead (${d.dc}), the supply's mains cord (${d.ac}), the lid fan's lead (${d.fan})`);
+    ok(!d.lines && d.nest, `51e: the rat's nest lines off by default (Wiring on), Rat's nest shows / hides them + the ESP32 antenna keep-out (${d.nest})`);
+    // 51e: the lid fan's lead - each wire from the fan's top center to the power terminal's pin, inside nothing (the box, its
+    // lid, the fan, the supply); a plug on each header a wire lands on (+ the terminal's 2 screws), with Wiring
+    const fan = await page.val(`(() => { const out = { ends: [], inside: {} }, box = wrMesh("Jackpot3_Box"); box.updateMatrixWorld();
+      const solid = meshes.filter((m) => /^(Jackpot3_(Box|Lid|Fan)|PSU_24V)$/.test(m.userData.name || "")), bx = solid.map((m) => new THREE.Box3().setFromObject(m));
+      const rc = new THREE.Raycaster(), dir = new THREE.Vector3(0.31, 0.53, 0.79).normalize();
+      WR.fan.userData.curves.forEach((c, k) => {
+        // its start (user 2026-11-05: the wires leave the top center under the sticker): over the sticker's middle third,
+        // in its hub cap (a ray down meets the fan within 1 mm); the model's side stubs hidden
+        const lb = new THREE.Box3().setFromObject(wrMesh("Jackpot3_Fan_Label")), lc = lb.getCenter(new THREE.Vector3()), ls = lb.getSize(new THREE.Vector3());
+        const pin = box.localToWorld(wrTermPin(box, k).at), w = (t) => c.getPoint(t).applyMatrix4(WR.fan.matrixWorld), s0 = w(0);
+        const mid = Math.max(Math.abs(s0.x - lc.x) / ls.x, Math.abs(s0.y - lc.y) / ls.y) <= 1 / 6;
+        rc.set(s0, new THREE.Vector3(0, 0, -1)); const hit = rc.intersectObject(wrMesh("Jackpot3_Fan"), false)[0];
+        out.ends.push(mid ? 0 : 9, hit ? +hit.distance.toFixed(2) : 99, +w(1).distanceTo(pin).toFixed(2));
+        out.stub = (out.stub || 0) + (wrMesh("Jackpot3_Fan_Lead_" + (k ? "Black" : "Red")).visible ? 1 : 0);
+        // (under the sticker it runs in the hub cap's channel, which the model doesn't have: the fan not checked there)
+        const lab = wrMesh("Jackpot3_Fan_Label"), up = (q) => { rc.set(q.clone().setZ(400), new THREE.Vector3(0, 0, -1)); return rc.intersectObject(lab, false).length > 0; };
+        for (const q0 of c.getSpacedPoints(Math.ceil(c.getLength() / 1.5))) { const q = q0.applyMatrix4(WR.fan.matrixWorld), skipFan = up(q);
+          solid.forEach((m, i) => { if (!bx[i].containsPoint(q) || (skipFan && m.userData.name === "Jackpot3_Fan")) return; rc.set(q, dir); if (rc.intersectObject(m, false).length % 2) out.inside[m.userData.name] = (out.inside[m.userData.name] || 0) + 1; }); }
+      });
+      { const [a, b] = WR.fan.userData.curves.map((c) => c.getSpacedPoints(Math.ceil(c.getLength() / 0.5)));   // the pair side by side, never through each other
+        out.gap = +Math.min(...a.map((p) => Math.min(...b.map((q) => p.distanceTo(q))))).toFixed(2); }
+      out.plugs = WR.plugs ? WR.plugs.children.length : 0; out.plugsOn = !!WR.plugs && WR.plugs.visible; return out; })()`);
+    ok(fan.ends.length === 6 && fan.ends.every((d, i) => d <= (i % 3 === 2 ? 2 : 1)) && !fan.stub, `51e: the lid fan's 2 wires from its top center under the sticker (the side stubs hidden: ${!fan.stub}) to the power terminal's pins (middle / on the top / pin: ${fan.ends.join(", ")} mm)`);
+    ok(!Object.keys(fan.inside).length, `the fan's lead inside no box wall / lid / fan / supply (${JSON.stringify(fan.inside)})`);
+    ok(fan.gap >= 1.2, `the fan's red and black side by side all the way, not through each other (closest ${fan.gap} mm apart; 1.3 = touching, 1.2 at a twist)`);
+    ok(fan.plugs === 13 && fan.plugsOn, `a plug on each header a wire lands on (5 motors, 6 inputs) + the terminal's 2 screws (${fan.plugs}), shown with Wiring`);
     // 51b: the routes over the travel - the far side's motors reach on lead + extender, the near ones on their lead; the
     // Y1 run passes every brace from its end to the box; the pose is put back after
     const e = await page.val(`(() => { const before = [HOME.pose.x, HOME.pose.y, HOME.pose.z].join(), r = LR4WiringView.report(), by = Object.fromEntries(r.map((q) => [q.id, q]));
@@ -77,7 +106,7 @@ const ok = (cond, msg) => { checks++; console.log((cond ? "  ok   " : "  FAIL ")
       const bad = [], ends = [];
       for (const [id, n] of Object.entries(want)) { const q = b.info[id]; if (!q || q.wires !== n) bad.push(id + " " + (q ? q.wires : 0));
         else ends.push(...q.from, ...q.to.filter((d) => d !== "join")); }
-      const solid = meshes.filter((m) => m.visible !== false && /^(Brace_|StrutPlate_|Jackpot3_(Box|Lid)$|(XZ|YZ)_Plate_(Min|Max)$|[YZ]_Stepper_(Min|Max)$|PSU_24V$|Hose_Holder|(Back|Front)Wheel_|RailStrip_)/.test(m.userData.name || "") && !/~thread/.test(m.userData.name));
+      const solid = meshes.filter((m) => m.visible !== false && /^(Endstop_[YZ]_(Min|Max)$|Brace_|StrutPlate_|Jackpot3_(Box|Lid)$|(XZ|YZ)_Plate_(Min|Max)$|[YZ]_Stepper_(Min|Max)$|PSU_24V$|Hose_Holder|(Back|Front)Wheel_|RailStrip_)/.test(m.userData.name || "") && !/~thread/.test(m.userData.name));
       const boxes = solid.map((m) => new THREE.Box3().setFromObject(m));
       const rc = new THREE.Raycaster(), dir = new THREE.Vector3(0.31, 0.53, 0.79).normalize(), inside = {};
       const nb = BW.baseCurves.length - BW.plateCurves.length, dB = BW.mesh.position, dP = BW.span.position;
@@ -109,7 +138,16 @@ const ok = (cond, msg) => { checks++; console.log((cond ? "  ok   " : "  FAIL ")
         shown: meshes.filter((m) => /^Beam_(Wires|ZipTies|Sleeve)/.test(m.userData.name || "")).every((m) => m.visible), sleeves: BW.sleeveCurves.length }; })()`);
     ok(!bw.bad.length && bw.maxEnd <= 2 && bw.shown, `51c: the beam's runs wire by wire, each from its part to its pin within 2 mm (${bw.n} ends, worst ${bw.maxEnd} mm${bw.bad.length ? "; wrong: " + bw.bad.join(", ") : ""})`);
     ok(bw.ties === bw.braces, `a zip tie beside each brace the bundle passes (${bw.ties} of ${bw.braces} braces)`);
-    ok(!Object.keys(bw.inside).length, `no wire / tie / sleeve inside a YZ plate (through its channels), a stepper, a wheel, a rail strip, a brace, the strut plate, the box, its lid, an XZ plate, the supply or a hose holder (${JSON.stringify(bw.inside)})`);
+    // the endstops' wires (user 2026-11-05: the kit's): each switch's red + black from its two OUTER tabs (COM + NC - V1E's
+    // NC standard; within 0.8 mm of the tab metal, > 5 mm apart), each under heatshrink (a tube there)
+    const sw = await page.val(`(() => { wrTick(); const out = {};
+      for (const n of ["Endstop_X", "Endstop_Y_Min", "Endstop_Z_Min", "Endstop_Y_Max", "Endstop_Z_Max"]) {
+        const lv = wrVerts(wrMesh(n + "_Lever")), h = [0, 1].map((k) => wrSwitchHead(n, k));
+        out[n] = h.every(Boolean) ? { metal: +Math.max(...h.map((q) => Math.min(...lv.map((v) => v.distanceTo(q.pts[0]))))).toFixed(2), apart: +h[0].pts[0].distanceTo(h[1].pts[0]).toFixed(1) } : null;
+      }
+      return out; })()`);
+    ok(Object.values(sw).every((q) => q && q.metal <= 0.8 && q.apart > 5), `51e: each endstop's 2 wires from its outer tabs (COM + NC), under heatshrink (${JSON.stringify(sw)})`);
+    ok(!Object.keys(bw.inside).length, `no wire / tie / sleeve inside an endstop, a YZ plate (through its channels), a stepper, a wheel, a rail strip, a brace, the strut plate, the box, its lid, an XZ plate, the supply or a hose holder (${JSON.stringify(bw.inside)})`);
     ok(bw.sleeves === 2, `a sleeve over each side's bundle, plate -> box (${bw.sleeves})`);
     ok(bw.yKept && bw.zSpan, `a Y move only moves the beam's wires (${bw.yKept}); a Z move rebuilds only the spans (${bw.zSpan})`);
     ok(bw.rope.n === 2 && bw.rope.end <= 0.5 && bw.rope.worst <= 1.1, `51d: the span plate -> beam a rope a side (${bw.rope.n}), at Z's bottom / top its ends on their pins (${bw.rope.end} mm), its length within 10 % of its rest (worst x${bw.rope.worst})`);

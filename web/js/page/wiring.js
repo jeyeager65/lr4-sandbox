@@ -3,9 +3,9 @@
 //   - the stand-in board (51a.3): the Jackpot 3 drawn as a plain blue PCB + its connector blocks at the list's spots,
 //     inside the box (a child of Jackpot3_Box: it rides the beam) - only when the user's own board model isn't there
 //     (it never is in the public page: LOCAL_ONLY);
-//   - the rat's nest (51a.5): Layers > Wiring - a line per run from end to end, coloured by its group (the core's runs
-//     along the router cord / vac hose), drawn over the parts; hover / tap one: its name, from -> to, its segments, how far.
-  const WR = { on: false, board: null, lines: null, tip: null, hover: null };
+//   - the rat's nest (51a.5): a line per run from end to end, coloured by its group, drawn over the parts - since 51e an
+//     option (Layers > Wiring > Rat's nest, off); hover / tap a drawn wire (or a line): its run's name, from -> to, how far.
+  const WR = { on: false, nest: false, board: null, lines: null, tip: null, hover: null, plugs: null, fan: null };
   const WR_V = (a) => new THREE.Vector3(...a);
   const wrMesh = (n) => meshes.find((m) => m.userData.name === n);
   function wrBoxLocal(box, at) {                      // a spot (mm from the box's bounding-box min) in the box mesh's frame
@@ -26,7 +26,7 @@
   }
   // ---- the ESP32 (user 2026-11-02: "we want to avoid routing wires over the wifi antenna"): the WROOM-32E module on
   // the stand-in board (the user's own board model has its own), and its antenna's keep-out - a clear amber zone over
-  // the antenna end (past the board's +y edge), JP3.esp.keep mm round it; shown only with the Wiring layer (user 2026-11-03) ----
+  // the antenna end (past the board's +y edge), JP3.esp.keep mm round it; shown only with Wiring > Rat's nest (user 2026-11-03 / -05) ----
   function wrEsp(box, own) {
     if (WR.esp && WR.esp.parent !== box) { WR.esp.parent && WR.esp.parent.remove(WR.esp); WR.esp = null; }
     if (!box || WR.esp || typeof LR4Wiring === "undefined" || !LR4Wiring.JP3.esp) return;
@@ -57,11 +57,11 @@
     wrEspKeep();
   }
   function wrEspKeep() {
-    if (WR.esp) WR.esp.traverse((o) => { if (o.userData.espKeep) o.visible = !!WR.on; });
+    if (WR.esp) WR.esp.traverse((o) => { if (o.userData.espKeep) o.visible = !!(WR.on && WR.nest); });
   }
   // ---- the stand-in board ----
   function wrBoard() {
-    { const bx = wrMesh("Jackpot3_Box"); wrEsp(bx, !!wrMesh("Jackpot3_PCB")); }
+    { const bx = wrMesh("Jackpot3_Box"); wrEsp(bx, !!wrMesh("Jackpot3_PCB")); const f = WR.fan, p = WR.plugs; wrPlugs(bx); wrFan(bx); if (WR.fan !== f || WR.plugs !== p) wrInBox(); }
     const box = wrMesh("Jackpot3_Box"), own = wrMesh("Jackpot3_PCB");
     if (WR.board && (WR.board.parent !== box || own)) { WR.board.parent && WR.board.parent.remove(WR.board); WR.board = null; }
     if (!box || own || WR.board || typeof LR4Wiring === "undefined") return;
@@ -78,11 +78,198 @@
     for (const [k, s] of Object.entries(J.spots)) {   // a connector block under each spot, the pins' tops level with it
       const sz = /motor/.test(k) ? [10.2, 2.5, 8.5] : /\.in\./.test(k) ? [2.5, 5.1, 8.5] : /power/.test(k) ? [7, 8, 7.5] : [5, 4.5, 6];
       const at = wrBoxLocal(box, s.at).sub(WR_V(P.n).multiplyScalar(sz[2])).sub(WR_V(P.x).multiplyScalar(sz[0] / 2)).sub(WR_V(P.y).multiplyScalar(sz[1] / 2));
-      frame(at, P.x, P.y, P.n, /motor|\.in\./.test(k) ? [0.08, 0.08, 0.09] : [0.92, 0.92, 0.9], sz);
+      frame(at, P.x, P.y, P.n, /motor|\.in\./.test(k) ? [0.08, 0.08, 0.09] : /power/.test(k) ? [0.1, 0.45, 0.25] : [0.92, 0.92, 0.9], sz);   // (power: a green screw terminal)
     }
     box.add(g);
     WR.board = g;
   }
+  // ---- 51e: inside the box - the plugs on the headers wires land on, the lid fan's lead (children of the box: they ride
+  // it; shown with Layers > Wiring, the user's own board model or the stand-in). GUESS: V1E docs (jackpot3.md "open 2.54
+  // male headers"; skrpro.md "the V1 Engineering wiring kits have the Molex style terminations"): a Molex KK-style housing
+  // on each motor header, a 2-pin Dupont on each input (they sit 2.54 apart: nothing wider fits), the power in a screw
+  // terminal (two screws on top, the wires in from its +X side) ----
+  const WR_TERM = 3.5;                                // the power terminal's pitch, mm (GUESS: its block is 8 wide)
+  // the power terminal's pin k (box-local): along the PCB's y, 0 = + (GUESS), the way the wires come in (its out)
+  function wrTermPin(box, k) {
+    const P = LR4Wiring.JP3.pcb, s = LR4Wiring.JP3.spots["jp3.power"];
+    return { at: wrBoxLocal(box, s.at).addScaledVector(WR_V(P.y), (k - 0.5) * WR_TERM), out: WR_V(s.out), up: WR_V(P.n) };
+  }
+  function wrPlugs(box) {
+    if (WR.plugs && WR.plugs.parent !== box) { WR.plugs.parent && WR.plugs.parent.remove(WR.plugs); WR.plugs = null; }
+    if (!box || WR.plugs || typeof LR4Wiring === "undefined") return;
+    const J = LR4Wiring.JP3, P = J.pcb, g = new THREE.Group();
+    g.name = "Jackpot3_Plugs";
+    const q = new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(WR_V(P.x), WR_V(P.y), WR_V(P.n)));
+    const block = (c, s, mat) => { const m = new THREE.Mesh(new THREE.BoxGeometry(...s), mat); m.quaternion.copy(q); m.position.copy(c); g.add(m); return m; };
+    const kk = material(null, { c: [0.93, 0.92, 0.86], r: 0.6 }), dp = material(null, { c: [0.14, 0.14, 0.15], r: 0.5 }), steel = new THREE.MeshStandardMaterial({ color: 0xb8babd, metalness: 0.8, roughness: 0.35 });
+    const used = new Set(LR4Wiring.runsFor(false).concat(LR4Wiring.runsFor(true)).map((r) => r.to && r.to.board).filter(Boolean));
+    for (const id of used) {
+      const s = J.spots[id], at = wrBoxLocal(box, s.at);
+      if (/motor/.test(id)) block(at.clone().addScaledVector(WR_V(P.n), 6), [s.pins * 2.54, 4.9, 12.5], kk);   // over the pins, + 6 mm up
+      else if (/\.in\./.test(id)) block(at.clone().addScaledVector(WR_V(P.n), 6.5), [2.5, 5.0, 13.5], dp);
+      else if (/power/.test(id)) for (let k = 0; k < 2; k++) {   // the terminal's screws (its block: the stand-in's, or yours)
+        const p = wrTermPin(box, k), c = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.5, 1.2, 14), steel);
+        c.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), p.up);
+        c.position.copy(p.at).addScaledVector(p.up, 7.5 / 2 + 0.4);   // (the block's top: the spot + half its 7.5)
+        g.add(c);
+        const slot = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.5, 0.4), dp); slot.position.set(0, 0.5, 0); c.add(slot);
+      }
+    }
+    box.add(g);
+    WR.plugs = g;
+  }
+  // the lid fan's lead (V1E docs: to the power input, always on). The 5015 blower sits on the lid; its two wires (user
+  // 2026-11-05, with a photo of the WINSINN fan) leave the hub at the top center under the sticker and run in a channel
+  // straight to the housing's rim, a quarter turn from the outlet (seen from the sticker side: outlet right, wires
+  // down, beside the lower ear; fclib hw.blower_5015's frame: local -y). The outlet points -X (build.py JP3_FAN_OUTLET),
+  // so the channel runs to the fan's +Y (back) rim. The model's lead stubs (out of its side) are hidden: panel.js.
+  // Down its flared side onto the lid, along the lid's top behind the fan to its +X end, over the edge, down outside the box's +X wall and in
+  // through its low slot (box frame y 76-103, z 9-15: free - the core's / Max wires use the upper one at y ~31), up into
+  // the power terminal from its open +X side over the 24 V lead's wires (red +, black -). Laid on the real surfaces
+  // (rays onto the fan / lid). GUESS beyond the user's words
+  const WR_FAN_LID = [[64, 69], [72, 70.5], [95, 69], [112, 67.5], [123.5, 67]];   // box frame [x, y] (mm from its min), on the lid: bending toward +X, behind the fan
+  const WR_FAN_CH = [0, 1, 0];                         // the channel's way (world): the outlet (-X) turned a quarter, seen from the sticker side
+  // box frame: over the lid's +X edge, down, in the low slot under the board shelf inside the wall (z 8-14: floor top
+  // 8.1, shelf bottom 13.8; x >= 112.7), up between the shelf's edge and the PCB's (x ~110-112) to the terminal
+  const WR_FAN_END = [[127.5, 69, 51], [128, 80, 34], [127.6, 91, 19], [126.7, 94.7, 11], [118.7, 94.7, 11], [114.5, 94.7, 10.8], [111.6, 94.5, 11.6], [110.6, 94.2, 15.2], [110.7, 93.7, 19.7]];
+  function wrFan(box) {
+    if (WR.fan && WR.fan.parent !== box) { WR.fan.parent && WR.fan.parent.remove(WR.fan); WR.fan = null; }
+    if (!box || WR.fan || typeof LR4Wiring === "undefined" || typeof hrTubes !== "function") return;
+    const fan = wrMesh("Jackpot3_Fan"), lid = wrMesh("Jackpot3_Lid"), lab = wrMesh("Jackpot3_Fan_Label");
+    if (!fan || !lid || !lab) return;
+    for (const m of [box, fan, lid, lab]) m.updateMatrixWorld();
+    const V = (x, y, z) => new THREE.Vector3(x, y, z), rc = new THREE.Raycaster(), dn = V(0, 0, -1), r = 0.65;
+    const topZ = (objs, x, y) => { rc.set(V(x, y, 400), dn); const h = rc.intersectObjects(objs, false)[0]; return h ? h.point.z : null; };
+    const W = (a) => box.localToWorld(wrBoxLocal(box, [a[0], a[1], 0]));   // a box-frame [x, y] -> world (z: replaced)
+    // the channel: from under the sticker's middle to the rim, every 2 mm while over the fan
+    const C = new THREE.Box3().setFromObject(lab).getCenter(V(0, 0, 0));
+    const u = V(...WR_FAN_CH).applyQuaternion(box.getWorldQuaternion(new THREE.Quaternion())).setZ(0).normalize(), side = V(-u.y, u.x, 0), groove = [];
+    for (let s = 0; s < 90; s += 2) { const x = C.x + u.x * s, y = C.y + u.y * s, z = topZ([fan], x, y); if (z === null) break; groove.push(V(x, y, z)); }
+    if (groove.length < 3) return;
+    const E = groove[groove.length - 1];
+    // past the fan the pair's middle line (box frame: on the lid, then down the +X end and in); each wire beside it,
+    // square to its way at each point (red on the left, as in the channel - user 2026-11-05: they overlapped where the
+    // route ran along the fixed side offset)
+    const tail = WR_FAN_LID.map((a) => { const q = W(a), z = topZ([lid], q.x, q.y); return box.worldToLocal(q.setZ((z === null ? q.z : z) + r + 0.2)); })
+      .concat(WR_FAN_END.map((a) => wrBoxLocal(box, a)));
+    const lefts = [];
+    for (let i = 0; i < tail.length; i++) {
+      const t = tail[Math.min(tail.length - 1, i + 1)].clone().sub(i ? tail[i - 1] : box.worldToLocal(E.clone().addScaledVector(u, 5))), l = V(0, 0, 1).cross(t);
+      if (l.length() < 0.3 * t.length() && lefts.length) lefts.push(lefts[lefts.length - 1].clone());   // (going straight down: as before)
+      else lefts.push(l.normalize());
+    }
+    const specs = [];
+    for (const [k, rgb] of [[0, [0.8, 0.1, 0.1]], [1, [0.05, 0.05, 0.05]]]) {
+      const o = side.clone().multiplyScalar(k ? -0.7 : 0.7);
+      // its start under the sticker's middle, out across the top, over the housing's step down to its shoulder and its
+      // edge onto the lid: the top's height every 0.5 mm along the way, each point over the highest within 2 mm (no corner cut)
+      const prof = [];
+      for (let s = 0; s <= E.distanceTo(C.clone().setZ(E.z)) + 5; s += 0.5) { const q = C.clone().add(o).addScaledVector(u, s); prof.push([q, topZ([fan, lid], q.x, q.y)]); }
+      const pts = [];
+      for (let i = 0; i < prof.length; i += 4) {
+        let z = -1e9;
+        for (let j = Math.max(0, i - 4); j <= Math.min(prof.length - 1, i + 4); j++) if (prof[j][1] !== null) z = Math.max(z, prof[j][1]);
+        // (under the sticker - a 0.01 mm skin over the hub's 1.5 mm cap: in its channel through the cap, hidden; the
+        // model has no channel)
+        const q = prof[i][0], under = topZ([lab], q.x, q.y) !== null;
+        if (z > -1e9) pts.push(q.clone().setZ(under && prof[i][1] !== null ? prof[i][1] - 0.77 : z + r + 0.15));   // (under it: its own height - the top is tilted)
+      }
+      const nL = WR_FAN_LID.length, L = pts.map((v) => box.worldToLocal(v)).concat(tail.map((v, i) => {
+        const q = v.clone().addScaledVector(lefts[i], k ? -0.7 : 0.7);
+        if (i < nL) { const w = box.localToWorld(q.clone()), z = topZ([lid], w.x, w.y); if (z !== null) q.copy(box.worldToLocal(w.setZ(z + r + 0.2))); }   // (each on the lid)
+        return q;
+      }));
+      const p = wrTermPin(box, k), end = p.at.clone().addScaledVector(p.up, 1.3);   // over the 24 V lead's wire in its clamp
+      L.push(end.clone().addScaledVector(p.out, 3.5), end);
+      const cv = new THREE.CatmullRomCurve3(L.filter((v, i) => !i || v.distanceTo(L[i - 1]) > 0.3), false, "centripetal");
+      specs.push({ curve: cv, segs: Math.ceil(cv.getLength() / 2), r, radial: 6, rgb, run: "fan" });
+    }
+    const m = new THREE.Mesh(hrTubes(null, specs), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.5 }));
+    m.name = "Jackpot3_FanWires"; m.userData.curves = specs.map((s) => s.curve);
+    box.add(m);
+    WR.fan = m;
+  }
+  function wrInBox() {                                // the box's wiring bits: with the Wiring layer
+    wrEspKeep();
+    for (const g of [WR.plugs, WR.fan]) if (g) g.visible = !!WR.on;
+  }
+  // ---- the endstops' wires on their tabs (user 2026-11-05, with V1E's kit photo): soldered to the two OUTER tabs (COM +
+  // NC: V1E's "Normally Closed (NC) endstop wiring"; the middle tab, NO, free), each joint under black heatshrink over
+  // the tab and the wire's end. The switch's frame from its meshes (fclib hw.omron_ss_gl13, SS_GL13): its body's
+  // principal axes (long x 19.8, y 10, thin z 6.4; the holes / plunger keep the axes square) and the tab side: past the
+  // body's y faces, the tabs are flat (0.5 thick in z), the lever 3.6 wide. Tabs at x -7.4 / +7.4, holes 5.7 past the
+  // body's terminal face, tips 7.0 past it ----
+  const WR_HS = { len: 16, r: 1.8 };                  // heatshrink: from the body's face out over the tab, mm (GUESS: the kit photo)
+  function wrEig3(A) {                                 // a symmetric 3x3's eigenvectors (Jacobi), columns sorted by eigenvalue, largest first
+    const mul = (P, Q) => P.map((r, i) => Q[0].map((_, j) => r[0] * Q[0][j] + r[1] * Q[1][j] + r[2] * Q[2][j]));
+    const T = (P) => P[0].map((_, j) => P.map((r) => r[j]));
+    let a = A.map((r) => r.slice()), v = [[1, 0, 0], [0, 1, 0], [0, 0, 1]];
+    for (let sweep = 0; sweep < 30; sweep++) for (const [p, q] of [[0, 1], [0, 2], [1, 2]]) {
+      if (Math.abs(a[p][q]) < 1e-9) continue;
+      const th = 0.5 * Math.atan2(2 * a[p][q], a[q][q] - a[p][p]), c = Math.cos(th), s = Math.sin(th);   // J^T A J zeroes a[p][q]
+      const J = [[1, 0, 0], [0, 1, 0], [0, 0, 1]]; J[p][p] = c; J[q][q] = c; J[p][q] = s; J[q][p] = -s;
+      a = mul(T(J), mul(a, J)); v = mul(v, J);
+    }
+    return [0, 1, 2].map((i) => [a[i][i], new THREE.Vector3(v[0][i], v[1][i], v[2][i])]).sort((p, q) => q[0] - p[0]).map((e) => e[1]);
+  }
+  const wrVerts = (m) => { m.updateMatrixWorld(); const a = m.geometry.getAttribute("position"), out = [];
+    for (let i = 0; i < a.count; i++) out.push(new THREE.Vector3().fromBufferAttribute(a, i).applyMatrix4(m.matrixWorld)); return out; };
+  // -> { tabs: [{ hole, tip, hs }] (red on one outer tab, black on the other; world), out: the tabs' way, n: the body's
+  // thin axis } or null
+  function wrSwitchTabs(name) {
+    const body = wrMesh(name), lever = wrMesh(name + "_Lever");
+    if (!body || !lever) return null;
+    body.updateMatrixWorld();
+    // (the frame: found once a mesh, kept in its own coordinates - the X switch's wires are redrawn every move)
+    const key = body.geometry.uuid + lever.geometry.uuid;
+    if (!body.userData.swFrame || body.userData.swFrame.key !== key) {
+      const f = wrSwitchFrame(body, lever), inv = new THREE.Matrix4().copy(body.matrixWorld).invert(), dir = (v) => v.clone().transformDirection(inv);
+      body.userData.swFrame = { key, C: f.C.clone().applyMatrix4(inv), X: dir(f.X), out: dir(f.out), Z: dir(f.Z), hy: f.hy };
+    }
+    const F = body.userData.swFrame, M = body.matrixWorld, C = F.C.clone().applyMatrix4(M), X = F.X.clone().transformDirection(M), out = F.out.clone().transformDirection(M), hy = F.hy;
+    const tabs = [-7.4, 7.4].map((x) => { const b = C.clone().addScaledVector(X, x);
+      return { face: b.clone().addScaledVector(out, hy), hole: b.clone().addScaledVector(out, hy + 5.7), tip: b.clone().addScaledVector(out, hy + 7), hs: b.clone().addScaledVector(out, hy + WR_HS.len) }; });
+    return { tabs, out, n: F.Z.clone().transformDirection(M), x: X };
+  }
+  function wrSwitchFrame(body, lever) {                // (world, at the pose of the moment)
+    const vs = wrVerts(body), c = new THREE.Vector3();
+    vs.forEach((v) => c.add(v)); c.multiplyScalar(1 / vs.length);
+    const A = [[0, 0, 0], [0, 0, 0], [0, 0, 0]];
+    for (const v of vs) { const d = [v.x - c.x, v.y - c.y, v.z - c.z]; for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) A[i][j] += d[i] * d[j]; }
+    // (the long axis from PCA; the other two are too alike in spread for it - the thin one: turned about the long
+    // axis to where the body is thinnest, 0.5 deg steps)
+    const [X, Y0, Z0] = wrEig3(A), pr = (ax) => vs.map((v) => v.clone().sub(c).dot(ax));
+    const span = (ax) => { const p = pr(ax); return Math.max(...p) - Math.min(...p); };
+    let Z = Z0, best = 1e9;
+    for (let d = 0; d < 180; d += 0.5) { const t = d * Math.PI / 180, ax = Y0.clone().multiplyScalar(Math.cos(t)).addScaledVector(Z0, Math.sin(t)), w = span(ax); if (w < best) { best = w; Z = ax; } }
+    const Y = Z.clone().cross(X).normalize();
+    const mid = (ax) => { const p = pr(ax); return (Math.min(...p) + Math.max(...p)) / 2; };
+    const C = c.clone().addScaledVector(X, mid(X)).addScaledVector(Y, mid(Y)).addScaledVector(Z, mid(Z));
+    const hy = (() => { const p = pr(Y); return (Math.max(...p) - Math.min(...p)) / 2; })();
+    // the tab side: the metal past a y face that's flat in z
+    const lv = wrVerts(lever), side = (s) => { const q = lv.filter((v) => v.clone().sub(C).dot(Y) * s > hy + 1).map((v) => v.clone().sub(C).dot(Z)); return q.length ? Math.max(...q) - Math.min(...q) : 1e9; };
+    const out = side(-1) < side(1) ? Y.clone().negate() : Y.clone();
+    return { C, X, out, Z, hy };
+  }
+  // a switch wire's start (world): soldered at its tab's hole, out under the heatshrink, then bending off toward `next`
+  // (its route's next point); + the heatshrink's tube points. Tab k (0 / 1: the outer tabs)
+  function wrSwitchHead(name, k, next) {
+    const s = wrSwitchTabs(name);
+    if (!s) return null;
+    const t = s.tabs[k], pts = [t.hole, t.tip.clone().addScaledVector(s.out, 2), t.hs];
+    if (next) { const d = next.clone().sub(t.hs); if (d.length() > 12) pts.push(t.hs.clone().addScaledVector(s.out, 5).addScaledVector(d.normalize(), 5)); }   // (a rounder bend off the sleeve)
+    else pts.push(t.hs.clone().addScaledVector(s.out, 6));
+    return { pts, hs: [t.face.clone().addScaledVector(s.out, 0.3), t.hs], out: s.out };
+  }
+  // both wires' heads, paired to the tabs so they don't cross (the shorter total way to their next points)
+  function wrSwitchHeads(name, nexts) {
+    const s = wrSwitchTabs(name);
+    if (!s) return null;
+    const d = (k, w) => s.tabs[k].hs.distanceTo(nexts[w]);
+    const swap = d(1, 0) + d(0, 1) < d(0, 0) + d(1, 1);
+    return [0, 1].map((w) => wrSwitchHead(name, swap ? 1 - w : w, nexts[w]));
+  }
+
   // ---- the ends, where they are now (world) ----
   function wrEnd(e) {
     if (!e) return null;
@@ -301,6 +488,7 @@
         ln.userData.join = j; WR.joins.add(j);
       }
     }
+    WR.lines.visible = !!WR.nest;                     // (51e: the rat's nest is an option; the joins are the drawn wires')
     scene.add(WR.lines, WR.joins);
     wrTick();
   }
@@ -503,9 +691,10 @@
       for (const R of Object.values(BW.ropes || {})) {
         const q = bwRope(R, rel);
         sl.push({ curve: q.axis, segs: 3 * BW_SPAN_N, r: BW_SLEEVE_R, radial: 14 });
-        for (const x of q.wires) { ws.push({ curve: x.curve, segs: 3 * BW_SPAN_N, r: x.s.r, radial: 6, rgb: x.s.rgb }); done.add(x.s); }
+        for (const x of q.wires) { ws.push({ curve: x.curve, segs: 3 * BW_SPAN_N, r: x.s.r, radial: 6, rgb: x.s.rgb, run: x.s.run }); done.add(x.s); }
       }
-      for (const s of BW.spans) if (!done.has(s)) ws.push({ curve: L(s), segs: 1, r: s.r, radial: 6, rgb: s.rgb });   // (a side with no sleeve: straight)
+      for (const s of BW.spans) if (!done.has(s)) ws.push({ curve: L(s), segs: 1, r: s.r, radial: 6, rgb: s.rgb, run: s.run });   // (a side with no sleeve: straight)
+      BW.spanPick = ws.filter((s) => s.run).map((s) => [s.run, s.curve]);
       BW.span.geometry = ws.length ? hrTubes(BW.span.geometry, ws) : bwEmpty();
       BW.sleeveSpan.geometry = sl.length ? hrTubes(BW.sleeveSpan.geometry, sl) : bwEmpty();
       BW.spanCurves = ws.map((s) => s.curve); BW.sleeveSpanCurves = sl.map((s) => s.curve);   // (tests: in the plate's frame - + BW.span.position)
@@ -521,11 +710,12 @@
     const bx = new THREE.Box3().setFromObject(box);
     const boxPt = (x, y, z) => box.localToWorld(wrBoxLocal(box, [x, y, z]));
     BW.joins = {}; BW.spans = []; BW.sleeveSpans = [];
-    const curve = (pts, rgb, r, to) => {
+    let cur = null;                                   // (51e: the run each wire is drawn for - hover picks it)
+    const curve = (pts, rgb, r, to, run) => {
       const q = pts.filter((v, i) => i === 0 || v.distanceTo(pts[i - 1]) > 0.05);
       if (q.length < 2) return null;
       const c = new THREE.CatmullRomCurve3(q, false, "centripetal");
-      to.push({ curve: c, segs: Math.max(6, Math.ceil(c.getLength() / 4)), r, radial: 6, rgb });
+      to.push({ curve: c, segs: Math.max(6, Math.ceil(c.getLength() / 4)), r, radial: 6, rgb, run });
       return c;
     };
     for (const [side, ids] of Object.entries(BW_SIDES)) {
@@ -533,10 +723,10 @@
       // a wire: split = [the plate's back exit, behind the XZ plate] (indices in pts): the plate's part, the span between
       // (rebuilt as Z moves: bwTick), the beam's part; no split: all the beam's
       const tube = (pts, rgb, r, split, stripe) => {
-        const put = (q, to) => { const c = curve(q, rgb, r, to); if (c && stripe) curve(q.map((v, i) => v.clone().add(stripe[i] || stripe[stripe.length - 1])), BW_C.white, 0.2, to); return c; };
+        const put = (q, to) => { const c = curve(q, rgb, r, to, cur); if (c && stripe) curve(q.map((v, i) => v.clone().add(stripe[i] || stripe[stripe.length - 1])), BW_C.white, 0.2, to); return c; };
         if (!split) { const c = put(pts, specs); return c && { c0: c, c1: c }; }
         const [iA, iW] = split, c0 = put(pts.slice(0, iA + 1), plateSpecs[side]), c1 = put(pts.slice(iW), specs);
-        BW.spans.push({ a: pts[iA].clone(), w: pts[iW].clone(), r, rgb, side });
+        BW.spans.push({ a: pts[iA].clone(), w: pts[iW].clone(), r, rgb, side, run: cur });
         return c0 && c1 && { c0, c1 };
       };
       // the Min entry: through the lid's end slot (world z 116..122; the box mesh's frame = its geometry's min, 6.3 mm
@@ -547,6 +737,7 @@
       for (const id of ids) {
         const r = runs[id], p = paths[id], kind = bwKind(id);
         if (!r || !p || p.exit === undefined) continue;
+        cur = id;
         const rib = r.segs.find((g) => g.kind === "ribbon");
         const p2 = p.slice(0, -2).concat(ent), iA0 = p.exit, iW0 = p.exit + 1, iT0 = p.fold;
         if (rib && r.group === "motor") J = bwAt(p2, r.segs[0].len - WR_ALLOW);   // the lead's end (its plug's allowance kept)
@@ -573,12 +764,17 @@
           else pts.push(...(max ? [B(6, -7, 20), B(0, -1, 21), B(0, 40, 22)] : []), B(0, 70, 24), B(4, 75, 24));   // (higher than the core's: kept off the lid's back wall)
           return pts.concat([14, 6, 1, 0].map((h) => pin.at.clone().addScaledVector(pin.up, h)));
         };
+        // an endstop's wires: from its outer tabs (soldered, under heatshrink: wrSwitchHeads) instead of the switch's middle
+        const hds = r.group === "switch" ? wrSwitchHeads(r.from.part, [0, 1].map((k) => along(slotOf(k), 0, Math.min(2, iE))[1])) : null;
         wires.forEach((w, k) => {
           const slot = slotOf(k);
-          if (iJ >= 0) { const c = tube(along(slot, 0, iJ), BW_C[w.c], BW_R[w.kind], sp2); if (c) ends.push({ c, pin: null }); return; }   // the lead / own pair to the join
+          const hd = hds && hds[k], sp = hd ? [sp2[0] + hd.pts.length - 1, sp2[1] + hd.pts.length - 1] : sp2;
+          const head = (q) => (hd ? hd.pts.concat(q.slice(1)) : q);
+          if (hd) curve(hd.hs, BW_C.black, WR_HS.r, plateSpecs[side], id);
+          if (iJ >= 0) { const c = tube(head(along(slot, 0, iJ)), BW_C[w.c], BW_R[w.kind], sp); if (c) ends.push({ c, pin: null, at: hd && hd.pts[0] }); return; }   // the lead / own pair to the join
           const pin = bwPin(pinId, k);
-          const c = pin && tube(along(slot, 0, iE).concat(inBox(lane + k, pin, r.group === "motor")), BW_C[w.c], BW_R[w.kind], sp2);
-          if (c) ends.push({ c, pin });
+          const c = pin && tube(head(along(slot, 0, iE)).concat(inBox(lane + k, pin, r.group === "motor")), BW_C[w.c], BW_R[w.kind], sp);
+          if (c) ends.push({ c, pin, at: hd && hd.pts[0] });
         });
         if (iJ >= 0 && r.group === "motor") {            // the extender: 6 black (the end one's white line) from the join, through the slot, split inside
           const sr = runs[rib.shares], zr = id === "y1-motor" ? 18.7 : 21.2;
@@ -588,7 +784,9 @@
             const yy = 31.5 + (j - 2.5) * 1.0;
             const pts = along(BW_SLOT.ribbon(kind, j), iJ, iE - 1).concat([boxPt(140, yy, zr), boxPt(132, yy, zr), boxPt(126, yy, zr), boxPt(114, yy, zr)], inBox(lane + j, pin, !toStop));
             const n0 = iE - iJ, st = j ? null : pts.map((v, i) => (i < n0 ? F[iJ + i][1].clone().multiplyScalar(0.42) : V(0, 0, 0.42)));
+            cur = toStop ? sr.id : id;                   // (the ribbon's 2 spare wires: the endstop's run)
             const c = tube(pts, BW_C.ribbon, BW_R.ribbon, null, st);
+            cur = id;
             if (c) ends.push({ c, pin, run: toStop ? sr.id : id });
           }
           const t = D[Math.min(iE, iJ + 1)].clone().sub(D[Math.max(0, iJ - 1)]).normalize();
@@ -610,7 +808,7 @@
         for (const e of ends) {
           const ie = e.run && e.run !== id ? (info[e.run] = info[e.run] || { wires: 0, from: [], to: [] }) : iv;
           ie.wires++;
-          if (!e.run) iv.from.push(+e.c.c0.getPoint(0).distanceTo(wrEnd(r.from)).toFixed(2));
+          if (!e.run) iv.from.push(+e.c.c0.getPoint(0).distanceTo(e.at || wrEnd(r.from)).toFixed(2));   // (an endstop's: its tab hole)
           ie.to.push(e.pin ? +e.c.c1.getPoint(1).distanceTo(e.pin.at).toFixed(2) : "join");
         }
       }
@@ -633,6 +831,8 @@
     const ts = tieAt.map((c) => ({ curve: c, segs: 24, r: 0.55, radial: 5 }));
     BW.ties.geometry = ts.length ? hrTubes(BW.ties.geometry, ts) : bwEmpty();
     // (tests: every piece at the build's pose - the beam's, the plates', the spans)
+    BW.pick = specs.filter((s) => s.run).map((s) => [s.run, s.curve]);   // (51e: hover)
+    BW.platePick = Object.fromEntries(Object.entries(plateSpecs).map(([s, a]) => [s, a.filter((q) => q.run).map((q) => [q.run, q.curve])]));
     BW.info = info; BW.tieN = ts.length; BW.tieCurves = tieAt; BW.sleeveCurves = sleeves.map((s) => s.curve);
     BW.plateCurves = [].concat(...Object.values(plateSpecs).map((a) => a.map((s) => s.curve)));
     BW.baseCurves = specs.map((s) => s.curve).concat(BW.plateCurves);
@@ -684,34 +884,63 @@
     if (typeof hrWiresSet === "function") hrWiresSet();   // Part 53c: the drawn wires show with it (hose_bom.js) - drawn first,
     if (WR.on) WR.report = wrReport();               // the report's X runs follow them (the lengths over the travel: once, as it's shown)
     const c = document.getElementById("lay-wiring"); if (c) c.checked = WR.on;
+    { const n = document.getElementById("lay-nest"); if (n && n.parentElement) n.parentElement.style.display = WR.on ? "" : "none"; }   // (only with Wiring)
     if (!WR.on) wrTip(null);
-    wrEspKeep();
+    wrInBox();
     wrLines();
     if (typeof applyVisibility === "function") applyVisibility();
   }
-  // hover / tap: the nearest run within 8 px of the pointer
+  // 51e: the rat's nest (the straight lines end to end, over the parts) - Layers > Wiring > Rat's nest, off by default
+  // now everything is drawn; the lines are still built with Wiring on (the runs' routed lengths, the taped joins)
+  function wrNest(on) {
+    WR.nest = !!on;
+    const c = document.getElementById("lay-nest"); if (c) c.checked = WR.nest;
+    if (WR.lines) WR.lines.visible = WR.nest;
+    wrEspKeep();                                     // (the antenna keep-out: with the rat's nest - user 2026-11-05)
+  }
+  // hover / tap: the nearest drawn wire (51e) - or rat's nest line - within 8 px of the pointer -> its run's id.
+  // Sources: [run id, the mesh it's drawn in (its matrixWorld maps the points; hidden: skipped), curves or points]
+  function wrPickSrc() {
+    const out = [], add = (id, obj, c) => { if (id && obj && c) out.push([id, obj, c]); };
+    for (const [obj, list] of [[BW.mesh, BW.pick], [BW.span, BW.spanPick]].concat(Object.entries(BW.plates).map(([s, m]) => [m, BW.platePick && BW.platePick[s]])))
+      for (const [id, c] of list || []) add(id, obj, c);
+    if (WR.fan) for (const c of WR.fan.userData.curves) add("fan", WR.fan, c);
+    if (typeof HR !== "undefined" && HR.corePick) for (const [id, obj, c] of HR.corePick) add(id, obj, c);
+    if (typeof PWR_MESH !== "undefined" && PWR_MESH) for (const [k, m] of Object.entries(PWR_MESH)) add(k === "cord" ? "psu-ac" : "psu-dc", m, m.userData.pick);
+    if (typeof HUB !== "undefined" && HUB.cables && wrHub()) for (const [n, p] of Object.entries(HUB.cables.pts)) add("hub-panel", wrMesh("TableHub_Cable" + n), p);
+    if (WR.lines && WR.nest) for (const ln of WR.lines.children) if (ln.userData.p) add(ln.userData.run.id, ln, ln.userData.p);
+    return out;
+  }
+  const WR_PV = new THREE.Vector3();
   function wrPick(cx, cy) {
-    if (!WR.lines) return null;
-    const r = canvas.getBoundingClientRect(), px = cx - r.left, py = cy - r.top, v = new THREE.Vector3();
+    if (!WR.on) return null;
+    const r = canvas.getBoundingClientRect(), px = cx - r.left, py = cy - r.top, v = WR_PV;
     let best = null, bd = 8;
-    const sc = (p) => { v.copy(p).project(camera); return [(v.x + 1) / 2 * r.width, (1 - v.y) / 2 * r.height, v.z]; };
-    for (const ln of WR.lines.children) {
-      if (!ln.visible) continue;
-      const a = ln.geometry.getAttribute("position");
-      for (let i = 0; i + 1 < a.count; i++) {
-        const p = sc(new THREE.Vector3().fromBufferAttribute(a, i)), q = sc(new THREE.Vector3().fromBufferAttribute(a, i + 1));
-        if (p[2] > 1 || q[2] > 1) continue;
-        const dx = q[0] - p[0], dy = q[1] - p[1], L = dx * dx + dy * dy, t = L ? Math.max(0, Math.min(1, ((px - p[0]) * dx + (py - p[1]) * dy) / L)) : 0;
-        const d = Math.hypot(p[0] + t * dx - px, p[1] + t * dy - py);
-        if (d < bd) { bd = d; best = ln; }
+    const sc = (p, M) => { v.copy(p).applyMatrix4(M).project(camera); return [(v.x + 1) / 2 * r.width, (1 - v.y) / 2 * r.height, v.z]; };
+    for (const [id, obj, c] of wrPickSrc()) {
+      let vis = true; for (let o = obj; o; o = o.parent) if (o.visible === false) { vis = false; break; }
+      if (!vis) continue;
+      obj.updateMatrixWorld();
+      // (a curve's points: sampled once, ~8 mm apart, kept on it - the curves are rebuilt when their wires are)
+      const pts = Array.isArray(c) ? c : c.userData && c.userData.pk ? c.userData.pk : ((c.userData = c.userData || {}).pk = c.getSpacedPoints(Math.max(2, Math.ceil(c.getLength() / 8))));
+      let p = sc(pts[0], obj.matrixWorld);
+      for (let i = 1; i < pts.length; i++) {
+        const q = sc(pts[i], obj.matrixWorld);
+        if (p[2] <= 1 && q[2] <= 1) {
+          const dx = q[0] - p[0], dy = q[1] - p[1], L = dx * dx + dy * dy, t = L ? Math.max(0, Math.min(1, ((px - p[0]) * dx + (py - p[1]) * dy) / L)) : 0;
+          const d = Math.hypot(p[0] + t * dx - px, p[1] + t * dy - py);
+          if (d < bd) { bd = d; best = id; }
+        }
+        p = q;
       }
     }
     return best;
   }
   const wrEndName = (e) => (!e ? "the wall" : e.board ? LR4Wiring.JP3.spots[e.board].label : e.probe ? "the touch plate (the core's hole)"
     : (wrMesh(e.part) && wrMesh(e.part).userData.label) || e.part.replace(/_/g, " "));
-  function wrTip(ln, cx, cy) {
+  function wrTip(id, cx, cy) {
     let el = WR.tip;
+    const ln = id && WR.lines && WR.lines.children.find((l) => l.userData.run.id === id);   // (its routed length: the run's line, built with Wiring on)
     if (!ln) { if (el) el.hidden = true; WR.hover = null; return; }
     if (!el) { el = WR.tip = document.createElement("div"); el.className = "wr-tip"; canvas.parentElement.appendChild(el); }
     const r = ln.userData.run, segs = r.segs.map((s) => `${s.kind === "ribbon" ? "V1E extender" : s.kind}${s.len ? ` ${(s.len / 1000).toFixed(2)} m` : ""}`).join(" + ");
@@ -722,12 +951,18 @@
     el.innerHTML = `<b>${r.name}</b><span>${wrEndName(r.from)} → ${wrEndName(r.to)}</span><span>${segs}</span><span>routed now: ${m(ln.userData.len)} (GUESS route)</span>${fit}`;
     const b = canvas.parentElement.getBoundingClientRect();
     el.style.left = `${cx - b.left + 14}px`; el.style.top = `${cy - b.top + 14}px`; el.hidden = false;
-    WR.hover = ln;
+    WR.hover = id;
   }
-  canvas.addEventListener("pointermove", (e) => { if (WR.on) wrTip(wrPick(e.clientX, e.clientY), e.clientX, e.clientY); });
+  { let at = null;                                    // (once a frame: the drawn wires are many curves)
+    canvas.addEventListener("pointermove", (e) => {
+      if (!WR.on) return;
+      const go = !at; at = [e.clientX, e.clientY];
+      if (go) requestAnimationFrame(() => { const [x, y] = at; at = null; if (WR.on) wrTip(wrPick(x, y), x, y); });
+    }); }
   canvas.addEventListener("pointerleave", () => wrTip(null));
   { const c = document.getElementById("lay-wiring"); if (c) c.addEventListener("change", () => wrSet(c.checked)); }
+  { const c = document.getElementById("lay-nest"); if (c) c.addEventListener("change", () => wrNest(c.checked)); }
   wrBoard();
   // tests / videos
-  window.LR4WiringView = { report: () => (WR.report = wrReport()), fit: wrFit, set: wrSet, on: () => WR.on, board: () => !!WR.board, runs: () => (WR.lines ? WR.lines.children.map((l) => ({ id: l.userData.run.id, shown: l.visible, len: Math.round(l.userData.len || 0) })) : []),
-    pick: (x, y) => { const l = wrPick(x, y); return l ? l.userData.run.id : null; }, beam: () => ({ info: BW.info, ties: BW.tieN, key: !!BW.key }) };
+  window.LR4WiringView = { report: () => (WR.report = wrReport()), fit: wrFit, set: wrSet, nest: wrNest, on: () => WR.on, board: () => !!WR.board, runs: () => (WR.lines ? WR.lines.children.map((l) => ({ id: l.userData.run.id, shown: l.visible, len: Math.round(l.userData.len || 0) })) : []),
+    pick: wrPick, beam: () => ({ info: BW.info, ties: BW.tieN, key: !!BW.key }) };

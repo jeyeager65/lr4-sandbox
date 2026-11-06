@@ -722,7 +722,8 @@
   <section class="layers-pop" id="layers-pop" aria-labelledby="h-show" hidden>
     <div class="layers-head"><h2 id="h-show">Layers</h2><button type="button" id="layers-x" aria-label="Close" title="Close (Esc)">✕</button></div>
     <p class="foot">The view only - the BOM keeps every part. A bolt joining two assemblies is under both and shows with either.</p>
-    <label class="check lay-extra" title="The wiring: the drawn wires and cords (the router cord, the core's wires + sleeve, the 24 V supply's cords, the table hub's mains wiring) and a line per run from end to end (motors, endstops, the touch plate, power), over the parts - hover one for its name and ends. Off, they're hidden (the gantry moves faster); the hose always shows"><input type="checkbox" id="lay-wiring"> Wiring</label>
+    <label class="check lay-extra" title="The wiring, each wire drawn: the motors', endstops' and touch plate's (through the YZ plates and along the beam or the router cord into the Jackpot box), the router cord, the 24 V supply's cords, the lid fan's lead, the plugs on the board, the table hub's mains wiring - hover a wire for its run's name, ends and length. Off, they're hidden (the gantry moves faster); the hose always shows"><input type="checkbox" id="lay-wiring"> Wiring</label>
+    <label class="check lay-extra" style="display: none; margin-left: 18px" title="With Wiring on: a straight line per run from end to end, drawn over the parts (the old overview) - hover one for its name and ends"><input type="checkbox" id="lay-nest"> Rat's nest</label>
     <label class="check lay-extra" title="The cable sleeves (over the core's wires and the beam's) drawn clear, to see each wire inside them"><input type="checkbox" id="lay-sleeve"> See through sleeves</label>
     <div class="presets" id="show-presets" role="group" aria-label="Presets"></div>
     <div class="tree" id="show-tree" role="group" aria-label="Parts shown"></div>

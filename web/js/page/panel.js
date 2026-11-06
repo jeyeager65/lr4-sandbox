@@ -305,6 +305,7 @@
         && !(TOUCH_ANIM.skirt >= 1 && PROBE_OFF.test(m.userData.name)) && !(AB.magnified && RACK_OFF.test(m.userData.name)) && !(jobBit && m.userData.name === "Router_Bit")   // off once it's slid out (job.js)
         && !(WIRES_OFF.test(m.userData.name || "") && !wiresShown() && !(INSPECT && /^Beam_WiresPlate_/.test(m.userData.name)));   // (Inspect: a YZ plate's wires in its channels, Wiring on or off - user 2026-11-05)
       m.visible = m.userData.shown && !ROPE_STUB.test(m.userData.name)   // the touch plate's wire stubs: rope.js draws the wires
+        && !/^Jackpot3_Fan_Lead_(Red|Black)$/.test(m.userData.name)   // the blower's lead stubs (out of its side - its wires leave the top: wiring.js wrFan draws them, user 2026-11-05)
         && !(/^Router_(StrainRelief|Cord)$/.test(m.userData.name) && cordMesh && fitted(cordMesh) && meta.hose && meta.hose.cord && meta.hose.cord.base);   // Part 53: the cord rope draws them, bending
     }
     const rb = meshes.find((m) => m.userData.name === "Router_Bit");

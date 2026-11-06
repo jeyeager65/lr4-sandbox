@@ -856,8 +856,8 @@
     }
     const tube = (m, pts, r) => {
       const q = pts.filter((p, i) => i === 0 || p.distanceTo(pts[i - 1]) > 1);
-      if (q.length < 2) { m.geometry.dispose(); m.geometry = new THREE.BufferGeometry(); m.geometry.setAttribute("position", new THREE.Float32BufferAttribute([], 3)); m.visible = false; return; }
-      const c = new THREE.CatmullRomCurve3(q, false, "centripetal");
+      if (q.length < 2) { m.userData.pick = null; m.geometry.dispose(); m.geometry = new THREE.BufferGeometry(); m.geometry.setAttribute("position", new THREE.Float32BufferAttribute([], 3)); m.visible = false; return; }
+      const c = m.userData.pick = new THREE.CatmullRomCurve3(q, false, "centripetal");   // (51e: hover - wiring.js wrPick)
       m.geometry = hrTubes(m.geometry, [{ curve: c, segs: Math.max(8, Math.ceil(c.getLength() / 6)), r, radial: 8 }]);
       m.visible = true;
     };
@@ -867,8 +867,11 @@
     const d = dc && wrPath(dc);                       // [near end, outside the slot, in the slot, ..., the terminal]
     tube(PWR_MESH.lead, d ? d.slice(0, 3).concat(d[2].clone().add(V(-6, 0, 0))) : [], 2.4);
     const pr = d ? [d[2].clone().add(V(-6, 0, 0)), ...d.slice(3)] : [];
-    tube(PWR_MESH.red, pr.map((q, i) => q.clone().add(V(0, 0, i ? 1.4 : 0.6))), 1.1);
-    tube(PWR_MESH.black, pr.map((q, i) => q.clone().add(V(0, 0, i ? -1.4 : -0.6))), 1.1);
+    // (51e: the last two points into the terminal's own pin each - red +, black -, along the PCB's y: wiring.js wrTermPin)
+    const bx = meshes.find((m) => m.userData.name === "Jackpot3_Box"), py = bx && V(...LR4Wiring.JP3.pcb.y).applyQuaternion(bx.getWorldQuaternion(new THREE.Quaternion()));
+    const at = (k, s) => (q, i) => q.clone().add(py && i >= pr.length - 2 ? py.clone().multiplyScalar((k - 0.5) * (typeof WR_TERM === "number" ? WR_TERM : 3.5)) : V(0, 0, s * (i ? 1.4 : 0.6)));
+    tube(PWR_MESH.red, pr.map(at(0, 1)), 1.1);
+    tube(PWR_MESH.black, pr.map(at(1, -1)), 1.1);
   }
   // the hub's mains cord as drawn (with the router cord: cp = its settled points), or null; also the wiring report's
   // length for it (wiring.js wrReport: each travel corner - Part 53c, it was the Wiring layer's route, ~10 cm short)
@@ -910,7 +913,7 @@
   }
   function hrWireMeshes(on) {
     const empty = () => new THREE.BufferGeometry().setAttribute("position", new THREE.Float32BufferAttribute([], 3));
-    if (!on) { wireMesh.geometry.dispose(); wireMesh.geometry = empty(); if (sleeveMesh) { sleeveMesh.geometry.dispose(); sleeveMesh.geometry = empty(); } return; }
+    if (!on) { HR.corePick = null; wireMesh.geometry.dispose(); wireMesh.geometry = empty(); if (sleeveMesh) { sleeveMesh.geometry.dispose(); sleeveMesh.geometry = empty(); } return; }
     if (typeof wrBoard === "function") wrBoard();      // the stand-in board + the ESP32's keep-out under the wires' ends
     const V = (...a) => new THREE.Vector3(...a), P = HR.wireP, trunk = new THREE.CatmullRomCurve3(P, false, "centripetal");
     const N = Math.max(8, Math.ceil(trunk.getLength() / 10)), S = trunk.getSpacedPoints(N), F = trunk.computeFrenetFrames(N, false);
@@ -939,15 +942,26 @@
         void Jn;                                       // then on to the bundle at the join (its next points)
       }
       else if (run === "motor" && HR.wireMotor) pts = HR.wireMotor.slice(0, 2).map((q) => q.clone().add(V(0, o[0] * 0.6, o[1] * 0.6)));
-      else if ((run === "stop" || run === "probe") && HR.wirePre) pts = HR.wirePre[run].map((q) => q.clone().add(V(o[0] * 0.25, 0, o[1] * 0.25)));   // through the tunnel / opening
+      else if ((run === "stop" || run === "probe") && HR.wirePre) {
+        pts = HR.wirePre[run].map((q) => q.clone().add(V(o[0] * 0.25, 0, o[1] * 0.25)));   // through the tunnel / opening
+        // the endstop's: from its outer tab (soldered, under heatshrink - wiring.js wrSwitchHead, user 2026-11-05), not its middle
+        const nx = (oo) => HR.wirePre.stop[Math.min(1, HR.wirePre.stop.length - 1)].clone().add(V(oo[0] * 0.25, 0, oo[1] * 0.25));
+        const hds = run === "stop" && typeof wrSwitchHeads === "function" ? wrSwitchHeads("Endstop_X", WIRE_SET.filter((e) => e[0] === "stop").map((e) => nx(e[3]))) : null, hd = hds && hds[k];
+        if (hd) {
+          pts = hd.pts.concat(pts.slice(1));
+          const hc = new THREE.CatmullRomCurve3(hd.hs, false, "centripetal");
+          geos.push({ curve: hc, segs: 4, r: WR_HS.r, radial: 10, rgb: [0.03, 0.03, 0.035], run: "x-stop" });
+        }
+      }
       for (let i = run === "motor" ? k1 : 0; i <= N; i++) pts.push(off(i, o));
       const sp = spot(WIRE_TO[run], k), end = pts[pts.length - 1];
       // straight down into the connector's top (user 2026-11-02), each onto its own pin: square to the board
       if (sp) pts.push(end.clone().add(V(-14, 0, 0)), ...hrBoxRoute(run, o), sp.at.clone().addScaledVector(up, 14), sp.at.clone().addScaledVector(up, 6), sp.at.clone().addScaledVector(up, 1), sp.at);
       const c = new THREE.CatmullRomCurve3(pts, false, "centripetal");
-      geos.push({ curve: c, segs: Math.max(6, Math.ceil(c.getLength() / (lb ? 4 : 10))), r, radial: 6, rgb });
+      geos.push({ curve: c, segs: Math.max(6, Math.ceil(c.getLength() / (lb ? 4 : 10))), r, radial: 6, rgb, run: { motor: "x-motor", stop: "x-stop", probe: "probe" }[run] });
     }
     wireMesh.geometry = hrTubes(wireMesh.geometry, geos);
+    HR.corePick = geos.map((g) => [g.run, wireMesh, g.curve]);   // (51e: hover picks the drawn wire - wiring.js wrPick)
     if (sleeveMesh) {
       const sc = new THREE.CatmullRomCurve3(S.slice(k1 + 2, N - 1), false, "centripetal");
       sleeveMesh.geometry = hrTubes(sleeveMesh.geometry, [{ curve: sc, segs: Math.ceil(sc.getLength() / 8), r: SLEEVE_R, radial: 12 }]);

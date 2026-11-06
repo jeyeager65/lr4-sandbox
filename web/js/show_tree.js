@@ -31,6 +31,8 @@
     if (p.group === "Belts") return /^Belt_X/.test(p.name) ? "beam" : "table";
     if (p.group === "Core" && ROUTER.test(p.name)) return "router";
     if (/^TouchPlate/.test(p.name)) return "touch";   // its own row: Inspect the plate, magnet + clip together
+    // the endstops (+ levers) with what they're screwed to, as the steppers: Inspect the core / a YZ side shows them (user 2026-11-05)
+    { const e = /^Endstop_(X|[YZ]_(Min|Max))(_|$)/.exec(p.name); if (e) return e[1] === "X" ? "core" : e[2] === "Min" ? "yz-min" : "yz-max"; }
     return GROUP_ASM[p.group] || MOTION_ASM[p.motion] || "beam";
   }
   function kindOf(p) {

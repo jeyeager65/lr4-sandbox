@@ -39,6 +39,8 @@ ok(where("Tool_Mount_T_Kobalt").join() === "router.printed", "tool mount with th
 ok(where("Dust_Skirt_Kobalt").join() === "router.printed", "skirt with the router");
 ok(where("X_Stepper").join() === "core.electronics", "X stepper: core electronics");
 ok(where("Jackpot3_Fan").join() === "electronics.electronics", "lid fan");
+ok(where("Endstop_X").join() === "core.electronics" && where("Endstop_X_Lever").join() === "core.electronics", "X endstop + lever: core electronics");
+ok(["Y_Min", "Z_Min"].every((s) => where("Endstop_" + s).join() === "yz-min.electronics") && ["Y_Max", "Z_Max"].every((s) => where("Endstop_" + s + "_Lever").join() === "yz-max.electronics"), "Y / Z endstops with their YZ side");
 ok(where("XZ_Plate_Min").join() === "yz-min.cut", "XZ plate cut");
 ok(where("Pendant_case").join() === "pendant.printed" && where("Pendant_spacer").join() === "pendant.cut", "pendant kinds");
 
