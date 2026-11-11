@@ -17,13 +17,13 @@ const steps = [
    const shown = (q) => getComputedStyle(document.querySelector(q)).display !== 'none';
    return { machineHidden: getComputedStyle(document.querySelector('.panel')).display === 'none', groups: s.groups.length, peter: s.peter.length,
      unit: s.unit, toolbar: shown('.toolbar'), panel: shown('.panel'), vrpop: shown('#vr-pop'),
-     pendant: Object.values(LR4Demo.boxes('^Pendant_')).filter((b) => b[2]).length, chip: s.groups.some((g) => g.id === 'g-pendant'),
+     pendant: Object.values(LR4Demo.boxes('^Pendant_')).filter((b) => b[2]).length, chip: s.groups.some((g) => g.id === 'pendant'),
      fits: LR4VR.layout(s).buttons.filter((b) => b.act.a === 'group').every((b) => b.y + b.h <= 634) }`,
   // the menu's actions land on the hidden controls
   `const v = LR4VR.page;
-   v.act({ a: 'unit', u: 'mm' }); v.act({ a: 'peter', v: 'none' }); v.act({ a: 'group', id: 'g-table' }); v.act({ a: 'group', id: 'g-pendant' });
+   v.act({ a: 'unit', u: 'mm' }); v.act({ a: 'peter', v: 'none' }); v.act({ a: 'group', id: 'table' }); v.act({ a: 'group', id: 'pendant' });
    const s = v.state();
-   return { unit: s.unit, peterNone: s.peter.some((p) => p.v === 'none' && p.on), table: document.getElementById('g-table').checked,
+   return { unit: s.unit, peterNone: s.peter.some((p) => p.v === 'none' && p.on), table: s.groups.find((g) => g.id === 'table').on,
      readout: /^mm/.test(document.getElementById('dro-hint').textContent) ? 'mm' : '?', pendant: Object.values(LR4Demo.boxes('^Pendant_')).filter((b) => b[2]).length }`,
   `LR4VR.page.preview(null); return { vr: document.body.classList.contains('vr-on'),
      toolbar: getComputedStyle(document.querySelector('.toolbar')).display !== 'none' }`,
@@ -57,5 +57,6 @@ if (ev.length === 3) {
   ok(b.pendant === 0, "pendant hidden from the menu");
   ok(!c.vr && c.toolbar, "leaving VR: toolbar back");
 }
+if (fails && ev.length === 3) console.log("the page's answers: " + JSON.stringify(ev).slice(0, 2000));
 console.log(fails ? `${fails} check(s) failed` : "all page + VR checks passed");
 process.exit(fails ? 1 : 0);

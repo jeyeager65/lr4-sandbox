@@ -91,11 +91,26 @@ async function chromePage(cport, o = {}) {           // o.gpu: the real GPU (liv
   const ncs = o.ncspeed ?? process.env.LR4_TEST_NCSPEED;
   const withSpeed = (u) => (!ncs || String(ncs) === "1" || !/\/web\/index\.html/.test(u) || /[?&]ncspeed=/.test(u) ? u
     : u.replace(/^([^#]*?)(\?[^#]*)?(#.*)?$/, (m, a, q, h) => `${a}${q ? q + "&" : "?"}ncspeed=${ncs}${h || ""}`));
-  const send = (method, params = {}) => new Promise((res, rej) => {
+  const raw = (method, params) => new Promise((res, rej) => {
     const n = ++id; pending.set(n, { res, rej });
-    if (method === "Page.navigate" && params.url) params = Object.assign({}, params, { url: withSpeed(params.url) });
     ws.send(JSON.stringify({ id: n, method, params }));
   });
+  // a navigate to the test's own server waits until it answers: the tests slept 0.8 s after starting it, and in a long
+  // suite Python can take longer - the page then sat on Chrome's error page until the load timed out (the flaky
+  // "page loaded" of phone, 2026-11-05)
+  const upSeen = new Set();
+  const serverUp = async (url) => {
+    const m = /^http:\/\/127\.0\.0\.1:\d+/.exec(url);
+    if (!m || upSeen.has(m[0])) return;
+    for (let i = 0; i < 150; i++) {
+      try { await fetch(m[0] + "/web/favicon-32.png", { signal: AbortSignal.timeout(2000) }); upSeen.add(m[0]); return; } catch (e) { await sleep(200); }
+    }
+    console.log(`  FAIL the test's server at ${m[0]} never answered`);
+  };
+  const send = async (method, params = {}) => {
+    if (method === "Page.navigate" && params.url) { await serverUp(params.url); params = Object.assign({}, params, { url: withSpeed(params.url) }); }
+    return raw(method, params);
+  };
   const val = async (expr) => {
     const r = await send("Runtime.evaluate", { expression: expr, awaitPromise: true, returnByValue: true });
     if (r.exceptionDetails) throw new Error(r.exceptionDetails.exception?.description || r.exceptionDetails.text);

@@ -66,8 +66,10 @@ const RULES = [
 
 const pick = new Map();      // test -> reasons
 const why = (t, r) => { if (!pick.has(t)) pick.set(t, new Set()); pick.get(t).add(r); };
-const notes = [];
+const notes = [], clips = new Set();   // clips: the help clips changed (test_page_help_all plays only those)
 for (const f of files) {
+  const clip = /^web\/help\/([\w-]+)\.gcode$/.exec(f);
+  if (clip) { clips.add(clip[1]); why("test_help_scripts.js", "a help clip"); why("test_page_help_all.js", `the clip ${clip[1]}`); continue; }
   const base = path.basename(f).replace(/\.(js|py|html)$/, "");
   for (const [re, ts, r] of RULES) if (re.test(f)) ts.forEach((t) => tests.some((x) => x.name === t) && why(t, r));
   if (f.startsWith("tests/") && /^test_/.test(path.basename(f))) { why(path.basename(f), "the test itself"); continue; }
@@ -92,12 +94,11 @@ for (const f of files) {
 
 // --- report / run -------------------------------------------------------------------------------------------------
 const times = {};
-try {
-  for (const l of fs.readFileSync(path.join(ROOT, "build", "pt2", "summary.txt"), "utf8").split("\n")) {
-    const m = l.match(/^(\S+) exit \d+ (\d+)s/);
-    if (m) times[m[1] + ".js"] = +m[2];
-  }
+try {                                                // (tools/page_tests.js keeps them)
+  for (const [k, v] of Object.entries(JSON.parse(fs.readFileSync(path.join(TESTS, "page_times.json"), "utf8")))) times[`test_page_${k}.js`] = v;
 } catch (e) { /* no timings yet */ }
+// test_page_help_all picked only for changed clips: it plays just those
+const onlyClips = (t) => (t === "test_page_help_all.js" && [...pick.get(t)].every((r) => r.startsWith("the clip ")) ? [...clips] : []);
 let list = [...pick.keys()].sort((a, b) => (a.startsWith("test_page_") - b.startsWith("test_page_")) || a.localeCompare(b));
 if (flag("--page")) list = list.filter((t) => t.startsWith("test_page_"));
 if (flag("--unit")) list = list.filter((t) => !t.startsWith("test_page_"));
@@ -111,7 +112,7 @@ if (flag("--run")) {
   const res = [];
   for (const t of list) {
     const t0 = Date.now(), py = t.endsWith(".py");
-    const r = spawnSync(py ? "python" : "node", [path.join(TESTS, t)], { cwd: py ? ROOT : TESTS, encoding: "utf8", timeout: 1800e3, maxBuffer: 1 << 28 });
+    const r = spawnSync(py ? "python" : "node", [path.join(TESTS, t), ...onlyClips(t)], { cwd: py ? ROOT : TESTS, encoding: "utf8", timeout: 1800e3, maxBuffer: 1 << 28 });
     const out = (r.stdout || "") + (r.stderr || ""), s = Math.round((Date.now() - t0) / 1000);
     const fails = out.split("\n").filter((l) => /FAIL/.test(l));
     res.push(`${t} exit ${r.status} ${s}s ${fails.length ? fails.length + " FAIL" : "ok"}`);

@@ -599,7 +599,7 @@
   function jobZShort(tl, zLow) {                     // how far the job's lowest Z is below the reach (cached per job)
     if (JOB.zMinFor !== tl) {
       JOB.zMinFor = tl;
-      JOB.zMin = Math.min(...tl.segs.map((q) => Math.min(q.start.z, q.end.z)));
+      JOB.zMin = tl.segs.reduce((z, q) => Math.min(z, q.start.z, q.end.z), Infinity);   // (no Math.min(...): a big job's moves overflow the stack)
     }
     return zLow - JOB.zMin;
   }

@@ -12,6 +12,12 @@ const ok = (cond, msg) => { checks++; if (!cond) { fails++; console.log("  FAIL 
 
 const HELP = path.join(__dirname, "../web/help"), html = fs.readFileSync(path.join(__dirname, "../web/index.html"), "utf8");
 const ids = new Set([...html.matchAll(/\bid="([^"]+)"/g)].map((m) => m[1]));
+const ST = require("../web/js/show_tree.js");
+const PARTS = JSON.parse(fs.readFileSync(path.join(__dirname, "../web/data/lr4_config.json"), "utf8")).parts.map((p) => p.meta.name);
+const ASMS = ST.ASM.map((a) => a[0]), GROUP_IDS = new Set([...ASMS, ...ASMS.flatMap((a) => ST.KINDS.map((k) => `${a}.${k[0]}`))]);
+const showKnows = (x) => (x.includes("*")
+  ? PARTS.some((p) => new RegExp("^" + x.split("*").map((s) => s.replace(/[.+?^${}()|[\]\\]/g, "\\$&")).join(".*") + "$").test(p))
+  : GROUP_IDS.has(x) || PARTS.includes(x));
 const index = JSON.parse(fs.readFileSync(path.join(HELP, "index.json"), "utf8"));
 ok(Array.isArray(index.files) && index.files.length >= 7, `index.json: ${index.files && index.files.length} files`);
 const idOf = (f) => f.file.replace(/\.[^.]+$/, "");
@@ -32,6 +38,13 @@ for (const v of index.files) {
   ok(Array.isArray(s.settings.machine), `${id}: MACHINE= (the same for every viewer)`);
   for (const c of [...s.intro, ...s.at].filter((q) => ["point", "click", "step"].includes(q.kind)))
     ok(ids.has(c.kv.id), `${id}: line ${c.line}: #${c.kv.id} is in web/index.html`);
+  // Show lines: an assembly, "asm.kind", a part or a part pattern (as the page's LR4Show.apply; test_page_help_all
+  // plays the clips, but only before a release)
+  for (const c of [...s.intro, ...s.at].filter((q) => q.kind === "show")) {
+    const sh = DS.showOf(c), bad = [...(sh.hide || []), ...(sh.show || [])].filter((x) => !showKnows(x));
+    if (sh.preset && !ST.PRESETS.some(([p]) => p === sh.preset)) bad.push("PRESET=" + sh.preset);
+    ok(!bad.length, `${id}: line ${c.line}: Show knows its ids (not: ${bad.join(", ")})`);
+  }
   const hasClickHome = s.intro.some((c) => (c.kind === "click" && /^home/.test(c.kv.id)) || c.kind === "home");
   ok(hasClickHome, `${id}: homes (Home or a clicked Home) before its job`);
 }

@@ -53,7 +53,9 @@ const ok = (cond, msg) => { checks++; console.log((cond ? "  ok   " : "  FAIL ")
     ok(await until("LR4Help.state().done", 180), "the video ends");
     ok(await page.val(`!document.querySelector(".rec-pointer") && !document.querySelector(".rec-ring")`), "pointer and ring gone at the end");
     try { await page.val(`document.querySelector("#hv-bar .hv-exit").click()`); } catch (e) { /* reloading */ }
-    ok(await loaded() && await page.val(`!MS.temp && location.hash === ""`), "Exit: back on yours");
+    // (not loaded() then a look: under load the reload starts later than loaded()'s 1.2 s, and the OLD page answered)
+    ok(await until(`document.readyState === "complete" && document.getElementById("status").hidden && !!window.LR4Help && !MS.temp && location.hash === ""`, 120),
+      "Exit: back on yours");
   } catch (e) {
     ok(false, "error: " + e.message);
   } finally {

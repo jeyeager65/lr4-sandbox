@@ -98,7 +98,7 @@ const SLOT = (depth, feed, hard) => ["(LR4 slip test)", "(Stock: XMIN=0 XMAX=200
     ok(/^Done\./.test(a.gentle) && a.gentleN === 0 && a.gentleLost.every((v) => v === 0), `sane cut: no slips (${a.gentleN}) - ${a.gentle}`);
     ok(/^Done\./.test(a.hard) && a.hardN > 0 && lostX(a.hardLost) > 0.5, `9 mm at 2500 slips X: ${a.hardN} slips, lost ${JSON.stringify(a.hardLost)}`);
     ok(/lost steps: X/.test(a.hard), `the job says so: ${a.hard}`);
-    ok(a.end !== null && near(a.end, 150 - lostX(a.hardLost) + 3.175 / 2, 2), `the slot ends short: x ${a.end} (FluidNC 150 + the bit radius, lost ${lostX(a.hardLost).toFixed(2)})`);   // 2 mm: a runaway (~107 mm) ends its last slips past the carve by up to ~1.9 mm (timing)
+    ok(a.end !== null && near(a.end, 150 - lostX(a.hardLost) + 3.175 / 2, 3), `the slot ends short: x ${a.end} (FluidNC 150 + the bit radius, lost ${lostX(a.hardLost).toFixed(2)})`);   // 3 mm: a runaway (~107 mm) ends its last slips past the carve by ~2 mm (timing: 2.07 in a long suite, 2026-11-05)
     ok(/lost steps/.test(a.note), `Run's note: ${a.note}`);
     ok(a.home0 && a.home1 && a.home0.every((v, i) => near(v, a.home1[i], 0.1)), `$H finds it: ${JSON.stringify(a.home0)} / ${JSON.stringify(a.home1)}`);
     ok(near(Math.abs(a.rack), 1.28, 0.01), `NOW= slip on Y racks it 1.28 mm: ${a.rack}`);

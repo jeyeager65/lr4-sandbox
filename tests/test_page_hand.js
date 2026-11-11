@@ -95,7 +95,7 @@ const TWO = ["G21 G90", "T1", "G0 Z5", "G0 X20 Y40", "G1 Z-1 F600", "G1 X80 F150
       for (const [id, v] of [["hs-x", 100], ["hs-w", 200], ["hs-y", 100], ["hs-d", 200], ["hs-t", 12]]) document.getElementById(id).value = v;
       document.getElementById("hs-use").click();
       await T.sleep(300);
-      const s = LR4Job.handSim(), out = Object.assign(out0, { on: !!s, top: s && Math.max(...s.heights), name: document.getElementById("hs-stock-name").textContent });
+      const s = LR4Job.handSim(), out = Object.assign(out0, { on: !!s, top: s && s.heights.reduce((a, b) => Math.max(a, b), -Infinity), name: document.getElementById("hs-stock-name").textContent });
       // a jog above the stock cuts nothing: to (203, 203), the tip 30 mm up
       await H.at(8, 8, 30);
       out.slid = H.min(s);

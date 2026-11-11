@@ -91,6 +91,8 @@ const steps = [
    out.home = [wc(g('TouchPlate_Magnet')).distanceTo(m0), wc(g('TouchPlate')).distanceTo(p0), wc(g('Dust_Skirt_Kobalt')).distanceTo(s0)];
    out.skirtBack = g('Dust_Skirt_Kobalt').visible; return out`,
   `LR4Inspect.open('core'); const L = document.getElementById('insp-list'); try {
+   for (let i = 0; i < 300 && ![...L.querySelectorAll('tr')].some((r) => r.cells[1] && r.cells[1].textContent === 'Core'); i++)
+     await new Promise((res) => setTimeout(res, 100));
    const rowBox = (t) => [...L.querySelectorAll('tr')].find((r) => r.cells[1].textContent === t).querySelector('input');
    const secBox = (t) => [...L.querySelectorAll('h3')].find((h) => h.textContent === t).querySelector('input');
    const vis = (re) => meshes.filter((m) => re.test(m.userData.name || '') && m.userData.shown).length;

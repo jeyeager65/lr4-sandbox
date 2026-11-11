@@ -3,6 +3,12 @@
 The version is the sandbox page's (`VERSION` in `web/js/page/job.js`, shown in its footer). The footer also shows
 the date the model data was built and the Printables file set it was solved for.
 
+## 0.70.3 - 2026-11-10
+- A very large job (a couple hundred thousand moves) no longer risks a "Maximum call stack size exceeded" error
+  when the page checks how deep it cuts.
+- Tests: a failed page test runs again alone and is reported as flaky if it then passes; the help clips play in
+  full only before a release (`node tools/page_tests.js <dir> --all`), their Show lines are checked in `npm test`.
+
 ## 0.70.2 - 2026-11-10
 - The table hub's 120 V wiring now says what it is: one way to build it, not an electrical design or a code check
   (the BOM's first hub wiring row, a note under the option, docs/WIRING.md). The switch panel's "?" and the wiring
