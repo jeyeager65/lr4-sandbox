@@ -624,6 +624,9 @@ def _tool_shape(tool):
         # angle ANGLE, up to the cutting diameter D (TaperDiameter)
         top = _mm(tool, "TaperDiameter") or _mm(tool, "ShankDiameter") or d
         return f"SHAPE=taperball D={n(top)} ANGLE={n(_mm(tool, 'TaperAngle') or 90.0)} TIP={n(d)}"
+    if shape == "radius":
+        # roundover: concave arc of radius CR from a tip of diameter TIP (0 = a point)
+        return f"SHAPE=roundover D={n(d)} CR={n(_mm(tool, 'CuttingRadius') or d / 2)} TIP={n(_mm(tool, 'TipDiameter') or 0.0)}"
     return f"SHAPE=flat D={n(d)}"
 
 

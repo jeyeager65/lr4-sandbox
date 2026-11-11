@@ -15,7 +15,7 @@ import Part
 
 SHAPES = {"endmill": "endmill.fcstd", "ballend": "ballend.fcstd", "vbit": "v-bit.fcstd",
           "taperedballnose": "taperedballnose.fcstd", "chamfer": "chamfer.fcstd",
-          "bullnose": "bullnose.fcstd", "drill": "drill.fcstd"}
+          "bullnose": "bullnose.fcstd", "drill": "drill.fcstd", "radius": "radius.fcstd"}
 
 
 def clear_expr(op, *props):

@@ -156,6 +156,9 @@ Run has a Machine column on the left, the Job column on the right and the consol
   in this browser, starting with the V1E store's bits and a 3/4" surfacing bit. A job's tool change pops up its
   bit: **Install bit and resume** first shows the change on the router (shaft lock or a second wrench, the collet nut
   off, the bit and - when the shank changes - the collet swapped, the nut back on); **Show the bit change** turns it off.
+  **▶ Start** asks first (**Start?**): **Bit changes & probing: Automatic** puts the bit in, lays the touch plate and
+  resumes by itself (**I do them** waits for your Resume), and with As built on Real-world you can run the job on the
+  Ideal machine instead.
 - **On the table > Stock** puts a board on the spoilboard by hand. **Spoilboard:** every cut into it stays (per
   machine, in this browser); **Surfacing job to the SD card** writes a zigzag that flattens it; **New spoilboard**
   lays a fresh one.

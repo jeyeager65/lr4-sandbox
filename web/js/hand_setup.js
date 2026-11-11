@@ -22,18 +22,19 @@
   // the page's bit form { shape, d, angle, len, tip, cr, flutes } <-> cnc-gcode-tools' tool def { shape, diameter, angle,
   // tip, cornerRadius, flutes, overallLength }: every shape its simulator cuts (stock-sim STOCK_TOOL_SHAPES). angle +
   // tip: V-bit / chamfer (tip = the flat at its point) and tapered ball (tip = the ball's diameter); cr: bullnose;
-  // flutes: 0 = not said (drawing only)
-  const SHAPES = ["flat", "ball", "bullnose", "vbit", "chamfer", "taperball"];
+  // roundover: cr = its profile radius, tip = its tip (0 = a point); flutes: 0 = not said (drawing only)
+  const SHAPES = ["flat", "ball", "bullnose", "vbit", "chamfer", "taperball", "roundover"];
   const MAX_D = 38.1;                                // no bits over 1-1/2" on an LR4 (user 2026-10-26); the forms clamp to it
   const ANGLED = ["vbit", "chamfer", "taperball"];
   const toDef = (b) => ({ shape: b.shape, diameter: b.d, angle: ANGLED.includes(b.shape) ? b.angle || 90 : undefined,
-    tip: ANGLED.includes(b.shape) && b.tip > 0 ? b.tip : undefined, cornerRadius: b.shape === "bullnose" && b.cr > 0 ? b.cr : undefined,
+    tip: (ANGLED.includes(b.shape) || b.shape === "roundover") && b.tip > 0 ? b.tip : undefined,
+    cornerRadius: (b.shape === "bullnose" || b.shape === "roundover") && b.cr > 0 ? b.cr : undefined,
     flutes: b.flutes > 0 ? Math.round(b.flutes) : undefined, overallLength: b.len > 0 ? b.len : undefined,
     fluteLength: b.flen > 0 ? b.flen : undefined });   // flen: a My bits bit's flute length (drawing)
   const fromDef = (d) => ({ shape: SHAPES.includes(d.shape) ? d.shape : "flat", d: d.diameter,
     angle: d.angle > 0 ? d.angle : 90, len: d.overallLength > 0 ? d.overallLength : 0,
     tip: d.tip > 0 ? d.tip : 0, cr: d.cornerRadius > 0 ? d.cornerRadius : 0, flutes: d.flutes > 0 ? d.flutes : 0 });
-  const KIND = { ball: "ball end", bullnose: "bullnose", chamfer: "chamfer", taperball: "tapered ball", flat: "flat end mill" };
+  const KIND = { ball: "ball end", bullnose: "bullnose", chamfer: "chamfer", taperball: "tapered ball", roundover: "roundover", flat: "flat end mill" };
   const bitName = (b) => (b.name ? b.name : bitKind(b));   // My bits: its own name
   const bitKind = (b) => `${b.shape === "vbit" ? `${+(b.angle || 90)}° V-bit` : b.shape === "chamfer" ? `${+(b.angle || 90)}° chamfer` :
     KIND[b.shape] || "flat end mill"} ` +

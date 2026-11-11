@@ -183,6 +183,33 @@
     });
     return ` The motors lost steps: ${parts.join(", ")} - FluidNC doesn't know; $H finds where the machine really is.`;
   }
+  // Start?'s options (user 2026-11-09): run on the Ideal machine instead of Real-world (As built), and who does the bit
+  // changes and probes (kept in this browser). Automatic: each tool change / M0 popup shows a moment, then Resume clicks
+  // itself (the bit change animates as usual); alarms and the user's own Hold still wait. Preview follows it too.
+  const RUN = { auto: kvGet("lr4-run-auto") === "auto", timer: 0 };
+  const runModeShow = () => $("start-auto").querySelectorAll("button[data-v]").forEach((b) =>
+    b.setAttribute("aria-pressed", String((b.dataset.v === "auto") === RUN.auto)));
+  $("start-auto").addEventListener("click", (e) => {
+    const b = e.target.closest("button[data-v]");
+    if (!b) return;
+    RUN.auto = b.dataset.v === "auto";
+    kvSet("lr4-run-auto", RUN.auto ? "auto" : "me");
+    runModeShow();
+  });
+  async function startIdeal() {                      // Start? > run on the Ideal machine: As built's Ideal
+    if (!AB.set.on || !$("start-ideal").checked) return;
+    $("ab-on").checked = false;
+    abSet(abRead(), false);
+    await spoilRelay(true);                          // a warped board with cuts in it: asks before laying a flat one
+  }
+  function runAutoResume() {                         // Automatic: Resume by itself after a moment (the popup readable)
+    clearTimeout(RUN.timer);
+    $("job-status").textContent += " Resuming by itself…";
+    RUN.timer = setTimeout(() => {
+      const waiting = FJ.job ? FJ.job.held : JOB.preview && !JOB.playing;
+      if (RUN.auto && waiting && !$("job-pop").hidden && !$("job-resume").disabled) $("job-resume").click();
+    }, 1500);
+  }
   async function fjRun() {
     if (!(await fjPrepare()) || !FJ.job) return;     // (gone meanwhile: stopped, or a second Run beat it)
     ctlLastSent = `$SD/Run=${FJ.job.path}`;
@@ -270,7 +297,7 @@
       const e = tl.events[J.k];                      // also when the hold beat this tick there: fjHold's own tick then
       if (e.kind === "tool") {                       // still finds it, so the popup asks for the bit, not "Paused (M0)"
         J.toolStop = e;
-        if (!J.held) CTL.sim.realtime("!");
+        if (!J.held) { CTL.sim.realtime("!"); J.bang = true; }   // (our hold, not an M0: fjHold)
       }
     }
   }
@@ -292,19 +319,29 @@
     fjTick();                                        // the motion up to now first: the status can beat the frame
     const J = FJ.job, tl = JOB.tl, segs = tl.segs, c = (J.C || J.P || J.T).i;
     const noCut = (a, b) => { for (let i = a; i < b; i++) if (segs[i].type === "cut") return false; return true; };
-    if (J.gate < Infinity && noCut(c + 1, J.gate)) fjGate(J.gate);   // at the M0 (a ! mid-cut leaves the gate)
+    // our own ! for a bit change (fjEvents) is not the M0, even with no cut before the next one: "T2" then "M0 (MSG,
+    // Change to Tool T2 ...)" (fluidnc_post) holds twice, and counting both moved the gate past the last M0, so
+    // Automatic never resumed that one (test_page_runstart's probe job hung there, 2026-11-10)
+    const bang = !!J.bang;
+    J.bang = false;
+    const atM0 = !bang && J.gate < Infinity && noCut(c + 1, J.gate);
+    if (atM0) fjGate(J.gate);                        // at the M0 (a ! mid-cut leaves the gate)
     // attach: the next probe's plate, if the bit is over its spot (a hold before moving there - "detach, moving
     // right" in docs/examples/z_level.gcode - puts the plate and clip away instead)
     const here = fjWork(ctlRaw());
     const attach = tl.plates.find((q) => q.index >= c && noCut(c, q.index) && Math.hypot(q.x - here.x, q.y - here.y) < 1);
     const remove = !attach && J.plate && noCut(J.plate.index + 1, c + 1);
-    if (attach) fjPlate(attach); else if (remove) fjPlate(null);
     let tool = J.toolStop;
     J.toolStop = null;
     if (!tool) {                                     // FluidNC held at the M6 before the trackers reached it (slow
       const k = tl.events.findIndex((q, i) => i >= J.k && q.kind === "tool");   // frames): the next one, no cut between
       if (k >= 0 && noCut(c + 1, tl.events[k].index)) { tool = tl.events[k]; J.k = k + 1; }
     }
+    // a bit change with its probe in the same pause ("Change to Tool T2 ... and Attach Probe"): the plate + clip go on
+    // after the new bit is in (Resume: table.js), not while it's changed (user 2026-11-09)
+    J.attachAfter = tool && attach ? attach : null;
+    if (attach && !tool) fjPlate(attach); else if (remove) fjPlate(null);
+    J.shownMsg = bang && tool ? null : FJ.lastMsg;   // (our ! hold: an M0's message that came early is for the next hold)
     $("job-pop-h").textContent = tool ? "Tool change" : FJ.lastMsg ? "Paused (M0)" : "Feed hold";
     $("job-pop-msg").textContent = tool ? tool.text : FJ.lastMsg || "Held. Resume to carry on.";
     $("job-resume").textContent = "Resume (cycle start)";
@@ -312,13 +349,14 @@
     if (tool) toolAsk(tool);
     $("job-pop").hidden = false;
     $("job-status").textContent = $("job-pop-msg").textContent;
+    if (RUN.auto && (tool || atM0) && !J.userHold) runAutoResume();
   }
   function fjStatus(ev) {                            // each status report while a job runs
     const J = FJ.job;
     if (ev.SD) { J.seenSD = true; fjProgress(ev.SD.pct); }
     const hold = /^Hold/.test(ev.state || "");
     if (hold && !J.held) { J.held = true; fjHold(); fjButtons(); }
-    else if (!hold && J.held && ev.state !== "Door") { J.held = false; $("job-pop").hidden = true; if (JOB.toolAsk) toolPut(); FJ.lastMsg = ""; fjButtons(); }
+    else if (!hold && J.held && ev.state !== "Door") { J.held = false; J.userHold = false; $("job-pop").hidden = true; if (JOB.toolAsk) toolPut(); if (FJ.lastMsg === J.shownMsg) FJ.lastMsg = ""; fjButtons(); }
     if (ev.state === "Alarm") fjDone("FluidNC alarmed: the job stopped. Send $X (Unlock) to carry on.");
     else if (J.seenSD && !ev.SD && ev.state === "Idle") fjDone("Done.");
   }
@@ -460,6 +498,9 @@
     const chk = startChecks();
     for (const [k, t] of chk) { const li = document.createElement("li"); li.className = k; li.textContent = t; list.append(li); }
     $("start-go").disabled = chk.some(([k]) => k === "bad");
+    $("start-ab").hidden = !AB.set.on;
+    $("start-ideal").checked = false;
+    runModeShow();
     pop.hidden = false;
     const r = (by || $("job-start")).getBoundingClientRect(), w = pop.offsetWidth, hgt = pop.offsetHeight;
     pop.style.left = `${Math.max(8, Math.min(r.right - w, innerWidth - w - 8))}px`;
@@ -468,7 +509,12 @@
   }
   const startClose = () => { $("start-pop").hidden = true; };
   $("start-no").addEventListener("click", startClose);
-  $("start-go").addEventListener("click", () => { startClose(); if (CTL.sim && JOB.tl && !FJ.job) fjRun(); });
+  $("start-go").addEventListener("click", async () => {
+    startClose();
+    if (!CTL.sim || !JOB.tl || FJ.job) return;
+    await startIdeal();
+    if (CTL.sim && JOB.tl && !FJ.job) fjRun();
+  });
   $("job-start").addEventListener("click", (e) => startAsk(e.currentTarget));
   $("job-pv").addEventListener("click", () => previewStart());
   document.addEventListener("pointerdown", (e) => { if (!$("start-pop").hidden && !e.target.closest("#start-pop, .sd-go, #job-start")) startClose(); });

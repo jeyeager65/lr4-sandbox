@@ -3,6 +3,20 @@
 The version is the sandbox page's (`VERSION` in `web/js/page/job.js`, shown in its footer). The footer also shows
 the date the model data was built and the Printables file set it was solved for.
 
+## 0.70.0 - 2026-11-10
+- **Start?** (▶ Start on a job) has two options. With As built on Real-world it offers to **run this on the Ideal
+  machine instead**. **Bit changes & probing: I do them | Automatic** (kept in this browser): on Automatic the bit
+  goes in, the touch plate and clip go on after the new bit is in, come off again after the probe, and the job
+  resumes by itself. Alarms and your own Hold still wait. Preview follows the same choice.
+- Fixed: a job that names its tool and then pauses for it (`T2`, then `M0 (MSG, Change to Tool T2 ...)`, as the
+  FreeCAD post writes) showed the M0 as "Feed hold" without its message, and its later pauses were not treated as
+  M0s.
+
+## 0.69.1 - 2026-11-06
+- **Roundover bits:** point-cutting and plunging roundovers can be picked in the bit forms (corner radius = the
+  profile radius, tip = 0 for a sharp point) and are carved with their real concave profile. G-code from the FreeCAD
+  post names them with `SHAPE=roundover`.
+
 ## 0.69.0 - 2026-11-05
 - **Show** (was Layers; L, or the toolbar): Parts (Printed / Cut / Hardware / Electronics) and Areas (Table, the YZ
   sides, Beam, Core, ...) as on / off buttons that combine freely, Reset, and the explanation behind "?". Hidden parts

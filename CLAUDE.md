@@ -29,7 +29,7 @@ across many FreeCAD builds. See README.md for the layout. FreeCAD 1.1, Python 3,
   Change both and run the tests.
 - Units: mm inside; the cutting area and table are in inches. Axes: X along the beam, Y along the table (front 0),
   Z up.
-- **Versions:** a user-visible page change bumps `VERSION` in `web/index.html` and gets a CHANGELOG.md entry; a new
+- **Versions:** a user-visible page change bumps `VERSION` in `web/js/page/job.js` and gets a CHANGELOG.md entry; a new
   feature or a moved control also gets its README.md line (and a new screenshot in `docs/img/` if one shows it).
   CI (`.github/workflows/ci.yml`) runs only what works without part files: the guard, a Python compile, `npm test`.
 

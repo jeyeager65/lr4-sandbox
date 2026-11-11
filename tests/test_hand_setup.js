@@ -28,13 +28,15 @@ const ok = (cond, msg) => { checks++; if (!cond) { fails++; console.log("FAIL " 
   ok(/1\/4"/.test(HS.bitName({ shape: "flat", d: 6.35 })), HS.bitName({ shape: "flat", d: 6.35 }));
   // every shape the simulator cuts (user 2026-10-26): bullnose, chamfer, tapered ball + tip / corner radius / flutes
   for (const x of [{ shape: "bullnose", d: 6.35, angle: 90, len: 0, tip: 0, cr: 1, flutes: 2 }, { shape: "chamfer", d: 12.7, angle: 90, len: 0, tip: 1, cr: 0, flutes: 0 },
-    { shape: "taperball", d: 6.35, angle: 10, len: 25, tip: 1.5, cr: 0, flutes: 2 }]) {
+    { shape: "taperball", d: 6.35, angle: 10, len: 25, tip: 1.5, cr: 0, flutes: 2 },
+    { shape: "roundover", d: 6.35, angle: 90, len: 50.8, tip: 0, cr: 3.175, flutes: 1 }, { shape: "roundover", d: 9.525, angle: 90, len: 0, tip: 3.175, cr: 3.175, flutes: 2 }]) {
     const y = HS.toDef(x);
     ok(JSON.stringify(HS.fromDef(y)) === JSON.stringify(x), `round trip ${x.shape}: ${JSON.stringify(y)}`);
   }
   ok(HS.toDef({ shape: "flat", d: 6, angle: 90, tip: 2, cr: 1 }).tip === undefined && HS.toDef({ shape: "flat", d: 6, cr: 1 }).cornerRadius === undefined,
     "a flat bit carries no tip / corner radius");
-  ok(HS.SHAPES.length === 6 && /chamfer/.test(HS.bitName({ shape: "chamfer", d: 12.7, angle: 90 })) && /tapered ball/.test(HS.bitName({ shape: "taperball", d: 3 })), "names");
+  ok(HS.SHAPES.length === 7 && /chamfer/.test(HS.bitName({ shape: "chamfer", d: 12.7, angle: 90 })) && /tapered ball/.test(HS.bitName({ shape: "taperball", d: 3 })) &&
+    /roundover/.test(HS.bitName({ shape: "roundover", d: 6.35 })), "names");
 
   // the offset view carves the same as the table's own frame
   const spoil = () => new StockSimulator({ xmin: -50, xmax: 250, ymin: -50, ymax: 250, zmin: -19, zmax: 0 }, new Map(), { maxCells: 9e4, snapshots: false });

@@ -677,7 +677,9 @@
     if (e.kind === "tool") toolAsk(e);
     $("job-pop").hidden = false;
     $("job-status").textContent = $("job-pop-msg").textContent;   // not the MSG lines after the M0 yet
-    jobTouch(JOB.tl.plates.find((q) => JOB.t >= q.t0 && JOB.t < q.t1) || null);
+    const pl = e.kind === "tool" ? null : JOB.tl.plates.find((q) => JOB.t >= q.t0 && JOB.t < q.t1) || null;
+    jobTouch(pl); jobCloseUp(pl);                    // a bit change: no plate till the new bit is in (Resume lays it)
+    if (RUN.auto && e.kind !== "alarm") runAutoResume();   // Preview follows Run's Automatic choice too
   }
   function jobTick() {
     const now = performance.now(), dt = Math.min((now - (JOB.last || now)) / 1000, 0.5);   // wall time: the speed holds on
@@ -700,7 +702,7 @@
     if (!JOB.tl) return;
     if (!JOB.preview) {                              // Run / Hold / Resume on FluidNC
       if (!FJ.job) fjRun();
-      else if (CTL.sim) { if (FJ.job.held) resumeWhenSettled(ctlResume); else CTL.sim.realtime("!"); }
+      else if (CTL.sim) { if (FJ.job.held) resumeWhenSettled(ctlResume); else { FJ.job.userHold = true; CTL.sim.realtime("!"); } }
       return;
     }
     if (!JOB.playing && JOB.t >= JOB.tl.total) { jobSeek(0); JOB.k = 0; }
@@ -719,7 +721,12 @@
       $("job-pop").classList.remove("tc-min");
       btn.disabled = false; btn.textContent = t;
     }
+    // the bit is in: now the plate + clip for the probe that follows (held back while the bit was changed)
+    const after = JOB.toolAsk ? (JOB.preview ? JOB.tl.plates.find((q) => JOB.t >= q.t0 && JOB.t < q.t1) : FJ.job && FJ.job.attachAfter) : null;
     if (JOB.toolAsk) toolPut();
+    if (after) {
+      if (JOB.preview) { jobTouch(after); jobCloseUp(after); } else { FJ.job.attachAfter = null; fjPlate(after); }
+    }
     resumeWhenSettled(() => {                        // the popup stays up (saying so) while the touch plate moves
       $("job-pop").hidden = true;
       if (JOB.preview) jobPlaying(true);

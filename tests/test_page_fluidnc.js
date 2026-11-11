@@ -33,7 +33,31 @@ function server(mode, port) {
       `http.server.ThreadingHTTPServer(("127.0.0.1", ${port}), functools.partial(serve.Isolated, directory=r"${ROOT}")).serve_forever()`
     : null;
   const args = code ? ["-c", code] : ["-m", "http.server", String(port), "--bind", "127.0.0.1", "--directory", ROOT];
-  return spawn(PY, args, { stdio: "ignore" });
+  const srv = spawn(PY, args, { stdio: "ignore" });
+  servers.add(srv);
+  srv.once("exit", () => servers.delete(srv));
+  return srv;
+}
+// a test that exits early (a throw, the watchdog) must not leave its server behind: leaked ones slow later tests
+const servers = new Set();
+process.on("exit", () => { for (const s of servers) try { s.kill(); } catch (e) { /* gone */ } });
+
+// No page test may hang (test_page_runstart's probe job waited ~3.5 h, 2026-11-09): after PAGE_TEST_MS (30 min, the
+// same limit tools/page_tests.js kills at) say what the page was doing, FAIL and exit. The exit handlers clean up.
+const WATCH_MS = +(process.env.PAGE_TEST_MS || 1800000);
+const STALL = `(() => { const g = (f) => { try { return f(); } catch (e) { return "?"; } }, el = (id) => document.getElementById(id);
+  return { state: g(() => LR4Ctl.state()), running: g(() => LR4Job.running()), status: g(() => el("job-status").textContent),
+    pill: g(() => el("job-pill").textContent), pop: g(() => !el("job-pop").hidden && el("job-pop-h").textContent + " | " + el("job-pop-msg").textContent),
+    held: g(() => FJ.job && FJ.job.held), userHold: g(() => FJ.job && FJ.job.userHold), attachAfter: g(() => FJ.job && FJ.job.attachAfter),
+    plate: g(() => FJ.job && !!FJ.job.plate), runTimer: g(() => !!RUN.timer), toolBusy: g(() => LR4ToolChange.busy()), lastMsg: g(() => FJ.lastMsg) }; })()`;
+function watchdog(val) {
+  const t = setTimeout(async () => {
+    let at = "the page didn't answer";
+    try { at = JSON.stringify(await Promise.race([val(STALL), sleep(5000)])) || at; } catch (e) { at = String(e); }
+    console.log(`  FAIL watchdog: not finished after ${Math.round(WATCH_MS / 60000)} min (PAGE_TEST_MS) - the page: ${at}`);
+    process.exit(1);
+  }, WATCH_MS);
+  t.unref();
 }
 
 async function chromePage(cport, o = {}) {           // o.gpu: the real GPU (live help videos), not SwiftShader
@@ -78,6 +102,7 @@ async function chromePage(cport, o = {}) {           // o.gpu: the real GPU (liv
   };
   await send("Runtime.enable");
   await send("Page.enable");
+  watchdog(val);
   const close = async () => { ws.close(); await P.drop(); };
   return { send, val, close };
 }
@@ -350,7 +375,7 @@ async function run(mode) {
   }
 }
 
-module.exports = { ROOT, CHROME, FIX, sleep, server, chromePage, HELPERS };
+module.exports = { ROOT, CHROME, FIX, sleep, server, chromePage, HELPERS, STALL };
 if (require.main === module) (async () => {
   if (!CHROME) { console.log("Chrome not found (set CHROME)"); process.exit(1); }
   if (!fs.existsSync(path.join(ROOT, "web", "fluidnc", "program.wasm"))) { console.log("web/fluidnc/program.wasm missing - run python tools/build_fluidnc_wasm.py"); process.exit(1); }

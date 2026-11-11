@@ -225,6 +225,8 @@ dialog.about { width: min(520px, calc(100vw - 32px)); border: 1px solid var(--li
 dialog.about::backdrop { background: rgb(0 0 0 / 0.45); }
 dialog.about h2 { font-size: 14px; color: var(--ink); }
 dialog.about p { margin: 0 0 10px; color: var(--muted); font-size: 13px; }
+#start-pop #start-ab { margin: 6px 0 0; }
+#start-pop #start-auto { margin: 8px 0 4px; }
 dialog.ask { width: min(400px, calc(100vw - 32px)); }
 dialog.ask #ask-in { width: 100%; box-sizing: border-box; margin: 0 0 12px; padding: 7px 9px; font: 14px var(--font-body); color: var(--ink);
   background: var(--bg); border: 1px solid var(--line); border-radius: 5px; }

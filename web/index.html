@@ -810,11 +810,11 @@
     </div>
     <div class="pair">
       <div class="field bit-lib"><label>From my bits</label><div class="bit-lib-row"><select data-k="lib" aria-label="From my bits"></select><a class="bit-store" target="_blank" rel="noopener" hidden title="This bit in the V1 Engineering store">store ↗</a></div></div>
-      <div class="field"><label>Bit</label><select data-k="shape"><option value="flat">Flat end mill</option><option value="ball">Ball end</option><option value="bullnose">Bullnose</option><option value="vbit">V-bit</option><option value="chamfer">Chamfer</option><option value="taperball">Tapered ball</option></select></div>
+      <div class="field"><label>Bit</label><select data-k="shape"><option value="flat">Flat end mill</option><option value="ball">Ball end</option><option value="bullnose">Bullnose</option><option value="vbit">V-bit</option><option value="chamfer">Chamfer</option><option value="taperball">Tapered ball</option><option value="roundover">Roundover</option></select></div>
       <div class="field"><label>Diameter</label><div class="unit-input"><input data-k="d" type="number" step="any" min="0.1" max="38.1" title="up to 1-1/2&quot; (38.1 mm)"><span>mm</span></div></div>
       <div class="field" data-for="vbit chamfer taperball"><label>Angle</label><div class="unit-input"><input data-k="angle" type="number" step="any" min="10" max="170" title="tip to tip"><span>°</span></div></div>
-      <div class="field" data-for="vbit chamfer taperball"><label>Tip</label><div class="unit-input"><input data-k="tip" type="number" step="any" min="0" title="V-bit / chamfer: the flat at its point; tapered ball: the ball's diameter"><span>mm</span></div></div>
-      <div class="field" data-for="bullnose"><label>Corner radius</label><div class="unit-input"><input data-k="cr" type="number" step="any" min="0"><span>mm</span></div></div>
+      <div class="field" data-for="vbit chamfer taperball roundover"><label>Tip</label><div class="unit-input"><input data-k="tip" type="number" step="any" min="0" title="V-bit / chamfer: the flat at its point; tapered ball: the ball's diameter; roundover: its tip, 0 for a sharp point"><span>mm</span></div></div>
+      <div class="field" data-for="bullnose roundover"><label>Corner radius</label><div class="unit-input"><input data-k="cr" type="number" step="any" min="0" title="Bullnose: its corner radius; roundover: its profile radius"><span>mm</span></div></div>
       <div class="field"><label>Flutes</label><div class="unit-input"><input data-k="flutes" type="number" step="1" min="0" max="12" title="0 = not said (the drawing only)"><span>#</span></div></div>
       <div class="field"><label>Sticks out</label><div class="unit-input"><input data-k="len" type="number" step="any" min="0"><span>mm</span></div></div>
     </div></div><div class="buttons"><button type="button" id="job-resume">Resume (cycle start)</button></div></div>
@@ -1143,13 +1143,13 @@
             and remembers your pick for that file.</p></div>
           <div class="pair" id="hs-bit">
             <div class="field bit-lib"><label>From my bits</label><div class="bit-lib-row"><select data-k="lib" aria-label="From my bits"></select><a class="bit-store" target="_blank" rel="noopener" hidden title="This bit in the V1 Engineering store">store ↗</a></div></div>
-            <div class="field"><label>Bit</label><select data-k="shape"><option value="flat">Flat end mill</option><option value="ball">Ball end</option><option value="bullnose">Bullnose</option><option value="vbit">V-bit</option><option value="chamfer">Chamfer</option><option value="taperball">Tapered ball</option></select></div>
+            <div class="field"><label>Bit</label><select data-k="shape"><option value="flat">Flat end mill</option><option value="ball">Ball end</option><option value="bullnose">Bullnose</option><option value="vbit">V-bit</option><option value="chamfer">Chamfer</option><option value="taperball">Tapered ball</option><option value="roundover">Roundover</option></select></div>
             <div class="field"><label>Diameter</label>
               <div class="unit-input"><input data-k="d" type="number" step="any" min="0.1" max="38.1" title="up to 1-1/2&quot; (38.1 mm)"><span>mm</span></div></div>
             <div class="field" data-for="vbit chamfer taperball"><label>Angle</label>
               <div class="unit-input"><input data-k="angle" type="number" step="any" min="10" max="170" title="a V-bit's angle, tip to tip"><span>°</span></div></div>
-            <div class="field" data-for="vbit chamfer taperball"><label>Tip</label><div class="unit-input"><input data-k="tip" type="number" step="any" min="0" title="V-bit / chamfer: the flat at its point; tapered ball: the ball's diameter"><span>mm</span></div></div>
-            <div class="field" data-for="bullnose"><label>Corner radius</label><div class="unit-input"><input data-k="cr" type="number" step="any" min="0"><span>mm</span></div></div>
+            <div class="field" data-for="vbit chamfer taperball roundover"><label>Tip</label><div class="unit-input"><input data-k="tip" type="number" step="any" min="0" title="V-bit / chamfer: the flat at its point; tapered ball: the ball's diameter; roundover: its tip, 0 for a sharp point"><span>mm</span></div></div>
+            <div class="field" data-for="bullnose roundover"><label>Corner radius</label><div class="unit-input"><input data-k="cr" type="number" step="any" min="0" title="Bullnose: its corner radius; roundover: its profile radius"><span>mm</span></div></div>
             <div class="field"><label>Flutes</label><div class="unit-input"><input data-k="flutes" type="number" step="1" min="0" max="12" title="0 = not said (the drawing only)"><span>#</span></div></div>
             <div class="field"><label>Sticks out</label>
               <div class="unit-input"><input data-k="len" type="number" step="any" min="0" title="below the collet (drawing only; 0 = as the model's bit)"><span>mm</span></div></div>
@@ -1187,6 +1187,10 @@
 <div class="start-pop" id="start-pop" role="dialog" aria-labelledby="start-h" hidden>
   <b id="start-h">Start?</b>
   <ul class="chk" id="start-chk"></ul>
+  <label class="check" id="start-ab" hidden><input type="checkbox" id="start-ideal"> As built is Real-world: run this on the Ideal machine instead</label>
+  <div class="variant" id="start-auto"><span>Bit changes &amp; probing</span>
+    <button type="button" data-v="me" aria-pressed="true" title="The job waits at each bit change and probe until you press Resume">I do them</button>
+    <button type="button" data-v="auto" aria-pressed="false" title="The bit goes in, the touch plate goes on and the job resumes by itself (alarms and your own Hold still wait)">Automatic</button></div>
   <div class="buttons"><button type="button" id="start-no">Cancel</button><button type="button" class="pri" id="start-go">▶ Start</button></div>
 </div>
 
