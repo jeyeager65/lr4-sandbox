@@ -193,9 +193,10 @@
           <p class="foot" id="bristle-note" hidden>Showing the standard ones: add tpu-bristles-32mm-extra-long.stl (Kobalt tool mount files) under Parts.</p>
           <label class="check sub"><input type="checkbox" id="opt-hose" checked> Dust shoe + vacuum hose, router cord + cable sleeve</label>
           <label class="check"><input type="checkbox" id="opt-fan" checked> Jackpot3 lid fan</label>
-          <label class="check" title="Optional: one power inlet on the table's left end (the extension cord plugs in) with the router and vac outlets, and a dust port the machine hose drops into - the shop vac's hose fits under it. Off: the hose goes to the floor and nothing is added to the BOM."><input type="checkbox" id="opt-hub"> Table power hub + dust port</label>
+          <label class="check" title="Optional: one power inlet on the table's left end (the extension cord plugs in) with the router and vac outlets, and a dust port the machine hose drops into - the shop vac's hose fits under it. Off: the hose goes to the floor and nothing is added to the BOM. The hub is 120 V house wiring: the BOM describes one way to build it, not an electrical design."><input type="checkbox" id="opt-hub"> Table power hub + dust port</label>
           <label class="check sub" title="Draws a shop vac and a cyclone separator on a bucket beside the table's left end, hosed to the dust port (generic shapes, sizes GUESS)."><input type="checkbox" id="opt-vac"> Shop vac + separator</label>
           <label class="check no-phone" title="The FluidTouch touchscreen pendant (github.com/jeyeager65/FluidTouch) on the table's front, running its real firmware in the page"><input type="checkbox" id="ft-on"> FluidTouch pendant</label>
+          <p class="foot" id="hub-note">The hub is 120 V house wiring. The BOM describes one way to build it; it is not an electrical design.</p>
         </div>
         <div class="variant" id="peter-variant" hidden><span>Peter Plates</span>
           <button type="button" data-v="solid" aria-pressed="false">Solid</button>
@@ -941,6 +942,9 @@
       <p><b>Release</b> it with a quarter twist. The power comes back and FluidNC restarts. Home it before the next job.</p>
       <p>With the <b>table hub</b> option, a magnetic paddle switch takes its place: slap the red <b>STOP</b> paddle to cut
       the power, press the green <b>START</b> to bring it back. It stays off after a stop or a power cut until START.</p>
+      <p>Without the table hub, the page doesn't design this panel's wiring. An e-stop button's own contacts (about
+      10 A on the common 22 mm kind) can't carry a router and a shop vac: the button has to switch a contactor or a
+      magnetic switch rated for the load.</p>
       <p><b>Router</b> and <b>Vac</b> are 20 A lighted toggles: lit means on, with power. The router turns only when the job
       turns it on, and the vac runs with it. The router also has its own switch on its body. Click it on the model to
       turn it off: the router won't start until it's back on.</p>

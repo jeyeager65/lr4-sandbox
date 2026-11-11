@@ -1224,7 +1224,7 @@ float lr4G(float x) { float s = 2.0 * fract(x) - 1.0; return floor(x) / 3.0 + (s
       ud("SwitchPanel_EStopStem", "E-stop plunger", at(SWP.estop), { color: [0.55, 0.55, 0.57] })]);
     out.push([lathe([[0, 0], [9, 0], [19, 1], [20, 3], [20, 8], [18, 11], [13, 13.5], [6, 14.6], [0, 14.9]]).translate(0, -10 - SWP.travel, 0),
       flat([0.78, 0.05, 0.04], { roughness: 0.35 }),
-      ud("SwitchPanel_EStop", "Emergency stop (click: press = mains off; click again: twist to release)", at(SWP.estop), { color: [0.78, 0.05, 0.04], click: "estop" })]);
+      ud("SwitchPanel_EStop", "Emergency stop (click: press = power off; click again: twist to release)", at(SWP.estop), { color: [0.78, 0.05, 0.04], click: "estop" })]);
     // with the table hub on (Part 52, user 2026-11-02): a magnetic paddle switch in its place (a POWERTEC 71007-style
     // START / STOP: slap the red paddle = all power off, and it stays off - after a stop or a power cut - until START is
     // pressed). Must be rated for the circuit (20 A at 120 V; check its label). panel.js shows it / hides the e-stop.
@@ -1665,7 +1665,7 @@ float lr4G(float x) { float s = 2.0 * fract(x) - 1.0; return floor(x) / 3.0 + (s
     // the 24 V supply's plug in its top socket, CONTROLLER (user 2026-11-03): its cord goes up to the gantry (wiring.js psu-ac)
     HUB.outlet.psu = [fx - 7, yA, zm + 19];
     out.push([plugGeo(HUB.outlet.psu), flat([0.07, 0.07, 0.08], { roughness: 0.6 }),
-      ud("TableHub_PsuPlug", "The 24 V supply's mains plug (in the CONTROLLER socket, the top of the accessory duplex; its cord runs up to the gantry and along the beam to the supply)", [0.07, 0.07, 0.08], "Electronics")]);
+      ud("TableHub_PsuPlug", "The 24 V supply's power plug (in the CONTROLLER socket, the top of the accessory duplex; its cord runs up to the gantry and along the beam to the supply)", [0.07, 0.07, 0.08], "Electronics")]);
     // the dust port: a bulkhead through the panel - a flange outside, a lock nut inside, stubs both ways
     // the port midway between the POWER IN plate's edge and the panel's end (user 2026-11-03)
     const yP = (yI + 36 + y0 + W) / 2, sx = fx - 40, ix = fx + T + HUB.stub, L = fx - sx;   // the mouth 40 mm out from the (set back) panel

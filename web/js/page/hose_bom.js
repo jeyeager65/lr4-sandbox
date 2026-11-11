@@ -900,7 +900,7 @@
     const ac = runs.find((r) => r.id === "psu-ac"), dc = runs.find((r) => r.id === "psu-dc");
     if (!PWR_MESH) {
       const mk = (name, label, c) => { const m = addMesh(new THREE.BufferGeometry(), material(c), { name, label, group: "Electronics", motion: "hose", source: "hardware", color: c }); return m; };
-      PWR_MESH = { cord: mk("PSU_MainsCord", "24 V supply mains cord::with the hub: from the CONTROLLER socket, tied along the router cord to the beam's end, then along the braces to the supply's far end", [0.06, 0.06, 0.065]),
+      PWR_MESH = { cord: mk("PSU_MainsCord", "24 V supply power cord::with the hub: from the CONTROLLER socket, tied along the router cord to the beam's end, then along the braces to the supply's far end", [0.06, 0.06, 0.065]),
         red: mk("PSU_Lead24V", "24 V lead (+, red)::the supply's near end into the Jackpot's power terminal", [0.75, 0.08, 0.06]),
         black: mk("PSU_Lead0V", "24 V lead (-, black)", [0.05, 0.05, 0.06]),
         lead: mk("PSU_LeadCable", "24 V lead cable::the supply's own 2-core cable (black jacket) to the Jackpot box, split into red / black inside", [0.07, 0.07, 0.075]) };
@@ -1181,6 +1181,7 @@
                   "the lead to a grounded screw (the switch panel's box, or the 24 V supply's earth terminal) - no outlet used"],
               // the hub's mains cables (user 2026-11-03; scene.js hubCables: the drawn runs + 150 mm in each box)
               ...(optsOn().hub && HUB.cables && HUB.cables.len.Paddle ? [
+                [null, "120 V wiring (20 A, North American parts): read this first", "this is one way to build it, not an electrical design or a code check. Follow your local electrical code, have someone qualified wire or check it, and unplug the inlet before opening a box"],
                 [1, `12-3 NM-B cable (12 AWG, yellow), ~${m(HUB.cables.len.Paddle + HUB.cables.len.Toggles + 300)} m`, "two runs stapled to the panels' backs: inlet box <-> paddle switch " +
                   `(~${m(HUB.cables.len.Paddle)} m: black = line out, red = switched back, white = neutral, bare = ground) and the router + vac toggles -> outlet box ` +
                   `(~${m(HUB.cables.len.Toggles)} m: black = router, red = vac); along the side and front panels' backs above the boxes; + spare`],
@@ -1192,7 +1193,7 @@
                 [5, "NM cable clamps / connectors for the box knockouts", "where each cable enters a box (the PVC boxes' built-in clamps may do)"]] : [])];
           }
           if (R["psu-ac"] && R["psu-ac"].cut && /^24 V power supply/.test(r[1] || ""))
-            return [[r[0], r[1], `${r[2]}; on the gantry: its mains cord ${optsOn().hub ? "plugged into the hub's CONTROLLER socket (the accessory duplex's top)" : "from the switch panel"} ~${m(R["psu-ac"].cut)} m, into the beam along the braces (V1E docs; GUESS route)`]];
+            return [[r[0], r[1], `${r[2]}; on the gantry: its power cord ${optsOn().hub ? "plugged into the hub's CONTROLLER socket (the accessory duplex's top)" : "from the switch panel"} ~${m(R["psu-ac"].cut)} m, into the beam along the braces (V1E docs; GUESS route)`]];
           return [r];
         }) }));
       }

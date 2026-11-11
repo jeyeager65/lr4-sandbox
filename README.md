@@ -11,13 +11,15 @@ features and checks every fastener.
 
 > [!WARNING]
 > Still under development. There's no guarantee that the model, measurements, cut list, BOM, G-code or config.yaml
-> are accurate: check them against V1 Engineering's docs before you cut, print or buy anything.
+> are accurate: check them against V1 Engineering's docs before you cut, print or buy anything. The 120 V side (the
+> table hub, the switch panel) is a drawing and a parts list, not an electrical design: check it against your local
+> code before you build it.
 
 ## What's here
 
 | | |
 |---|---|
-| **LowRider 4 Sandbox** (`web/index.html`) | The page. **Configure:** enter a cutting area and it builds the machine in 3D (every printed part, rail, belt, bolt, the strut plates and the vacuum hose); choose what's on it (router + shoe, hose, lid fan, pendant, Peter Plates, strut plates). **Layers** (on the view): a tree of every part by assembly and kind, with presets, to hide parts from the view, and an inspect view for one assembly at a time. **Get the files:** the cut list (V1E's calculator), the strut plate outlines, DXF / SVG / G-code downloads, the full BOM and a `config.yaml` for your size. **Run:** play G-code on the machine, or drive it with FluidNC in the browser. Plus machine sounds, a workshop round it, VR, share links and scripted demo videos. |
+| **LowRider 4 Sandbox** (`web/index.html`) | The page. **Configure:** enter a cutting area and it builds the machine in 3D (every printed part, rail, belt, bolt, the strut plates and the vacuum hose); choose what's on it (router + shoe, hose, lid fan, pendant, Peter Plates, strut plates). **Show** (on the view): on / off buttons by kind of part and by area of the machine, to hide parts from the view, plus the wiring drawn wire by wire, and an inspect view for one assembly at a time. **Get the files:** the cut list (V1E's calculator), the strut plate outlines, DXF / SVG / G-code downloads, the full BOM and a `config.yaml` for your size. **Run:** play G-code on the machine, or drive it with FluidNC in the browser. Plus machine sounds, a workshop round it, VR, share links and scripted demo videos. |
 | **FreeCAD model** (`freecad/`) | Scripts that assemble the LowRider 4 in [FreeCAD](https://www.freecad.org/) from the official STLs. Every part is placed by its measured mating features (hole patterns, pockets), and every fastener is checked for seat, engagement and collisions. Outputs: an FCStd assembly, a BOM, strut plate DXF/SVG and G-code. |
 | **Pipeline** (`pipeline/`) | Builds the model at many sizes and fits how each part moves with the size. That is how the page can draw any size without FreeCAD. |
 | **FluidNC in the browser** (`web/fluidnc/`) | FluidNC's wasm port, built from a fork's `wasm-sim` branch with simulated limit switches, a touch plate probe and a time scale. |
@@ -64,7 +66,7 @@ Unzip each download into its folder under `parts/` (the table above), for exampl
 
 ## Using the page
 
-### Configure and Layers
+### Configure and Show
 
 **Configure** is six steps that open in any order (a closed step shows a one-line summary):
 **1 Size** - enter the cutting area (inches or mm) and the page rebuilds the machine: brace count, rails, belts,
@@ -100,13 +102,15 @@ the cuts and readouts always use the real values.
 **Printed in** on any part's chip to print just that part in another filament. Printed parts are drawn with layer
 lines at your layer height. The strut plates can be drawn as MDF, hardboard, plywood or acrylic.
 
-**Layers** (on the view, or L) only hides parts from the view, never from the BOM: a tree of assembly > printed / cut / hardware /
-electronics > part (a bolt is listed under both assemblies it joins), with presets (All, No hardware, Printed parts
-only, Frame only). **Look** > **Scene** sets the detail (Full, or Lite for slower devices), the lighting (Realistic: the
+**Show** (on the view, or L) only hides parts from the view, never from the BOM: **Parts** (Printed / Cut / Hardware /
+Electronics) and **Areas** (Table, the YZ sides, Beam, Core, ...) are on / off buttons that combine freely, with Reset.
+**Wiring > Wires** draws every wire along its route, with **X-ray parts** to see them inside the plates and the beam,
+and a run list that traces each run end to end. Parts you hide one by one (H) show as a "N hidden · Show all" chip
+(Shift+H brings them back). **Look** > **Scene** sets the detail (Full, or Lite for slower devices), the lighting (Realistic: the
 workshop's own lights, soft shadows on Full detail and filmic colour; or Simple: even light, lightest on the GPU) and
 the background (the workshop, the same shop empty, or plain).
 
-**Inspect** (⤢ on a Layers row, **Inspect** on a selected part, or double-click a part) shows one assembly or part alone with the bolts and bearings
+**Inspect** (**Inspect** on a selected part, I, or double-click a part) shows one assembly or part alone with the bolts and bearings
 that hold it, and its parts list with screw and nut counts. Its tools: an exploded view (along the bolt lines), a
 section cut (X, Y or Z, either side), X-ray (the printed parts see-through, the hardware solid), Lines (edges only)
 and a measuring tool that snaps to corners and hole centres. Esc or **Back to the machine** returns.
@@ -242,7 +246,7 @@ any G-code file with `(Video ...)` lines on the SD card can be played the same w
 ### Around the view
 
 - **Iso / Front / Top / Side / Back / Fit all** (keys **1**-**5**, **F**) set the camera; on a phone they fold into
-  one **View** menu. ☰ (**H**) hides the side panel. **Layers** (**L**) shows / hides parts.
+  one **View** menu. ☰ (**H**) hides the side panel. **Show** (**L**) shows / hides parts.
 - **On a phone** Run is the view, Hold / Stop, the readout, Home / Zero / Jog / Files and the job; Jog, Files and the
   console open as sheets from the bottom.
 - **📏 Measure** (**M**): two clicks on the machine, snapping to corners and hole centres; Esc ends it.

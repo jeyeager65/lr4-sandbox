@@ -1,5 +1,5 @@
 // Part 51a in headless Chrome: the wiring. The stand-in Jackpot board inside the box (the user's own board is never in
-// the public data), Layers > Wiring: a line per run (but the mains to the wall), the core's runs along the cable
+// the public data), Show > Wiring: a line per run (but the mains to the wall), the core's runs along the cable
 // cord / hose, the ends riding their parts (the gantry moves: the X motor's end moves with it, the board's stays), hover
 // picks a run (51e: the drawn wire), Show > Wiring (Wires, X-ray parts, trace a run), the lid fan's lead + the plugs, off = gone.
 //   node tests/test_page_wiring.js   (not in npm test: needs Chrome + Python + parts/; ~1 min)
@@ -42,7 +42,7 @@ const ok = (cond, msg) => { checks++; console.log((cond ? "  ok   " : "  FAIL ")
     ok(on1.drawn.every((x) => x) && on1.hose[0], `Wiring on: the drawn wires shown (${on1.drawn.length}) + the hose`);
     ok(ms1 < 40, `Wiring on: a move ${ms1} ms (budget 40)`);
     const b = await page.val(`(() => { const r = LR4WiringView.runs(), by = Object.fromEntries(r.map((q) => [q.id, q])); return { n: r.length, shown: r.filter((q) => q.shown).length, by }; })()`);
-    ok(b.n === 15 && b.shown === 14 && !b.by.mains.shown, `Layers > Wiring: a line per run, the mains (to the wall) not drawn (${b.shown} of ${b.n})`);
+    ok(b.n === 15 && b.shown === 14 && !b.by.mains.shown, `Show > Wiring: a line per run, the mains (to the wall) not drawn (${b.shown} of ${b.n})`);
     ok(b.by["x-motor"].len > 2 * b.by["y0-motor"].len, `the core's X motor along the cord / hose (${b.by["x-motor"].len} mm) - longer than the near Y0's straight line (${b.by["y0-motor"].len})`);
     // the gantry moves 200 mm in Y: the X motor's end rides it, the board's stays (the box is on the gantry too: both move)
     const c = await page.val(`(async () => {

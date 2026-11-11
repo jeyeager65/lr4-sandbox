@@ -3,6 +3,13 @@
 The version is the sandbox page's (`VERSION` in `web/js/page/job.js`, shown in its footer). The footer also shows
 the date the model data was built and the Printables file set it was solved for.
 
+## 0.70.2 - 2026-11-10
+- The table hub's 120 V wiring now says what it is: one way to build it, not an electrical design or a code check
+  (the BOM's first hub wiring row, a note under the option, docs/WIRING.md). The switch panel's "?" and the wiring
+  list say that without the hub an e-stop button must switch a contactor: its own contacts can't carry a router and
+  a vac.
+- US terms: "power cord" and "120 V", not "mains".
+
 ## 0.70.1 - 2026-11-10
 - If something on the page breaks (a script error, or a file of the page that didn't load), a bar at the bottom now
   says so, with **Reload** and **Report** (a GitHub issue with the error filled in) - before, the page could just stop

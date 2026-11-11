@@ -3,6 +3,10 @@
 The sources for the page's wiring list (`web/data/wiring.js`). Anything not from a source below is marked GUESS -
 measure yours and say so (CONFIGURATOR.md Part 51).
 
+> The 120 V side (the table hub, the switch panel) is a drawing and a parts list, not an electrical design.
+> Check it against your local code before you build it. An e-stop button's own contacts (about 10 A) can't switch a
+> router and a shop vac directly: it has to switch a contactor or a magnetic switch rated for the load.
+
 ## The Jackpot 3 board ([V1E docs](https://docs.v1e.com/electronics/jackpot3/))
 
 Pinout image: [jp3label.png](https://github.com/V1EngineeringInc/V1EngineeringInc-Docs/blob/master/docs/img/jackpot/jackpot3/jp3label.png)
@@ -46,7 +50,7 @@ Endstops are only read while homing (not limit switches). All inputs: active low
 - **Wire sleeve** ([wire-sleeve](https://www.v1e.com/products/wire-sleeve)): 3/8" PET, by the foot - the core's
   bundle (the X extender + the touch plate's leads) along the hose (hose_bom.js).
 - **Power supply** ([24V](https://www.v1e.com/products/24v-power-supply)): 24 V 2.5 A (60 W), a barrel plug - "cut it
-  off, strip the wires and connect directly"; mains in by an IEC C5 / C13 cord.
+  off, strip the wires and connect directly"; 120 V in by an IEC C5 / C13 cord.
 - **Touch plate**: the plate's wire (red) + the clip's (black) out of the core's hole (rope.js) to the probe input,
   in the sleeve (GUESS: one 2-wire lead).
 
@@ -73,7 +77,7 @@ D:\GitHub\V1EngineeringInc-Docs). What the docs say:
   router cord / vac hose through the hose hooks to the **brace just past halfway**, then into the braces with the
   others (w7, w8, w8b). The wires pass under the hose at the middle; a partial twist if it tracks badly.
 
-- Power (w9c-w9e): the supply rides the gantry (in a bay, on the strut plates); its mains "out with the vacuum hose,
+- Power (w9c-w9e): the supply rides the gantry (in a bay, on the strut plates); its power cord "out with the vacuum hose,
   or a single extension cord into the beam". The model (user 2026-11-02: in the beam through the braces; the router
   cord along the hose): the switch panel (table front) -> along the front to the gantry end nearer the supply -> its
   YZ plate -> the braces -> the supply (~3.0 m at 26x50, 1.6 m at 15x30, 4.7 m at 48x96).
@@ -83,7 +87,7 @@ D:\GitHub\V1EngineeringInc-Docs). What the docs say:
   router / vac duplex (tab broken: each half on its switch panel toggle) and an always-on accessory duplex, in
   single-gang boxes. The line runs to the switch panel's magnetic STOP / START switch and back, then to the toggles,
   the accessory outlet and the supply: one 12 AWG cable bundle along the table's underside between the hub and the
-  panel (~0.8 m at 26x50). The supply's mains starts at the hub (~1.5 m at 26x50, into the beam along the braces).
+  panel (~0.8 m at 26x50). The supply's power cord starts at the hub (~1.5 m at 26x50, into the beam along the braces).
   The router cord rides the hose to the port, then plugs into ROUTER; the vac into VAC. Every switch in the path rated
   for the circuit (20 A at 120 V); router 9 A + vac 9 A + supply < 1 A is under a 20 A breaker, but nothing else on
   that circuit while it runs. A relay from FluidNC for the vac (M8) is planned, not built: its own box.
