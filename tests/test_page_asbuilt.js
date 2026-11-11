@@ -160,7 +160,7 @@ const PASSES = (() => {
       out.homedE = LR4AsBuilt.E();
       await A.play(job, "sq2.gcode");
       out.square = LR4AsBuilt.measure(); out.noteS = document.getElementById("ab-sq-note").textContent;
-      out.depth = r.z;
+      out.depth = r.z; out.rect = r;
       LR4AsBuilt.set({ stop: { y: null, z: null } });
       return out;
     })()`);
@@ -171,7 +171,10 @@ const PASSES = (() => {
     ok(d.follow[0] < -0.05 && near(d.follow[1], 0, 0.05) || d.follow[0] < d.follow[1] - 0.05, `stock follows: sag ${d.follow.map((v) => v.toFixed(3)).join(" / ")}`);
     ok(d.racked && !d.racked.missing && Math.abs(d.racked.diff - d.wantR) < 0.15, `measured racked: ${d.racked.diff && d.racked.diff.toFixed(3)} vs ${d.wantR.toFixed(3)} (${d.depth} mm deep) - ${d.noteR}`);
     ok(d.none.missing && d.none.missing.length === 4, "new board: nothing to measure");
-    ok(d.square && !d.square.missing && Math.abs(d.square.diff) < 0.1 && near(d.homedE.y, 0, 0.02), `measured after $H: ${d.square.diff && d.square.diff.toFixed(3)} - ${d.noteS}`);
+    const sqC = [[0, 0], [1, 0], [1, 1], [0, 1]].map(([i, j]) => [d.rect.x + i * d.rect.w, d.rect.y + j * d.rect.h]);
+    const sqErr = d.square && !d.square.missing ? d.square.corners.map((c, k) => `${(c[0] - sqC[k][0]).toFixed(3)},${(c[1] - sqC[k][1]).toFixed(3)}`).join(" | ") : "";
+    ok(near(d.homedE.y, 0, 0.02), `$H square: ${d.homedE.y.toFixed(3)} mm of rack left`);
+    ok(d.square && !d.square.missing && Math.abs(d.square.diff) < 0.1, `measured after $H: ${d.square.diff && d.square.diff.toFixed(3)} - ${d.noteS} (corners off by ${sqErr})`);
 
     // (after the follow-ups: it lays a new board and cuts only its stock, so their warp check would find the board
     // uncut and lay it again without asking - the failure 2026-11-04)

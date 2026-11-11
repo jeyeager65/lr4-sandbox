@@ -496,10 +496,19 @@
   $("ab-m0").addEventListener("click", (e) => { const b = e.target.closest("button[data-v]"); if (b) abSet({ motor0: b.dataset.v }); });
   // the squareness test's rectangle: 25 mm in from the cutting area; deep enough that the V-groove is ~2 of the
   // spoilboard sim's cells wide (Measure reads it to ~0.1 mm then; 1 mm deep would fall between its points): 2.5 mm,
-  // 5 in Lite
+  // 5 in Lite - and deeper by a warped board's sag (Z 0 is its high spot: at the low spot the groove was under 2 cells
+  // wide, and Measure called a square machine 0.12 mm out, 2026-11-10)
+  const SQ_SAG = { key: null, sag: 0 };
+  function abSqSag() {                               // how far the laid board's low spot is below its high spot, mm
+    const w = SPOIL.sim && SPOIL.laid && typeof SPOIL.laid === "object" ? SPOIL.laid : null;
+    if (!w) return 0;
+    const key = `${JSON.stringify(w)}|${SPOIL.sim.nx}x${SPOIL.sim.ny}`;
+    if (key !== SQ_SAG.key) { SQ_SAG.key = key; SQ_SAG.sag = Imperfect.freshHeights(SPOIL.sim, w, spoilBox()).depth; }
+    return SQ_SAG.sag;
+  }
   function abSqRect() {
     const m = 25, cell = SPOIL.sim ? Math.max(SPOIL.sim.dx, SPOIL.sim.dy) : 1.3;
-    return { x: m, y: m, w: S.cutX - 2 * m, h: S.cutY - 2 * m, z: -Math.max(1, Math.ceil(cell * 3.6) / 2) };
+    return { x: m, y: m, w: S.cutX - 2 * m, h: S.cutY - 2 * m, z: -(Math.max(1, Math.ceil(cell * 3.6) / 2) + Math.ceil(abSqSag() * 10) / 10) };
   }
   // read the test off the cut: its corner crosses in the job's stock, the hand stock or the spoilboard
   function abMeasure() {
@@ -509,7 +518,8 @@
     const names = ["front-left", "front-right", "back-right", "back-left"];
     $("ab-sq-note").textContent = q.missing ? `No cross cut at the ${q.missing.map((k) => names[k]).join(", ")} corner${q.missing.length > 1 ? "s" : ""}: run the squareness test first.` :
       `Measured off the cut: diagonals ${q.d1.toFixed(2)} / ${q.d2.toFixed(2)} mm, ${Math.abs(q.diff).toFixed(2)} apart` +
-      (Math.abs(q.diff) < 0.1 ? " - square (as near as the sim reads, ~0.1 mm)." : ` - out of square (the front edge ${Math.abs(q.skew * 60).toFixed(1)}' off X).`);
+      (q.thin && Math.abs(q.diff) < 0.5 ? " - too shallow a cut to tell: a groove is narrower than the sim's grid here (read to ~0.5 mm). Cut the test deeper." :
+        Math.abs(q.diff) < 0.1 ? " - square (as near as the sim reads, ~0.1 mm)." : ` - out of square (the front edge ${Math.abs(q.skew * 60).toFixed(1)}' off X).`);
     return q;
   }
   $("ab-meas").addEventListener("click", abMeasure);

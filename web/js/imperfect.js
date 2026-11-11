@@ -288,7 +288,9 @@
   // a line fitted through each groove (along X: per column, along Y: per row), the crossing columns / rows (cut over
   // more than wide mm) left out -> [x, y] where they meet, or null. Each column's middle from its deepest node and the
   // deeper neighbour: a V-bit's sides rise k mm per mm (k = 1 / tan(half angle)), so their height difference says
-  // where the point ran between them (exact while both are in the groove: cut ~2 cells wide)
+  // where the point ran between them (exact while both are in the groove: cut ~2 cells wide). A groove with one node
+  // across it (too shallow for the grid, e.g. at a warped board's low spot) can't say which side of the node the point
+  // ran: the result is marked .thin (good to about half a cell)
   function findCross(sim, off, cx, cy, win = 15, wide = 4, k = 1 / Math.tan(Math.PI / 6)) {
     const S = sim.stock, h = sim.heights, x = cx - off[0], y = cy - off[1];
     const i0 = Math.max(0, Math.ceil((x - win - S.xmin) / sim.dx)), i1 = Math.min(sim.nx, Math.floor((x + win - S.xmin) / sim.dx));
@@ -301,6 +303,7 @@
     // one groove: for each line across it (u), its middle along it (v) -> fitted v = a + b u
     const fit = (alongX) => {
       const pts = [], step = alongX ? sim.dy : sim.dx, q0 = alongX ? j0 : i0, q1 = alongX ? j1 : i1;
+      let thin = 0;
       for (let p = alongX ? i0 : j0; p <= (alongX ? i1 : j1); p++) {
         const at = (q) => (alongX ? h[q * sim.vx + p] : h[p * sim.vx + q]);
         let m = -1, lo = Infinity, hi = -Infinity;
@@ -309,8 +312,9 @@
           lo = Math.min(lo, q); hi = Math.max(hi, q);
           if (m < 0 || at(q) < at(m)) m = q;
         }
-        if (m <= q0 || m >= q1 || (hi - lo) * step > wide) continue;
+        if (m <= q0 || m >= q1 || (hi - lo) * step > Math.max(wide, 2.6 * step)) continue;   // (a coarse grid: 2 cells is no crossing)
         const n = at(m - 1) < at(m + 1) ? m - 1 : m + 1;   // the deeper neighbour: the point ran between m and n
+        if (top - at(n) <= cut) thin++;                // n is uncut board: m alone is in the groove
         const off1 = Math.max(0, step - (at(n) - at(m)) / k) / 2;
         pts.push([alongX ? X(p) : Y(p), (alongX ? Y(m) : X(m)) + (n > m ? off1 : -off1)]);
       }
@@ -319,15 +323,18 @@
       let suu = 0, suv = 0;
       for (const [u, v] of pts) { suu += (u - mu) ** 2; suv += (u - mu) * (v - mv); }
       const b = suu > 0 ? suv / suu : 0;
-      return { a: mv - b * mu, b };
+      return { a: mv - b * mu, b, thin: thin > n / 2 };
     };
     const gx = fit(true), gy = fit(false);           // y = gx.a + gx.b x; x = gy.a + gy.b y
     if (!gx || !gy) return null;
     const px = (gy.a + gy.b * gx.a) / (1 - gy.b * gx.b), py = gx.a + gx.b * px;
-    return [px + off[0], py + off[1]];
+    const at = [px + off[0], py + off[1]];
+    if (gx.thin || gy.thin) at.thin = true;
+    return at;
   }
   // the squareness test read off the cut: each corner cross of rectangle r (table frame, as commanded) found in the
-  // first of srcs [{ sim, off }] that has it -> { corners, d1, d2, diff, skew } (corners in the table frame), or
+  // first of srcs [{ sim, off }] that has it -> { corners, d1, d2, diff, skew, thin } (corners in the table frame;
+  // thin: a groove too shallow for its grid, read to about half a cell only), or
   // { corners, missing: [index...] } when a cross isn't there
   function readSquare(srcs, r, win = 15) {
     const want = [[r.x0, r.y0], [r.x1, r.y0], [r.x1, r.y1], [r.x0, r.y1]], corners = [], missing = [];
@@ -337,7 +344,7 @@
       corners.push(got);
       if (!got) missing.push(k);
     });
-    return missing.length ? { corners, missing } : Object.assign({ corners }, diagonals(corners));
+    return missing.length ? { corners, missing } : Object.assign({ corners, thin: corners.some((c) => c.thin) }, diagonals(corners));
   }
   // a squareness test job (mm, work zero = the cutting area's front-left corner, Z 0 = the spoilboard's top): a
   // rectangle o.w x o.h at o.x, o.y engraved o.z deep (negative) with a V-bit, crosses at the corners to measure

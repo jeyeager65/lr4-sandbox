@@ -158,11 +158,13 @@ function sqCut(E, depth) {
   for (const [x, y] of [[x0, y0], [x1, y0], [x1, y1], [x0, y1]]) { ln(x - 10, y, x + 10, y); ln(x, y - 10, x, y + 10); }
   return { s, rd: IM.readSquare([{ sim: s, off: [0, 0, 0] }], sqR), want: IM.squareness(E, gT, sqR) };
 }
-for (const [E, d] of [[{ y: 2, z: 0 }, 3], [{ y: 0, z: 0 }, 3], [{ y: 0.8, z: 0.5 }, 3], [{ y: -1.2, z: 0 }, 3], [{ y: 0.8, z: 0 }, 2]]) {
+for (const [E, d] of [[{ y: 2, z: 0 }, 3], [{ y: 0, z: 0 }, 3], [{ y: 0.8, z: 0.5 }, 3], [{ y: -1.2, z: 0 }, 3], [{ y: 0.8, z: 0 }, 2], [{ y: 0, z: 0 }, 2.5], [{ y: 2, z: 0 }, 2.5]]) {
   const { rd, want, s } = sqCut(E, d);
   ok(!rd.missing && Math.abs(rd.diff - want.diff) < 0.05, `read the cut, rack ${E.y} ${d} mm deep (cell ${s.dx.toFixed(2)}): diagonals ${rd.d1 && rd.d1.toFixed(2)} / ${rd.d2 && rd.d2.toFixed(2)}, diff ${rd.diff && rd.diff.toFixed(3)} vs ${want.diff.toFixed(3)}`);
 }
 ok(IM.readSquare([{ sim: mk(), off: [0, 0, 0] }], { x0: 50, y0: 50, x1: 500, y1: 80 }).missing.length === 4, "nothing cut: missing");
+// a groove one node wide (too shallow for the grid) is marked thin, a 2-cell one isn't
+ok(sqCut({ y: 0, z: 0 }, 1.3).rd.thin === true && sqCut({ y: 0, z: 0 }, 2.5).rd.thin === false, "a cut too shallow for the grid reads as thin");
 // which motor is on which end (V1E: Y0 / Z0 on the left = the Min end, the default; some machines the other way)
 ok(IM.settings({}).motor0 === "min" && IM.settings({ motor0: "max" }).motor0 === "max" && IM.settings({ motor0: "x" }).motor0 === "min", "motor0 setting");
 ok(IM.side2Motor(IM.settings({})) === 1 && IM.side2Motor(IM.settings({ motor0: "max" })) === 0, "side 2 (Max end) motor");

@@ -3,6 +3,11 @@
 The version is the sandbox page's (`VERSION` in `web/js/page/job.js`, shown in its footer). The footer also shows
 the date the model data was built and the Printables file set it was solved for.
 
+## 0.70.4 - 2026-11-10
+- Real-world mode's squareness test could call a square machine "out of square" by about 0.1 mm at full detail: on a
+  warped spoilboard the test groove was too narrow at the board's low spot for Measure to read. The test now cuts
+  deeper by the board's sag, and Measure says when a cut is too shallow to tell instead of giving a verdict.
+
 ## 0.70.3 - 2026-11-10
 - A very large job (a couple hundred thousand moves) no longer risks a "Maximum call stack size exceeded" error
   when the page checks how deep it cuts.
