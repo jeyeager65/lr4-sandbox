@@ -15,6 +15,7 @@
      and adds ?v= to the local script / style tags below; lr4v() does the same for what the page loads itself
      (data, models, the firmware builds). Blank when served locally: URLs unchanged. -->
 <script>window.LR4_BUILD = ""; window.lr4v = (u) => (window.LR4_BUILD ? u + (u.includes("?") ? "&" : "?") + "v=" + window.LR4_BUILD : u);</script>
+<script src="js/page_errors.js"></script>
 <script src="coi-serviceworker.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=Barlow:wght@400;500&family=IBM+Plex+Mono:wght@400;500&display=swap">

@@ -3,6 +3,11 @@
 The version is the sandbox page's (`VERSION` in `web/js/page/job.js`, shown in its footer). The footer also shows
 the date the model data was built and the Printables file set it was solved for.
 
+## 0.70.1 - 2026-11-10
+- If something on the page breaks (a script error, or a file of the page that didn't load), a bar at the bottom now
+  says so, with **Reload** and **Report** (a GitHub issue with the error filled in) - before, the page could just stop
+  responding with nothing to see.
+
 ## 0.70.0 - 2026-11-10
 - **Start?** (▶ Start on a job) has two options. With As built on Real-world it offers to **run this on the Ideal
   machine instead**. **Bit changes & probing: I do them | Automatic** (kept in this browser): on Automatic the bit

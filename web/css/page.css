@@ -1208,3 +1208,11 @@ body.rec-ui .rec-msg { top: calc(3.5% + 44px); font-size: clamp(15px, 2.4vh, 38p
 .hidden-chip { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); z-index: 6; padding: 5px 12px; border-radius: 999px;
   font-size: 13px; background: var(--panel); border: 1px solid var(--accent); box-shadow: 0 4px 14px rgb(0 0 0 / 0.25); }
 #pick p { white-space: pre-line; }   /* the part's note on its own line (scene.js labelNote) */
+
+/* a script error, said out loud (js/page_errors.js): a bar along the bottom, over everything */
+.errbar { position: fixed; left: 50%; bottom: 12px; transform: translateX(-50%); z-index: 10000; box-sizing: border-box;
+  max-width: min(720px, calc(100vw - 24px)); display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px;
+  padding: 10px 14px; border: 1px solid var(--warn); border-radius: 8px; background: var(--warn-bg); color: var(--ink);
+  font-size: 14px; line-height: 1.35; box-shadow: 0 6px 24px rgba(0, 0, 0, 0.3); }
+.errbar-msg { flex: 1 1 320px; overflow-wrap: anywhere; }
+.errbar a { color: inherit; }

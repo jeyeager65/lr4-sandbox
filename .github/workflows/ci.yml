@@ -38,3 +38,8 @@ jobs:
         run: |
           npm ci
           npm test
+
+      # the page as a first visitor gets it (no part files) in headless Chrome: it loads, draws, nothing throws
+      - name: Page smoke test
+        timeout-minutes: 10
+        run: node tests/test_page_smoke.js

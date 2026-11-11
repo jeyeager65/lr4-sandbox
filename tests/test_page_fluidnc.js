@@ -65,7 +65,8 @@ async function chromePage(cport, o = {}) {           // o.gpu: the real GPU (liv
   // LR4_TEST_GPU=1: every page test on the real GPU (SwiftShader draws the ~5M-triangle scene on the CPU, every frame)
   if (process.env.LR4_TEST_GPU === "1") o = Object.assign({}, o, { gpu: true });
   const gl = o.gpu ? ["--use-angle=d3d11", "--ignore-gpu-blocklist", "--enable-gpu-rasterization"] : ["--use-angle=swiftshader", "--enable-unsafe-swiftshader"];
-  const chrome = spawn(CHROME, ["--headless=new", ...gl,
+  // (CI: GitHub's runners don't let Chrome make its sandbox)
+  const chrome = spawn(CHROME, ["--headless=new", ...(process.env.CI ? ["--no-sandbox"] : []), ...gl,
     `--remote-debugging-port=${cport}`, `--user-data-dir=${prof}`, "--window-size=1500,1000", "about:blank"], { stdio: "ignore" });
   P.own(chrome);
   let target;
@@ -76,12 +77,12 @@ async function chromePage(cport, o = {}) {           // o.gpu: the real GPU (liv
   if (!target) throw new Error("Chrome didn't start");
   const ws = new WebSocket(target.webSocketDebuggerUrl);
   await new Promise((r) => ws.addEventListener("open", r));
-  let id = 0;
+  let id = 0, mute = false;                          // mute(true): a test throwing on purpose (test_page_smoke)
   const pending = new Map();
   ws.addEventListener("message", (ev) => {
     const m = JSON.parse(ev.data);
     if (m.id && pending.has(m.id)) { const p = pending.get(m.id); pending.delete(m.id); m.error ? p.rej(new Error(m.error.message)) : p.res(m.result); }
-    else if (m.method === "Runtime.exceptionThrown") console.log("  [exception]", m.params.exceptionDetails.exception?.description || m.params.exceptionDetails.text);
+    else if (m.method === "Runtime.exceptionThrown") mute || console.log("  [exception]", m.params.exceptionDetails.exception?.description || m.params.exceptionDetails.text);
     else if (m.method === "Runtime.consoleAPICalled" && m.params.type === "error")
       console.log("  [console.error]", m.params.args.map((a) => a.value ?? a.description).join(" "));
   });
@@ -104,7 +105,7 @@ async function chromePage(cport, o = {}) {           // o.gpu: the real GPU (liv
   await send("Page.enable");
   watchdog(val);
   const close = async () => { ws.close(); await P.drop(); };
-  return { send, val, close };
+  return { send, val, close, mute: (v) => { mute = !!v; } };
 }
 
 // in-page helpers, defined once per page load
