@@ -19,6 +19,8 @@ across many FreeCAD builds. See README.md for the layout. FreeCAD 1.1, Python 3,
   with a note on each. Don't re-derive them, and don't assume design angles: fit the real features.
 - **`freecad/fclib/` is a vendored copy.** Don't edit it here. Change the source (the maintainer's FreeCAD workspace,
   `D:/FreeCAD/lib/fclib`), then `python tools/sync_fclib.py`.
+- **`web/js/lib/cnc-gcode-tools/` is a vendored copy too**, pinned to a commit in its `SOURCE.json`. Change the source
+  (`D:/GitHub/cnc-gcode-tools`) and commit there, then `python tools/sync_gcode_tools.py` (`--check` runs in CI).
 - **No part files in git.** STL / STEP / DXF / OBJ / 3MF / FCStd, and `parts/`, `private/`, `vendor/`, `build/`,
   `exports/` are git-ignored, and `tools/check_no_parts.py` is the pre-commit hook. The V1E files are V1E's; users
   download their own. `web/data/` is committed: the page's data from `pipeline/share_data.py`, with no V1E geometry.

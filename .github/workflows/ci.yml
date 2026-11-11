@@ -24,6 +24,9 @@ jobs:
       - name: No part / CAD / private files in the repo
         run: python tools/check_no_parts.py --all
 
+      - name: Vendored cnc-gcode-tools files are the pinned commit's (SOURCE.json)
+        run: python tools/sync_gcode_tools.py --check
+
       - name: Python scripts compile
         run: python -m compileall -q freecad pipeline tools tests
 

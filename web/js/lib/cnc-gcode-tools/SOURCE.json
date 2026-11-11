@@ -1,0 +1,13 @@
+{
+  "repo": "https://github.com/jeyeager65/cnc-gcode-tools",
+  "version": "0.6.2",
+  "commit": "b7323fba802276c75a58f9707dc88615dabbea9d",
+  "date": "2026-11-10",
+  "files": {
+    "parser.js": "ddb7233d04405b708e75ab95f458567cc7bc8ce427b009e6e2c2ce4dfe5d5cdd",
+    "gcode-expander.js": "a051dc929f65d18fc982e822db9bb6895030acd84c6e63cc026d3fe7a2a4b637",
+    "animator.js": "be7d3fdc632cee26d986e7b3607fb7926f846aa04bf82c0044eee52729cc094e",
+    "stock-sim.js": "86c1a7ecd36b1a0adddd685e1ea1751e5896a22541d7437cd6b534202c539161",
+    "LICENSE": "09196265453648d0faf3c39859b22ea644542e566dc37db462aa3044b634060c"
+  }
+}
