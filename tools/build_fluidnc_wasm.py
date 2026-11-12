@@ -22,7 +22,7 @@ EMSDK = os.path.normpath(os.environ.get("EMSDK", r"D:/emsdk"))
 REPO = "https://github.com/jeyeager65/FluidNC"
 BRANCH = "wasm-sim"
 # the wasm-sim commit the page ships; bump it after committing (and pushing) a change on the branch
-PIN = "8755cc999ea79df827d12320774a8091e512acb7"
+PIN = "d27b351916bfbcd8f0f89fbe8df346c9b0aa2180"
 
 
 def git(*args):

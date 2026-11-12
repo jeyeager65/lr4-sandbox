@@ -90,8 +90,8 @@
   //                                   is <= tripSteps (activeBelow) / >= tripSteps; sim.clearSwitch(gpio) = no switch
   //   sim.addMotor(stepPin, dirPin)   count a motor's steps with no switch on it; sim.motorSteps(stepPin)
   //   sim.pinMask()                   the pin levels (bit n = gpio n); sim.setTimeScale(k) machine time k x real
-  //   sim.pinEdges() -> [[gpio, high], ...]   the pins' changes since the last call, in order: the levels are sampled
-  //                                   every 4 ms, so a switch that trips and opens again between two frames still shows
+  //   sim.pinEdges() -> [[gpio, high], ...]   the switches' changes since the last call, in order (recorded by the
+  //                                   wasm as they happen: one that trips and opens again between two calls still shows)
   // Raw TCP into FluidNC's own web server (BrowserAsyncTCP's fluidnc_vconn_*; FluidTouch's WebSocket rides on it):
   //   sim.vconn.open(port, onData(Uint8Array), onClose()) -> id (0 = nothing listening yet)
   //   sim.vconn.send(id, bytes); sim.vconn.close(id)
@@ -107,9 +107,8 @@
     const win = frame.contentWindow;
     let stopped = false;
     let pumpId = () => 0;
-    let pinTimer = 0;
     const stop = () => {
-      stopped = true; clearInterval(pumpId()); clearInterval(pinTimer); win.fluidncOnOutput = () => {};
+      stopped = true; clearInterval(pumpId()); win.fluidncOnOutput = () => {};
       for (const c of vconns.values()) c.onClose();
       vconns.clear(); frame.remove();
     };
@@ -183,18 +182,6 @@
     try { greeting = await booted; } catch (e) { stop(); throw e; }
     const pins = typeof Module._fluidnc_set_switch === "function", N = "number";
     const call = (f, ret, args) => (pins && !stopped ? Module.ccall(f, ret, args.map(() => N), args) : ret ? 0 : undefined);
-    // the pins' edges, sampled on a timer (a frame is too slow: homing trips a switch and backs off it within one slow
-    // frame). The mask has up to 49 bits (a double): no bit operators on it
-    let pinWas = 0;
-    const pinEv = [];
-    const pinSample = () => {
-      const m = call("fluidnc_pin_mask", N, []);
-      if (m === pinWas) return;
-      for (let g = 0, a = m, b = pinWas; a || b; g++, a = Math.floor(a / 2), b = Math.floor(b / 2)) if (a % 2 !== b % 2) pinEv.push([g, a % 2 === 1]);
-      pinWas = m;
-      if (pinEv.length > 512) pinEv.splice(0, pinEv.length - 512);   // (nobody reading them)
-    };
-    if (pins) pinTimer = setInterval(pinSample, 4);
     const sim = { Module, FS, info, greeting: greeting.text, on, waitFor, send, realtime, command, status, writeFile, pins,
       setSwitch: (g, st, d, trip, below) => call("fluidnc_set_switch", null, [g, st, d, Math.round(trip), below ? 1 : 0]),
       clearSwitch: (g) => call("fluidnc_clear_switch", null, [g]),
@@ -202,7 +189,7 @@
       motorSteps: (st) => call("fluidnc_motor_steps", N, [st]),
       pinMask: () => call("fluidnc_pin_mask", N, []),
       setTimeScale: (k) => call("fluidnc_set_time_scale", null, [k]),
-      pinEdges: () => { pinSample(); return pinEv.splice(0); },
+      pinEdges: () => { const out = []; if (!pins || stopped) return out; for (let e; (e = call("fluidnc_next_pin_edge", N, [])) >= 0 && out.length < 256;) out.push([e >> 1, e % 2 === 1]); return out; },
       readFile: (p, enc) => FS.readFile(p, enc ? { encoding: enc } : undefined),
       vconn: {
         open(port, onData, onClose) {

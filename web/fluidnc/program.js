@@ -7175,6 +7175,8 @@ var _fluidnc_motor_steps = Module["_fluidnc_motor_steps"] = makeInvalidEarlyAcce
 
 var _fluidnc_pin_mask = Module["_fluidnc_pin_mask"] = makeInvalidEarlyAccess("_fluidnc_pin_mask");
 
+var _fluidnc_next_pin_edge = Module["_fluidnc_next_pin_edge"] = makeInvalidEarlyAccess("_fluidnc_next_pin_edge");
+
 var _fluidnc_set_time_scale = Module["_fluidnc_set_time_scale"] = makeInvalidEarlyAccess("_fluidnc_set_time_scale");
 
 var _fluidnc_start = Module["_fluidnc_start"] = makeInvalidEarlyAccess("_fluidnc_start");
@@ -7258,6 +7260,7 @@ function assignWasmExports(wasmExports) {
   assert(typeof wasmExports["fluidnc_add_motor"] !== "undefined", "missing Wasm export: fluidnc_add_motor");
   assert(typeof wasmExports["fluidnc_motor_steps"] !== "undefined", "missing Wasm export: fluidnc_motor_steps");
   assert(typeof wasmExports["fluidnc_pin_mask"] !== "undefined", "missing Wasm export: fluidnc_pin_mask");
+  assert(typeof wasmExports["fluidnc_next_pin_edge"] !== "undefined", "missing Wasm export: fluidnc_next_pin_edge");
   assert(typeof wasmExports["fluidnc_set_time_scale"] !== "undefined", "missing Wasm export: fluidnc_set_time_scale");
   assert(typeof wasmExports["fluidnc_start"] !== "undefined", "missing Wasm export: fluidnc_start");
   assert(typeof wasmExports["fluidnc_send_text"] !== "undefined", "missing Wasm export: fluidnc_send_text");
@@ -7304,6 +7307,7 @@ function assignWasmExports(wasmExports) {
   _fluidnc_add_motor = Module["_fluidnc_add_motor"] = createExportWrapper("fluidnc_add_motor", wasmExports["fluidnc_add_motor"], 2);
   _fluidnc_motor_steps = Module["_fluidnc_motor_steps"] = createExportWrapper("fluidnc_motor_steps", wasmExports["fluidnc_motor_steps"], 1);
   _fluidnc_pin_mask = Module["_fluidnc_pin_mask"] = createExportWrapper("fluidnc_pin_mask", wasmExports["fluidnc_pin_mask"], 0);
+  _fluidnc_next_pin_edge = Module["_fluidnc_next_pin_edge"] = createExportWrapper("fluidnc_next_pin_edge", wasmExports["fluidnc_next_pin_edge"], 0);
   _fluidnc_set_time_scale = Module["_fluidnc_set_time_scale"] = createExportWrapper("fluidnc_set_time_scale", wasmExports["fluidnc_set_time_scale"], 1);
   _fluidnc_start = Module["_fluidnc_start"] = createExportWrapper("fluidnc_start", wasmExports["fluidnc_start"], 0);
   _fluidnc_send_text = Module["_fluidnc_send_text"] = createExportWrapper("fluidnc_send_text", wasmExports["fluidnc_send_text"], 1);

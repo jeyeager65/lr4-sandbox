@@ -456,8 +456,8 @@
       "This config.yaml's soft_limits are off, so FluidNC doesn't stop it." : "";
     if (warn ? $("ctl-msg").textContent !== warn : /^Past the hard stop/.test($("ctl-msg").textContent)) ctlMsg(warn);
     // a switch closing flashes it (and its lever) and ticks; opening, a tock.
-    // Every edge since the last frame, in order (sim.pinEdges samples the pins every 4 ms: a poll once a frame missed a
-    // switch that tripped and opened again within one slow frame - no click)
+    // Every edge since the last frame, in order (sim.pinEdges: the wasm records them as they happen - a poll of the
+    // levels once a frame missed a switch that tripped and opened again within one slow frame: no click)
     const pr = CTL.cfg.pins.probe;                   // the bit touching the plate
     for (const [g, high] of sim.pinEdges()) {
       CTL.cfg.pins.motors.forEach((m, i) => {

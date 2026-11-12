@@ -3,6 +3,11 @@
 The version is the sandbox page's (`VERSION` in `web/js/page/job.js`, shown in its footer). The footer also shows
 the date the model data was built and the Printables file set it was solved for.
 
+## 0.70.11 - 2026-11-12
+- Sound: a homing switch's click is no longer missed however busy the page is (FluidNC wasm-sim d27b3519: the
+  simulator records each switch change as it happens; the page read the switches on a timer). Homing at 10x with
+  the page stalled 90% of the time: all 10 clicks.
+
 ## 0.70.10 - 2026-11-12
 - A probe no longer goes through the touch plate and marks the stock under it. FluidNC needs a moment to stop after
   the touch (0.7 mm at F200, the plate is 0.5 mm thick): the bit now stops on the plate, and nothing under the plate
