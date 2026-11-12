@@ -1018,7 +1018,10 @@
       // the hose's lower run back from the clamp (its x rising, toward the U-turn), as far as the middle guide
       let kS = HR.cx.cl;
       while (kS > 0 && cp[kS - 1][0] >= cp[kS][0] - 1 && cp[kS][0] < xg) kS--;
-      const run = cp.slice(kS, kE + 1).map((q) => V(...q).add(V(0, 0, 8)));          // on top of the router cord, along the beam
+      // on top of the router cord, along the beam - and off the hose (where the router cord lies on the hose's side,
+      // 8 mm up from it is inside the hose: 48 x 96)
+      const hpR = HR.hose ? HR.hose.points() : [];
+      const run = cp.slice(kS, kE + 1).map((q) => hrOffHose(V(...q).add(V(0, 0, 8)), hpR, meta.hose.od / 2 + 4.5));
       if (run[0].x < xg) run.unshift(V(xg, run[0].y, run[0].z));                      // (the U-turn short of it: on along the holders)
       const S = run[0];
       // a wide, gradual loop past the guide, back into the brick's end level - above the bottom strut plate it sits on
@@ -1029,7 +1032,9 @@
         .find((b) => b.min.x > F.x - 1 && b.max.x < xg + 10);
       const win = bw ? [bw.min.x - 10, bw.min.x + 2, bw.max.x - 2, bw.max.x + 10].map((x) => V(x, bw.min.y + 62, bw.min.z + 60)) : [];   // straight through it
       const W1 = win.length ? win[1] : V(F.x + 30, F.y, zF + 10);
-      const loop = [V(F.x, F.y, zF), V(F.x + 6, F.y - 4, zF + 2), ...win, V(xg + 30, (W1.y + S.y) / 2, (W1.z + S.z) / 2), V(xg + 18, S.y, S.z - 12)];
+      const loop = [V(F.x, F.y, zF), V(F.x + 6, F.y - 4, zF + 2), ...win,
+        // (where the loop joins the run it is beside the hose: off it too - it cut 10 mm into it at 48 x 96)
+        ...[V(xg + 30, (W1.y + S.y) / 2, (W1.z + S.z) / 2), V(xg + 18, S.y, S.z - 12)].map((q) => hrOffHose(q, hpR, meta.hose.od / 2 + 4.5))];
       // beside it: behind it down the table's edge, on the panel's side under the table (not the hose's: it ran
       // inside it - user 2026-11-11), and never in the hose
       const hpH = HR.hose ? HR.hose.points() : [], ex0 = hrEdge().x, rH = meta.hose.od / 2 + 4.5;

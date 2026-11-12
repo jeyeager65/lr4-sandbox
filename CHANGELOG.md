@@ -3,6 +3,10 @@
 The version is the sandbox page's (`VERSION` in `web/js/page/job.js`, shown in its footer). The footer also shows
 the date the model data was built and the Printables file set it was solved for.
 
+## 0.70.6 - 2026-11-11
+- With the table hub at the larger sizes (48 x 96), the 24 V supply's power cord no longer cuts into the vacuum hose
+  where it joins the router cord by the middle hose guide.
+
 ## 0.70.5 - 2026-11-11
 - With the table hub on, the router cord, the 24 V supply's power cord and the hose's ground lead always show, not
   only with Show > Wiring on.
