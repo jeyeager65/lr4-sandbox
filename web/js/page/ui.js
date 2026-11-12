@@ -578,7 +578,7 @@
     $("mc-del").addEventListener("click", async () => {
       if (!await askBox({ title: `Delete ${MS.name}?`, text: "Its settings, SD card, Flash and spoilboard go, and can't come back (Export it first to keep a copy).", ok: "Delete" })) return;
       await MC.drop(MS.id);
-      MS.remove(MS.id);
+      MS.removeMachine(MS.id);
       MC.go();
     });
     $("mc-export").addEventListener("click", async () => {

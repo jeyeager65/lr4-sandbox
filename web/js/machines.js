@@ -76,7 +76,7 @@
       m.name = uniqueName(name, mid); saveList(l);
       return m.name;
     }
-    function remove(mid) {                           // its settings + its place in the list (the page drops its databases)
+    function removeMachine(mid) {                           // its settings + its place in the list (the page drops its databases)
       const l = list().filter((m) => m.id !== mid);
       if (!l.length) return false;                   // the last one stays
       clearSettings(mid); saveList(l);
@@ -97,7 +97,7 @@
       spoilKey: (k) => prefix(id) + k,
       // machine settings (keys) the active machine has: Reset clears these
       clear: () => clearSettings(id),
-      list, find, add, rename, remove, use, uniqueName, settingsOf, writeSettings, clearSettings,
+      list, find, add, rename, removeMachine, use, uniqueName, settingsOf, writeSettings, clearSettings,
       mine: () => find(pick()),                      // the one a plain load opens (while viewing a shared build: yours)
     };
   }

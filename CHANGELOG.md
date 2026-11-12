@@ -3,6 +3,10 @@
 The version is the sandbox page's (`VERSION` in `web/js/page/job.js`, shown in its footer). The footer also shows
 the date the model data was built and the Printables file set it was solved for.
 
+## 0.70.8 - 2026-11-11
+- Strut plate settings > Reset and a job's Unload now really forget what was saved (the saved settings / SD card
+  selection came back after a reload).
+
 ## 0.70.7 - 2026-11-11
 - Sound: a switch's click could be missed when homing (the page looked at the switches once a frame; a switch that
   tripped and opened again within one slow frame made no sound). The switches are now sampled every 4 ms.

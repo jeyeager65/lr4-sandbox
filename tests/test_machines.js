@@ -26,6 +26,8 @@ ok(a.list().length === 1 && a.list()[0].name === "My LR4" && a.id === a.list()[0
 ok(ls.getItem("lr4-opts") === null && a.get("lr4-opts") === '{"router":false}' && a.get("detail") === "lite" && a.get("lr4-jobdef:sd:a.nc") === "{}",
   "plain machine keys moved into it");
 ok(ls.getItem("lr4-theme") === "dark" && a.get("lr4-theme") === "dark", "browser keys stay plain");
+a.set("lr4-cam", "{}"); a.remove("lr4-cam");
+ok(a.get("lr4-cam") === null && a.list().length === 1, "remove forgets a setting (it was the machine delete: the two shared a name)");
 a.set("lr4-hand", "{}");
 ok(ls.getItem(`lr4@${a.id}/lr4-hand`) === "{}" && a.key("lr4-mode") === "lr4-mode", "set goes under the machine's prefix; browser keys pass through");
 ok(a.db("lr4-sandbox-sd") === `lr4-sandbox-sd@${a.id}` && a.spoilKey("660x1270") === `lr4@${a.id}/660x1270`, "databases + spoilboard keys per machine");
@@ -38,9 +40,9 @@ a.use(b);
 const a2 = M.create(ls, "", now);
 ok(a2.id === b && a2.name === "Shop LR4" && a2.get("lr4-opts") === null && a2.get("lr4-theme") === "dark", "the next load opens the one picked");
 ok(a2.rename(b, "My LR4") === "My LR4 (3)" && a2.rename(b, "Garage") === "Garage", "rename keeps names unique");
-ok(a2.remove(c) && !a2.find(c) && Object.keys(a2.settingsOf(c)).length === 0, "delete drops it and its keys");
-a2.remove(a.id);
-ok(!a2.remove(b) && a2.list().length === 1, "the last machine stays");
+ok(a2.removeMachine(c) && !a2.find(c) && Object.keys(a2.settingsOf(c)).length === 0, "delete drops it and its keys");
+a2.removeMachine(a.id);
+ok(!a2.removeMachine(b) && a2.list().length === 1, "the last machine stays");
 
 // a shared link: the temporary machine, fresh each time; yours untouched; saving it copies it
 const s = M.create(ls, "#26x50&units=in", now);

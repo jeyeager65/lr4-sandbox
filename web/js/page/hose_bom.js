@@ -4,7 +4,7 @@
   // ---- vacuum hose: clamped in the Min-end holder; between the clamp and the core it folds like a drag
   // chain (lower run in the trays, U-turn, upper run on top back to the core), so it is re-swept for every
   // pose. hoseRoute mirrors lr4.hose_route (Python) - keep the two in step. ----
-  let hoseMesh = null, hoseWire = null;
+  let hoseMesh = null, hoseWire = null, tieMesh = null;
   function hoseRoute(h, dx, dz) {
     const r = h.od / 2, od = h.od, R = h.loop_r;
     const px = h.port[0] + dx, py = h.port[1], pz = h.port[2] - h.cuff_in;

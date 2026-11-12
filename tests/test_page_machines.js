@@ -30,7 +30,7 @@ const ok = (cond, msg) => { checks++; console.log((cond ? "  ok   " : "  FAIL ")
     await page.send("Page.navigate", { url: base + "#26x50" });
     ok(await loaded(), "page loaded");
     // a clean start: one machine
-    await go(`(async () => { for (const m of MS.list()) if (m.id !== MS.id) { await MC.drop(m.id); MS.remove(m.id); }
+    await go(`(async () => { for (const m of MS.list()) if (m.id !== MS.id) { await MC.drop(m.id); MS.removeMachine(m.id); }
       MS.clear(); for (const r of await SdCard.store.all()) await SdCard.store.remove(r.path); MS.rename(MS.id, "My LR4"); MC.go(); })()`);
     let a = await state();
     ok(a.n === 1 && a.btn === "My LR4 ▾" && !a.temp && !a.banner, `one machine: "${a.btn}"`);
@@ -51,8 +51,17 @@ const ok = (cond, msg) => { checks++; console.log((cond ? "  ok   " : "  FAIL ")
     ok(c.btn === "My LR4 copy ▾" && !c.router && c.sd === "/one.nc", `Duplicate: "${c.btn}", router off, SD ${c.sd}`);
     // Delete it: its databases go
     const dupId = c.id;
-    await go(`(async () => { await MC.drop(MS.id); MS.remove(MS.id); MC.go(); })()`);
-    const dbs = await page.val(`indexedDB.databases().then((l) => l.map((d) => d.name).filter((n) => n.includes(${JSON.stringify(dupId)})))`);
+    // (not at once: a Delete within moments of the load races the page's startup reads of the SD card / Flash, which
+    // open - and so recreate - the databases just deleted; open item, LOG.md 2026-11-11)
+    await sleep(4000);
+    await go(`(async () => { await MC.drop(MS.id); MS.removeMachine(MS.id); MC.go(); })()`);
+    // (a database still open when Delete ran goes once the page has reloaded and its connection closed: give it a moment)
+    let dbs = [];
+    for (let i = 0; i < 20; i++) {
+      dbs = await page.val(`indexedDB.databases().then((l) => l.map((d) => d.name).filter((n) => n.includes(${JSON.stringify(dupId)})))`);
+      if (!dbs.length) break;
+      await sleep(500);
+    }
     a = await state();
     ok(a.n === 2 && !(await page.val(`!!MS.find(${JSON.stringify(dupId)})`)) && dbs.length === 0, `Delete: ${a.n} machines left, its databases gone (${dbs.join() || "none"})`);
     // a shared link: temporary, banner, yours untouched

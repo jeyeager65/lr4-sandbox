@@ -395,7 +395,7 @@
     return settings(s);
   }
   const api = { DEFAULTS, GUESS_STOP, freshHeights, settings, toLink, fromLink, side2Motor, bySide, pulloffs, withPulloffs, dirOf, residual, stops, powerUp, tipErr, slopes, warpAt, warpBoard,
-    freshHeights, boardCut, restField, follow, restAt, tiltPiece, tiltSweep, attach, squareness, diagonals, findCross, readSquare, squareJob };
+    boardCut, restField, follow, restAt, tiltPiece, tiltSweep, attach, squareness, diagonals, findCross, readSquare, squareJob };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.Imperfect = api;
 })(typeof self !== "undefined" ? self : this);
