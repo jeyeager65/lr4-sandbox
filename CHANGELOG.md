@@ -3,6 +3,10 @@
 The version is the sandbox page's (`VERSION` in `web/js/page/job.js`, shown in its footer). The footer also shows
 the date the model data was built and the Printables file set it was solved for.
 
+## 0.70.12 - 2026-11-12
+- With the table hub, the router cord and the 24 V supply's cord hung in waves and the hose's loop crossed itself
+  right after the hub was turned on (or the page loaded with it on), until the first move. They now settle at once.
+
 ## 0.70.11 - 2026-11-12
 - Sound: a homing switch's click is no longer missed however busy the page is (FluidNC wasm-sim d27b3519: the
   simulator records each switch change as it happens; the page read the switches on a timer). Homing at 10x with

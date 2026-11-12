@@ -442,6 +442,9 @@
     if (mains) worst["psu-ac"] = mains;               // (not the Wiring layer's route: ~10 cm short)
     if (hl.length) HR.need = { max: Math.max(...hl), min: Math.min(...hl), rope: true };
     move(back);
+    // back from the far corner in one jump: the hanging cord's droop finds its length over a few passes - it stayed
+    // bunched into waves, the hose's loop crossed, until the first move (user 2026-11-12)
+    if (hr && typeof hoseMesh !== "undefined" && hoseMesh) for (let i = 0; i < 5; i++) updateHose(...back);
     const need = {};
     for (const [id, w] of Object.entries(worst)) if (w) need[id] = Math.round(w + 2 * WR_ALLOW);
     const f = LR4Wiring.fit(need);
