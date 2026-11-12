@@ -70,7 +70,8 @@ async function chromePage(cport, o = {}) {           // o.gpu: the real GPU (liv
     `--remote-debugging-port=${cport}`, `--user-data-dir=${prof}`, "--window-size=1500,1000", "about:blank"], { stdio: "ignore" });
   P.own(chrome);
   let target;
-  for (let i = 0; i < 50 && !target; i++) {
+  // (10 s to come up; 30 in CI: a shared runner once took longer - "Chrome didn't start", 2026-11-12)
+  for (let i = 0; i < (process.env.CI ? 150 : 50) && !target; i++) {
     await sleep(200);
     try { target = (await (await fetch(`http://127.0.0.1:${cport}/json`)).json()).find((t) => t.type === "page"); } catch (e) { /* not up */ }
   }
