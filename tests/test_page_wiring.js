@@ -7,6 +7,7 @@
 const { CHROME, sleep, server, chromePage } = require("./test_page_fluidnc.js");
 
 let fails = 0, checks = 0;
+const HUB_MS = [40, 60, 75];   // ms a move with the hub on (budgets, ~2x 2026-11-12's: 20 at 26 x 50; 32 / 38 at 48 x 96)
 const ok = (cond, msg) => { checks++; console.log((cond ? "  ok   " : "  FAIL ") + msg); if (!cond) fails++; };
 
 (async () => {
@@ -206,6 +207,28 @@ const ok = (cond, msg) => { checks++; console.log((cond ? "  ok   " : "  FAIL ")
       return { wires: LR4WiringView.on(), cord: v("Router_Cord_Run"), relief: v("Router_Cord_Relief"), psu: v("PSU_MainsCord"), gnd: v("TableHub_HoseGround"),
         core: wrMesh("Core_Wires").visible, lead: wrMesh("PSU_LeadCable").visible, moved: Math.abs(e1 - e0) > 5 }; })()`);
     ok(!hb.wires && hb.cord && hb.relief && hb.psu && hb.gnd && !hb.core && !hb.lead && hb.moved, `the hub on, Wiring off: the router cord, the supply's power cord and the hose ground shown, the cord follows a move (${JSON.stringify(hb)})`);
+    // a move's time with the hub on (2026-11-12: the budgets above are without it - the hose and the cords' simulation
+    // to the hub is most of a move): here, and at the largest size (48 x 96: the longest hose), Wiring off and on
+    const hubOn = async () => {
+      await page.val(`(() => { const e = document.getElementById("opt-hub"); if (!e.checked) e.click(); return true; })()`);
+      for (let i = 0; i < 300 && !(await page.val("!!wrMesh('TableHub_HoseGround') && !!wrMesh('PSU_MainsCord') && document.getElementById('status').hidden")); i++) await sleep(200);
+      await sleep(500);
+    };
+    const hm0 = await page.val(moveMs);
+    ok(hm0 < HUB_MS[0], `the hub on, Wiring off: a move ${hm0} ms (budget ${HUB_MS[0]})`);
+    ok(!(await page.val("window.__errors && window.__errors.length")), "no page errors");
+    await page.send("Page.navigate", { url: "about:blank" }); await sleep(300);   // (a hash change alone doesn't reload)
+    await page.send("Page.navigate", { url: `http://127.0.0.1:${port}/web/index.html?parts=/parts/#48x96` });
+    up = false;
+    for (let i = 0; i < 480 && !up; i++) { await sleep(500); try { up = await page.val("document.getElementById('status').hidden && !!HOME.pose && !!window.LR4WiringView"); } catch (e) { /* loading */ } }
+    ok(up, "48 x 96 loaded");
+    if (!up) return;
+    await hubOn();
+    const big0 = await page.val(moveMs);
+    await page.val(`(() => { LR4WiringView.set(true); return true; })()`);
+    await sleep(1500);
+    const big1 = await page.val(moveMs);
+    ok(big0 < HUB_MS[1] && big1 < HUB_MS[2], `48 x 96, the hub on: a move ${big0} ms Wiring off (budget ${HUB_MS[1]}), ${big1} ms on (budget ${HUB_MS[2]})`);
     ok(!(await page.val("window.__errors && window.__errors.length")), "no page errors");
   } finally { page.close(); srv.kill(); console.log(fails ? `${fails} of ${checks} failed` : `${checks}/${checks} checks passed`); process.exit(fails ? 1 : 0); }
 })();
