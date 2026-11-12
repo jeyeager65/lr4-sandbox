@@ -3,6 +3,11 @@
 The version is the sandbox page's (`VERSION` in `web/js/page/job.js`, shown in its footer). The footer also shows
 the date the model data was built and the Printables file set it was solved for.
 
+## 0.70.10 - 2026-11-12
+- A probe no longer goes through the touch plate and marks the stock under it. FluidNC needs a moment to stop after
+  the touch (0.7 mm at F200, the plate is 0.5 mm thick): the bit now stops on the plate, and nothing under the plate
+  is cut. Beside a plate that was left out, the bit cuts as before.
+
 ## 0.70.9 - 2026-11-12
 - Real-world mode's squareness test in Lite detail always answered "too shallow a cut to tell". The test now cuts
   2.5 grid cells deep (3.1 mm; 5.4 mm in Lite, the V-bit's limit), and "square" means within what the grid can read:

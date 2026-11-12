@@ -38,7 +38,7 @@
     const now = ncTime();                            // dt in machine seconds
     slipTick((now - FJ.job.at) / 1000);              // lost steps (Part 44a) before the spot is read
     const raw = ctlRaw(), dts = (now - FJ.job.at) / 1000;
-    FJ.pts.push(Object.assign(fjWork(raw), { dt: dts }));
+    FJ.pts.push(Object.assign(fjWork(raw), { dt: dts, raw }));
     FJ.job.at = now;
     if (FJ.job.C) {                                  // where FluidNC thinks it is (the lost steps put back): the job's
       const ms = CTL.cfg.pins.motors;                // progress (line, events, router) - the real bit can be far off
@@ -63,6 +63,7 @@
         for (const a of acts) if (a.line && J.P.i > a.seg) a.seg = J.P.i;   // the bit of the move the job is on (the 2 mm
       }                                              // tracker) - not the last move it matched (2026-10-26: T1's V-bit
                                                      // carved the 1in surfacing passes as thin lines)
+      if (ctlOverPlate(q.raw)) continue;             // on the touch plate: nothing is cut (controller.js ctlOnPlate)
       if (JOB.sim && acts.length) MotionCarve.carve(JOB.sim, tl.segs, acts);
       if (JOB.spoil && acts.length && MotionCarve.carve(JOB.spoil, tl.segs, acts)) J.spoilCut = true;
     }

@@ -105,6 +105,15 @@ const TWO = ["G21 G90", "T1", "G0 Z5", "G0 X20 Y40", "G1 Z-1 F600", "G1 X80 F150
       document.getElementById("ctl-plate").click(); await T.sleep(200);
       out.plate = { on: LR4Ctl.plate(), z: LR4Ctl.TOUCH_PLATE.stock, note: document.getElementById("hs-plate-note").textContent };
       await H.at(null, null, 30);
+      // a probe onto it: FluidNC stops a little after the touch (0.7 mm on at F200, the plate is 0.5 thick) - the bit is
+      // drawn stopped on the plate and nothing under it is cut; beside a plate left out a plunge cuts as ever
+      const pr = await LR4FluidNC.command("G38.2 G91 Z-40 F200", 60000);
+      await T.idle(); LR4Ctl.sync(); await T.sleep(300);
+      out.probe = { ok: pr.ok, tip: LR4Ctl.pose()[2] + LR4Ctl.tip(), top: LR4Ctl.TOUCH_PLATE.stock + LR4Ctl.TOUCH_PLATE.plate, cut: H.min(s) };
+      await LR4FluidNC.command("G90"); await H.jog(0, 0, 20, 600);
+      await H.jog(0, 30, 0, 3000); await H.jog(0, 0, -21.5, 600);
+      out.beside = LR4Ctl.pose()[2] + LR4Ctl.tip();
+      await H.jog(0, 0, 21.5, 600); await H.jog(0, -30, 0, 3000);
       document.getElementById("ctl-plate").click(); await T.sleep(200);
       out.plateOff = LR4Ctl.plate();
       out.spoil0 = H.min(LR4Job.spoil());
@@ -113,6 +122,8 @@ const TWO = ["G21 G90", "T1", "G0 Z5", "G0 X20 Y40", "G1 Z-1 F600", "G1 X80 F150
     ok(a.on && Math.abs(a.top - 12) < 1e-6 && /200 × 200 × 12/.test(a.name), `hand stock on the table: ${JSON.stringify(a.name)}`);
     ok(a.homed && a.slid === 12, `homed; a jog above the stock cuts nothing: ${a.slid}`);
     ok(Math.abs(a.cut - 8) < 0.05, `the jogs carved it to 8 mm: ${a.cut} (tip ${JSON.stringify(a.tip)}, jogs ok ${a.jogs}, pose ${a.pose}, ${a.state})`);
+    ok(a.probe.ok && Math.abs(a.probe.tip - a.probe.top) < 0.01 && Math.abs(a.probe.cut - a.cut) < 0.01 && a.beside < a.probe.top - 0.5,
+      `a probe onto the plate: the bit drawn on it (${a.probe.tip.toFixed(3)} vs ${a.probe.top}), nothing cut under it (${a.probe.cut.toFixed(3)}); beside it the bit goes on down (${a.beside.toFixed(3)})`);
     ok(a.plate.on && Math.abs(a.plate.z - 12) < 0.05 && /stock/.test(a.plate.note) && !a.plateOff, `touch plate on the stock, then away: ${JSON.stringify(a.plate)}`);
     ok(a.spoil0 === 0, "spoilboard untouched so far");
 

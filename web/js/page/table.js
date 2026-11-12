@@ -265,7 +265,7 @@
     const q = { x: p[0] - tv.x[0], y: p[1] - tv.y[0], z: p[2] + meta.tip_above_table, sim: CTL.sim }, a = HAND.at;
     if (!a || a.sim !== CTL.sim) { HAND.at = q; return; }   // a new FluidNC (restart, power cycle): a new start, no line across
     if (Math.abs(a.x - q.x) + Math.abs(a.y - q.y) + Math.abs(a.z - q.z) <= 0.01) return;
-    handCarve(a, q);
+    if (!ctlOverPlate(p)) handCarve(a, q);           // (on the touch plate: nothing is cut - controller.js ctlOnPlate)
     HAND.at = q;
   }
   function handTick() {
@@ -274,7 +274,7 @@
     const tv = meta.travel, p = HOME.pose, now = { x: p.x - tv.x[0], y: p.y - tv.y[0], z: p.z + meta.tip_above_table };
     const prev = HAND.last;
     HAND.last = now;
-    if (CTL.recRaw && !HAND.skip && !JOB.playing && !FJ.job && prev && HAND.tool && !JOB.preview &&
+    if (CTL.recRaw && !HAND.skip && !JOB.playing && !FJ.job && prev && HAND.tool && !JOB.preview && !ctlOverPlate([p.x, p.y, p.z]) &&
         (prev.x !== now.x || prev.y !== now.y || prev.z !== now.z)) handCarve(prev, now);
     HAND.skip = false;
     const d = HAND.dirty;

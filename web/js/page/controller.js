@@ -440,7 +440,7 @@
       const was = CTL.pose;
       CTL.pose = q;
       if (JOB.preview && was) previewEnd("FluidNC moved: the preview ended.");   // the machine wins over the preview
-      if (!JOB.preview) move(q);
+      if (!JOB.preview) move(ctlOnPlate(q));
     }
     if (AB.set.on && AB.geo && Math.abs(Imperfect.tipErr(AB.E, AB.geo, q[0] - t.x[0]).dz - AB.probeDz) > 0.002) ctlProbe();   // the tip's height along a tilted beam
     if (AB.set.on && (CTL.jobPlate || HAND.plate)) {  // As built: each probe trips a little differently (plate, wire,
@@ -487,6 +487,35 @@
       }
     }
     ctlProbe();
+  }
+  // The touch plate under the bit holds it: FluidNC takes ~0.2 s to stop after the touch (0.7 mm on at F200, 2.5 at
+  // F600 - more than the plate is thick; its zero is right, taken at the touch), a real bit can't follow. So the bit
+  // is drawn stopped on the plate, and nothing is cut under it (table.js handSample, job_fluidnc.js fjCarve) - it went
+  // through the plate into the stock (user 2026-11-12). Only over the plate's pad (18 mm square, centred where it
+  // was laid): beside a plate left out the bit cuts as ever. OPEN (user): a stopped bit pushed on the plate, the
+  // stock or the spoilboard really lifts the gantry's near side and stalls Z - not drawn, and Lost steps only loads
+  // a job's stock (LOG.md 2026-11-12)
+  const PLATE_PAD = 18;
+  const ctlPlateOut = () => !!(CTL.jobPlate || HAND.plate);
+  function ctlOverPlate(q) {                         // q: a pose (mm from the parked pose) - the bit over the plate's pad?
+    const pl = CTL.jobPlate || HAND.plate;
+    if (!pl || !meta) return false;
+    let dx, dy;
+    if (pl.world) {                                  // the button's plate: world mm
+      const fr = SPOIL.frame || tableFrame();
+      if (!fr) return false;
+      dx = q[0] - meta.travel.x[0] - (pl.x - fr[0]); dy = q[1] - meta.travel.y[0] - (pl.y - fr[1]);
+    } else {                                         // a job's: its work mm
+      if (!JOB.tl) return false;
+      const w = fjWork(q);
+      dx = w.x - pl.x; dy = w.y - pl.y;
+    }
+    return Math.abs(dx) <= PLATE_PAD / 2 && Math.abs(dy) <= PLATE_PAD / 2;
+  }
+  function ctlOnPlate(q) {
+    if (!ctlOverPlate(q)) return q;
+    const tp = touchPlate(), zs = tp.stock + tp.plate + (AB.set.on ? CTL.probeNoise || 0 : 0) - meta.tip_above_table - (AB.probeDz || 0);
+    return q[2] < zs ? [q[0], q[1], zs] : q;
   }
   function ctlProbe() {
     const sim = CTL.sim, pr = CTL.cfg && CTL.cfg.pins.probe, kz = CTL.cfg ? CTL.cfg.pins.motors.findIndex((m) => m.axis === "z") : -1, z = kz >= 0 ? CTL.cfg.pins.motors[kz] : null;
@@ -864,5 +893,5 @@
   window.LR4Ctl = { mode: () => CTL.mode, state: () => CTL.state, mpos: () => CTL.mpos, boot: () => CTL.boot,
     cfg: () => CTL.cfg, pose: () => HOME.pose && [HOME.pose.x, HOME.pose.y, HOME.pose.z], travel: () => meta && meta.travel,
     tip: () => meta && meta.tip_above_table, TOUCH_PLATE, sync: () => ctlTick(), homed: () => CTL.homed,
-    plate: () => !!(CTL.jobPlate || HAND.plate), stop: () => ctlStop(), start: () => ctlBoot() };   // stop / start: FluidNC down and up (tests)
+    plate: ctlPlateOut, stop: () => ctlStop(), start: () => ctlBoot() };   // stop / start: FluidNC down and up (tests)
 
