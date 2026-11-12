@@ -455,18 +455,17 @@
     const warn = past.length ? `Past the hard stop (${past.join(", ")}): the real machine would hit it there. ` +
       "This config.yaml's soft_limits are off, so FluidNC doesn't stop it." : "";
     if (warn ? $("ctl-msg").textContent !== warn : /^Past the hard stop/.test($("ctl-msg").textContent)) ctlMsg(warn);
-    // a switch closing flashes it (and its lever) and ticks; opening, a tock. The mask has up to 49 bits (a double): no & / ~ on it,
-    // they cut it to 32 bits (the switches' gpios are above 31, so FluidNC mode never clicked before Part 25)
-    const pins = sim.pinMask(), was = CTL.pins, bit = (n, g) => Math.floor(n / 2 ** g) % 2 === 1;
-    const closed = (g) => bit(pins, g) && !bit(was, g), opened = (g) => !bit(pins, g) && bit(was, g);
-    CTL.pins = pins;
-    if (pins !== was) {
+    // a switch closing flashes it (and its lever) and ticks; opening, a tock.
+    // Every edge since the last frame, in order (sim.pinEdges samples the pins every 4 ms: a poll once a frame missed a
+    // switch that tripped and opened again within one slow frame - no click)
+    const pr = CTL.cfg.pins.probe;                   // the bit touching the plate
+    for (const [g, high] of sim.pinEdges()) {
       CTL.cfg.pins.motors.forEach((m, i) => {
-        if (Object.values(m.limits).some(closed)) { clickSwitch(m.axis); delete CTL.rel[i]; }
-        if (Object.values(m.limits).some(opened)) CTL.rel[i] = { axis: m.axis, at: p["xyz".indexOf(m.axis)] };
+        if (!Object.values(m.limits).includes(g)) return;
+        if (high) { clickSwitch(m.axis); delete CTL.rel[i]; }
+        else CTL.rel[i] = { axis: m.axis, at: p["xyz".indexOf(m.axis)] };
       });
-      const pr = CTL.cfg.pins.probe;                 // the bit touching the plate
-      if (pr && closed(pr.gpio) && SND.s) SND.s.event("tap");
+      if (pr && g === pr.gpio && high && SND.s) SND.s.event("tap");
     }
     // the tock once the lever is back RELEASE_MM from where the pin opened (the simulated pin has no lever travel)
     for (const [i, r] of Object.entries(CTL.rel)) {
