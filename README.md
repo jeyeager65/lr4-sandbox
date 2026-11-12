@@ -104,8 +104,10 @@ lines at your layer height. The strut plates can be drawn as MDF, hardboard, ply
 
 **Show** (on the view, or L) only hides parts from the view, never from the BOM: **Parts** (Printed / Cut / Hardware /
 Electronics) and **Areas** (Table, the YZ sides, Beam, Core, ...) are on / off buttons that combine freely, with Reset.
-**Wiring > Wires** draws every wire along its route, with **X-ray parts** to see them inside the plates and the beam,
-and a run list that traces each run end to end. Parts you hide one by one (H) show as a "N hidden · Show all" chip
+**Wiring > Wires** draws every wire along its route, and a run list traces each run end to end; turn on **X-ray parts**
+to see the wires inside the plates and the beam. With the table hub, the cords into its sockets (router, 24 V supply)
+and the hose's ground lead show whether Wiring is on or not: they hang along under the table's edge to a cord clip by
+the hub. Parts you hide one by one (H) show as a "N hidden · Show all" chip
 (Shift+H brings them back). **Look** > **Scene** sets the detail (Full, or Lite for slower devices), the lighting (Realistic: the
 workshop's own lights, soft shadows on Full detail and filmic colour; or Simple: even light, lightest on the GPU) and
 the background (the workshop, the same shop empty, or plain).
@@ -391,7 +393,11 @@ node test_page_fluidtouch.js                 # headless Chrome: FluidTouch's UI 
 node test_page_sound.js                      # headless Chrome: machine sounds start, follow the axes, render a WAV
 node test_page_parts.js                      # headless Chrome: part files - the Parts chip, welcome card, stand-ins
 node test_page_phone.js                      # headless Chrome: the phone layout (390 x 844): Run's sheets, console
-node test_page_help_all.js                   # every help video in web/help/ plays live to its end
+node test_page_help_all.js                   # every help video in web/help/ plays live to its end (before a release)
+node test_page_smoke.js                      # headless Chrome, no part files: the page loads, no errors (CI runs it)
+node ../tools/page_tests.js ../build/pt      # every test_page_* in turn (~1 h; --all adds help_all): a failure runs again
+                                             #   alone and is reported FLAKY if it then passes; logs + summary.txt in the dir
+node ../tools/test_quick.js --run            # only the tests that cover the files changed since the last commit
 node test_page_hand.js                       # headless Chrome: stock / bit / touch plate by hand, moves carve, M6 holds
 node test_page_table.js                      # headless Chrome: the table base (MDF sheet / torsion box) and spoilboard
 node test_page_asbuilt.js                    # headless Chrome: As built - racked homing, power cycle, warp, tram
@@ -404,8 +410,9 @@ node test_parts_files.js                     # the page's STL / DXF readers vs t
 python ../tools/run.py test_share.py         # the share data's placements vs the reference build (needs parts/)
 ```
 
-CI (`.github/workflows/ci.yml`) runs the no-part-files guard, a compile of every Python script and `npm test`.
-The rest need Chrome, `parts/`, the size builds or the OpenSCAD goldens, so they run locally.
+CI (`.github/workflows/ci.yml`) runs the no-part-files guard, a compile of every Python script, a check that the
+vendored cnc-gcode-tools files match their pinned commit, `npm test` and the page smoke test (the page opened in
+headless Chrome). The rest need `parts/`, the size builds or the OpenSCAD goldens, so they run locally.
 
 ## Problems and changes
 
