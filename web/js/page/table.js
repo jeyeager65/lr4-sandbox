@@ -494,10 +494,11 @@
     if (b && (b.dataset.v === "real") !== $("ab-on").checked) { $("ab-on").checked = b.dataset.v === "real"; abSet(abRead(), true); }
   });
   $("ab-m0").addEventListener("click", (e) => { const b = e.target.closest("button[data-v]"); if (b) abSet({ motor0: b.dataset.v }); });
-  // the squareness test's rectangle: 25 mm in from the cutting area; deep enough that the V-groove is ~2 of the
-  // spoilboard sim's cells wide (Measure reads it to ~0.1 mm then; 1 mm deep would fall between its points): 2.5 mm,
-  // 5 in Lite - and deeper by a warped board's sag (Z 0 is its high spot: at the low spot the groove was under 2 cells
-  // wide, and Measure called a square machine 0.12 mm out, 2026-11-10)
+  // the squareness test's rectangle: 25 mm in from the cutting area; 2.5 of the spoilboard sim's cells deep (3.1 mm;
+  // Lite: 5.4, the 60 deg 1/4" V-bit's cone is 5.5 deep). Measure needs 2.1 cells or a groove whose point runs by a
+  // node has that node alone in it ("thin"; it was 1.8 - 2.1 cells by the 0.5 mm rounding: thin in Lite, 2026-11-12),
+  // and past ~2.7 the groove is as wide as a crossing (no cross found). Deeper by a warped board's sag (Z 0 is its
+  // high spot: at the low spot Measure called a square machine 0.12 mm out, 2026-11-10)
   const SQ_SAG = { key: null, sag: 0 };
   function abSqSag() {                               // how far the laid board's low spot is below its high spot, mm
     const w = SPOIL.sim && SPOIL.laid && typeof SPOIL.laid === "object" ? SPOIL.laid : null;
@@ -508,18 +509,21 @@
   }
   function abSqRect() {
     const m = 25, cell = SPOIL.sim ? Math.max(SPOIL.sim.dx, SPOIL.sim.dy) : 1.3;
-    return { x: m, y: m, w: S.cutX - 2 * m, h: S.cutY - 2 * m, z: -(Math.max(1, Math.ceil(cell * 3.6) / 2) + Math.ceil(abSqSag() * 10) / 10) };
+    return { x: m, y: m, w: S.cutX - 2 * m, h: S.cutY - 2 * m, z: -(Math.min(5.4, Math.max(1, Math.ceil(cell * 25) / 10)) + Math.ceil(abSqSag() * 10) / 10) };
   }
-  // read the test off the cut: its corner crosses in the job's stock, the hand stock or the spoilboard
+  // read the test off the cut: its corner crosses in the job's stock, the hand stock or the spoilboard. "Square":
+  // within what the grid reads - 0.1 mm at full detail (1.2 mm cells), 0.2 in Lite (2.4 mm cells: a square test read
+  // up to 0.17 apart there, by where its lines fall on the grid)
   function abMeasure() {
     const r = abSqRect(), J = JOB.sim && JOB.sim._asBuilt;
+    const tol = Math.max(0.1, Math.ceil((SPOIL.sim ? Math.max(SPOIL.sim.dx, SPOIL.sim.dy) : 1.2) * 0.8) / 10);
     const srcs = [JOB.sim && { sim: JOB.sim, off: J ? J.toTable : [0, 0, 0] }, HAND.sim && { sim: HAND.sim, off: [0, 0, 0] }, SPOIL.sim && { sim: SPOIL.sim, off: [0, 0, 0] }];
     const q = Imperfect.readSquare(srcs.filter(Boolean), { x0: r.x, x1: r.x + r.w, y0: r.y, y1: r.y + r.h });
     const names = ["front-left", "front-right", "back-right", "back-left"];
     $("ab-sq-note").textContent = q.missing ? `No cross cut at the ${q.missing.map((k) => names[k]).join(", ")} corner${q.missing.length > 1 ? "s" : ""}: run the squareness test first.` :
       `Measured off the cut: diagonals ${q.d1.toFixed(2)} / ${q.d2.toFixed(2)} mm, ${Math.abs(q.diff).toFixed(2)} apart` +
       (q.thin && Math.abs(q.diff) < 0.5 ? " - too shallow a cut to tell: a groove is narrower than the sim's grid here (read to ~0.5 mm). Cut the test deeper." :
-        Math.abs(q.diff) < 0.1 ? " - square (as near as the sim reads, ~0.1 mm)." : ` - out of square (the front edge ${Math.abs(q.skew * 60).toFixed(1)}' off X).`);
+        Math.abs(q.diff) < tol ? ` - square (as near as the sim reads, ~${tol} mm${tol > 0.1 ? " in Lite detail" : ""}).` : ` - out of square (the front edge ${Math.abs(q.skew * 60).toFixed(1)}' off X).`);
     return q;
   }
   $("ab-meas").addEventListener("click", abMeasure);

@@ -3,6 +3,11 @@
 The version is the sandbox page's (`VERSION` in `web/js/page/job.js`, shown in its footer). The footer also shows
 the date the model data was built and the Printables file set it was solved for.
 
+## 0.70.9 - 2026-11-12
+- Real-world mode's squareness test in Lite detail always answered "too shallow a cut to tell". The test now cuts
+  2.5 grid cells deep (3.1 mm; 5.4 mm in Lite, the V-bit's limit), and "square" means within what the grid can read:
+  0.1 mm at full detail, 0.2 mm in Lite (the note says which).
+
 ## 0.70.8 - 2026-11-11
 - Strut plate settings > Reset and a job's Unload now really forget what was saved (the saved settings / SD card
   selection came back after a reload).
