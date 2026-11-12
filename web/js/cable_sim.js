@@ -3,8 +3,9 @@
 // of (boxes, upright cylinders, a floor). No self-collision. Plain JS, no three.js (tests/test_cable_sim.js).
 // Stiffness here is soft (a position-based solver can't hold a long bend against the chain's weight); a stiff cable
 // (the vac hose) uses fewer, longer segments instead - the smooth tube through them can't fold tighter than ~one.
-//   const c = LR4Cable.make(points, { n, len, r, stiff, stretch, give, damp, iters })   // laid along points (n nodes);
-//     len = its relaxed length; stretch = how far it can extend (1: not at all), give = how softly it pulls back
+//   const c = LR4Cable.make(points, { n, len, r, stiff, stretch, give, damp, iters, minBend })   // laid along points (n nodes);
+//     len = its relaxed length; stretch = how far it can extend (1: not at all), give = how softly it pulls back;
+//     minBend = the tightest bend radius it takes, mm (0: none) - held hard, where stiff only leans toward straight
 //   c.pin(i, [x, y, z]) / c.unpin(i); c.guide(targets, k); c.step(dt, colliders); c.settle(steps, colliders); c.points(); c.length()
 // colliders: [{ box: [x0, y0, z0, x1, y1, z1] } | { cyl: [x, y, r, z0, z1] } | { sph: [x, y, z, r] } | { floor: z }]. mm, s;
 // z up. self: [from, to] - those nodes keep 2r apart (a run lying on itself; not near neighbours).
@@ -27,7 +28,7 @@
   }
 
   function make(points, o) {
-    o = Object.assign({ n: 30, len: null, r: 5, stiff: 0.2, stretch: 1, give: 0.2, damp: 0.04, iters: 24, self: null }, o || {});
+    o = Object.assign({ n: 30, len: null, r: 5, stiff: 0.2, stretch: 1, give: 0.2, damp: 0.04, iters: 24, self: null, minBend: 0 }, o || {});
     const lay = resample(points, o.n), n = lay.length;
     const L = o.len || lay.reduce((s, p, i) => (i ? s + Math.hypot(p[0] - lay[i - 1][0], p[1] - lay[i - 1][1], p[2] - lay[i - 1][2]) : 0), 0);
     const seg = L / (n - 1);
@@ -105,6 +106,14 @@
         if (c.box) {
           const b = c.box;
           if (x > b[0] - R && x < b[3] + R && y > b[1] - R && y < b[4] + R && z > b[2] - R && z < b[5] + R) {
+            // its center outside the box: off the nearest point of it, so an edge is round - it rolls off one (pushed
+            // out by the nearest face alone, a hose perched on a table's edge with its center past it, and ran along it)
+            const nx = x < b[0] ? b[0] : x > b[3] ? b[3] : x, ny = y < b[1] ? b[1] : y > b[4] ? b[4] : y, nz = z < b[2] ? b[2] : z > b[5] ? b[5] : z;
+            const ex = x - nx, ey = y - ny, ez = z - nz, e = Math.hypot(ex, ey, ez);
+            if (e > 1e-9) {
+              if (e < R) { const k = R / e; p[3 * i] = nx + ex * k; p[3 * i + 1] = ny + ey * k; p[3 * i + 2] = nz + ez * k; }
+              continue;
+            }
             const out = [[x - (b[0] - R), 0, -1], [(b[3] + R) - x, 0, 1], [y - (b[1] - R), 1, -1], [(b[4] + R) - y, 1, 1],
               [z - (b[2] - R), 2, -1], [(b[5] + R) - z, 2, 1]].reduce((m, v) => (v[0] < m[0] ? v : m));
             p[3 * i + out[1]] += out[0] * out[2];
@@ -142,6 +151,14 @@
           if (!ws) continue;
           const dx = p[3 * b0] - p[3 * a0], dy = p[3 * b0 + 1] - p[3 * a0 + 1], dz = p[3 * b0 + 2] - p[3 * a0 + 2];
           const d = Math.hypot(dx, dy, dz);
+          if (o.minBend > 0) {                           // never folded tighter than radius minBend: the turn at this node
+            // is at most its two segments' mean length / minBend (as long as they are now: a stretchy hose's are longer
+            // than seg), which puts the nodes either side at least this far apart
+            const la = Math.hypot(p[3 * i] - p[3 * a0], p[3 * i + 1] - p[3 * a0 + 1], p[3 * i + 2] - p[3 * a0 + 2]);
+            const lb = Math.hypot(p[3 * b0] - p[3 * i], p[3 * b0 + 1] - p[3 * i + 1], p[3 * b0 + 2] - p[3 * i + 2]);
+            const dm = Math.sqrt(la * la + lb * lb + 2 * la * lb * Math.cos(Math.min(Math.PI / 2, (la + lb) / (2 * o.minBend))));
+            if (d < dm) { dist(a0, b0, dm, wa / ws, wb / ws); continue; }
+          }
           if (d < 2 * seg) dist(a0, b0, 2 * seg, o.stiff * wa / ws, o.stiff * wb / ws);
         }
         for (let k = 0; k + 1 < n; k++) {              // the segments' lengths, last (they win)

@@ -3,6 +3,16 @@
 The version is the sandbox page's (`VERSION` in `web/js/page/job.js`, shown in its footer). The footer also shows
 the date the model data was built and the Printables file set it was solved for.
 
+## 0.70.5 - 2026-11-11
+- With the table hub on, the router cord, the 24 V supply's power cord and the hose's ground lead always show, not
+  only with Show > Wiring on.
+- Show > Wiring no longer starts with X-ray parts on.
+- The vacuum hose no longer rests on the table's edge and runs along it before dropping (a kink in the side view): it
+  rolls off an edge now and hangs straight from the beam's end, and its hanging loop no longer crosses itself.
+- With the table hub, the router cord and the 24 V supply's cord come down the table's edge behind the hose and hang
+  along under the edge to a cord clip by the hub (new in the parts list), then up into their sockets - not through the
+  hose.
+
 ## 0.70.4 - 2026-11-10
 - Real-world mode's squareness test could call a square machine "out of square" by about 0.1 mm at full detail: on a
   warped spoilboard the test groove was too narrow at the board's low spot for Measure to read. The test now cuts

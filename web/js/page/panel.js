@@ -289,6 +289,9 @@
   // they aren't redrawn as it moves) - the hose always
   const WIRES_OFF = /^(Router_Cord_Run|Router_Cord_Relief|Core_Wires|Cable_Sleeve|Beam_(Wires(Plate_(Min|Max)|Span)?|ZipTies|Sleeve(Span)?)|PSU_(MainsCord|Lead24V|Lead0V|LeadCable)|TableHub_(Panel)?(Wires[A-Z][a-z]+|WireNuts|Term(Brass|Silver|Ground))|TableHub_HoseGround)$/;
   const wiresShown = () => !!(window.LR4WiringView && LR4WiringView.on());
+  // ... but with the table hub on, the cords into its sockets and the hose's ground lead always (user 2026-11-11)
+  const HUB_CORDS = /^(Router_Cord_Run|Router_Cord_Relief|PSU_MainsCord|TableHub_HoseGround)$/;
+  const wireHidden = (n) => (n === "TableHub_CordClip" ? !OPT.hub : WIRES_OFF.test(n) && !wiresShown() && !(OPT.hub && HUB_CORDS.test(n)));   // (their clip: with the hub only)
   function applyVisibility() {
     const listed = meshes.filter((m) => m.userData.name && fitted(m) && variantOK(m) && !m.userData.missingHw);   // Part 38: not with its missing part
     const key = listed.map((m) => m.userData.name).join();
@@ -303,7 +306,7 @@
       m.userData.shown = inTree.has(m) && LR4ShowTree.on(tree, showOff, partId(m))
         && (!INSPECT || (INSPECT.set.has(partId(m)) && !INSPECT.hide.has(partId(m))))   // inspect: its set, less the list's unticked rows
         && !(TOUCH_ANIM.skirt >= 1 && PROBE_OFF.test(m.userData.name)) && !(AB.magnified && RACK_OFF.test(m.userData.name)) && !(jobBit && m.userData.name === "Router_Bit")   // off once it's slid out (job.js)
-        && !(WIRES_OFF.test(m.userData.name || "") && !wiresShown() && !(INSPECT && /^Beam_WiresPlate_/.test(m.userData.name)));   // (Inspect: a YZ plate's wires in its channels, Wiring on or off - user 2026-11-05)
+        && !(wireHidden(m.userData.name || "") && !(INSPECT && /^Beam_WiresPlate_/.test(m.userData.name)));   // (Inspect: a YZ plate's wires in its channels, Wiring on or off - user 2026-11-05)
       m.visible = m.userData.shown && !ROPE_STUB.test(m.userData.name)   // the touch plate's wire stubs: rope.js draws the wires
         && !/^Jackpot3_Fan_Lead_(Red|Black)$/.test(m.userData.name)   // the blower's lead stubs (out of its side - its wires leave the top: wiring.js wrFan draws them, user 2026-11-05)
         && !(/^Router_(StrainRelief|Cord)$/.test(m.userData.name) && cordMesh && fitted(cordMesh) && meta.hose && meta.hose.cord && meta.hose.cord.base);   // Part 53: the cord rope draws them, bending

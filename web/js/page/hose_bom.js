@@ -259,8 +259,8 @@
     const nH = ncl + Math.max(4, Math.round(Lfree / seg)) + 1, Lh = seg * (nH - 1);
     const k = w.findIndex((v, i) => arc[i] > P.cl.s), lay = w.slice(0, k).concat([P.cl.p]).concat(w.slice(k));
     HR.ix = { t1: Math.round(P.t1.s / seg), t2: Math.round(P.t2.s / seg), cl: ncl, ex: Math.min(nH - 3, P.ex ? Math.round(P.ex.s / seg) : ncl + 2) };
-    HR.hose = LR4Cable.make(lay.map(hrV), { n: nH, len: Lh, r: h.od / 2, stiff: 0.25, stretch: HR.stretch, give: HR.give, damp: 0.08, iters: 12,
-      self: [HR.ix.t2 + 2, HR.ix.cl - 2] });
+    HR.hose = LR4Cable.make(lay.map(hrV), { n: nH, len: Lh, r: h.od / 2, stiff: 0.25, stretch: HR.stretch, give: HR.give, damp: 0.08, iters: 12, minBend: HR_BEND,
+      self: [HR.ix.t2 + 2, hubOn() ? nH - 1 : HR.ix.cl - 2] });   // (the hub: its hanging loop too - it crossed itself, user 2026-11-11)
     HR.cord = null;
   }
   function hrCordBuild(hp, dx, dy, dz) {              // the cord: out of the router, along the settled hose (on top) between the ties, then off
@@ -309,8 +309,14 @@
   // HR.force: the wiring report's moves (wrReport) run the cord sim with the layer off too - its rest length at the fixed
   // pose (HR.fixing: HR.cordL, user 2026-11-05 - it was set when Wiring went on, so it varied with the pose then) and
   // the drawn mains cord's length at each corner (HR.mainsLen)
+  // With the table hub on (user 2026-11-11): the router cord (+ relief) and the supply's power cord always - they run
+  // to its ROUTER / CONTROLLER sockets, the hub looks unplugged without them (hrCordOn; panel.js HUB_CORDS).
+  // the hose's tightest bend radius, mm (GUESS: about its diameter): free, it folded ~55 deg in one segment where it
+  // draped over the table's edge, into the hub's port and at the bottom of its loop (user 2026-11-11: "a kink")
+  const HR_BEND = 75;
   const hrShown = () => !!(window.LR4WiringView && LR4WiringView.on());
-  const hrWiresOn = () => !!HR.force || hrShown();
+  const hrCordOn = () => hrShown() || !!hubOn();
+  const hrWiresOn = () => !!HR.force || hrCordOn();
   function hrWiresSet() {                             // Wiring toggled: the cord re-settles from its route, then all redrawn
     HR.cordJump = true;
     if (hoseMesh && typeof move === "function") move();
@@ -349,6 +355,7 @@
     hc.settle(jump ? (HR.quick ? 25 : 90) : 10, cols);   // quick: the wiring report's corner moves (lengths, not looks)                  // (no head box: the guide holds the arc round it; the box fought it - stretched 1.6x)   // + the router's head + the core's top: it wraps round them
     const hp = hc.points();
     let cp = null;
+    { const on = hrWiresOn(); if (on && !HR.cordWas) HR.cordJump = true; HR.cordWas = on; }   // just turned on: it settles from its route
     if (cordMesh && meta.hose.cord && hrWiresOn()) {
       // the cord where it always was (user 2026-11-02: "look where the router cord was before... not on top of the
       // hose"): cordRoute run over the SETTLED hose gives its path round the hose (its angles along it); that path,
@@ -367,7 +374,7 @@
         const bz = new THREE.CubicBezierCurve3(A, A.clone().addScaledVector(dir, 95), Tb.clone().add(new THREE.Vector3(-130, 0, 0)), Tb);   // wide: round the core's end
         G = bz.getPoints(28).map(hrV).concat(G.slice(k1 + 1));
       }
-      if (hub) G = G.slice(0, near(hp[HR.ix.ex]) + 1);   // to the beam's end; then it drops (not round the hose)
+      if (hub) G = G.slice(0, near(hp[HR.ix.cl + 1]) + 1);   // to the holder at the beam's end; then it drops (not round the hose)
       let tailFrom = G.length;                         // with the hub: from the beam's end down to ROUTER (user 2026-11-02: no
       if (hub && HR.cord) {                            // wrapping the hose; "fix this mess"): one clean U below the outlet - down
         // the outside, round the bottom, up in front of the VAC plug (-Y of the vac cord) into ROUTER; the U's depth
@@ -378,26 +385,39 @@
         // "this point ... doesn't make sense" - a sharp fold at the U's bottom): the U in the panel's plane, along its
         // face - down a leg toward the back, a round bottom (r 45), up into ROUTER; slack the U can't take (the gantry
         // near the hub) lengthens its bottom along the floor
-        const yr = Bq.y - 16, xi = Bq.x - 20, cr2 = c.d / 2, RU = 45, s45 = 0.29;
-        const path = (zl, Lf = 0) => {
-          const yD = yr + 2 * RU + Lf, V3 = (y, z) => new THREE.Vector3(xi, y, z);
-          return new THREE.CatmullRomCurve3([E, new THREE.Vector3((E.x + xi) / 2, (E.y + yD) / 2, Math.max(zl + 140, (E.z + zl) / 2)),
-            V3(yD, zl + RU), V3(yD - s45 * RU, zl + s45 * RU), V3(yD - RU, zl), ...(Lf > 1 ? [V3(yr + RU, zl)] : []),
-            V3(yr + s45 * RU, zl + s45 * RU), V3(yr, zl + RU), V3(yr, Bq.z - 70), new THREE.Vector3(Bq.x - 22, Bq.y, Bq.z - 8), Bq], false, "centripetal");
-        };
-        const gA = hrArc(G.map((q) => new THREE.Vector3(...q))), want = HR.cord.len * 0.997 - gA[gA.length - 1];
-        let lo = fl + cr2, hi = Bq.z - 130;
-        for (let it = 0; it < 22; it++) { const m = (lo + hi) / 2; if (path(m).getLength() > want) lo = m; else hi = m; }
-        // no slack for a U (the far Y stop): straight in from the beam, up into the plug from below-front
-        const direct = new THREE.CatmullRomCurve3([E, new THREE.Vector3(xi, yr + RU, Math.min(E.z, Bq.z) - 110), new THREE.Vector3(xi, yr, Bq.z - 70),
-          new THREE.Vector3(Bq.x - 22, Bq.y, Bq.z - 8), Bq], false, "centripetal");
-        let cur = path(hi).getLength() > want ? direct : path(Math.max(fl + cr2, (lo + hi) / 2));
-        if (path(fl + cr2).getLength() < want) {       // more than the U holds: the hairpin on the floor
-          let a0 = 0, a1 = 3000;
-          for (let it = 0; it < 22; it++) { const m = (a0 + a1) / 2; if (path(fl + cr2, m).getLength() < want) a0 = m; else a1 = m; }
-          cur = path(fl + cr2, (a0 + a1) / 2);
+        // 2026-11-11 (user: the cords between the hose and the table's edge - not through the hose, not down its outside,
+        // no tuck under the table where they drop): from the holder down the table's edge just behind the hose (behind
+        // its rearmost point there: it leans toward the port as it drops), then a free droop along under the edge - it
+        // takes up the slack - to a cord clip under the edge by the hub (hrClip: the cord is pinned in it), and from the
+        // clip a fixed short run in under the table, up into ROUTER from below
+        const yr = Bq.y - 16, xi = Bq.x - 20, cr2 = c.d / 2;
+        const ed = hrEdge(), xe = ed.x - cr2 - 1.5, K = hrClip(ed, cr2);
+        let yc = E.y;
+        for (let i = HR.ix.cl + 1; i < hp.length && hp[i][2] > ed.z - 30; i++) yc = Math.max(yc, hp[i][1]);
+        yc += r + cr2 + 4;
+        const A2 = new THREE.Vector3(xe, yc, ed.z + 4);
+        const plen = (ps) => { let s = 0; for (let i = 1; i < ps.length; i++) s += ps[i].distanceTo(ps[i - 1]); return s; };
+        const leadP = new THREE.CatmullRomCurve3([E, new THREE.Vector3(xe, yc, ed.top + 12), A2], false, "centripetal").getPoints(12);
+        const fixP = hrClipRun(K, xi, yr, Bq);
+        const Kb = K.clone().add(new THREE.Vector3(0, 26, 0));   // into the clip from behind, level (it runs straight through it)
+        const droop = (sag) => Array.from({ length: 25 }, (_, i) => { const u = i / 24, q = A2.clone().lerp(Kb, u);
+          q.z = Math.max(fl + cr2, q.z - sag * (1 - (2 * u - 1) ** 2) * (1 - u ** 3) * 1.6); return q; });   // (level into the clip)
+        const gA = hrArc(G.map((q) => new THREE.Vector3(...q)));
+        const want = HR.cord.len * 0.997 - gA[gA.length - 1] - plen(leadP) - plen(fixP) + (HR.tailAdd || 0);   // tailAdd: what the passes below took off it last time
+        let lo = 0, hi = 2500;
+        for (let it = 0; it < 22; it++) { const m = (lo + hi) / 2; if (plen(droop(m)) < want) lo = m; else hi = m; }
+        let dr = droop(plen(droop(0)) >= want ? 0 : (lo + hi) / 2);   // (taut at the far Y stop: straight to the clip)
+        const dmax = droop(2500), zf = fl + cr2;
+        if (plen(dmax) < want) {                       // more than the droop holds (a long table, the gantry near the hub):
+          // the rest lies on the floor, a hairpin out behind the drop and back (as the old U's did)
+          const i0 = dmax.findIndex((q) => q.z <= zf + 1), i1 = dmax.length - 1 - dmax.slice().reverse().findIndex((q) => q.z <= zf + 1);
+          const a = dmax[i0], b = dmax[i1], yb = Math.max(a.y, b.y) + (want - plen(dmax)) / 2, F = (x, y) => new THREE.Vector3(x, y, zf);
+          dr = dmax.slice(0, i0 + 1).concat([F(a.x - 14, (a.y + yb) / 2), F(a.x - 8, yb - 20), F(a.x + 6, yb), F(a.x + 20, yb - 20), F(b.x + 16, (b.y + yb) / 2)], dmax.slice(i1));
         }
-        G = G.concat(cur.getPoints(40).slice(1).map(hrV));
+        dr.push(K);
+        HR.gD = G.length + leadP.length - 2; HR.gK = HR.gD + dr.length - 1;   // G's points at the edge's bottom and at the clip
+        HR.clip = K.toArray(); HR.clipRun = plen(fixP);
+        G = G.concat(leadP.slice(1).concat(dr.slice(1), fixP.slice(1)).map(hrV));
         HR.tailGuided = true;
         HR.cordE = E.toArray();                       // (the supply's cord joins it here: hrPowerMeshes)
       }
@@ -456,13 +476,16 @@
       const B = hub && new THREE.Vector3(HUB.outlet.router[0] - 31, HUB.outlet.router[1], HUB.outlet.router[2]);
       const fresh = !HR.cord;
       if (!HR.cord) {                                   // laid along the path (+ down to the plug), a little slack
+        HR.tailAdd = 0;
         const lay = G.map((q) => new THREE.Vector3(...q));
         // the guided part + a little slack; the hanging tail (hub) long enough for the far Y stop (it stretched 1.6x there)
-        const Ee = lay[tailFrom - 1], tl = B ? Math.max(...meta.travel.y.map((yv) => Math.hypot(Ee.x - B.x, Ee.y + (yv - dy) - B.y, Ee.z - B.z))) * 1.15 + 150 : 0;
+        // (down the edge, along under it to the clip, the clip's run to the socket - see the tail's path above)
+        const Ee = lay[tailFrom - 1], ed = B && hrEdge(), K0 = B && hrClip(ed, c.d / 2);
+        const tl = B ? Math.max(...meta.travel.y.map((yv) => (Ee.z - ed.z) + Math.hypot(Ee.x - K0.x, Ee.y + (yv - dy) + r + 10 - K0.y))) + 480 : 0;
         const la = hrArc(lay), L0 = B ? gArc[tailFrom - 1] * 1.03 + tl : la[la.length - 1] * 1.03;
         if (HR.fixing) HR.cordL = { key: HR.key, L: L0 };   // the fixed pose's (wrReport): this scene's cord from now on
         const L = HR.cordL && HR.cordL.key === HR.key ? HR.cordL.L : L0, n = Math.max(20, Math.round(L / HR.segC) + 1);
-        HR.cord = LR4Cable.make(lay.map(hrV), { n, len: L, r: c.d / 2, stiff: 0.3, damp: 0.08, iters: 8 });   // stiff enough for smooth, rounded bends only
+        HR.cord = LR4Cable.make(lay.map(hrV), { n, len: L, r: c.d / 2, stiff: 0.3, damp: 0.08, iters: 8, minBend: hub ? 40 : 0 });   // stiff enough for smooth, rounded bends only (the hub: its hanging part folded at the clip)
         HR.cG = Math.round(gL / L * (n - 1));          // the guided nodes: 0 .. cG
         HR.cx = {}; for (const k of ["t1", "t2", "cl"]) HR.cx[k] = Math.round(tArc(k) / L * (n - 1));
         jump = true;
@@ -477,16 +500,26 @@
         return [0, 1, 2].map((k) => G[i - 1][k] + (G[i][k] - G[i - 1][k]) * Math.min(1, Math.max(0, t))); };
       // each node's place along the path: piecewise between the ties at THIS pose (the path's length to each tie changes
       // with X as the U-turn rolls - spread over the whole stretch, not taken up by one segment at a pin)
-      const anc = [[0, 0], [HR.cx.t1, tArc("t1")], [HR.cx.t2, tArc("t2")], [HR.cx.cl, tArc("cl")], [HR.cG, gL]];
+      const clipOn = !!(hub && HR.tailGuided && HR.clip && HR.gK < G.length), kN = clipOn ? HR.cord.n - 1 - Math.max(3, Math.round(HR.clipRun / HR.cord.seg)) : -1;
+      HR.cordK = clipOn && kN > HR.cx.cl + 4 ? kN : null;   // the cord's node in the clip (hrMainsPts: the supply's cord too)
+      // the path from the holder's tie to the clip as long as the cord between those two pins: longer and it is stretched
+      // and jagged, shorter and it bunches into waves (user 2026-11-11) - the difference goes into the next droop
+      if (HR.cordK) HR.tailAdd = Math.max(-800, Math.min(1500, (HR.tailAdd || 0) + 0.7 * ((HR.cordK - HR.cx.cl) * HR.cord.seg * 0.998 - (gArc[HR.gK] - tArc("cl")))));
+      const anc = [[0, 0], [HR.cx.t1, tArc("t1")], [HR.cx.t2, tArc("t2")], [HR.cx.cl, tArc("cl")], ...(HR.cordK ? [[HR.cordK, gArc[HR.gK]]] : []), [HR.cG, gL]];
       const arcOf = (i) => { let k = 1; while (k < anc.length - 1 && anc[k][0] < i) k++; const [i0, s0] = anc[k - 1], [i1, s1] = anc[k]; return s0 + (s1 - s0) * (i - i0) / ((i1 - i0) || 1); };
       const tailArc = gArc[tailFrom - 1];
-      const gC = Array.from({ length: cc.n }, (_, i) => { if (i > HR.cG) return null; const sv = arcOf(i), q = at(sv); return sv > tailArc ? q.concat(0.8) : q; });
+      // (the droop between the edge and the clip: hardly guided - it hangs as a cord does, off the hose)
+      const dArc = clipOn ? [gArc[HR.gD] + 40, gArc[HR.gK] - 40] : null;
+      const gC = Array.from({ length: cc.n }, (_, i) => { if (i > HR.cG) return null; const sv = arcOf(i), q = at(sv);
+        return sv > tailArc ? q.concat(dArc && sv > dArc[0] && sv < dArc[1] ? 0.12 : 0.8) : q; });
       cc.guide(gC, 0.3);
       cc.pin(0, hrV(A)); cc.unpin(1);                   // the relief bends from its base to come round the core (user 2026-11-02)
       HR.cordAt = {};
       for (const k of ["t1", "t2", "cl"]) { cc.pin(HR.cx[k], hrV(tieP[k])); HR.cordAt[k] = hrV(tieP[k]); }   // in the zip ties
       if (B) { cc.pin(-1, hrV(B)); cc.pin(-2, hrV(B.clone().add(new THREE.Vector3(-cs, 0, 0))));   // out of the socket,
-        cc.unpin(-3); }
+        cc.unpin(-3);
+        if (HR.cordK) { const k = HR.clip;               // and held in the clip, straight through it (along Y)
+          cc.pin(HR.cordK, k); cc.pin(HR.cordK - 1, [k[0], k[1] + cs, k[2]]); cc.pin(HR.cordK + 1, [k[0], k[1] - cs, k[2]]); } }
       else { cc.pin(-1, G[G.length - 1]); cc.unpin(-2); cc.unpin(-3); }
       const balls = hp.map((q) => ({ sph: [q[0], q[1], q[2], r] }));   // every node (every 2nd left gaps the cord slipped into)
       // the hose last (it wins: never inside it - user); the router's cap only (the core-top box is crude and squeezed it into the hose)
@@ -844,7 +877,7 @@
     const len = curve.getLength();
     hoseMesh.geometry = hrTubes(hoseMesh.geometry, [{ curve, segs: Math.ceil(len / 4), r: meta.hose.od / 2, radial: 28 }]);
     hoseWire.repeat.set(len / 10, 1);                    // wire pitch ~10 mm
-    if (cordMesh && R && R.cp && hrShown()) {          // (not the report's forced sims: the relief's box is the hose's collider)
+    if (cordMesh && R && R.cp && hrCordOn()) {         // (not the report's forced sims: the relief's box is the hose's collider)
       let cq = R.cp.map((p) => new THREE.Vector3(...p));
       if (cut >= 0) {                                  // (cut short too: from its point nearest the hose's at the beam's end)
         const E = new THREE.Vector3(...R.hp[cut]); let k = 0;
@@ -858,11 +891,55 @@
     }
     if (tieMesh && R) { tieMesh.geometry.dispose(); tieMesh.geometry = hrTies(R.hp); }
     if (HR.force) { const m = R && R.cp && hrMainsPts(R.cp); HR.mainsLen = m ? hrArc(m)[m.length - 1] : 0; }
-    if (!hrShown()) return;                           // (hidden: kept as they were, redrawn when it's turned on)
-    if (wireMesh) hrWireMeshes(R && HR.wireP);
-    hrPowerMeshes(R && R.cp);
+    if (!hrCordOn()) return;                          // (hidden: kept as they were, redrawn when it's turned on)
+    if (wireMesh && hrShown()) hrWireMeshes(R && HR.wireP);
+    hrPowerMeshes(R && R.cp);                         // (the hub, Wiring off: for its power cord; the 24 V leads stay hidden)
   }
   // a run of points kept to index i0, then on along it L mm more (the last point cut in between)
+  // the table's edge under the beam's Min end, from its colliders (the top + what hangs under its edge - an apron, a
+  // torsion box): { x: its outside face, top, z: its underside }
+  function hrEdge() {
+    const bs = hrColliders().filter((q) => q.box && q.box[4] - q.box[1] > 500 && q.box[0] < 40 && q.box[3] > q.box[0] + 20).map((q) => q.box);
+    const x = bs.length ? Math.min(...bs.map((b) => b[0])) : 0, at = bs.filter((b) => b[0] < x + 5);
+    return { x, top: at.length ? Math.max(...at.map((b) => b[5])) : 0, z: at.length ? Math.min(...at.map((b) => b[2])) : -19 };
+  }
+  // the cord clip under the table's edge by the hub (user 2026-11-11): just in front of the port (the droop into it
+  // stays behind POWER IN - nearer the sockets it hung in front of the inlet)
+  function hrClip(ed, cr2) { return new THREE.Vector3(ed.x + 19, HUB.port[1] - 68, ed.z - cr2 - 3); }
+  // from the clip to a socket: straight out of the clip, level along under the edge to above the socket, in and down,
+  // a small round U (r 30) in the panel's plane (x xi; its up leg at y yr), up into the plug's end P from below
+  function hrClipRun(K, xi, yr, P) {
+    const R = 30, zb = P.z - 105, V = (x, y, z) => new THREE.Vector3(x, y, z);
+    return new THREE.CatmullRomCurve3([K, V(K.x, K.y - 28, K.z), ...(K.y - 28 > yr + 2 * R + 70 ? [V(K.x + 4, yr + 2 * R + 45, K.z - 3)] : []), V((K.x + xi) / 2 + 5, yr + 2 * R + 10, K.z - 48), V(xi, yr + 2 * R, zb + R + 25), V(xi, yr + 2 * R, zb + R),
+      V(xi, yr + 2 * R - 0.29 * R, zb + 0.29 * R), V(xi, yr + R, zb), V(xi, yr + 0.29 * R, zb + 0.29 * R), V(xi, yr, zb + R), V(xi, yr, P.z - 60),
+      V(P.x - 22, P.y, P.z - 8), P], false, "centripetal").getPoints(36);
+  }
+  // the clip, drawn where the cord is pinned (HR.clip): a P-clip round both cords, its tab screwed up into the edge
+  function hrClipMesh(m) {
+    const on = !!(optsOn().hub && HR.clip), key = on ? HR.clip.map((v) => v.toFixed(1)).join() : "";
+    if (m.userData.clipKey === key) return;
+    m.userData.clipKey = key;
+    m.geometry.dispose();
+    if (!on) { m.geometry = new THREE.BufferGeometry(); m.geometry.setAttribute("position", new THREE.Float32BufferAttribute([], 3)); return; }
+    const [x, y] = HR.clip, zt = hrEdge().z, cx = x + 3;
+    const ring = new THREE.TorusGeometry(9.5, 1.6, 8, 28); ring.rotateX(Math.PI / 2); ring.translate(cx, y, zt - 11.3);   // round the cords (they run along Y)
+    const tab = new THREE.BoxGeometry(16, 12, 1.6); tab.translate(cx + 15, y, zt - 0.8);
+    const head = new THREE.CylinderGeometry(3.6, 3.6, 2.4, 16); head.rotateX(Math.PI / 2); head.translate(cx + 17, y, zt - 2.8);
+    m.geometry = hrMerge([ring, tab, head]);
+  }
+  // a point pushed off the hose (its axis hp), clear mm from the axis
+  function hrOffHose(v, hp, clear) {
+    let bd = Infinity, bn = null;
+    for (let i = 1; i < hp.length; i++) {
+      const a = hp[i - 1], b = hp[i], ax = b[0] - a[0], ay = b[1] - a[1], az = b[2] - a[2], L2 = ax * ax + ay * ay + az * az;
+      const u = Math.max(0, Math.min(1, ((v.x - a[0]) * ax + (v.y - a[1]) * ay + (v.z - a[2]) * az) / (L2 || 1)));
+      const nx = a[0] + ax * u, ny = a[1] + ay * u, nz = a[2] + az * u, d = Math.hypot(v.x - nx, v.y - ny, v.z - nz);
+      if (d < bd) { bd = d; bn = [nx, ny, nz]; }
+    }
+    if (bd >= clear || bd < 1e-6) return v;
+    const k = clear / bd;
+    return new THREE.Vector3(bn[0] + (v.x - bn[0]) * k, bn[1] + (v.y - bn[1]) * k, bn[2] + (v.z - bn[2]) * k);
+  }
   const HR_HANG = 400;                                 // mm the hose hangs off the beam's end with no hub (GUESS: "shortened")
   function hrCut(pts, i0, L) {
     const out = pts.slice(0, i0 + 1);
@@ -903,14 +980,16 @@
       PWR_MESH = { cord: mk("PSU_MainsCord", "24 V supply power cord::with the hub: from the CONTROLLER socket, tied along the router cord to the beam's end, then along the braces to the supply's far end", [0.06, 0.06, 0.065]),
         red: mk("PSU_Lead24V", "24 V lead (+, red)::the supply's near end into the Jackpot's power terminal", [0.75, 0.08, 0.06]),
         black: mk("PSU_Lead0V", "24 V lead (-, black)", [0.05, 0.05, 0.06]),
-        lead: mk("PSU_LeadCable", "24 V lead cable::the supply's own 2-core cable (black jacket) to the Jackpot box, split into red / black inside", [0.07, 0.07, 0.075]) };
+        lead: mk("PSU_LeadCable", "24 V lead cable::the supply's own 2-core cable (black jacket) to the Jackpot box, split into red / black inside", [0.07, 0.07, 0.075]),
+        clip: mk("TableHub_CordClip", "Cord clip (3/4\" cable clamp + a wood screw)::under the table's edge by the hub: the router cord and the 24 V supply's cord through it - their slack hangs along under the edge", [0.09, 0.09, 0.1]) };
     }
+    hrClipMesh(PWR_MESH.clip);
     const tube = (m, pts, r) => {
       const q = pts.filter((p, i) => i === 0 || p.distanceTo(pts[i - 1]) > 1);
       if (q.length < 2) { m.userData.pick = null; m.geometry.dispose(); m.geometry = new THREE.BufferGeometry(); m.geometry.setAttribute("position", new THREE.Float32BufferAttribute([], 3)); m.visible = false; return; }
       const c = m.userData.pick = new THREE.CatmullRomCurve3(q, false, "centripetal");   // (51e: hover - wiring.js wrPick)
       m.geometry = hrTubes(m.geometry, [{ curve: c, segs: Math.max(8, Math.ceil(c.getLength() / 6)), r, radial: 8 }]);
-      m.visible = true;
+      m.visible = !wireHidden(m.userData.name);       // (the hub, Wiring off: its power cord only - panel.js)
     };
     // the mains cord: drawn only with the hub (user 2026-11-05: without it, no cord from the e-stop / switch panel - that
     // route was a GUESS; the BOM's length still comes from it: wiring.js wrPath / wrReport)
@@ -951,15 +1030,15 @@
       const win = bw ? [bw.min.x - 10, bw.min.x + 2, bw.max.x - 2, bw.max.x + 10].map((x) => V(x, bw.min.y + 62, bw.min.z + 60)) : [];   // straight through it
       const W1 = win.length ? win[1] : V(F.x + 30, F.y, zF + 10);
       const loop = [V(F.x, F.y, zF), V(F.x + 6, F.y - 4, zF + 2), ...win, V(xg + 30, (W1.y + S.y) / 2, (W1.z + S.z) / 2), V(xg + 18, S.y, S.z - 12)];
-      const tail = cp.slice(kE).map((q) => V(...q).add(V(-11, 0, 0)));               // beside it, outside (away from the panel)
-      // with it down and round the bottom of its U (in the panel's plane), on along the bottom past where it turns up
-      // into ROUTER, then its own round turn up into CONTROLLER (further toward the front) - user 2026-11-03
-      const zMin = Math.min(...tail.map((q) => q.z));
-      let kB = tail.length - 1; while (kB > 1 && tail[kB].z > zMin + 3) kB--;            // the bottom's last point (it rises after)
-      const t2 = tail.slice(1, kB + 1), B0 = t2[t2.length - 1], P = V(...HUB.outlet.psu).add(V(-31, 0, 0)), xu = B0.x, R2 = 40;
-      const yT = Math.min(B0.y - 10, P.y + R2);
-      pts = [...loop, ...run, ...t2, V(xu, yT, B0.z), V(xu, P.y + 0.29 * R2, B0.z + 0.29 * R2), V(xu, P.y, B0.z + R2),
-        V(xu, P.y, P.z - 70), V(P.x - 12, P.y, P.z - 8), P];
+      // beside it: behind it down the table's edge, on the panel's side under the table (not the hose's: it ran
+      // inside it - user 2026-11-11), and never in the hose
+      const hpH = HR.hose ? HR.hose.points() : [], ex0 = hrEdge().x, rH = meta.hose.od / 2 + 4.5;
+      const kK = HR.cordK && HR.cordK > kE ? HR.cordK : cp.length - 1;
+      const tail = cp.slice(kE, kK + 1).map((q) => { const f = Math.max(0, Math.min(1, (q[0] - ex0) / 40)); return hrOffHose(V(...q).add(V(11 * f, 9 * (1 - f), 0)), hpH, rH); });
+      // with it down the edge and along the droop to the clip, then its own run in under the table to CONTROLLER
+      // (further toward the front) - user 2026-11-03 / 2026-11-11
+      const P = V(...HUB.outlet.psu).add(V(-31, 0, 0)), Kq = tail[tail.length - 1];
+      pts = [...loop, ...run, ...tail.slice(1), ...hrClipRun(Kq, P.x - 20, P.y, P).slice(1)];
     }
     return pts;
   }
@@ -1179,6 +1258,8 @@
                 "hub panel below the port (counterbore the 5/8\" plywood from behind if its thread is short), its back stud to the inlet box's ground nut (with the cables' bares and the inlet's ground pigtail) - no outlet used"]
                 : [1, "Hose ground: 14 AWG green wire, a ring terminal, a 2-1/2\" hose clamp", "bare the hose's steel wire at one end, clamp the ring terminal to it; " +
                   "the lead to a grounded screw (the switch panel's box, or the 24 V supply's earth terminal) - no outlet used"],
+              ...(optsOn().hub ? [[1, "Cord clip: a 3/4\" cable clamp (nylon P-clip) + a wood screw", "under the table's edge by the hub, just in front of the dust port: the router cord and " +
+                "the 24 V supply's cord through it, so their slack hangs along under the edge - between the hose and the table - and not across the port"]] : []),
               // the hub's mains cables (user 2026-11-03; scene.js hubCables: the drawn runs + 150 mm in each box)
               ...(optsOn().hub && HUB.cables && HUB.cables.len.Paddle ? [
                 [null, "120 V wiring (20 A, North American parts): read this first", "this is one way to build it, not an electrical design or a code check. Follow your local electrical code, have someone qualified wire or check it, and unplug the inlet before opening a box"],

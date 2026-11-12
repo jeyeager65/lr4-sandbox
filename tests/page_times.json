@@ -18,8 +18,8 @@
  "parts": 13,
  "pendant": 377,
  "phone": 22,
- "router": 56,
- "router_build": 69,
+ "router": 55,
+ "router_build": 70,
  "runstart": 225,
  "sdjob": 217,
  "slip": 33,
@@ -28,6 +28,6 @@
  "table": 31,
  "tool_change": 437,
  "webui": 70,
- "wiring": 17,
+ "wiring": 19,
  "zlevel": 100
 }

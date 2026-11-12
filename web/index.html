@@ -725,14 +725,15 @@
     <div class="show-head"><h2 id="h-show">Show <button type="button" class="q" data-help="help-show" aria-label="About Show" title="About Show">?</button></h2><span class="show-tools"><button type="button" id="show-reset" title="Everything back: all parts and areas, the hidden parts, wires off">Reset</button><button type="button" id="show-x" aria-label="Close" title="Close (Esc)">✕</button></span></div>
     <div class="help" id="help-show" hidden><p>What the view draws - the BOM always keeps every part. <b>Parts</b> and <b>Areas</b> each turn a kind of part
       or a part of the machine on or off; a part shows when both its kind and its area are on (a bolt joining two areas shows with either).
-      <b>Wiring</b> draws every wire, cord and sleeve (moves are slower with it on); <b>X-ray parts</b> makes the rest see-through so the
+      <b>Wiring</b> draws every wire, cord and sleeve (moves are slower with it on; with the table hub, the cords into its
+      sockets and the hose's ground lead always show); <b>X-ray parts</b> makes the rest see-through so the
       wires show inside the plates, the beam and the sleeves; pick a run in the list to trace it end to end (or hover a wire). Keys: <b>H</b> hides the selected part, <b>Shift+H</b> shows every hidden part again,
       <b>I</b> inspects the selected part's assembly, <b>L</b> opens this.</p></div>
     <div class="show-row"><span>Parts</span><div class="show-opts c4" id="show-kinds" role="group" aria-label="Kinds of parts shown"></div></div>
     <div class="show-row"><span>Areas</span><div class="show-opts c3" id="show-areas" role="group" aria-label="Areas shown"></div></div>
     <div class="show-row"><span>Wiring</span><div class="show-opts c2" role="group" aria-label="Wiring">
       <button type="button" id="show-wiring" aria-pressed="false">Wires</button>
-      <button type="button" id="show-xray" aria-pressed="true" hidden>X-ray parts</button>
+      <button type="button" id="show-xray" aria-pressed="false" hidden>X-ray parts</button>
       </div></div>
     <div class="show-runs" id="show-runs" hidden></div>
   </section>

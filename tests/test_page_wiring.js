@@ -60,15 +60,17 @@ const ok = (cond, msg) => { checks++; console.log((cond ? "  ok   " : "  FAIL ")
         lines: WR.lines.visible }; })()`);
     ok(d.dc === "psu-dc" && !d.ac && d.fan === "fan", `51e: hover picks the drawn wire: the 24 V lead (${d.dc}), the lid fan's lead (${d.fan}); no hub: no mains cord drawn from the e-stop panel (user 2026-11-05) (${d.ac})`);
     ok(!d.lines, "the straight lines (the old rat's nest) not drawn");
-    // Show > Wiring (2026-11-05): X-ray parts on with the wires - the machine see-through (printed parts), the table and the
+    // Show > Wiring (2026-11-05; X-ray off at first - user 2026-11-11): X-ray parts - the machine see-through (printed parts), the table and the
     // electronics solid, the sleeves clear; off puts them back. The run list: one button per drawn run; tracing one
     // outlines its wires (a tube per drawn curve), its details shown; again = off
     const xr = await page.val(`(() => { const m = (n) => wrMesh(n), op = () => [m("YZ_Plate_Min").material.opacity, m("TableBase") ? m("TableBase").material.opacity : 1, m("Y_Stepper_Min").material.opacity, HR.sleeveClear];
-      const on = op(); LR4WiringView.xray(false); const off = op(); LR4WiringView.xray(true);
+      const pressed = () => document.getElementById("show-xray").getAttribute("aria-pressed"), first = [pressed(), op()[0]];
+      LR4WiringView.xray(true); const on = op(), chip = pressed(); LR4WiringView.xray(false); const off = op(); LR4WiringView.xray(true);
       const btns = [...document.querySelectorAll("#show-runs button[data-run]")].map((b) => b.dataset.run);
       LR4WiringView.trace("y1-motor"); wrTick(); const t = { id: LR4WiringView.traced(), hl: WR_HL.objs.length, info: /Y1 motor/.test(document.querySelector("#show-runs .wr-info").textContent) };
       LR4WiringView.trace(null); wrTick();
-      return { on, off, btns, t, cleared: WR_HL.objs.length, chip: document.getElementById("show-xray").getAttribute("aria-pressed") }; })()`);
+      return { on, off, btns, t, cleared: WR_HL.objs.length, chip, first }; })()`);
+    ok(xr.first[0] === "false" && xr.first[1] === 1, `Wiring on: X-ray parts off at first (${xr.first})`);
     ok(xr.on[0] < 0.5 && xr.on[1] === 1 && xr.on[2] === 1 && xr.on[3] && xr.off[0] === 1 && !xr.off[3] && xr.chip === "true",
       `X-ray parts: the YZ plate see-through (${xr.on[0]}), the table + a stepper solid, the sleeves clear; off: back (${xr.off[0]})`);
     ok(xr.btns.length >= 13 && xr.btns.includes("fan") && xr.t.id === "y1-motor" && xr.t.hl >= 4 && xr.t.info && !xr.cleared,
@@ -193,6 +195,17 @@ const ok = (cond, msg) => { checks++; console.log((cond ? "  ok   " : "  FAIL ")
       hidePart(wrMesh("Core")); const d1 = reset.disabled; reset.click();
       return { d0, d1, d2: reset.disabled, off: showOff.size, wires: LR4WiringView.on(), core: wrMesh("Core").visible, chip: document.getElementById("unhide").hidden }; })()`);
     ok(rs.d0 && !rs.d1 && rs.d2 && !rs.off && !rs.wires && rs.core && rs.chip, `Show > Reset: kinds, areas, hidden parts back, wires off (${JSON.stringify(rs)})`);
+    // the table hub (user 2026-11-11): Wiring off, the cords into its sockets and the hose's ground lead still show
+    // (and follow a move); the other wires stay hidden
+    await page.val(`(() => { document.getElementById("opt-hub").click(); return true; })()`);
+    for (let i = 0; i < 300 && !(await page.val("!!wrMesh('TableHub_HoseGround') && !!wrMesh('PSU_MainsCord') && document.getElementById('status').hidden")); i++) await sleep(200);
+    await sleep(500);
+    const hb = await page.val(`(() => { const v = (n) => { const m = wrMesh(n); return !!m && m.visible && m.geometry.attributes.position.count > 0; };
+      const end = () => { const p = wrMesh("Router_Cord_Run").geometry.attributes.position; return p.getX(0) + p.getY(0); }, e0 = end(), t = meta.travel;
+      move([t.x[1], t.y[1], t.z[1]]); const e1 = end(); move([HOME.pose.x, HOME.pose.y, HOME.pose.z]);
+      return { wires: LR4WiringView.on(), cord: v("Router_Cord_Run"), relief: v("Router_Cord_Relief"), psu: v("PSU_MainsCord"), gnd: v("TableHub_HoseGround"),
+        core: wrMesh("Core_Wires").visible, lead: wrMesh("PSU_LeadCable").visible, moved: Math.abs(e1 - e0) > 5 }; })()`);
+    ok(!hb.wires && hb.cord && hb.relief && hb.psu && hb.gnd && !hb.core && !hb.lead && hb.moved, `the hub on, Wiring off: the router cord, the supply's power cord and the hose ground shown, the cord follows a move (${JSON.stringify(hb)})`);
     ok(!(await page.val("window.__errors && window.__errors.length")), "no page errors");
   } finally { page.close(); srv.kill(); console.log(fails ? `${fails} of ${checks} failed` : `${checks}/${checks} checks passed`); process.exit(fails ? 1 : 0); }
 })();

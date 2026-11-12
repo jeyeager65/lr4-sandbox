@@ -5,7 +5,7 @@
 //     (it never is in the public page: LOCAL_ONLY);
 //   - the rat's nest (51a.5): a line per run from end to end, coloured by its group, built hidden:
 //     not drawn (the wires all are: 2026-11-05) - kept for the runs' lengths + the joins; hover / tap a drawn wire: its run's name, from -> to, how far.
-  const WR = { on: false, xray: true, trace: null, board: null, lines: null, tip: null, hover: null, plugs: null, fan: null };
+  const WR = { on: false, xray: false, trace: null, board: null, lines: null, tip: null, hover: null, plugs: null, fan: null };
   const WR_V = (a) => new THREE.Vector3(...a);
   const wrMesh = (n) => meshes.find((m) => m.userData.name === n);
   // a mesh's own bounds (world), not its children's - Box3.setFromObject takes them in, and the Jackpot box carries the
@@ -901,7 +901,7 @@
     wrShowSync();
     if (typeof applyVisibility === "function") applyVisibility();   // (+ wrXrayApply)
   }
-  function wrShowReset() { WR.xray = true; if (WR.on) wrSet(false); else wrShowSync(); }   // (Show > Reset: panel.js)
+  function wrShowReset() { WR.xray = false; if (WR.on) wrSet(false); else wrShowSync(); }   // (Show > Reset: panel.js)
   function wrXraySet(on) { WR.xray = !!on; wrShowSync(); if (typeof applyVisibility === "function") applyVisibility(); }
   // the machine see-through (not the wires / sleeves / the electronics they land on / the table), as Inspect's X-ray (inspect.js setLook:
   // materials changed in place, put back) - off in Inspect (its own looks); re-applied when the parts / materials change
